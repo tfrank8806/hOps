@@ -14,6 +14,9 @@ namespace hOps.web.Data
         public DbSet<Property> Properties { get; set; }
         // Future: DbSet<Room>, DbSet<WorkOrder>, etc.
 
+        public DbSet<UserAccessRequest> UserAccessRequests { get; set; }
+
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
