@@ -13,6 +13,11 @@
                 <li><a asp-controller="Home" asp-action="Index">Home</a></li>
                 <li><a asp-area="Identity" asp-page="/Account/Login">Login</a></li>
                 <li><a asp-area="Identity" asp-page="/Account/Register">Register</a></li>
+                @if (User.IsInRole("Manager") || User.IsInRole("Admin"))
+                {
+                    <li><a asp-controller="Admin" asp-action="AccessRequests">Admin</a></li>
+                }
+
             </ul>
         </nav>
     </header>

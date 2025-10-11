@@ -1,0 +1,51 @@
+﻿@model IEnumerable<hOps.web.Models.UserAccessRequest>
+@{
+    ViewData["Title"] = "Access Requests";
+}
+
+<h2>Pending Access Requests</h2>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Property Code</th>
+            <th>Requested At</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var req in Model)
+        {
+            <tr>
+                <td>@req.Id</td>
+                <td>@req.FirstName @req.LastName</td>
+                <td>@req.Email</td>
+                <td>@req.PropertyCode</td>
+                <td>@req.RequestedAt.ToLocalTime()</td>
+                <td>
+                    <a asp-action="Details" asp-route-id="@req.Id">Details</a> |
+                    <form asp-action="Approve" method="post" style="display:inline">
+                        <input type="hidden" name="id" value="@req.Id" />
+                        <button type="submit" class="btn btn-sm btn-success">Approve</button>
+                    </form>
+                    <form asp-action="Reject" method="post" style="display:inline">
+                        <input type="hidden" name="id" value="@req.Id" />
+                        <button type="submit" class="btn btn-sm btn-danger">Reject</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

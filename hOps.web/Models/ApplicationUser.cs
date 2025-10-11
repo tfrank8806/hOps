@@ -8,6 +8,7 @@ namespace hOps.web.Models
         public string FirstName { get; set; } = "";
         public string LastName { get; set; } = "";
         public string? MobilePhone { get; set; }
-        // Future: navigation property for property access
+
+        public ICollection<UserPropertyAccess>? PropertyAccesses { get; set; }
     }
 }
