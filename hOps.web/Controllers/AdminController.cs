@@ -25,6 +25,25 @@ namespace hOps.web.Controllers
             _emailSender = emailSender;
         }
 
+        // Admin Landing Page
+        public IActionResult Dashboard()
+        {
+            return View();
+        }
+
+        // View all users
+        public async Task<IActionResult> Users()
+        {
+            var users = await _userManager.Users.ToListAsync();
+            return View(users);
+        }
+
+        // Settings placeholder
+        public IActionResult Settings()
+        {
+            return View();
+        }
+
         // View all pending access requests
         public async Task<IActionResult> AccessRequests()
         {
