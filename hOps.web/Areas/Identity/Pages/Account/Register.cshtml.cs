@@ -1,9 +1,10 @@
 ﻿#nullable disable
 
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
-using System.Text;
+using System.Text.Encodings.Web;
 using System.Threading;
 using System.Threading.Tasks;
 using hOps.web.Data;
@@ -14,6 +15,7 @@ using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 
 namespace hOps.web.Areas.Identity.Pages.Account
 {
@@ -48,7 +50,6 @@ namespace hOps.web.Areas.Identity.Pages.Account
         public InputModel Input { get; set; }
 
         public string ReturnUrl { get; set; }
-
         public IList<AuthenticationScheme> ExternalLogins { get; set; }
 
         public class InputModel
@@ -99,11 +100,9 @@ namespace hOps.web.Areas.Identity.Pages.Account
 
             if (ModelState.IsValid)
             {
-                // Hash the password
                 var hasher = new PasswordHasher<ApplicationUser>();
                 var hashedPassword = hasher.HashPassword(new ApplicationUser(), Input.Password);
 
-                // Save to UserAccessRequest table
                 var request = new UserAccessRequest
                 {
                     FirstName = Input.FirstName,
@@ -121,10 +120,35 @@ namespace hOps.web.Areas.Identity.Pages.Account
                 await _dbContext.SaveChangesAsync();
 
                 _logger.LogInformation("Access request submitted for approval.");
+
+                // Send email to all managers/admins
+                var adminRoleIds = _dbContext.Roles
+                    .Where(r => r.Name == "Manager" || r.Name == "Admin")
+                    .Select(r => r.Id)
+                    .ToList();
+
+                var managerUsers = await (from ur in _dbContext.UserRoles
+                                          join u in _dbContext.Users on ur.UserId equals u.Id
+                                          where adminRoleIds.Contains(ur.RoleId)
+                                          select u).ToListAsync();
+
+                foreach (var mgr in managerUsers)
+                {
+                    var approveUrl = Url.Page("/Admin/AccessRequests", null, null, Request.Scheme);
+                    var message = $@"
+Hello {mgr.UserName},<br/><br/>
+A new user has requested access:<br/>
+Name: {request.FirstName} {request.LastName}<br/>
+Email: {request.Email}<br/>
+Property Code: {request.PropertyCode}<br/><br/>
+Please <a href='{HtmlEncoder.Default.Encode(approveUrl)}'>review pending requests</a>.
+";
+                    await _emailSender.SendEmailAsync(mgr.Email, "New Access Request", message);
+                }
+
                 return RedirectToPage("./RegisterConfirmation", new { email = Input.Email });
             }
 
-            // If we got this far, something failed, redisplay form
             return Page();
         }
 
@@ -132,7 +156,7 @@ namespace hOps.web.Areas.Identity.Pages.Account
         {
             if (!_userManager.SupportsUserEmail)
             {
-                throw new NotSupportedException("The default UI requires a user store with email support.");
+                throw new InvalidOperationException("The default UI requires a user store with email support.");
             }
             return (IUserEmailStore<ApplicationUser>)_userStore;
         }

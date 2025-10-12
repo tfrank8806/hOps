@@ -1,103 +1,83 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using hOps.web.Data;
+﻿using hOps.web.Data;
 using hOps.web.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace hOps.web.Controllers
 {
-    [Authorize(Roles = "Manager,Admin")]
+    [Authorize(Roles = "Admin,Manager")]
     public class AdminController : Controller
     {
         private readonly ApplicationDbContext _db;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly IEmailSender _emailSender;
 
-        public AdminController(
-            ApplicationDbContext db,
-            UserManager<ApplicationUser> userManager,
-            RoleManager<IdentityRole> roleManager)
+        public AdminController(ApplicationDbContext db, UserManager<ApplicationUser> userManager,
+            RoleManager<IdentityRole> roleManager, IEmailSender emailSender)
         {
             _db = db;
             _userManager = userManager;
             _roleManager = roleManager;
+            _emailSender = emailSender;
         }
 
+        // View all pending access requests
         public async Task<IActionResult> AccessRequests()
         {
-            // Show pending requests
-            var pending = await _db.UserAccessRequests
-                .Where(r => !r.IsApproved && !r.IsRejected)
+            var requests = await _db.UserAccessRequests
+                .Where(r => !r.IsRejected && !_db.Users.Any(u => u.Email == r.Email))
                 .ToListAsync();
-            return View(pending);
+
+            return View(requests);
         }
 
-        public async Task<IActionResult> Details(int id)
-        {
-            var req = await _db.UserAccessRequests.FindAsync(id);
-            if (req == null) return NotFound();
-            return View(req);
-        }
-
+        // Approve access request
         [HttpPost]
         public async Task<IActionResult> Approve(int id)
         {
-            var req = await _db.UserAccessRequests.FindAsync(id);
-            if (req == null) return NotFound();
+            var request = await _db.UserAccessRequests.FindAsync(id);
+            if (request == null) return NotFound();
 
-            // Create the user
             var user = new ApplicationUser
             {
-                UserName = req.Email,
-                Email = req.Email,
-                FirstName = req.FirstName,
-                LastName = req.LastName,
-                MobilePhone = req.MobilePhone
+                UserName = request.Email,
+                Email = request.Email,
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                MobilePhone = request.MobilePhone
             };
 
-            // Create user without password (we already have hash)
-            var result = await _userManager.CreateAsync(user);
-            if (!result.Succeeded)
+            var result = await _userManager.CreateAsync(user, "TempPassword@123");
+            if (result.Succeeded)
             {
-                // handle errors
-                TempData["Error"] = "Error creating user: " + string.Join(", ", result.Errors.Select(e => e.Description));
-                return RedirectToAction(nameof(Details), new { id = id });
+                await _userManager.AddToRoleAsync(user, "User");
+
+                var message = $@"
+Hi {user.FirstName},<br/><br/>
+Your access request to HotelOps has been <strong>approved</strong>.<br/>
+You can now log in using your email and temporary password:<br/>
+<strong>Password:</strong> TempPassword@123<br/><br/>
+Please change your password after login.<br/><br/>
+HotelOps Admin Team
+";
+
+                await _emailSender.SendEmailAsync(user.Email, "HotelOps Access Approved", message);
+
+                TempData["Success"] = "Access granted and user created.";
+            }
+            else
+            {
+                TempData["Error"] = "Failed to create user: " + string.Join(", ", result.Errors.Select(e => e.Description));
             }
 
-            // Set the password hash (directly) — risky but acceptable in this flow
-            user.PasswordHash = req.PasswordHash;
-            await _db.SaveChangesAsync();
-
-            // Assign role (ensure role exists)
-            var defaultRole = "User";
-            if (!await _roleManager.RoleExistsAsync(defaultRole))
-                await _roleManager.CreateAsync(new IdentityRole(defaultRole));
-            await _userManager.AddToRoleAsync(user, defaultRole);
-
-            // Map property access (if you have UserPropertyAccess)
-            // For this, we need to find the property by code
-            var prop = await _db.Properties.FirstOrDefaultAsync(p => p.Code == req.PropertyCode);
-            if (prop != null)
-            {
-                var upa = new UserPropertyAccess
-                {
-                    ApplicationUserId = user.Id,
-                    PropertyId = prop.Id
-                };
-                _db.UserPropertyAccesses.Add(upa);
-                await _db.SaveChangesAsync();
-            }
-
-            // Mark request as approved
-            req.IsApproved = true;
-            _db.UserAccessRequests.Update(req);
-            await _db.SaveChangesAsync();
-
-            TempData["Success"] = "User approved and account created.";
             return RedirectToAction(nameof(AccessRequests));
         }
 
+        // Reject access request
         [HttpPost]
         public async Task<IActionResult> Reject(int id)
         {
@@ -108,7 +88,16 @@ namespace hOps.web.Controllers
             _db.UserAccessRequests.Update(req);
             await _db.SaveChangesAsync();
 
-            TempData["Success"] = "Request rejected.";
+            var message = $@"
+Hi {req.FirstName},<br/><br/>
+Your access request to HotelOps was <strong>not approved</strong>.<br/>
+If you believe this was an error, please contact your property manager.<br/><br/>
+Thank you,<br/>
+HotelOps Admin Team
+";
+            await _emailSender.SendEmailAsync(req.Email, "Access Request Denied", message);
+
+            TempData["Success"] = "Request rejected and user notified.";
             return RedirectToAction(nameof(AccessRequests));
         }
     }

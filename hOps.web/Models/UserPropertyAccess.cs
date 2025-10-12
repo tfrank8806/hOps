@@ -1,4 +1,5 @@
 ﻿namespace hOps.web.Models
+
 {
     public class UserPropertyAccess
     {
