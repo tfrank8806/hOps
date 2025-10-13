@@ -14,6 +14,7 @@ namespace hOps.web.Data
         public DbSet<Property> Properties { get; set; }
         public DbSet<UserAccessRequest> UserAccessRequests { get; set; }
         public DbSet<UserPropertyAccess> UserPropertyAccesses { get; set; }
+        public DbSet<Department> Departments { get; set; }
 
         // Future: add WorkOrders, Rooms, Departments, etc.
 

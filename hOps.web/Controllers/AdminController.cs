@@ -54,6 +54,16 @@ namespace hOps.web.Controllers
             return View(requests);
         }
 
+        // API endpoint for badge counter
+        [HttpGet]
+        public async Task<JsonResult> GetPendingAccessRequestCount()
+        {
+            var count = await _db.UserAccessRequests
+                .CountAsync(r => !r.IsRejected && !_db.Users.Any(u => u.Email == r.Email));
+
+            return Json(count);
+        }
+
         // Approve access request
         [HttpPost]
         public async Task<IActionResult> Approve(int id)
