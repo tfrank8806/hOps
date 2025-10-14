@@ -15,6 +15,12 @@ namespace hOps.web.Data
         public DbSet<UserAccessRequest> UserAccessRequests { get; set; }
         public DbSet<UserPropertyAccess> UserPropertyAccesses { get; set; }
         public DbSet<Department> Departments { get; set; }
+        public DbSet<WorkOrderType> WorkOrderTypes { get; set; }
+        public DbSet<RoomType> RoomTypes { get; set; }
+        public DbSet<PhonebookType> PhonebookTypes { get; set; }
+        public DbSet<CalendarCategory> CalendarCategories { get; set; }
+
+
 
         // Future: add WorkOrders, Rooms, Departments, etc.
 
@@ -29,7 +35,7 @@ namespace hOps.web.Data
             // Optional: define navigation relationships if you need them
             builder.Entity<UserPropertyAccess>()
                 .HasOne(upa => upa.ApplicationUser)
-                .WithMany(u => u.PropertyAccesses)
+                .WithMany(u => u.UserPropertyAccesses)
                 .HasForeignKey(upa => upa.ApplicationUserId);
 
             builder.Entity<UserPropertyAccess>()

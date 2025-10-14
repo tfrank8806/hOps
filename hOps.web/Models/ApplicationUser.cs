@@ -9,6 +9,6 @@ namespace hOps.web.Models
         public string LastName { get; set; } = "";
         public string? MobilePhone { get; set; }
 
-        public ICollection<UserPropertyAccess>? PropertyAccesses { get; set; }
+        public ICollection<UserPropertyAccess>? UserPropertyAccesses { get; set; }
     }
 }

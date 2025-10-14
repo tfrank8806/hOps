@@ -1,0 +1,32 @@
+﻿@model hOps.web.Models.UserIndexViewModel
+@{
+    ViewData["Title"] = "Users";
+}
+
+<h2>Users</h2>
+<p><a asp-action="Create" class="btn btn-primary">Create User</a></p>
+
+<table class="table table-striped">
+    <thead>
+        <tr><th>Email</th><th>Name</th><th>Role</th><th>Properties</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var user in Model.Users)
+        {
+            <tr>
+                <td>@user.Email</td>
+                <td>@user.FirstName @user.LastName</td>
+                <td>@Model.UserRoles[user.Id]</td>
+                <td>
+                    @string.Join(", ", user.UserPropertyAccesses.Select(x => x.Property.Code))
+                </td>
+                <td>
+                    <a asp-action="Edit" asp-route-id="@user.Id">Edit</a> |
+                    <form asp-action="Delete" asp-route-id="@user.Id" method="post" style="display:inline">
+                        <button onclick="return confirm('Delete this user?');">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
