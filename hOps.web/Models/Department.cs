@@ -8,7 +8,7 @@ namespace hOps.web.Models
 
         [Required]
         [Display(Name = "Department Name")]
-        public string Name { get; set; }
+        public string ? Name { get; set; }
 
         [Display(Name = "Color Code (HEX)")]
         public string Color { get; set; } = "#6c757d"; // default gray

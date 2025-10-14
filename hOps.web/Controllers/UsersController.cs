@@ -1,278 +1,166 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using hOps.web.Data;
+﻿using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
+#nullable enable
 namespace hOps.web.Controllers
 {
     [Authorize(Roles = "Admin,Manager")]
-    public class UsersController : Controller
+    public class UsersController : BaseController
     {
-        private readonly ApplicationDbContext _db;
-        private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
 
         public UsersController(
             ApplicationDbContext db,
             UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager)
+            : base(db, userManager)
         {
-            _db = db;
-            _userManager = userManager;
             _roleManager = roleManager;
         }
 
         public async Task<IActionResult> Index()
         {
-            var currentUser = await _userManager.GetUserAsync(User);
-            if (currentUser == null) return Unauthorized();
+            var users = await _userManager.Users.ToListAsync();
+            var vmList = new List<UserWithAccessViewModel>();
 
-            var currentUserRoles = await _userManager.GetRolesAsync(currentUser);
-
-            IQueryable<ApplicationUser> query = _userManager.Users;
-
-            // If a Manager (not Admin), restrict by property access
-            if (currentUserRoles.Contains("Manager") && !currentUserRoles.Contains("Admin"))
-            {
-                var myProps = _db.UserPropertyAccesses
-                                 .Where(upa => upa.ApplicationUserId == currentUser.Id)
-                                 .Select(upa => upa.PropertyId)
-                                 .ToList();
-
-                query = from u in _userManager.Users
-                        join upa in _db.UserPropertyAccesses on u.Id equals upa.ApplicationUserId
-                        where myProps.Contains(upa.PropertyId)
-                        select u;
-            }
-
-            var users = await query
-                .Include(u => u.UserPropertyAccesses)
-                    .ThenInclude(upa => upa.Property)
-                .ToListAsync();
-
-            var userRolesMap = new Dictionary<string, string>();
             foreach (var u in users)
             {
-                var roles = await _userManager.GetRolesAsync(u);
-                userRolesMap[u.Id] = roles.FirstOrDefault() ?? "";
+                var vm = new UserWithAccessViewModel
+                {
+                    Id = u.Id,
+                    Email = u.Email ?? "",
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+                    Roles = (await _userManager.GetRolesAsync(u)).ToList()
+                };
+
+                vm.PropertyIds = await _context.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == u.Id)
+                    .Select(upa => upa.PropertyId)
+                    .ToListAsync();
+
+                vmList.Add(vm);
             }
 
-            var vm = new UserIndexViewModel
+            return View(vmList);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> EditPropertiesRoles(string userId)
+        {
+            if (string.IsNullOrEmpty(userId)) return BadRequest();
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null) return NotFound();
+
+            var allProps = await _context.Properties.ToListAsync();
+            var userPropIds = await _context.UserPropertyAccesses
+                .Where(upa => upa.ApplicationUserId == userId)
+                .Select(upa => upa.PropertyId)
+                .ToListAsync();
+
+            var currentUser = await _userManager.GetUserAsync(User);
+            var currentRoles = await _userManager.GetRolesAsync(currentUser);
+
+            List<Property> assignableProps = allProps;
+            if (currentRoles.Contains("Manager") && !currentRoles.Contains("Admin"))
             {
-                Users = users,
-                CurrentUserRoles = currentUserRoles,
-                UserRoles = userRolesMap
+                var mgrPropIds = await _context.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == currentUser.Id)
+                    .Select(upa => upa.PropertyId)
+                    .ToListAsync();
+
+                assignableProps = allProps.Where(p => mgrPropIds.Contains(p.Id)).ToList();
+            }
+
+            var allRoles = _roleManager.Roles.Select(r => r.Name).ToList();
+            var userRoles = (await _userManager.GetRolesAsync(user)).ToList();
+
+            var vm = new EditUserPropertiesViewModel
+            {
+                UserId = userId,
+                Email = user.Email,
+                PropertyList = assignableProps,
+                SelectedPropertyIds = userPropIds,
+                AllRoles = allRoles,
+                SelectedRoles = userRoles
             };
 
             return View(vm);
         }
 
-        public async Task<IActionResult> Create()
-        {
-            ViewBag.AllRoles = await _roleManager.Roles
-                .Select(r => r.Name)
-                .ToListAsync();
-            ViewBag.AllProperties = await _db.Properties.ToListAsync();
-            return View();
-        }
-
         [HttpPost]
-        public async Task<IActionResult> Create(CreateUserViewModel vm)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditPropertiesRoles(EditUserPropertiesViewModel vm)
         {
-            if (!ModelState.IsValid) return View(vm);
+            if (vm == null || string.IsNullOrEmpty(vm.UserId)) return BadRequest();
 
-            var user = new ApplicationUser
-            {
-                UserName = vm.Email,
-                Email = vm.Email,
-                FirstName = vm.FirstName,
-                LastName = vm.LastName,
-                MobilePhone = vm.MobilePhone
-            };
+            var user = await _userManager.FindByIdAsync(vm.UserId);
+            if (user == null) return NotFound();
 
-            var result = await _userManager.CreateAsync(user, vm.Password);
-            if (!result.Succeeded)
+            var allProps = await _context.Properties.ToListAsync();
+            var currentUser = await _userManager.GetUserAsync(User);
+            var currentRoles = await _userManager.GetRolesAsync(currentUser);
+
+            HashSet<int> allowedPropIds = allProps.Select(p => p.Id).ToHashSet();
+            if (currentRoles.Contains("Manager") && !currentRoles.Contains("Admin"))
             {
-                foreach (var err in result.Errors)
-                {
-                    ModelState.AddModelError("", err.Description);
-                }
-                ViewBag.AllRoles = await _roleManager.Roles.Select(r => r.Name).ToListAsync();
-                ViewBag.AllProperties = await _db.Properties.ToListAsync();
-                return View(vm);
+                var mgrPropIds = await _context.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == currentUser.Id)
+                    .Select(upa => upa.PropertyId)
+                    .ToListAsync();
+
+                allowedPropIds = mgrPropIds.ToHashSet();
             }
 
-            if (!string.IsNullOrEmpty(vm.Role))
-            {
-                if (!await _roleManager.RoleExistsAsync(vm.Role))
-                    await _roleManager.CreateAsync(new IdentityRole(vm.Role));
-                await _userManager.AddToRoleAsync(user, vm.Role);
-            }
+            var existing = await _context.UserPropertyAccesses
+                .Where(upa => upa.ApplicationUserId == user.Id && allowedPropIds.Contains(upa.PropertyId))
+                .ToListAsync();
 
-            if (vm.PropertyIds != null)
+            _context.UserPropertyAccesses.RemoveRange(existing);
+
+            if (vm.SelectedPropertyIds != null)
             {
-                foreach (var pid in vm.PropertyIds)
+                foreach (var pid in vm.SelectedPropertyIds)
                 {
-                    _db.UserPropertyAccesses.Add(new UserPropertyAccess
+                    if (!allowedPropIds.Contains(pid)) continue;
+
+                    _context.UserPropertyAccesses.Add(new UserPropertyAccess
                     {
                         ApplicationUserId = user.Id,
                         PropertyId = pid
                     });
                 }
-                await _db.SaveChangesAsync();
             }
 
-            return RedirectToAction(nameof(Index));
-        }
+            await _context.SaveChangesAsync();
 
-        public async Task<IActionResult> Edit(string id)
-        {
-            if (string.IsNullOrEmpty(id)) return BadRequest();
+            var currentUserRoles = await _userManager.GetRolesAsync(user);
+            var desiredRoles = vm.SelectedRoles ?? new List<string>();
 
-            var user = await _userManager.FindByIdAsync(id);
-            if (user == null) return NotFound();
-
-            var currentUser = await _userManager.GetUserAsync(User);
-            if (currentUser == null) return Unauthorized();
-            var currentRoles = await _userManager.GetRolesAsync(currentUser);
-
-            if (currentRoles.Contains("Manager") && !currentRoles.Contains("Admin"))
+            foreach (var role in desiredRoles.Except(currentUserRoles))
             {
-                var myProps = _db.UserPropertyAccesses
-                    .Where(x => x.ApplicationUserId == currentUser.Id)
-                    .Select(x => x.PropertyId)
-                    .ToList();
-                var theirProps = _db.UserPropertyAccesses
-                    .Where(x => x.ApplicationUserId == id)
-                    .Select(x => x.PropertyId)
-                    .ToList();
+                if (currentRoles.Contains("Manager") && !currentRoles.Contains("Admin") && role == "Admin")
+                    continue;
 
-                if (!theirProps.Any(pid => myProps.Contains(pid)))
-                    return Forbid();
+                await _userManager.AddToRoleAsync(user, role);
             }
 
-            var userProps = _db.UserPropertyAccesses
-                .Where(x => x.ApplicationUserId == id)
-                .Select(x => x.PropertyId)
-                .ToList();
-
-            var roles = await _userManager.GetRolesAsync(user);
-
-            var vm = new EditUserViewModel
+            foreach (var role in currentUserRoles.Except(desiredRoles))
             {
-                Id = user.Id,
-                Email = user.Email,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                MobilePhone = user.MobilePhone,
-                Role = roles.FirstOrDefault(),
-                PropertyIds = userProps
-            };
+                if (role == "Admin" && user.Id == currentUser.Id)
+                    continue;
 
-            ViewBag.AllRoles = await _roleManager.Roles.Select(r => r.Name).ToListAsync();
-            ViewBag.AllProperties = await _db.Properties.ToListAsync();
-
-            return View(vm);
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> Edit(EditUserViewModel vm)
-        {
-            if (!ModelState.IsValid) return View(vm);
-
-            var user = await _userManager.FindByIdAsync(vm.Id);
-            if (user == null) return NotFound();
-
-            user.FirstName = vm.FirstName;
-            user.LastName = vm.LastName;
-            user.MobilePhone = vm.MobilePhone;
-            user.Email = vm.Email;
-            user.UserName = vm.Email;
-
-            var updateResult = await _userManager.UpdateAsync(user);
-            if (!updateResult.Succeeded)
-            {
-                foreach (var err in updateResult.Errors)
-                    ModelState.AddModelError("", err.Description);
-
-                ViewBag.AllRoles = await _roleManager.Roles.Select(r => r.Name).ToListAsync();
-                ViewBag.AllProperties = await _db.Properties.ToListAsync();
-                return View(vm);
+                await _userManager.RemoveFromRoleAsync(user, role);
             }
-
-            var existingRoles = await _userManager.GetRolesAsync(user);
-            if (existingRoles.FirstOrDefault() != vm.Role)
-            {
-                await _userManager.RemoveFromRolesAsync(user, existingRoles);
-                if (!string.IsNullOrEmpty(vm.Role))
-                {
-                    if (!await _roleManager.RoleExistsAsync(vm.Role))
-                        await _roleManager.CreateAsync(new IdentityRole(vm.Role));
-                    await _userManager.AddToRoleAsync(user, vm.Role);
-                }
-            }
-
-            var existingAccess = _db.UserPropertyAccesses
-                .Where(x => x.ApplicationUserId == vm.Id);
-            _db.UserPropertyAccesses.RemoveRange(existingAccess);
-
-            if (vm.PropertyIds != null)
-            {
-                foreach (var pid in vm.PropertyIds)
-                {
-                    _db.UserPropertyAccesses.Add(new UserPropertyAccess
-                    {
-                        ApplicationUserId = vm.Id,
-                        PropertyId = pid
-                    });
-                }
-            }
-
-            await _db.SaveChangesAsync();
-
-            return RedirectToAction(nameof(Index));
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> Delete(string id)
-        {
-            if (string.IsNullOrEmpty(id)) return BadRequest();
-
-            var user = await _userManager.FindByIdAsync(id);
-            if (user == null) return NotFound();
-
-            var currentUser = await _userManager.GetUserAsync(User);
-            if (currentUser == null) return Unauthorized();
-
-            var roles = await _userManager.GetRolesAsync(currentUser);
-            if (roles.Contains("Manager") && !roles.Contains("Admin"))
-            {
-                var myProps = _db.UserPropertyAccesses
-                    .Where(x => x.ApplicationUserId == currentUser.Id)
-                    .Select(x => x.PropertyId)
-                    .ToList();
-                var theirProps = _db.UserPropertyAccesses
-                    .Where(x => x.ApplicationUserId == id)
-                    .Select(x => x.PropertyId)
-                    .ToList();
-
-                if (!theirProps.Any(pid => myProps.Contains(pid)))
-                    return Forbid();
-            }
-
-            var accessEntries = _db.UserPropertyAccesses
-                .Where(x => x.ApplicationUserId == id);
-            _db.UserPropertyAccesses.RemoveRange(accessEntries);
-
-            await _userManager.DeleteAsync(user);
-
-            await _db.SaveChangesAsync();
 
             return RedirectToAction(nameof(Index));
         }

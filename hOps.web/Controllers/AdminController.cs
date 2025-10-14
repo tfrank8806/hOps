@@ -13,10 +13,8 @@ using System.Collections.Generic;
 namespace hOps.web.Controllers
 {
     [Authorize(Roles = "Admin,Manager")]
-    public class AdminController : Controller
+    public class AdminController : BaseController
     {
-        private readonly ApplicationDbContext _db;
-        private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IEmailSender _emailSender;
 
@@ -25,9 +23,8 @@ namespace hOps.web.Controllers
             UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager,
             IEmailSender emailSender)
+            : base(db, userManager)
         {
-            _db = db;
-            _userManager = userManager;
             _roleManager = roleManager;
             _emailSender = emailSender;
         }
@@ -55,7 +52,7 @@ namespace hOps.web.Controllers
                     Roles = (await _userManager.GetRolesAsync(u)).ToList()
                 };
 
-                vm.PropertyIds = await _db.UserPropertyAccesses
+                vm.PropertyIds = await _context.UserPropertyAccesses
                     .Where(upa => upa.ApplicationUserId == u.Id)
                     .Select(upa => upa.PropertyId)
                     .ToListAsync();
@@ -76,19 +73,23 @@ namespace hOps.web.Controllers
             if (user == null)
                 return NotFound();
 
-            var allProperties = await _db.Properties.ToListAsync();
-            var userProps = await _db.UserPropertyAccesses
+            // All properties
+            var allProperties = await _context.Properties.ToListAsync();
+
+            // Properties user currently has
+            var userProps = await _context.UserPropertyAccesses
                 .Where(upa => upa.ApplicationUserId == userId)
                 .Select(upa => upa.PropertyId)
                 .ToListAsync();
 
+            // Determine which properties current editor is allowed to assign
             var currentUser = await _userManager.GetUserAsync(User);
             var currentRoles = await _userManager.GetRolesAsync(currentUser);
 
             List<Property> assignableProps = allProperties;
             if (currentRoles.Contains("Manager") && !currentRoles.Contains("Admin"))
             {
-                var managerPropIds = await _db.UserPropertyAccesses
+                var managerPropIds = await _context.UserPropertyAccesses
                     .Where(upa => upa.ApplicationUserId == currentUser.Id)
                     .Select(upa => upa.PropertyId)
                     .ToListAsync();
@@ -96,6 +97,7 @@ namespace hOps.web.Controllers
                 assignableProps = allProperties.Where(p => managerPropIds.Contains(p.Id)).ToList();
             }
 
+            // Roles data
             var allRoles = _roleManager.Roles.Select(r => r.Name).ToList();
             var userRoles = (await _userManager.GetRolesAsync(user)).ToList();
 
@@ -123,14 +125,15 @@ namespace hOps.web.Controllers
             if (user == null)
                 return NotFound();
 
-            var allProperties = await _db.Properties.ToListAsync();
+            var allProperties = await _context.Properties.ToListAsync();
             var currentUser = await _userManager.GetUserAsync(User);
             var currentRoles = await _userManager.GetRolesAsync(currentUser);
 
+            // Determine allowed properties
             HashSet<int> allowedPropIds = allProperties.Select(p => p.Id).ToHashSet();
             if (currentRoles.Contains("Manager") && !currentRoles.Contains("Admin"))
             {
-                var mgrPropIds = await _db.UserPropertyAccesses
+                var mgrPropIds = await _context.UserPropertyAccesses
                     .Where(upa => upa.ApplicationUserId == currentUser.Id)
                     .Select(upa => upa.PropertyId)
                     .ToListAsync();
@@ -138,11 +141,12 @@ namespace hOps.web.Controllers
             }
 
             // Remove existing accesses that are within allowed set
-            var existingAccesses = await _db.UserPropertyAccesses
+            var existingAccesses = await _context.UserPropertyAccesses
                 .Where(upa => upa.ApplicationUserId == user.Id && allowedPropIds.Contains(upa.PropertyId))
                 .ToListAsync();
-            _db.UserPropertyAccesses.RemoveRange(existingAccesses);
+            _context.UserPropertyAccesses.RemoveRange(existingAccesses);
 
+            // Add new ones from posted selections
             if (vm.SelectedPropertyIds != null)
             {
                 foreach (var pid in vm.SelectedPropertyIds)
@@ -150,7 +154,7 @@ namespace hOps.web.Controllers
                     if (!allowedPropIds.Contains(pid))
                         continue;
 
-                    _db.UserPropertyAccesses.Add(new UserPropertyAccess
+                    _context.UserPropertyAccesses.Add(new UserPropertyAccess
                     {
                         ApplicationUserId = user.Id,
                         PropertyId = pid
@@ -158,31 +162,25 @@ namespace hOps.web.Controllers
                 }
             }
 
-            await _db.SaveChangesAsync();
+            await _context.SaveChangesAsync();
 
             // Handle role assignments
             var currentUserRoles = await _userManager.GetRolesAsync(user);
             var desiredRoles = vm.SelectedRoles ?? new List<string>();
 
-            // Add new roles
+            // Add roles not currently assigned
             foreach (var role in desiredRoles.Except(currentUserRoles))
             {
-                // If manager editing, disallow assigning Admin
                 if (currentRoles.Contains("Manager") && !currentRoles.Contains("Admin") && role == "Admin")
-                {
-                    continue;
-                }
+                    continue; // Managers can’t assign Admin role
                 await _userManager.AddToRoleAsync(user, role);
             }
 
-            // Remove roles not in desired
+            // Remove roles not desired
             foreach (var role in currentUserRoles.Except(desiredRoles))
             {
-                // Prevent self-removal of Admin role optionally
                 if (role == "Admin" && user.Id == currentUser.Id)
-                {
-                    continue;  // skip removing own admin
-                }
+                    continue; // prevent self-demotion
                 await _userManager.RemoveFromRoleAsync(user, role);
             }
 
@@ -191,8 +189,8 @@ namespace hOps.web.Controllers
 
         public async Task<IActionResult> AccessRequests()
         {
-            var requests = await _db.UserAccessRequests
-                .Where(r => !r.IsRejected && !_db.Users.Any(u => u.Email == r.Email))
+            var requests = await _context.UserAccessRequests
+                .Where(r => !r.IsRejected && !_context.Users.Any(u => u.Email == r.Email))
                 .ToListAsync();
 
             return View(requests);
@@ -201,15 +199,15 @@ namespace hOps.web.Controllers
         [HttpGet]
         public async Task<JsonResult> GetPendingAccessRequestCount()
         {
-            var count = await _db.UserAccessRequests
-                .CountAsync(r => !r.IsRejected && !_db.Users.Any(u => u.Email == r.Email));
+            var count = await _context.UserAccessRequests
+                .CountAsync(r => !r.IsRejected && !_context.Users.Any(u => u.Email == r.Email));
             return Json(count);
         }
 
         [HttpPost]
         public async Task<IActionResult> Approve(int id)
         {
-            var request = await _db.UserAccessRequests.FindAsync(id);
+            var request = await _context.UserAccessRequests.FindAsync(id);
             if (request == null)
                 return NotFound();
 
@@ -249,13 +247,13 @@ HotelOps Admin Team
         [HttpPost]
         public async Task<IActionResult> Reject(int id)
         {
-            var req = await _db.UserAccessRequests.FindAsync(id);
+            var req = await _context.UserAccessRequests.FindAsync(id);
             if (req == null)
                 return NotFound();
 
             req.IsRejected = true;
-            _db.UserAccessRequests.Update(req);
-            await _db.SaveChangesAsync();
+            _context.UserAccessRequests.Update(req);
+            await _context.SaveChangesAsync();
 
             var message = $@"
 Hi {req.FirstName},<br/><br/>

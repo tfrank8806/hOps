@@ -4,6 +4,9 @@ using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace hOps.web.Controllers
 {
@@ -17,7 +20,8 @@ namespace hOps.web.Controllers
             _db = db;
         }
 
-// Departments
+        // — Departments CRUD —
+
         public async Task<IActionResult> Departments()
         {
             var departments = await _db.Departments.ToListAsync();
@@ -30,13 +34,14 @@ namespace hOps.web.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateDepartment(Department model)
         {
             if (!ModelState.IsValid) return View(model);
 
             _db.Departments.Add(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction("Departments");
+            return RedirectToAction(nameof(Departments));
         }
 
         public async Task<IActionResult> EditDepartment(int id)
@@ -47,16 +52,18 @@ namespace hOps.web.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditDepartment(Department model)
         {
             if (!ModelState.IsValid) return View(model);
 
             _db.Departments.Update(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction("Departments");
+            return RedirectToAction(nameof(Departments));
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteDepartment(int id)
         {
             var dept = await _db.Departments.FindAsync(id);
@@ -64,10 +71,11 @@ namespace hOps.web.Controllers
 
             _db.Departments.Remove(dept);
             await _db.SaveChangesAsync();
-            return RedirectToAction("Departments");
+            return RedirectToAction(nameof(Departments));
         }
 
-// WorkOrderTypes
+        // — WorkOrderTypes CRUD —
+
         public async Task<IActionResult> WorkOrderTypes()
         {
             var types = await _db.WorkOrderTypes.ToListAsync();
@@ -76,39 +84,42 @@ namespace hOps.web.Controllers
 
         public IActionResult CreateWorkOrderType()
         {
-            ViewData["FormAction"] = "CreateWorkOrderType";
+            ViewData["FormAction"] = nameof(CreateWorkOrderType);
             return View("WorkOrderTypeForm", new WorkOrderType());
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateWorkOrderType(WorkOrderType model)
         {
             if (!ModelState.IsValid) return View("WorkOrderTypeForm", model);
 
             _db.WorkOrderTypes.Add(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction("WorkOrderTypes");
+            return RedirectToAction(nameof(WorkOrderTypes));
         }
 
         public async Task<IActionResult> EditWorkOrderType(int id)
         {
             var item = await _db.WorkOrderTypes.FindAsync(id);
             if (item == null) return NotFound();
-            ViewData["FormAction"] = "EditWorkOrderType";
+            ViewData["FormAction"] = nameof(EditWorkOrderType);
             return View("WorkOrderTypeForm", item);
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditWorkOrderType(WorkOrderType model)
         {
             if (!ModelState.IsValid) return View("WorkOrderTypeForm", model);
 
             _db.WorkOrderTypes.Update(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction("WorkOrderTypes");
+            return RedirectToAction(nameof(WorkOrderTypes));
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteWorkOrderType(int id)
         {
             var item = await _db.WorkOrderTypes.FindAsync(id);
@@ -116,103 +127,55 @@ namespace hOps.web.Controllers
 
             _db.WorkOrderTypes.Remove(item);
             await _db.SaveChangesAsync();
-            return RedirectToAction("WorkOrderTypes");
+            return RedirectToAction(nameof(WorkOrderTypes));
         }
 
-// RoomTypes
-        public async Task<IActionResult> RoomTypes()
-        {
-            var types = await _db.RoomTypes.ToListAsync();
-            return View(types);
-        }
+        // — PhonebookTypes CRUD —
 
-        public IActionResult CreateRoomType()
-        {
-            ViewData["FormAction"] = "CreateRoomType";
-            return View("RoomTypeForm", new RoomType());
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> CreateRoomType(RoomType model)
-        {
-            if (!ModelState.IsValid) return View("RoomTypeForm", model);
-
-            _db.RoomTypes.Add(model);
-            await _db.SaveChangesAsync();
-            return RedirectToAction("RoomTypes");
-        }
-
-        public async Task<IActionResult> EditRoomType(int id)
-        {
-            var type = await _db.RoomTypes.FindAsync(id);
-            if (type == null) return NotFound();
-            ViewData["FormAction"] = "EditRoomType";
-            return View("RoomTypeForm", type);
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> EditRoomType(RoomType model)
-        {
-            if (!ModelState.IsValid) return View("RoomTypeForm", model);
-
-            _db.RoomTypes.Update(model);
-            await _db.SaveChangesAsync();
-            return RedirectToAction("RoomTypes");
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> DeleteRoomType(int id)
-        {
-            var type = await _db.RoomTypes.FindAsync(id);
-            if (type == null) return NotFound();
-
-            _db.RoomTypes.Remove(type);
-            await _db.SaveChangesAsync();
-            return RedirectToAction("RoomTypes");
-        }
-
-// PhonebookTypes
         public async Task<IActionResult> PhonebookTypes()
         {
-            var types = await _db.PhonebookTypes.ToListAsync();
-            return View(types);
+            var list = await _db.PhonebookTypes.ToListAsync();
+            return View(list);
         }
 
         public IActionResult CreatePhonebookType()
         {
-            ViewData["FormAction"] = "CreatePhonebookType";
+            ViewData["FormAction"] = nameof(CreatePhonebookType);
             return View("PhonebookTypeForm", new PhonebookType());
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreatePhonebookType(PhonebookType model)
         {
             if (!ModelState.IsValid) return View("PhonebookTypeForm", model);
 
             _db.PhonebookTypes.Add(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction("PhonebookTypes");
+            return RedirectToAction(nameof(PhonebookTypes));
         }
 
         public async Task<IActionResult> EditPhonebookType(int id)
         {
             var type = await _db.PhonebookTypes.FindAsync(id);
             if (type == null) return NotFound();
-            ViewData["FormAction"] = "EditPhonebookType";
+            ViewData["FormAction"] = nameof(EditPhonebookType);
             return View("PhonebookTypeForm", type);
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditPhonebookType(PhonebookType model)
         {
             if (!ModelState.IsValid) return View("PhonebookTypeForm", model);
 
             _db.PhonebookTypes.Update(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction("PhonebookTypes");
+            return RedirectToAction(nameof(PhonebookTypes));
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeletePhonebookType(int id)
         {
             var type = await _db.PhonebookTypes.FindAsync(id);
@@ -220,11 +183,11 @@ namespace hOps.web.Controllers
 
             _db.PhonebookTypes.Remove(type);
             await _db.SaveChangesAsync();
-            return RedirectToAction("PhonebookTypes");
+            return RedirectToAction(nameof(PhonebookTypes));
         }
 
+        // — CalendarCategories CRUD —
 
-// CalendaryCategories
         public async Task<IActionResult> CalendarCategories()
         {
             var list = await _db.CalendarCategories.ToListAsync();
@@ -233,18 +196,19 @@ namespace hOps.web.Controllers
 
         public IActionResult CreateCalendarCategory()
         {
-            ViewData["FormAction"] = "CreateCalendarCategory";
+            ViewData["FormAction"] = nameof(CreateCalendarCategory);
             return View("CalendarCategoryForm", new CalendarCategory());
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateCalendarCategory(CalendarCategory model)
         {
             if (!ModelState.IsValid) return View("CalendarCategoryForm", model);
 
             _db.CalendarCategories.Add(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction("CalendarCategories");
+            return RedirectToAction(nameof(CalendarCategories));
         }
 
         public async Task<IActionResult> EditCalendarCategory(int id)
@@ -252,21 +216,23 @@ namespace hOps.web.Controllers
             var item = await _db.CalendarCategories.FindAsync(id);
             if (item == null) return NotFound();
 
-            ViewData["FormAction"] = "EditCalendarCategory";
+            ViewData["FormAction"] = nameof(EditCalendarCategory);
             return View("CalendarCategoryForm", item);
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditCalendarCategory(CalendarCategory model)
         {
             if (!ModelState.IsValid) return View("CalendarCategoryForm", model);
 
             _db.CalendarCategories.Update(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction("CalendarCategories");
+            return RedirectToAction(nameof(CalendarCategories));
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteCalendarCategory(int id)
         {
             var item = await _db.CalendarCategories.FindAsync(id);
@@ -274,14 +240,13 @@ namespace hOps.web.Controllers
 
             _db.CalendarCategories.Remove(item);
             await _db.SaveChangesAsync();
-            return RedirectToAction("CalendarCategories");
+            return RedirectToAction(nameof(CalendarCategories));
         }
 
+        // — Layout Editor & Save —
 
-        // Layout Editior
         public async Task<IActionResult> LayoutEditor(int propertyId)
         {
-            // load rooms for that property
             var rooms = await _db.Rooms
                 .Where(r => r.PropertyId == propertyId)
                 .ToListAsync();
@@ -332,6 +297,5 @@ namespace hOps.web.Controllers
             await _db.SaveChangesAsync();
             return Json(new { success = true });
         }
-
     }
 }

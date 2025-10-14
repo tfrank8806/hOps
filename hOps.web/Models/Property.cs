@@ -1,5 +1,6 @@
 ﻿#nullable enable
 
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace hOps.web.Models
@@ -18,5 +19,10 @@ namespace hOps.web.Models
 
         [Display(Name = "Address")]
         public string? Address { get; set; }
+
+        // Optional: Used for navigation in EF and View rendering
+        public ICollection<UserPropertyAccess> UserAccesses { get; set; } = new List<UserPropertyAccess>();
+
+        public ICollection<Room> Rooms { get; set; } = new List<Room>();
     }
 }

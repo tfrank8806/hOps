@@ -342,6 +342,9 @@ namespace hOps.web.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Floor")
                         .HasColumnType("INTEGER");
 
@@ -367,24 +370,6 @@ namespace hOps.web.Migrations
                     b.HasIndex("PropertyId");
 
                     b.ToTable("Rooms");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.RoomType", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("RoomTypes");
                 });
 
             modelBuilder.Entity("hOps.web.Models.UserAccessRequest", b =>
@@ -537,7 +522,7 @@ namespace hOps.web.Migrations
             modelBuilder.Entity("hOps.web.Models.Room", b =>
                 {
                     b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany()
+                        .WithMany("Rooms")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -554,7 +539,7 @@ namespace hOps.web.Migrations
                         .IsRequired();
 
                     b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany()
+                        .WithMany("UserAccesses")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -567,6 +552,13 @@ namespace hOps.web.Migrations
             modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
                 {
                     b.Navigation("UserPropertyAccesses");
+                });
+
+            modelBuilder.Entity("hOps.web.Models.Property", b =>
+                {
+                    b.Navigation("Rooms");
+
+                    b.Navigation("UserAccesses");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,4 +1,6 @@
-﻿namespace hOps.web.Models
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace hOps.web.Models
 {
     public class Room
     {
@@ -8,6 +10,7 @@
         public string RoomNumber { get; set; } = null!;
         public int Floor { get; set; }
         public string RoomType { get; set; } = null!;
+        public string? Description { get; set; }
         // optional layout position
         public int X { get; set; }
         public int Y { get; set; }

@@ -11,30 +11,26 @@ namespace hOps.web.Data
         {
         }
 
-        public DbSet<Room> Rooms { get; set; }
+        // Entities you referenced in controllers/views:
         public DbSet<Property> Properties { get; set; }
-        public DbSet<UserAccessRequest> UserAccessRequests { get; set; }
+        public DbSet<Room> Rooms { get; set; }
         public DbSet<UserPropertyAccess> UserPropertyAccesses { get; set; }
+
+        public DbSet<UserAccessRequest> UserAccessRequests { get; set; }
         public DbSet<Department> Departments { get; set; }
         public DbSet<WorkOrderType> WorkOrderTypes { get; set; }
-        public DbSet<RoomType> RoomTypes { get; set; }
         public DbSet<PhonebookType> PhonebookTypes { get; set; }
         public DbSet<CalendarCategory> CalendarCategories { get; set; }
         public DbSet<RoomLayout> RoomLayouts { get; set; }
-
-
-
-        // Future: add WorkOrders, Rooms, Departments, etc.
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
 
-            // Composite key: UserId + PropertyId
+            // Composite key for UserPropertyAccess
             builder.Entity<UserPropertyAccess>()
                 .HasKey(upa => new { upa.ApplicationUserId, upa.PropertyId });
 
-            // Optional: define navigation relationships if you need them
             builder.Entity<UserPropertyAccess>()
                 .HasOne(upa => upa.ApplicationUser)
                 .WithMany(u => u.UserPropertyAccesses)
@@ -42,8 +38,11 @@ namespace hOps.web.Data
 
             builder.Entity<UserPropertyAccess>()
                 .HasOne(upa => upa.Property)
-                .WithMany()
+                .WithMany(p => p.UserAccesses)
                 .HasForeignKey(upa => upa.PropertyId);
+
+            // Similarly declare keys/relations for other models (if needed)
+            // e.g., UserAccessRequest, RoomLayout etc.
         }
     }
 }

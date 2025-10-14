@@ -4,10 +4,10 @@ public class RoomLayout
 {
     public int Id { get; set; }
     public int PropertyId { get; set; }
-    public Property Property { get; set; }
+    public Property? Property { get; set; }
 
     public int RoomId { get; set; }
-    public Room Room { get; set; }
+    public Room ? Room { get; set; }
 
     public int X { get; set; }   // Left, in px or grid units
     public int Y { get; set; }   // Top
