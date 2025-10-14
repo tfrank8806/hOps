@@ -1,5 +1,6 @@
 ﻿using hOps.web.Data;
 using hOps.web.Models;
+using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -274,6 +275,62 @@ namespace hOps.web.Controllers
             _db.CalendarCategories.Remove(item);
             await _db.SaveChangesAsync();
             return RedirectToAction("CalendarCategories");
+        }
+
+
+        // Layout Editior
+        public async Task<IActionResult> LayoutEditor(int propertyId)
+        {
+            // load rooms for that property
+            var rooms = await _db.Rooms
+                .Where(r => r.PropertyId == propertyId)
+                .ToListAsync();
+            var layouts = await _db.RoomLayouts
+                .Where(l => l.PropertyId == propertyId)
+                .ToListAsync();
+
+            var vm = new LayoutEditorViewModel
+            {
+                PropertyId = propertyId,
+                Rooms = rooms,
+                Layouts = layouts
+            };
+            return View(vm);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveLayout([FromBody] List<RoomLayoutDto> layoutDtos)
+        {
+            foreach (var dto in layoutDtos)
+            {
+                var existing = await _db.RoomLayouts
+                    .FirstOrDefaultAsync(l => l.RoomId == dto.RoomId && l.PropertyId == dto.PropertyId);
+
+                if (existing != null)
+                {
+                    existing.X = dto.X;
+                    existing.Y = dto.Y;
+                    existing.Width = dto.Width;
+                    existing.Height = dto.Height;
+                    _db.RoomLayouts.Update(existing);
+                }
+                else
+                {
+                    var newLayout = new RoomLayout
+                    {
+                        PropertyId = dto.PropertyId,
+                        RoomId = dto.RoomId,
+                        X = dto.X,
+                        Y = dto.Y,
+                        Width = dto.Width,
+                        Height = dto.Height
+                    };
+                    _db.RoomLayouts.Add(newLayout);
+                }
+            }
+
+            await _db.SaveChangesAsync();
+            return Json(new { success = true });
         }
 
     }

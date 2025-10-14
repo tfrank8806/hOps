@@ -11,6 +11,7 @@ namespace hOps.web.Data
         {
         }
 
+        public DbSet<Room> Rooms { get; set; }
         public DbSet<Property> Properties { get; set; }
         public DbSet<UserAccessRequest> UserAccessRequests { get; set; }
         public DbSet<UserPropertyAccess> UserPropertyAccesses { get; set; }
@@ -19,6 +20,7 @@ namespace hOps.web.Data
         public DbSet<RoomType> RoomTypes { get; set; }
         public DbSet<PhonebookType> PhonebookTypes { get; set; }
         public DbSet<CalendarCategory> CalendarCategories { get; set; }
+        public DbSet<RoomLayout> RoomLayouts { get; set; }
 
 
 

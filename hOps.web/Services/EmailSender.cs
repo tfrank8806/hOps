@@ -33,6 +33,13 @@ namespace hOps.web.Services
                 Credentials = new NetworkCredential(smtpUser, smtpPass)
             };
 
+            if (string.IsNullOrEmpty(fromEmail) || string.IsNullOrEmpty(email))
+            {
+                _logger.LogError("EmailSender: fromEmail or email is null/empty");
+                return;
+            }
+            var mailAddr = new MailAddress(email, fromName);
+
             var mail = new MailMessage
             {
                 From = new MailAddress(fromEmail, fromName),

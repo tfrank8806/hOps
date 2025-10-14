@@ -1,0 +1,97 @@
+﻿@using hOps.web.ViewModels
+@model LayoutEditorViewModel
+
+@{
+    ViewData["Title"] = "Layout Editor";
+}
+
+<h2>Layout Editor</h2>
+<p>Drag rooms to arrange them. Click “Save” when done.</p>
+
+<div id="editor-container" style="position: relative; width: 800px; height: 600px; border: 1px solid #ccc;">
+    @foreach (var room in Model.Rooms)
+    {
+        var layout = Model.Layouts.FirstOrDefault(l => l.RoomId == room.Id);
+        var style = layout != null
+        ? $"position:absolute; left:{layout.X}px; top:{layout.Y}px; width:{layout.Width}px; height:{layout.Height}px;"
+        : "";
+        <div class="room-box" data-room-id="@room.Id" style="@style border:1px solid #333; background: #f5f5f5;">
+            @room.RoomNumber
+        </div>
+    }
+</div>
+
+<button id="save-layout-btn" class="btn btn-primary mt-3">Save Layout</button>
+
+@section Scripts {
+    <script>
+        // Simplified drag & drop logic
+        let selected = null;
+        let offsetX, offsetY;
+
+        document.querySelectorAll(".room-box").forEach(elem => {
+            elem.addEventListener("mousedown", e => {
+                selected = elem;
+                // compute offset
+                const rect = elem.getBoundingClientRect();
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+                document.addEventListener("mousemove", mouseMove);
+                document.addEventListener("mouseup", mouseUp);
+            });
+        });
+
+        function mouseMove(e) {
+            if (!selected) return;
+            const container = document.getElementById("editor-container");
+            const rect = container.getBoundingClientRect();
+            let x = e.clientX - rect.left - offsetX;
+            let y = e.clientY - rect.top - offsetY;
+            if (x < 0) x = 0;
+            if (y < 0) y = 0;
+            selected.style.left = x + "px";
+            selected.style.top = y + "px";
+        }
+
+        function mouseUp(e) {
+            document.removeEventListener("mousemove", mouseMove);
+            document.removeEventListener("mouseup", mouseUp);
+            selected = null;
+        }
+
+        document.getElementById("save-layout-btn").addEventListener("click", async () => {
+            const boxes = document.querySelectorAll(".room-box");
+            const layouts = [];
+            boxes.forEach(b => {
+                const id = b.getAttribute("data-room-id");
+                const x = parseInt(b.style.left) || 0;
+                const y = parseInt(b.style.top) || 0;
+                const width = parseInt(b.style.width) || b.offsetWidth;
+                const height = parseInt(b.style.height) || b.offsetHeight;
+                layouts.push({
+                    propertyId: @Model.PropertyId,
+                    roomId: parseInt(id),
+                    x: x,
+                    y: y,
+                    width: width,
+                    height: height
+                });
+            });
+
+            const response = await fetch('@Url.Action("SaveLayout", "Settings")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                },
+                body: JSON.stringify(layouts)
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert("Layout saved!");
+            } else {
+                alert("Error saving layout");
+            }
+        });
+    </script>
+}

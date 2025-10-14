@@ -1,5 +1,9 @@
-﻿using hOps.web.Data;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using hOps.web.Data;
 using hOps.web.Models;
+using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +18,10 @@ namespace hOps.web.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
 
-        public UsersController(ApplicationDbContext db, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
+        public UsersController(
+            ApplicationDbContext db,
+            UserManager<ApplicationUser> userManager,
+            RoleManager<IdentityRole> roleManager)
         {
             _db = db;
             _userManager = userManager;
@@ -24,15 +31,19 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> Index()
         {
             var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null) return Unauthorized();
+
             var currentUserRoles = await _userManager.GetRolesAsync(currentUser);
 
             IQueryable<ApplicationUser> query = _userManager.Users;
 
+            // If a Manager (not Admin), restrict by property access
             if (currentUserRoles.Contains("Manager") && !currentUserRoles.Contains("Admin"))
             {
                 var myProps = _db.UserPropertyAccesses
                                  .Where(upa => upa.ApplicationUserId == currentUser.Id)
-                                 .Select(upa => upa.PropertyId);
+                                 .Select(upa => upa.PropertyId)
+                                 .ToList();
 
                 query = from u in _userManager.Users
                         join upa in _db.UserPropertyAccesses on u.Id equals upa.ApplicationUserId
@@ -42,14 +53,14 @@ namespace hOps.web.Controllers
 
             var users = await query
                 .Include(u => u.UserPropertyAccesses)
-                .ThenInclude(upa => upa.Property)
+                    .ThenInclude(upa => upa.Property)
                 .ToListAsync();
 
             var userRolesMap = new Dictionary<string, string>();
             foreach (var u in users)
             {
-                var role = (await _userManager.GetRolesAsync(u)).FirstOrDefault();
-                userRolesMap[u.Id] = role ?? "";
+                var roles = await _userManager.GetRolesAsync(u);
+                userRolesMap[u.Id] = roles.FirstOrDefault() ?? "";
             }
 
             var vm = new UserIndexViewModel
@@ -64,7 +75,9 @@ namespace hOps.web.Controllers
 
         public async Task<IActionResult> Create()
         {
-            ViewBag.AllRoles = await _roleManager.Roles.Select(r => r.Name).ToListAsync();
+            ViewBag.AllRoles = await _roleManager.Roles
+                .Select(r => r.Name)
+                .ToListAsync();
             ViewBag.AllProperties = await _db.Properties.ToListAsync();
             return View();
         }
@@ -87,7 +100,11 @@ namespace hOps.web.Controllers
             if (!result.Succeeded)
             {
                 foreach (var err in result.Errors)
+                {
                     ModelState.AddModelError("", err.Description);
+                }
+                ViewBag.AllRoles = await _roleManager.Roles.Select(r => r.Name).ToListAsync();
+                ViewBag.AllProperties = await _db.Properties.ToListAsync();
                 return View(vm);
             }
 
@@ -116,20 +133,36 @@ namespace hOps.web.Controllers
 
         public async Task<IActionResult> Edit(string id)
         {
+            if (string.IsNullOrEmpty(id)) return BadRequest();
+
             var user = await _userManager.FindByIdAsync(id);
             if (user == null) return NotFound();
 
             var currentUser = await _userManager.GetUserAsync(User);
-            var roles = await _userManager.GetRolesAsync(currentUser);
+            if (currentUser == null) return Unauthorized();
+            var currentRoles = await _userManager.GetRolesAsync(currentUser);
 
-            if (roles.Contains("Manager") && !roles.Contains("Admin"))
+            if (currentRoles.Contains("Manager") && !currentRoles.Contains("Admin"))
             {
-                var myProps = _db.UserPropertyAccesses.Where(x => x.ApplicationUserId == currentUser.Id).Select(x => x.PropertyId);
-                var theirProps = _db.UserPropertyAccesses.Where(x => x.ApplicationUserId == id).Select(x => x.PropertyId);
+                var myProps = _db.UserPropertyAccesses
+                    .Where(x => x.ApplicationUserId == currentUser.Id)
+                    .Select(x => x.PropertyId)
+                    .ToList();
+                var theirProps = _db.UserPropertyAccesses
+                    .Where(x => x.ApplicationUserId == id)
+                    .Select(x => x.PropertyId)
+                    .ToList();
 
                 if (!theirProps.Any(pid => myProps.Contains(pid)))
                     return Forbid();
             }
+
+            var userProps = _db.UserPropertyAccesses
+                .Where(x => x.ApplicationUserId == id)
+                .Select(x => x.PropertyId)
+                .ToList();
+
+            var roles = await _userManager.GetRolesAsync(user);
 
             var vm = new EditUserViewModel
             {
@@ -138,8 +171,8 @@ namespace hOps.web.Controllers
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 MobilePhone = user.MobilePhone,
-                Role = (await _userManager.GetRolesAsync(user)).FirstOrDefault(),
-                PropertyIds = _db.UserPropertyAccesses.Where(x => x.ApplicationUserId == id).Select(x => x.PropertyId).ToList()
+                Role = roles.FirstOrDefault(),
+                PropertyIds = userProps
             };
 
             ViewBag.AllRoles = await _roleManager.Roles.Select(r => r.Name).ToListAsync();
@@ -159,8 +192,19 @@ namespace hOps.web.Controllers
             user.FirstName = vm.FirstName;
             user.LastName = vm.LastName;
             user.MobilePhone = vm.MobilePhone;
+            user.Email = vm.Email;
+            user.UserName = vm.Email;
 
-            await _userManager.UpdateAsync(user);
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                foreach (var err in updateResult.Errors)
+                    ModelState.AddModelError("", err.Description);
+
+                ViewBag.AllRoles = await _roleManager.Roles.Select(r => r.Name).ToListAsync();
+                ViewBag.AllProperties = await _db.Properties.ToListAsync();
+                return View(vm);
+            }
 
             var existingRoles = await _userManager.GetRolesAsync(user);
             if (existingRoles.FirstOrDefault() != vm.Role)
@@ -174,8 +218,10 @@ namespace hOps.web.Controllers
                 }
             }
 
-            var existing = _db.UserPropertyAccesses.Where(x => x.ApplicationUserId == vm.Id);
-            _db.UserPropertyAccesses.RemoveRange(existing);
+            var existingAccess = _db.UserPropertyAccesses
+                .Where(x => x.ApplicationUserId == vm.Id);
+            _db.UserPropertyAccesses.RemoveRange(existingAccess);
+
             if (vm.PropertyIds != null)
             {
                 foreach (var pid in vm.PropertyIds)
@@ -187,6 +233,7 @@ namespace hOps.web.Controllers
                     });
                 }
             }
+
             await _db.SaveChangesAsync();
 
             return RedirectToAction(nameof(Index));
@@ -195,24 +242,37 @@ namespace hOps.web.Controllers
         [HttpPost]
         public async Task<IActionResult> Delete(string id)
         {
+            if (string.IsNullOrEmpty(id)) return BadRequest();
+
             var user = await _userManager.FindByIdAsync(id);
             if (user == null) return NotFound();
 
             var currentUser = await _userManager.GetUserAsync(User);
-            var roles = await _userManager.GetRolesAsync(currentUser);
+            if (currentUser == null) return Unauthorized();
 
+            var roles = await _userManager.GetRolesAsync(currentUser);
             if (roles.Contains("Manager") && !roles.Contains("Admin"))
             {
-                var myProps = _db.UserPropertyAccesses.Where(x => x.ApplicationUserId == currentUser.Id).Select(x => x.PropertyId);
-                var theirProps = _db.UserPropertyAccesses.Where(x => x.ApplicationUserId == id).Select(x => x.PropertyId);
+                var myProps = _db.UserPropertyAccesses
+                    .Where(x => x.ApplicationUserId == currentUser.Id)
+                    .Select(x => x.PropertyId)
+                    .ToList();
+                var theirProps = _db.UserPropertyAccesses
+                    .Where(x => x.ApplicationUserId == id)
+                    .Select(x => x.PropertyId)
+                    .ToList();
+
                 if (!theirProps.Any(pid => myProps.Contains(pid)))
                     return Forbid();
             }
 
-            var access = _db.UserPropertyAccesses.Where(x => x.ApplicationUserId == id);
-            _db.UserPropertyAccesses.RemoveRange(access);
+            var accessEntries = _db.UserPropertyAccesses
+                .Where(x => x.ApplicationUserId == id);
+            _db.UserPropertyAccesses.RemoveRange(accessEntries);
 
             await _userManager.DeleteAsync(user);
+
+            await _db.SaveChangesAsync();
 
             return RedirectToAction(nameof(Index));
         }
