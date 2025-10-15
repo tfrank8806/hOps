@@ -1,0 +1,127 @@
+﻿@model List<hOps.web.Models.Room>
+@{
+    ViewData["Title"] = "Rooms";
+    int propertyId = ViewBag.PropertyId;
+    var allProps = ViewBag.AllProperties as List<hOps.web.Models.Property>;
+}
+
+<h2>Room Settings</h2>
+
+<!-- Property Selector -->
+<form asp-action="Rooms" method="get" class="mb-4">
+    <div class="row">
+        <div class="col-md-4">
+            <label>Select Property</label>
+            <select name="propertyId" class="form-control" onchange="this.form.submit()">
+                @if (allProps != null)
+                {
+                    foreach (var p in allProps)
+                    {
+                        <option value="@p.Id" selected="@(p.Id == propertyId ? "selected" : null)">
+                            @p.Name (@p.Code)
+                        </option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
+</form>
+
+<!-- Room Table Form -->
+<form asp-action="SaveRooms" method="post" id="roomsForm">
+    <input type="hidden" name="propertyId" value="@propertyId" />
+
+    <table class="table table-bordered table-striped" id="roomsTable">
+        <thead class="table-light">
+            <tr>
+                <th>Room Number</th>
+                <th>Floor</th>
+                <th>Room Type</th>
+                <th>Description</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (int i = 0; i < Model.Count; i++)
+            {
+                <tr>
+                    <td>
+                        <input type="hidden" name="rooms[@i].Id" value="@Model[i].Id" />
+                        <input type="hidden" name="rooms[@i].PropertyId" value="@propertyId" />
+                        <input name="rooms[@i].RoomNumber" value="@Model[i].RoomNumber" class="form-control" />
+                    </td>
+                    <td>
+                        <input name="rooms[@i].Floor" value="@Model[i].Floor" class="form-control" />
+                    </td>
+                    <td>
+                        <input name="rooms[@i].RoomType" value="@Model[i].RoomType" class="form-control" />
+                    </td>
+                    <td>
+                        <input name="rooms[@i].Description" value="@Model[i].Description" class="form-control" />
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-danger btn-sm btn-delete-row">Delete</button>
+                    </td>
+                </tr>
+            }
+
+            <!-- Hidden Template Row -->
+            <tr id="newRowTemplate" style="display:none;">
+                <td>
+                    <input type="hidden" name="rooms[#].Id" value="0" />
+                    <input type="hidden" name="rooms[#].PropertyId" value="@propertyId" />
+                    <input name="rooms[#].RoomNumber" class="form-control" />
+                </td>
+                <td><input name="rooms[#].Floor" class="form-control" /></td>
+                <td><input name="rooms[#].RoomType" class="form-control" /></td>
+                <td><input name="rooms[#].Description" class="form-control" /></td>
+                <td><button type="button" class="btn btn-danger btn-sm btn-delete-row">Delete</button></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <button type="button" id="btnAddRow" class="btn btn-secondary mb-3">➕ Add Row</button>
+    <div>
+        <button type="submit" class="btn btn-success">💾 Save Rooms</button>
+    </div>
+</form>
+
+<hr />
+
+<h4>📂 Import / Export Rooms</h4>
+
+<form asp-action="ImportRooms" method="post" enctype="multipart/form-data" class="mt-2">
+    <input type="hidden" name="propertyId" value="@propertyId" />
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <input type="file" name="csvFile" accept=".csv" class="form-control" />
+        </div>
+        <div class="col-md-6">
+            <button type="submit" class="btn btn-primary">📥 Import CSV</button>
+            <a asp-action="DownloadRoomsTemplate" class="btn btn-secondary ms-2">⬇️ Download Template</a>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        document.getElementById("btnAddRow").addEventListener("click", function () {
+            const table = document.getElementById("roomsTable").getElementsByTagName("tbody")[0];
+            const template = document.getElementById("newRowTemplate");
+            const clone = template.cloneNode(true);
+            clone.style.display = "";
+            clone.removeAttribute("id");
+
+            // Replace index in field names
+            const rowCount = table.querySelectorAll("tr:not(#newRowTemplate)").length;
+            clone.innerHTML = clone.innerHTML.replace(/rooms\[\#\]/g, "rooms[" + rowCount + "]");
+            table.appendChild(clone);
+        });
+
+        document.getElementById("roomsTable").addEventListener("click", function (e) {
+            if (e.target && e.target.classList.contains("btn-delete-row")) {
+                e.target.closest("tr").remove();
+            }
+        });
+    </script>
+}

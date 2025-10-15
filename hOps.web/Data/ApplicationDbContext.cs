@@ -15,7 +15,7 @@ namespace hOps.web.Data
         public DbSet<Property> Properties { get; set; }
         public DbSet<Room> Rooms { get; set; }
         public DbSet<UserPropertyAccess> UserPropertyAccesses { get; set; }
-
+        public DbSet<RoomType> RoomTypes { get; set; }
         public DbSet<UserAccessRequest> UserAccessRequests { get; set; }
         public DbSet<Department> Departments { get; set; }
         public DbSet<WorkOrderType> WorkOrderTypes { get; set; }

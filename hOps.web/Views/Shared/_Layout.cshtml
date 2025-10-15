@@ -25,7 +25,7 @@
                     {
                         var user = await UserManager.GetUserAsync(User);
                         IList<string> roles = new List<string>();
-                        if (user != null)
+                        if (user is not null)
                         {
                             roles = await UserManager.GetRolesAsync(user);
                         }
@@ -51,7 +51,7 @@
                                     <li class="dropdown-header">Settings</li>
                                     <li><a class="dropdown-item" asp-controller="Settings" asp-action="Departments">Departments</a></li>
                                     <li><a class="dropdown-item" asp-controller="Settings" asp-action="WorkOrderTypes">Work Order Types</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Settings" asp-action="RoomTypes">Room Types</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Settings" asp-action="Rooms" asp-route-propertyId="@(ViewBag.CurrentProperty?.Id ?? 0)">Rooms</a></li>
                                     <li><a class="dropdown-item" asp-controller="Settings" asp-action="PhonebookTypes">Phonebook Types</a></li>
                                     <li><a class="dropdown-item" asp-controller="Settings" asp-action="CalendarCategories">Calendar Categories</a></li>
                                     <li>
@@ -84,7 +84,7 @@
                         {
                             <li class="nav-item dropdown me-2">
                                 <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    @currentProp?.Name
+                                    @currentProp?.Name ?? "Select Property"
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     @foreach (var prop in userProps)
@@ -109,6 +109,7 @@
                         </li>
                     }
                 </ul>
+
             </div>
         </nav>
     </header>

@@ -7,6 +7,9 @@ using Microsoft.EntityFrameworkCore;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using System.Linq;
 
 namespace hOps.web.Controllers
 {
@@ -14,31 +17,28 @@ namespace hOps.web.Controllers
     public class SettingsController : Controller
     {
         private readonly ApplicationDbContext _db;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public SettingsController(ApplicationDbContext db)
+        public SettingsController(ApplicationDbContext db, UserManager<ApplicationUser> userManager)
         {
             _db = db;
+            _userManager = userManager;
         }
 
         // — Departments CRUD —
-
         public async Task<IActionResult> Departments()
         {
             var departments = await _db.Departments.ToListAsync();
             return View(departments);
         }
 
-        public IActionResult CreateDepartment()
-        {
-            return View();
-        }
+        public IActionResult CreateDepartment() => View();
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateDepartment(Department model)
         {
             if (!ModelState.IsValid) return View(model);
-
             _db.Departments.Add(model);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(Departments));
@@ -56,7 +56,6 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> EditDepartment(Department model)
         {
             if (!ModelState.IsValid) return View(model);
-
             _db.Departments.Update(model);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(Departments));
@@ -68,14 +67,12 @@ namespace hOps.web.Controllers
         {
             var dept = await _db.Departments.FindAsync(id);
             if (dept == null) return NotFound();
-
             _db.Departments.Remove(dept);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(Departments));
         }
 
         // — WorkOrderTypes CRUD —
-
         public async Task<IActionResult> WorkOrderTypes()
         {
             var types = await _db.WorkOrderTypes.ToListAsync();
@@ -93,7 +90,6 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> CreateWorkOrderType(WorkOrderType model)
         {
             if (!ModelState.IsValid) return View("WorkOrderTypeForm", model);
-
             _db.WorkOrderTypes.Add(model);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(WorkOrderTypes));
@@ -112,7 +108,6 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> EditWorkOrderType(WorkOrderType model)
         {
             if (!ModelState.IsValid) return View("WorkOrderTypeForm", model);
-
             _db.WorkOrderTypes.Update(model);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(WorkOrderTypes));
@@ -124,14 +119,12 @@ namespace hOps.web.Controllers
         {
             var item = await _db.WorkOrderTypes.FindAsync(id);
             if (item == null) return NotFound();
-
             _db.WorkOrderTypes.Remove(item);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(WorkOrderTypes));
         }
 
         // — PhonebookTypes CRUD —
-
         public async Task<IActionResult> PhonebookTypes()
         {
             var list = await _db.PhonebookTypes.ToListAsync();
@@ -149,7 +142,6 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> CreatePhonebookType(PhonebookType model)
         {
             if (!ModelState.IsValid) return View("PhonebookTypeForm", model);
-
             _db.PhonebookTypes.Add(model);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(PhonebookTypes));
@@ -168,7 +160,6 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> EditPhonebookType(PhonebookType model)
         {
             if (!ModelState.IsValid) return View("PhonebookTypeForm", model);
-
             _db.PhonebookTypes.Update(model);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(PhonebookTypes));
@@ -180,14 +171,12 @@ namespace hOps.web.Controllers
         {
             var type = await _db.PhonebookTypes.FindAsync(id);
             if (type == null) return NotFound();
-
             _db.PhonebookTypes.Remove(type);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(PhonebookTypes));
         }
 
         // — CalendarCategories CRUD —
-
         public async Task<IActionResult> CalendarCategories()
         {
             var list = await _db.CalendarCategories.ToListAsync();
@@ -205,7 +194,6 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> CreateCalendarCategory(CalendarCategory model)
         {
             if (!ModelState.IsValid) return View("CalendarCategoryForm", model);
-
             _db.CalendarCategories.Add(model);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(CalendarCategories));
@@ -215,7 +203,6 @@ namespace hOps.web.Controllers
         {
             var item = await _db.CalendarCategories.FindAsync(id);
             if (item == null) return NotFound();
-
             ViewData["FormAction"] = nameof(EditCalendarCategory);
             return View("CalendarCategoryForm", item);
         }
@@ -225,7 +212,6 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> EditCalendarCategory(CalendarCategory model)
         {
             if (!ModelState.IsValid) return View("CalendarCategoryForm", model);
-
             _db.CalendarCategories.Update(model);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(CalendarCategories));
@@ -237,14 +223,125 @@ namespace hOps.web.Controllers
         {
             var item = await _db.CalendarCategories.FindAsync(id);
             if (item == null) return NotFound();
-
             _db.CalendarCategories.Remove(item);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(CalendarCategories));
         }
 
-        // — Layout Editor & Save —
+        // — Room Management (CRUD + CSV Import/Export) —
+        public async Task<IActionResult> Rooms(int propertyId)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            var roles = await _userManager.GetRolesAsync(currentUser);
 
+            // Get accessible properties
+            List<Property> accessibleProps;
+            if (roles.Contains("Admin"))
+            {
+                accessibleProps = await _db.Properties.ToListAsync();
+            }
+            else
+            {
+                accessibleProps = await _db.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == currentUser.Id)
+                    .Select(upa => upa.Property)
+                    .ToListAsync();
+            }
+
+            if (!accessibleProps.Any())
+                return Forbid();
+
+            if (!accessibleProps.Any(p => p.Id == propertyId))
+                propertyId = accessibleProps.First().Id;
+
+            var rooms = await _db.Rooms
+                .Where(r => r.PropertyId == propertyId)
+                .ToListAsync();
+
+            ViewBag.PropertyId = propertyId;
+            ViewBag.AllProperties = accessibleProps;
+            return View(rooms);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveRooms(int propertyId, List<Room> rooms)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            var roles = await _userManager.GetRolesAsync(currentUser);
+
+            bool allowed = roles.Contains("Admin") || await _db.UserPropertyAccesses
+                .AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == propertyId);
+            if (!allowed) return Forbid();
+
+            foreach (var r in rooms)
+            {
+                r.PropertyId = propertyId;
+                if (string.IsNullOrWhiteSpace(r.RoomNumber)) continue;
+
+                if (r.Id == 0)
+                    _db.Rooms.Add(r);
+                else
+                    _db.Rooms.Update(r);
+            }
+
+            await _db.SaveChangesAsync();
+            return RedirectToAction(nameof(Rooms), new { propertyId });
+        }
+
+        public FileResult DownloadRoomsTemplate()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("RoomNumber,Floor,RoomType,Description");
+            sb.AppendLine("101,1,Standard,Sample description");
+            var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+            return File(bytes, "text/csv", "rooms_template.csv");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ImportRooms(int propertyId, IFormFile csvFile)
+        {
+            if (csvFile == null || csvFile.Length == 0)
+                return BadRequest("CSV file is empty");
+
+            var currentUser = await _userManager.GetUserAsync(User);
+            var roles = await _userManager.GetRolesAsync(currentUser);
+
+            bool allowed = roles.Contains("Admin") || await _db.UserPropertyAccesses
+                .AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == propertyId);
+            if (!allowed) return Forbid();
+
+            using var stream = csvFile.OpenReadStream();
+            using var reader = new System.IO.StreamReader(stream);
+            await reader.ReadLineAsync(); // skip header
+
+            var newRooms = new List<Room>();
+            while (!reader.EndOfStream)
+            {
+                var line = await reader.ReadLineAsync();
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                var parts = line.Split(',');
+                if (parts.Length < 4) continue;
+
+                var room = new Room
+                {
+                    PropertyId = propertyId,
+                    RoomNumber = parts[0].Trim(),
+                    Floor = int.TryParse(parts[1].Trim(), out int f) ? f : 0,
+                    RoomType = parts[2].Trim(),
+                    Description = parts[3].Trim()
+                };
+                newRooms.Add(room);
+            }
+
+            _db.Rooms.RemoveRange(_db.Rooms.Where(r => r.PropertyId == propertyId));
+            await _db.Rooms.AddRangeAsync(newRooms);
+            await _db.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Rooms), new { propertyId });
+        }
+
+        // — Layout Editor & Save —
         public async Task<IActionResult> LayoutEditor(int propertyId)
         {
             var rooms = await _db.Rooms
