@@ -1,97 +1,283 @@
-﻿@using hOps.web.ViewModels
-@model LayoutEditorViewModel
+﻿@model hOps.web.ViewModels.LayoutEditorViewModel
 
 @{
     ViewData["Title"] = "Layout Editor";
+    int propertyId = Model.PropertyId;
+    int selFloor = Model.SelectedFloor;
+    var floors = Model.AllFloors;
 }
 
-<h2>Layout Editor</h2>
-<p>Drag rooms to arrange them. Click “Save” when done.</p>
+<h2>Layout Editor — Property @propertyId, Floor @selFloor</h2>
 
-<div id="editor-container" style="position: relative; width: 800px; height: 600px; border: 1px solid #ccc;">
-    @foreach (var room in Model.Rooms)
-    {
-        var layout = Model.Layouts.FirstOrDefault(l => l.RoomId == room.Id);
-        var style = layout != null
-        ? $"position:absolute; left:{layout.X}px; top:{layout.Y}px; width:{layout.Width}px; height:{layout.Height}px;"
-        : "";
-        <div class="room-box" data-room-id="@room.Id" style="@style border:1px solid #333; background: #f5f5f5;">
-            @room.RoomNumber
+@if (floors != null && floors.Count > 1)
+{
+    <div class="mb-3">
+        <label>Floor:</label>
+        <select id="floorSelect" class="form-select" style="width:auto; display:inline-block;">
+            @foreach (var f in floors)
+            {
+                var url = Url.Action("LayoutEditor", "Settings", new { propertyId, floor = f });
+                if (f == selFloor)
+                {
+                    <option selected value="@url">Floor @f</option>
+                }
+                else
+                {
+                    <option value="@url">Floor @f</option>
+                }
+            }
+        </select>
+    </div>
+}
+
+<p>
+    <label>
+        <input type="checkbox" id="chkSnap" />
+        Snap to grid
+    </label>
+</p>
+
+<div style="display:flex;">
+    <!-- Palette sidebar -->
+    <div id="palette" style="width:200px; border:1px solid #ccc; padding:5px;">
+        <h4>Palette</h4>
+        <div class="pal-shape" data-room-id="0" draggable="true" style="
+             width:50px; height:50px; border:1px solid #333;
+             margin-bottom:10px; display:flex; align-items:center; justify-content:center;
+             cursor: grab;">
+            Custom
         </div>
-    }
+        @foreach (var room in Model.Rooms.Where(r => r.Floor == selFloor))
+        {
+            <div class="pal-shape" data-room-id="@room.Id" draggable="true" style="
+                     width:50px; height:50px; border:1px solid #333;
+                     margin-bottom:10px; display:flex; align-items:center; justify-content:center;
+                     cursor: grab;">
+                @room.RoomNumber
+            </div>
+        }
+    </div>
+
+    <!-- Editor container -->
+    <div id="editor-container" style="
+        position: relative; width:800px; height:600px;
+        border:2px solid #666; background-color:#f7f7f7;
+        background-image:
+            linear-gradient(to right, #ddd 1px, transparent 1px),
+            linear-gradient(to bottom, #ddd 1px, transparent 1px);
+        background-size:50px 50px; margin-left:10px; overflow:hidden;
+    ">
+        @foreach (var layout in Model.Layouts)
+        {
+            <div class="room-box" data-room-id="@layout.RoomId" style="
+                        position:absolute;
+                        left:@layout.X px;
+                        top:@layout.Y px;
+                        width:@layout.Width px;
+                        height:@layout.Height px;
+                        border:1px solid #333;
+                        background-color:#cce5ff;
+                        display:flex; align-items:center; justify-content:center;
+                        cursor:move;">
+                @Model.Rooms.FirstOrDefault(r => r.Id == layout.RoomId)?.RoomNumber
+                <div class="resize-handle" style="
+                            position:absolute; right:0; bottom:0;
+                            width:12px; height:12px; background:#333;
+                            cursor:se-resize;"></div>
+            </div>
+        }
+    </div>
 </div>
 
 <button id="save-layout-btn" class="btn btn-primary mt-3">Save Layout</button>
 
 @section Scripts {
     <script>
-        // Simplified drag & drop logic
-        let selected = null;
-        let offsetX, offsetY;
+        (function(){
+            const gridSize = 50;
+            let dragBox = null, offsetX = 0, offsetY = 0;
+            let resizeBox = null, startW = 0, startH = 0, startX = 0, startY = 0;
 
-        document.querySelectorAll(".room-box").forEach(elem => {
-            elem.addEventListener("mousedown", e => {
-                selected = elem;
-                // compute offset
-                const rect = elem.getBoundingClientRect();
-                offsetX = e.clientX - rect.left;
-                offsetY = e.clientY - rect.top;
-                document.addEventListener("mousemove", mouseMove);
-                document.addEventListener("mouseup", mouseUp);
+            const chkSnap = document.getElementById("chkSnap");
+            chkSnap.checked = localStorage.getItem("layoutSnap") === "true";
+            toggleGrid();
+
+            chkSnap.addEventListener("change", function(){
+                localStorage.setItem("layoutSnap", chkSnap.checked);
+                toggleGrid();
             });
-        });
 
-        function mouseMove(e) {
-            if (!selected) return;
-            const container = document.getElementById("editor-container");
-            const rect = container.getBoundingClientRect();
-            let x = e.clientX - rect.left - offsetX;
-            let y = e.clientY - rect.top - offsetY;
-            if (x < 0) x = 0;
-            if (y < 0) y = 0;
-            selected.style.left = x + "px";
-            selected.style.top = y + "px";
-        }
+            function toggleGrid(){
+                const container = document.getElementById("editor-container");
+                if (chkSnap.checked)
+                    container.style.backgroundImage = "linear-gradient(to right, #ddd 1px, transparent 1px), linear-gradient(to bottom, #ddd 1px, transparent 1px)";
+                else
+                    container.style.backgroundImage = "none";
+            }
 
-        function mouseUp(e) {
-            document.removeEventListener("mousemove", mouseMove);
-            document.removeEventListener("mouseup", mouseUp);
-            selected = null;
-        }
-
-        document.getElementById("save-layout-btn").addEventListener("click", async () => {
-            const boxes = document.querySelectorAll(".room-box");
-            const layouts = [];
-            boxes.forEach(b => {
-                const id = b.getAttribute("data-room-id");
-                const x = parseInt(b.style.left) || 0;
-                const y = parseInt(b.style.top) || 0;
-                const width = parseInt(b.style.width) || b.offsetWidth;
-                const height = parseInt(b.style.height) || b.offsetHeight;
-                layouts.push({
-                    propertyId: @Model.PropertyId,
-                    roomId: parseInt(id),
-                    x: x,
-                    y: y,
-                    width: width,
-                    height: height
+            document.querySelectorAll(".pal-shape").forEach(p => {
+                p.addEventListener("dragstart", e => {
+                    e.dataTransfer.setData("text/plain", p.getAttribute("data-room-id"));
                 });
             });
 
-            const response = await fetch('@Url.Action("SaveLayout", "Settings")', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
-                },
-                body: JSON.stringify(layouts)
+            const container = document.getElementById("editor-container");
+            container.addEventListener("dragover", e => e.preventDefault());
+            container.addEventListener("drop", e => {
+                e.preventDefault();
+                const rid = e.dataTransfer.getData("text/plain");
+                let x = e.offsetX - gridSize/2;
+                let y = e.offsetY - gridSize/2;
+                if (chkSnap.checked) {
+                    x = Math.round(x / gridSize) * gridSize;
+                    y = Math.round(y / gridSize) * gridSize;
+                }
+                addBox(rid, x, y);
             });
-            const result = await response.json();
-            if (result.success) {
-                alert("Layout saved!");
-            } else {
-                alert("Error saving layout");
+
+            function addBox(roomId, x, y) {
+                const div = document.createElement("div");
+                div.classList.add("room-box");
+                div.setAttribute("data-room-id", roomId);
+
+                div.style.left = x + "px";
+                div.style.top = y + "px";
+                div.style.width = gridSize + "px";
+                div.style.height = gridSize + "px";
+                div.style.position = "absolute";
+                div.style.border = "1px solid #333";
+                div.style.backgroundColor = "#cce5ff";
+                div.style.display = "flex";
+                div.style.alignItems = "center";
+                div.style.justifyContent = "center";
+                div.style.cursor = "move";
+
+                if (roomId === "0") {
+                    div.textContent = "Custom";
+                } else {
+                    div.textContent = roomId;
+                }
+
+                const rh = document.createElement("div");
+                rh.classList.add("resize-handle");
+                rh.style.position = "absolute";
+                rh.style.right = "0";
+                rh.style.bottom = "0";
+                rh.style.width = "12px";
+                rh.style.height = "12px";
+                rh.style.background = "#333";
+                rh.style.cursor = "se-resize";
+                div.appendChild(rh);
+
+                container.appendChild(div);
+                div.addEventListener("mousedown", startDrag);
             }
-        });
+
+            function startDrag(evt) {
+                if (evt.target.classList.contains("resize-handle")) {
+                    resizeBox = evt.target.parentElement;
+                    startW = parseInt(window.getComputedStyle(resizeBox).width);
+                    startH = parseInt(window.getComputedStyle(resizeBox).height);
+                    startX = evt.clientX;
+                    startY = evt.clientY;
+                    document.addEventListener("mousemove", onResize);
+                    document.addEventListener("mouseup", stopResize);
+                } else {
+                    dragBox = evt.currentTarget;
+                    const rect = dragBox.getBoundingClientRect();
+                    offsetX = evt.clientX - rect.left;
+                    offsetY = evt.clientY - rect.top;
+                    document.addEventListener("mousemove", onDrag);
+                    document.addEventListener("mouseup", stopDrag);
+                }
+                evt.preventDefault();
+                evt.stopPropagation();
+            }
+
+            function onDrag(evt) {
+                if (!dragBox) return;
+                const contRect = container.getBoundingClientRect();
+                let x = evt.clientX - contRect.left - offsetX;
+                let y = evt.clientY - contRect.top - offsetY;
+                if (x < 0) x = 0;
+                if (y < 0) y = 0;
+                dragBox.style.left = x + "px";
+                dragBox.style.top = y + "px";
+            }
+
+            function stopDrag(evt) {
+                document.removeEventListener("mousemove", onDrag);
+                document.removeEventListener("mouseup", stopDrag);
+                if (dragBox && chkSnap.checked) {
+                    let x = parseInt(dragBox.style.left) || 0;
+                    let y = parseInt(dragBox.style.top) || 0;
+                    x = Math.round(x / gridSize) * gridSize;
+                    y = Math.round(y / gridSize) * gridSize;
+                    dragBox.style.left = x + "px";
+                    dragBox.style.top = y + "px";
+                }
+                dragBox = null;
+            }
+
+            function onResize(evt) {
+                if (!resizeBox) return;
+                let dx = evt.clientX - startX;
+                let dy = evt.clientY - startY;
+                let w = startW + dx;
+                let h = startH + dy;
+                if (w < gridSize) w = gridSize;
+                if (h < gridSize) h = gridSize;
+                resizeBox.style.width = w + "px";
+                resizeBox.style.height = h + "px";
+            }
+
+            function stopResize(evt) {
+                document.removeEventListener("mousemove", onResize);
+                document.removeEventListener("mouseup", stopResize);
+                if (resizeBox && chkSnap.checked) {
+                    let w = parseInt(resizeBox.style.width) || resizeBox.offsetWidth;
+                    let h = parseInt(resizeBox.style.height) || resizeBox.offsetHeight;
+                    w = Math.round(w / gridSize) * gridSize;
+                    h = Math.round(h / gridSize) * gridSize;
+                    resizeBox.style.width = w + "px";
+                    resizeBox.style.height = h + "px";
+                }
+                resizeBox = null;
+            }
+
+            document.querySelectorAll(".room-box").forEach(elem => {
+                elem.addEventListener("mousedown", startDrag);
+            });
+
+            document.getElementById("save-layout-btn").addEventListener("click", async function(){
+                const boxes = document.querySelectorAll(".room-box");
+                const layoutDtos = [];
+                boxes.forEach(b => {
+                    const id = b.getAttribute("data-room-id");
+                    const x = parseInt(b.style.left) || 0;
+                    const y = parseInt(b.style.top) || 0;
+                    const w = parseInt(b.style.width) || b.offsetWidth;
+                    const h = parseInt(b.style.height) || b.offsetHeight;
+                    layoutDtos.push({
+                        propertyId: @Model.PropertyId,
+                        roomId: parseInt(id),
+                        floor: @Model.SelectedFloor,
+                        x, y, width: w, height: h
+                    });
+                });
+
+                const resp = await fetch('@Url.Action("SaveLayout", "Settings")', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(layoutDtos)
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    alert("Layout saved!");
+                } else {
+                    alert("Error saving layout");
+                }
+            });
+        })();
     </script>
 }

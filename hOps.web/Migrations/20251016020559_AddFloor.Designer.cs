@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using hOps.web.Data;
 
@@ -10,9 +11,11 @@ using hOps.web.Data;
 namespace hOps.web.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251016020559_AddFloor")]
+    partial class AddFloor
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.9");
@@ -155,7 +158,7 @@ namespace hOps.web.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("Floor")
+                    b.Property<int?>("FloorId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Height")
@@ -294,6 +297,28 @@ namespace hOps.web.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Departments");
+                });
+
+            modelBuilder.Entity("hOps.web.Models.Floor", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PropertyId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PropertyId");
+
+                    b.ToTable("Floors");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PhonebookType", b =>
@@ -520,6 +545,17 @@ namespace hOps.web.Migrations
                 });
 
             modelBuilder.Entity("RoomLayout", b =>
+                {
+                    b.HasOne("hOps.web.Models.Property", "Property")
+                        .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Property");
+                });
+
+            modelBuilder.Entity("hOps.web.Models.Floor", b =>
                 {
                     b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany()

@@ -2,13 +2,13 @@
 using hOps.web.Models;
 using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using System.Linq;
 
 namespace hOps.web.Controllers
@@ -234,7 +234,6 @@ namespace hOps.web.Controllers
             var currentUser = await _userManager.GetUserAsync(User);
             var roles = await _userManager.GetRolesAsync(currentUser);
 
-            // Get accessible properties
             List<Property> accessibleProps;
             if (roles.Contains("Admin"))
             {
@@ -248,15 +247,11 @@ namespace hOps.web.Controllers
                     .ToListAsync();
             }
 
-            if (!accessibleProps.Any())
-                return Forbid();
-
+            if (!accessibleProps.Any()) return Forbid();
             if (!accessibleProps.Any(p => p.Id == propertyId))
                 propertyId = accessibleProps.First().Id;
 
-            var rooms = await _db.Rooms
-                .Where(r => r.PropertyId == propertyId)
-                .ToListAsync();
+            var rooms = await _db.Rooms.Where(r => r.PropertyId == propertyId).ToListAsync();
 
             ViewBag.PropertyId = propertyId;
             ViewBag.AllProperties = accessibleProps;
@@ -270,15 +265,15 @@ namespace hOps.web.Controllers
             var currentUser = await _userManager.GetUserAsync(User);
             var roles = await _userManager.GetRolesAsync(currentUser);
 
-            bool allowed = roles.Contains("Admin") || await _db.UserPropertyAccesses
-                .AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == propertyId);
+            bool allowed = roles.Contains("Admin")
+                || await _db.UserPropertyAccesses
+                    .AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == propertyId);
             if (!allowed) return Forbid();
 
             foreach (var r in rooms)
             {
                 r.PropertyId = propertyId;
                 if (string.IsNullOrWhiteSpace(r.RoomNumber)) continue;
-
                 if (r.Id == 0)
                     _db.Rooms.Add(r);
                 else
@@ -304,15 +299,7 @@ namespace hOps.web.Controllers
             if (csvFile == null || csvFile.Length == 0)
                 return BadRequest("CSV file is empty");
 
-            var currentUser = await _userManager.GetUserAsync(User);
-            var roles = await _userManager.GetRolesAsync(currentUser);
-
-            bool allowed = roles.Contains("Admin") || await _db.UserPropertyAccesses
-                .AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == propertyId);
-            if (!allowed) return Forbid();
-
-            using var stream = csvFile.OpenReadStream();
-            using var reader = new System.IO.StreamReader(stream);
+            using var reader = new System.IO.StreamReader(csvFile.OpenReadStream());
             await reader.ReadLineAsync(); // skip header
 
             var newRooms = new List<Room>();
@@ -341,22 +328,32 @@ namespace hOps.web.Controllers
             return RedirectToAction(nameof(Rooms), new { propertyId });
         }
 
-        // — Layout Editor & Save —
-        public async Task<IActionResult> LayoutEditor(int propertyId)
+        // — Layout Editor & Save using Room.Floor —
+        public async Task<IActionResult> LayoutEditor(int propertyId, int? floor)
         {
             var rooms = await _db.Rooms
                 .Where(r => r.PropertyId == propertyId)
                 .ToListAsync();
+
+            if (!rooms.Any())
+                return NotFound("No rooms found for this property.");
+
+            var floorNumbers = rooms.Select(r => r.Floor).Distinct().OrderBy(f => f).ToList();
+            int selectedFloor = floor ?? floorNumbers.First();
+
             var layouts = await _db.RoomLayouts
-                .Where(l => l.PropertyId == propertyId)
+                .Where(l => l.PropertyId == propertyId && l.Floor == selectedFloor)
                 .ToListAsync();
 
             var vm = new LayoutEditorViewModel
             {
                 PropertyId = propertyId,
+                SelectedFloor = selectedFloor,
+                AllFloors = floorNumbers,
                 Rooms = rooms,
                 Layouts = layouts
             };
+
             return View(vm);
         }
 
@@ -366,7 +363,10 @@ namespace hOps.web.Controllers
             foreach (var dto in layoutDtos)
             {
                 var existing = await _db.RoomLayouts
-                    .FirstOrDefaultAsync(l => l.RoomId == dto.RoomId && l.PropertyId == dto.PropertyId);
+                    .FirstOrDefaultAsync(l =>
+                        l.RoomId == dto.RoomId &&
+                        l.PropertyId == dto.PropertyId &&
+                        l.Floor == dto.Floor);
 
                 if (existing != null)
                 {
@@ -378,16 +378,16 @@ namespace hOps.web.Controllers
                 }
                 else
                 {
-                    var newLayout = new RoomLayout
+                    _db.RoomLayouts.Add(new RoomLayout
                     {
                         PropertyId = dto.PropertyId,
                         RoomId = dto.RoomId,
+                        Floor = dto.Floor,
                         X = dto.X,
                         Y = dto.Y,
                         Width = dto.Width,
                         Height = dto.Height
-                    };
-                    _db.RoomLayouts.Add(newLayout);
+                    });
                 }
             }
 

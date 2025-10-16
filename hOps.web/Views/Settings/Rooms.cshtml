@@ -2,32 +2,31 @@
 @{
     ViewData["Title"] = "Rooms";
     int propertyId = ViewBag.PropertyId;
-    var allProps = ViewBag.AllProperties as List<hOps.web.Models.Property>;
+    var allProps = ViewBag.AllProperties as List<hOps.web.Models.Property> ?? new List<hOps.web.Models.Property>();
 }
 
-<h2>Room Settings</h2>
+<h2>Rooms for Property @propertyId</h2>
 
-<!-- Property Selector -->
-<form asp-action="Rooms" method="get" class="mb-4">
-    <div class="row">
-        <div class="col-md-4">
-            <label>Select Property</label>
-            <select name="propertyId" class="form-control" onchange="this.form.submit()">
-                @if (allProps != null)
+@if (allProps.Count > 1)
+{
+    <div class="mb-3">
+        <label>Select Property: </label>
+        <select id="propertySelect" class="form-select" style="width:auto; display:inline-block;">
+            @foreach (var prop in allProps)
+            {
+                if (prop.Id == propertyId)
                 {
-                    foreach (var p in allProps)
-                    {
-                        <option value="@p.Id" selected="@(p.Id == propertyId ? "selected" : null)">
-                            @p.Name (@p.Code)
-                        </option>
-                    }
+                    <option selected value="@Url.Action("Rooms", "Settings", new { propertyId = prop.Id })">@prop.Name</option>
                 }
-            </select>
-        </div>
+                else
+                {
+                    <option value="@Url.Action("Rooms", "Settings", new { propertyId = prop.Id })">@prop.Name</option>
+                }
+            }
+        </select>
     </div>
-</form>
+}
 
-<!-- Room Table Form -->
 <form asp-action="SaveRooms" method="post" id="roomsForm">
     <input type="hidden" name="propertyId" value="@propertyId" />
 
@@ -65,16 +64,15 @@
                 </tr>
             }
 
-            <!-- Hidden Template Row -->
             <tr id="newRowTemplate" style="display:none;">
                 <td>
                     <input type="hidden" name="rooms[#].Id" value="0" />
                     <input type="hidden" name="rooms[#].PropertyId" value="@propertyId" />
-                    <input name="rooms[#].RoomNumber" class="form-control" />
+                    <input name="rooms[#].RoomNumber" class="form-control" placeholder="Room #" />
                 </td>
-                <td><input name="rooms[#].Floor" class="form-control" /></td>
-                <td><input name="rooms[#].RoomType" class="form-control" /></td>
-                <td><input name="rooms[#].Description" class="form-control" /></td>
+                <td><input name="rooms[#].Floor" class="form-control" placeholder="Floor" /></td>
+                <td><input name="rooms[#].RoomType" class="form-control" placeholder="Room Type" /></td>
+                <td><input name="rooms[#].Description" class="form-control" placeholder="Description" /></td>
                 <td><button type="button" class="btn btn-danger btn-sm btn-delete-row">Delete</button></td>
             </tr>
         </tbody>
@@ -82,13 +80,13 @@
 
     <button type="button" id="btnAddRow" class="btn btn-secondary mb-3">➕ Add Row</button>
     <div>
-        <button type="submit" class="btn btn-success">💾 Save Rooms</button>
+        <button type="submit" class="btn btn-success">Save Rooms</button>
     </div>
 </form>
 
 <hr />
 
-<h4>📂 Import / Export Rooms</h4>
+<h4>Import / Export</h4>
 
 <form asp-action="ImportRooms" method="post" enctype="multipart/form-data" class="mt-2">
     <input type="hidden" name="propertyId" value="@propertyId" />
@@ -97,31 +95,38 @@
             <input type="file" name="csvFile" accept=".csv" class="form-control" />
         </div>
         <div class="col-md-6">
-            <button type="submit" class="btn btn-primary">📥 Import CSV</button>
-            <a asp-action="DownloadRoomsTemplate" class="btn btn-secondary ms-2">⬇️ Download Template</a>
+            <button type="submit" class="btn btn-primary">Import CSV</button>
+            <a asp-action="DownloadRoomsTemplate" class="btn btn-secondary ms-2">Download Template</a>
         </div>
     </div>
 </form>
 
 @section Scripts {
-    <script>
-        document.getElementById("btnAddRow").addEventListener("click", function () {
-            const table = document.getElementById("roomsTable").getElementsByTagName("tbody")[0];
-            const template = document.getElementById("newRowTemplate");
-            const clone = template.cloneNode(true);
-            clone.style.display = "";
-            clone.removeAttribute("id");
+<script>
+    document.getElementById("btnAddRow").addEventListener("click", function () {
+        var table = document.getElementById("roomsTable").getElementsByTagName("tbody")[0];
+        var template = document.getElementById("newRowTemplate");
+        var clone = template.cloneNode(true);
+        clone.style.display = "";
+        clone.removeAttribute("id");
 
-            // Replace index in field names
-            const rowCount = table.querySelectorAll("tr:not(#newRowTemplate)").length;
-            clone.innerHTML = clone.innerHTML.replace(/rooms\[\#\]/g, "rooms[" + rowCount + "]");
-            table.appendChild(clone);
-        });
+        var rowCount = table.querySelectorAll("tr:not(#newRowTemplate)").length;
+        clone.innerHTML = clone.innerHTML.replace(/rooms\[\#\]/g, "rooms[" + rowCount + "]");
+        table.appendChild(clone);
+    });
 
-        document.getElementById("roomsTable").addEventListener("click", function (e) {
-            if (e.target && e.target.classList.contains("btn-delete-row")) {
-                e.target.closest("tr").remove();
-            }
+    document.getElementById("roomsTable").addEventListener("click", function (e) {
+        if (e.target && e.target.classList.contains("btn-delete-row")) {
+            var row = e.target.closest("tr");
+            row.remove();
+        }
+    });
+
+    var select = document.getElementById("propertySelect");
+    if (select) {
+        select.addEventListener("change", function () {
+            window.location.href = this.value;
         });
-    </script>
+    }
+</script>
 }
