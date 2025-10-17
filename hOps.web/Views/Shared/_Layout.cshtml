@@ -30,6 +30,10 @@
                             roles = await UserManager.GetRolesAsync(user);
                         }
 
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="LostAndFound" asp-action="Index">Lost &amp; Found</a>
+                        </li>
+
                         if (roles.Contains("Manager") || roles.Contains("Admin"))
                         {
                             <li class="nav-item dropdown">
