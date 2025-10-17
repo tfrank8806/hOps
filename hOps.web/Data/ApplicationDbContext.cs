@@ -23,6 +23,7 @@ namespace hOps.web.Data
         public DbSet<PhonebookContact> PhonebookContacts { get; set; }
         public DbSet<CalendarCategory> CalendarCategories { get; set; }
         public DbSet<RoomLayout> RoomLayouts { get; set; }
+        public DbSet<LostFoundEntry> LostFoundEntries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
