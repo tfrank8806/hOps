@@ -321,9 +321,18 @@ namespace hOps.web.Controllers
             var floors = rooms.Select(r => r.Floor).Distinct().OrderBy(f => f).ToList();
             int selectedFloor = floor ?? floors.First();
 
-            var layouts = await _db.RoomLayouts
-                .Where(l => l.PropertyId == propertyId && l.Floor == selectedFloor)
+            var allLayouts = await _db.RoomLayouts
+                .Where(l => l.PropertyId == propertyId)
                 .ToListAsync();
+
+            var layoutsByFloor = allLayouts
+                .GroupBy(l => l.Floor)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            if (!layoutsByFloor.TryGetValue(selectedFloor, out var layouts))
+            {
+                layouts = new List<RoomLayout>();
+            }
 
             var vm = new LayoutEditorViewModel
             {
@@ -331,7 +340,8 @@ namespace hOps.web.Controllers
                 SelectedFloor = selectedFloor,
                 AllFloors = floors,
                 Rooms = rooms,
-                Layouts = layouts
+                Layouts = layouts,
+                LayoutsByFloor = layoutsByFloor
             };
             return View(vm);
         }
