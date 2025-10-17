@@ -20,6 +20,7 @@ namespace hOps.web.Data
         public DbSet<Department> Departments { get; set; }
         public DbSet<WorkOrderType> WorkOrderTypes { get; set; }
         public DbSet<PhonebookType> PhonebookTypes { get; set; }
+        public DbSet<PhonebookContact> PhonebookContacts { get; set; }
         public DbSet<CalendarCategory> CalendarCategories { get; set; }
         public DbSet<RoomLayout> RoomLayouts { get; set; }
         public DbSet<LostFoundEntry> LostFoundEntries { get; set; }
