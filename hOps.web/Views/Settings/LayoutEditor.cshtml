@@ -1,4 +1,5 @@
 @using System
+@using System.Linq
 @using System.Text.Json
 @model hOps.web.ViewModels.LayoutEditorViewModel
 
@@ -115,7 +116,7 @@
         (function(){
             const propertyId = @Model.PropertyId;
             const selectedFloor = @Model.SelectedFloor;
-            const existingFloors = @Html.Raw(JsonSerializer.Serialize(Model.AllFloors ?? Array.Empty<int>()));
+            const existingFloors = @Html.Raw(JsonSerializer.Serialize(Model.AllFloors ?? Enumerable.Empty<int>()));
             const baseLayoutUrl = '@Url.Action("LayoutEditor", "Settings")';
             const gridSize = 50;
             let scale = 1.0;
