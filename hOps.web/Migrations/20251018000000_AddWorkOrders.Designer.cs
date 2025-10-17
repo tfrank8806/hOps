@@ -676,13 +676,9 @@ namespace hOps.web.Migrations
                         .WithMany()
                         .HasForeignKey("WorkOrderTypeId");
 
-                    b.Navigation("Attachments");
-
                     b.Navigation("CreatedBy");
 
                     b.Navigation("Department");
-
-                    b.Navigation("Properties");
 
                     b.Navigation("WorkOrderType");
                 });
