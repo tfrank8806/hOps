@@ -1,0 +1,95 @@
+@model hOps.web.ViewModels.PhonebookContactFormViewModel
+@using System.Linq
+@{
+    ViewData["Title"] = Model.Title;
+}
+
+<h1 class="h3 mb-4">@Model.Title</h1>
+
+<form asp-action="@(Model.IsEdit ? "Edit" : "Create")" asp-route-id="@(Model.IsEdit ? Model.Contact.Id : null)" method="post">
+    @if (Model.IsEdit)
+    {
+        <input type="hidden" asp-for="Contact.Id" />
+    }
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label asp-for="Contact.TypeName" class="form-label"></label>
+            <input asp-for="Contact.TypeName" class="form-control" list="typeOptions" />
+            <datalist id="typeOptions">
+                @foreach (var type in Model.Types)
+                {
+                    <option value="@type.Name">@type.Name</option>
+                }
+            </datalist>
+            @if (Model.Types.Any())
+            {
+                <div class="form-text">Start typing to select from existing types or enter a new one.</div>
+            }
+            else
+            {
+                <div class="form-text">Enter a type name to categorize this contact.</div>
+            }
+            <span asp-validation-for="Contact.TypeName" class="text-danger"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Contact.Company" class="form-label"></label>
+            <input asp-for="Contact.Company" class="form-control" />
+            <span asp-validation-for="Contact.Company" class="text-danger"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Contact.FirstName" class="form-label"></label>
+            <input asp-for="Contact.FirstName" class="form-control" />
+            <span asp-validation-for="Contact.FirstName" class="text-danger"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Contact.LastName" class="form-label"></label>
+            <input asp-for="Contact.LastName" class="form-control" />
+            <span asp-validation-for="Contact.LastName" class="text-danger"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Contact.Title" class="form-label"></label>
+            <input asp-for="Contact.Title" class="form-control" />
+            <span asp-validation-for="Contact.Title" class="text-danger"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Contact.PhoneNumber" class="form-label"></label>
+            <input asp-for="Contact.PhoneNumber" class="form-control" />
+            <span asp-validation-for="Contact.PhoneNumber" class="text-danger"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Contact.Email" class="form-label"></label>
+            <input asp-for="Contact.Email" class="form-control" />
+            <span asp-validation-for="Contact.Email" class="text-danger"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Contact.Fax" class="form-label"></label>
+            <input asp-for="Contact.Fax" class="form-control" />
+            <span asp-validation-for="Contact.Fax" class="text-danger"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Contact.Website" class="form-label"></label>
+            <input asp-for="Contact.Website" class="form-control" />
+            <span asp-validation-for="Contact.Website" class="text-danger"></span>
+        </div>
+        <div class="col-12">
+            <label asp-for="Contact.Address" class="form-label"></label>
+            <textarea asp-for="Contact.Address" class="form-control" rows="2"></textarea>
+            <span asp-validation-for="Contact.Address" class="text-danger"></span>
+        </div>
+        <div class="col-12">
+            <label asp-for="Contact.Notes" class="form-label"></label>
+            <textarea asp-for="Contact.Notes" class="form-control" rows="4"></textarea>
+            <span asp-validation-for="Contact.Notes" class="text-danger"></span>
+        </div>
+    </div>
+
+    <div class="mt-4 d-flex justify-content-between">
+        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">Save Contact</button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
