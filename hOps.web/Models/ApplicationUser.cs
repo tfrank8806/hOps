@@ -10,5 +10,7 @@ namespace hOps.web.Models
         public string? MobilePhone { get; set; }
 
         public ICollection<UserPropertyAccess>? UserPropertyAccesses { get; set; }
+
+        public ICollection<CalendarEvent> CreatedCalendarEvents { get; set; } = new List<CalendarEvent>();
     }
 }
