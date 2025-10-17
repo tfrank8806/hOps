@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using hOps.web.Areas.Identity.Pages.Account;
+using hOps.web.Controllers;
 using hOps.web.Data;
 using hOps.web.Models;
 using Microsoft.AspNetCore.Authentication;
@@ -50,6 +51,10 @@ public class RegisterModelTests
             null,
             null);
 
+        userManagerMock
+            .Setup(um => um.SupportsUserEmail)
+            .Returns(true);
+
         var httpContext = new DefaultHttpContext();
         httpContext.Request.Scheme = "https";
 
@@ -85,7 +90,7 @@ public class RegisterModelTests
             .Returns("/");
 
         urlHelperMock
-            .Setup(u => u.Page("/Admin/AccessRequests", null, null, httpContext.Request.Scheme))
+            .Setup(u => u.Action(nameof(AdminController.AccessRequests), "Admin", null, httpContext.Request.Scheme))
             .Returns(encodedUrlTarget);
 
         var actionContext = new ActionContext(httpContext, new RouteData(), new PageActionDescriptor());
