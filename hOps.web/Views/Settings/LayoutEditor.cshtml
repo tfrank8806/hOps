@@ -1,4 +1,6 @@
-﻿@model hOps.web.ViewModels.LayoutEditorViewModel
+@using System
+@using System.Text.Json
+@model hOps.web.ViewModels.LayoutEditorViewModel
 
 @{
     ViewData["Title"] = "Layout Editor";
@@ -113,6 +115,8 @@
         (function(){
             const propertyId = @Model.PropertyId;
             const selectedFloor = @Model.SelectedFloor;
+            const existingFloors = @Html.Raw(JsonSerializer.Serialize(Model.AllFloors ?? Array.Empty<int>()));
+            const baseLayoutUrl = '@Url.Action("LayoutEditor", "Settings")';
             const gridSize = 50;
             let scale = 1.0;
             const scaleStep = 0.1;
@@ -122,6 +126,56 @@
             const wrapper = document.getElementById("editor-wrapper");
             const container = document.getElementById("editor-container");
             const chkSnap = document.getElementById("chkSnap");
+            const floorSelect = document.getElementById("floorSelect");
+            const addFloorBtn = document.getElementById("btnAddFloor");
+
+            if (floorSelect) {
+                floorSelect.addEventListener("change", e => {
+                    const target = e.target;
+                    if (!(target instanceof HTMLSelectElement)) return;
+                    const url = target.value;
+                    if (url) {
+                        window.location.href = url;
+                    }
+                });
+            }
+
+            if (addFloorBtn) {
+                addFloorBtn.addEventListener("click", async () => {
+                    const currentFloors = Array.isArray(existingFloors) ? existingFloors : [];
+                    const suggestedFloor = currentFloors.length ? Math.max(...currentFloors) + 1 : selectedFloor + 1;
+                    const response = prompt("Enter the floor number to add:", suggestedFloor.toString());
+                    if (response === null) {
+                        return;
+                    }
+                    const floorNumber = parseInt(response, 10);
+                    if (Number.isNaN(floorNumber)) {
+                        alert("Please enter a valid number for the floor.");
+                        return;
+                    }
+                    if (currentFloors.includes(floorNumber)) {
+                        alert(`Floor ${floorNumber} already exists.`);
+                        return;
+                    }
+
+                    try {
+                        const result = await fetch('@Url.Action("AddFloor", "Settings")', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ propertyId, floor: floorNumber })
+                        });
+
+                        if (!result.ok) {
+                            alert('Unable to add the floor.');
+                            return;
+                        }
+
+                        window.location.href = `${baseLayoutUrl}?propertyId=${propertyId}&floor=${floorNumber}`;
+                    } catch {
+                        alert('An unexpected error occurred while adding the floor.');
+                    }
+                });
+            }
 
             chkSnap.checked = localStorage.getItem("layoutSnap") === "true";
             toggleGrid();
