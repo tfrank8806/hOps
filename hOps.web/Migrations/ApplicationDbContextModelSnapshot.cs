@@ -911,6 +911,25 @@ namespace hOps.web.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("hOps.web.Models.CalendarEventProperty", b =>
+                {
+                    b.HasOne("hOps.web.Models.CalendarEvent", "CalendarEvent")
+                        .WithMany("EventProperties")
+                        .HasForeignKey("CalendarEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("hOps.web.Models.Property", "Property")
+                        .WithMany("CalendarEvents")
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CalendarEvent");
+
+                    b.Navigation("Property");
+                });
+
             modelBuilder.Entity("hOps.web.Models.CalendarEvent", b =>
                 {
                     b.HasOne("hOps.web.Models.CalendarCategory", "Category")
@@ -930,25 +949,6 @@ namespace hOps.web.Migrations
                     b.Navigation("CreatedBy");
 
                     b.Navigation("EventProperties");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.CalendarEventProperty", b =>
-                {
-                    b.HasOne("hOps.web.Models.CalendarEvent", "CalendarEvent")
-                        .WithMany("EventProperties")
-                        .HasForeignKey("CalendarEventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany("CalendarEvents")
-                        .HasForeignKey("PropertyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CalendarEvent");
-
-                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PhonebookContact", b =>
