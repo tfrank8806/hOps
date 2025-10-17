@@ -26,22 +26,28 @@ namespace hOps.web.Models
         public int Floor { get; set; }
 
         /// <summary>
-        /// X-coordinate position on the layout grid.
+        /// X-coordinate position, in pixels captured from the layout editor canvas.
+        /// See <c>Views/Settings/LayoutEditor.cshtml</c> for snap-to-grid behavior that
+        /// can quantize this value.
         /// </summary>
         public int X { get; set; }
 
         /// <summary>
-        /// Y-coordinate position on the layout grid.
+        /// Y-coordinate position, in pixels captured from the layout editor canvas.
+        /// See <c>Views/Settings/LayoutEditor.cshtml</c> for snap-to-grid behavior that
+        /// can quantize this value.
         /// </summary>
         public int Y { get; set; }
 
         /// <summary>
-        /// Width of the room shape (in grid units).
+        /// Width of the room shape, measured in pixels from the layout editor when the
+        /// user drops or resizes a box.
         /// </summary>
         public int Width { get; set; }
 
         /// <summary>
-        /// Height of the room shape (in grid units).
+        /// Height of the room shape, measured in pixels from the layout editor when the
+        /// user drops or resizes a box.
         /// </summary>
         public int Height { get; set; }
 
