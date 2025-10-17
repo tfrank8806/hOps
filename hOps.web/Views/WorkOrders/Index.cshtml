@@ -21,7 +21,7 @@
                         <select asp-for="Form.Status" class="form-select">
                             @foreach (var status in Model.StatusOptions)
                             {
-                                <option value="@status.Key" @(status.Key.Equals(Model.Form.Status, StringComparison.OrdinalIgnoreCase) ? "selected" : string.Empty)>@status.Label</option>
+                                <option value="@status.Key" selected="@(status.Key.Equals(Model.Form.Status, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@status.Label</option>
                             }
                         </select>
                         <span asp-validation-for="Form.Status" class="text-danger"></span>
@@ -45,7 +45,7 @@
                             <option value="">-- Select Type --</option>
                             @foreach (var type in Model.WorkOrderTypes)
                             {
-                                <option value="@type.Id" @(Model.Form.WorkOrderTypeId == type.Id ? "selected" : string.Empty)>@type.Name</option>
+                                <option value="@type.Id" selected="@(Model.Form.WorkOrderTypeId == type.Id ? "selected" : null)">@type.Name</option>
                             }
                         </select>
                         <span asp-validation-for="Form.WorkOrderTypeId" class="text-danger"></span>
@@ -75,7 +75,7 @@
                                 <option value="">-- Unassigned --</option>
                                 @foreach (var dept in Model.Departments)
                                 {
-                                    <option value="@dept.Id" @(Model.Form.DepartmentId == dept.Id ? "selected" : string.Empty)>@dept.Name</option>
+                                    <option value="@dept.Id" selected="@(Model.Form.DepartmentId == dept.Id ? "selected" : null)">@dept.Name</option>
                                 }
                             </select>
                             <span asp-validation-for="Form.DepartmentId" class="text-danger"></span>
@@ -127,8 +127,8 @@
                     <div class="col-md-4">
                         <label for="SortOrder" class="form-label">Sort</label>
                         <select class="form-select" id="SortOrder" name="SortOrder">
-                            <option value="newest" @(Model.Filters.SortOrder == "newest" ? "selected" : string.Empty)>Newest First</option>
-                            <option value="oldest" @(Model.Filters.SortOrder == "oldest" ? "selected" : string.Empty)>Oldest First</option>
+                            <option value="newest" selected="@(Model.Filters.SortOrder == "newest" ? "selected" : null)">Newest First</option>
+                            <option value="oldest" selected="@(Model.Filters.SortOrder == "oldest" ? "selected" : null)">Oldest First</option>
                         </select>
                     </div>
                     <div class="col-md-4">
@@ -141,7 +141,7 @@
                             <option value="">All</option>
                             @foreach (var status in Model.StatusOptions)
                             {
-                                <option value="@status.Key" @(string.Equals(Model.Filters.Status, status.Key, StringComparison.OrdinalIgnoreCase) ? "selected" : string.Empty)>@status.Label</option>
+                                <option value="@status.Key" selected="@(string.Equals(Model.Filters.Status, status.Key, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@status.Label</option>
                             }
                         </select>
                     </div>
@@ -151,7 +151,7 @@
                             <option value="">All</option>
                             @foreach (var dept in Model.Departments)
                             {
-                                <option value="@dept.Id" @(Model.Filters.DepartmentId == dept.Id ? "selected" : string.Empty)>@dept.Name</option>
+                                <option value="@dept.Id" selected="@(Model.Filters.DepartmentId == dept.Id ? "selected" : null)">@dept.Name</option>
                             }
                         </select>
                     </div>
@@ -161,7 +161,7 @@
                             <option value="">All</option>
                             @foreach (var type in Model.WorkOrderTypes)
                             {
-                                <option value="@type.Id" @(Model.Filters.WorkOrderTypeId == type.Id ? "selected" : string.Empty)>@type.Name</option>
+                                <option value="@type.Id" selected="@(Model.Filters.WorkOrderTypeId == type.Id ? "selected" : null)">@type.Name</option>
                             }
                         </select>
                     </div>
@@ -171,7 +171,7 @@
                             <option value="">All</option>
                             @foreach (var creator in Model.CreatorOptions)
                             {
-                                <option value="@creator.Value" @(Model.Filters.CreatorId == creator.Value ? "selected" : string.Empty)>@creator.Text</option>
+                                <option value="@creator.Value" selected="@(Model.Filters.CreatorId == creator.Value ? "selected" : null)">@creator.Text</option>
                             }
                         </select>
                     </div>
@@ -199,7 +199,7 @@
                                 <option value="">All</option>
                             @foreach (var property in Model.PropertyOptions)
                             {
-                                <option value="@property.Id" @(Model.Filters.PropertyId == property.Id ? "selected" : string.Empty)>@property.Name (@property.Code)</option>
+                                <option value="@property.Id" selected="@(Model.Filters.PropertyId == property.Id ? "selected" : null)">@property.Name (@property.Code)</option>
                             }
                             </select>
                         </div>

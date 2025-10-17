@@ -28,21 +28,21 @@ namespace hOps.web.Controllers
         {
             _reportDefinitions = new List<ReportDefinition>
             {
-                new(PropertiesReportKey, "Property Directory", supportsPropertyFilter: true,
+                new(PropertiesReportKey, "Property Directory", true,
                     "Summarizes the properties you can access, including location and room counts."),
-                new(RoomsReportKey, "Room Inventory", supportsPropertyFilter: true,
+                new(RoomsReportKey, "Room Inventory", true,
                     "Lists rooms for the selected properties with floor and type details."),
-                new(RoomLayoutsReportKey, "Room Layout Coordinates", supportsPropertyFilter: true,
+                new(RoomLayoutsReportKey, "Room Layout Coordinates", true,
                     "Shows layout positions for rooms that have been placed on a floor plan."),
-                new(UserAccessReportKey, "User Property Access", supportsPropertyFilter: true,
+                new(UserAccessReportKey, "User Property Access", true,
                     "Identifies which teammates can access each property."),
-                new(DepartmentsReportKey, "Departments", supportsPropertyFilter: false,
+                new(DepartmentsReportKey, "Departments", false,
                     "Reference list of departments configured for work orders and assignments."),
-                new(WorkOrderTypesReportKey, "Work Order Types", supportsPropertyFilter: false,
+                new(WorkOrderTypesReportKey, "Work Order Types", false,
                     "Lookup values for work order categorization and routing."),
-                new(PhonebookTypesReportKey, "Phonebook Types", supportsPropertyFilter: false,
+                new(PhonebookTypesReportKey, "Phonebook Types", false,
                     "Categories available when organizing the property phonebook."),
-                new(CalendarCategoriesReportKey, "Calendar Categories", supportsPropertyFilter: false,
+                new(CalendarCategoriesReportKey, "Calendar Categories", false,
                     "Shared calendar color codes for scheduling and events.")
             };
         }

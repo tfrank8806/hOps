@@ -29,21 +29,20 @@
                         }
                         else
                         {
-                            @{ 
-                                var initials = string.Empty;
-                                if (!string.IsNullOrWhiteSpace(Model.Profile.FirstName))
-                                {
-                                    initials += Model.Profile.FirstName![0].ToString().ToUpperInvariant();
-                                }
-                                if (!string.IsNullOrWhiteSpace(Model.Profile.LastName))
-                                {
-                                    initials += Model.Profile.LastName![0].ToString().ToUpperInvariant();
-                                }
-                                if (string.IsNullOrWhiteSpace(initials))
-                                {
-                                    initials = "U";
-                                }
+                            var initials = string.Empty;
+                            if (!string.IsNullOrWhiteSpace(Model.Profile.FirstName))
+                            {
+                                initials += Model.Profile.FirstName![0].ToString().ToUpperInvariant();
                             }
+                            if (!string.IsNullOrWhiteSpace(Model.Profile.LastName))
+                            {
+                                initials += Model.Profile.LastName![0].ToString().ToUpperInvariant();
+                            }
+                            if (string.IsNullOrWhiteSpace(initials))
+                            {
+                                initials = "U";
+                            }
+
                             <div class="rounded-circle bg-secondary d-inline-flex align-items-center justify-content-center" style="width: 120px; height: 120px;">
                                 <span class="text-white fw-semibold fs-4">@initials</span>
                             </div>

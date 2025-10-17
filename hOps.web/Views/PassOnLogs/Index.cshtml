@@ -24,7 +24,7 @@
                 <select class="form-select" id="sortOrder" name="sortOrder">
                     @foreach (var option in Model.Filters.SortOptions)
                     {
-                        <option value="@option.Value" @(option.Selected ? "selected" : null)>@option.Text</option>
+                        <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
                     }
                 </select>
             </div>
@@ -41,7 +41,7 @@
                 <select class="form-select" id="creatorId" name="creatorId">
                     @foreach (var option in Model.Filters.CreatorOptions)
                     {
-                        <option value="@option.Value" @(option.Selected ? "selected" : null)>@option.Text</option>
+                        <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
                     }
                 </select>
             </div>

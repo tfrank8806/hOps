@@ -165,6 +165,10 @@ namespace hOps.web.Controllers
                 filters.PropertyId = null;
             }
 
+            var selectedPropertyIds = form?.SelectedPropertyIds != null
+                ? new HashSet<int>(form.SelectedPropertyIds.Where(id => accessiblePropertyIds.Contains(id)))
+                : new HashSet<int>();
+
             var query = _context.WorkOrders
                 .Include(w => w.WorkOrderType)
                 .Include(w => w.Department)
@@ -287,11 +291,19 @@ namespace hOps.web.Controllers
                     Id = p.Id,
                     Name = p.Name,
                     Code = p.Code,
-                    IsSelected = form?.SelectedPropertyIds?.Contains(p.Id) ?? false
+                    IsSelected = false
                 })
                 .ToListAsync();
 
-            if ((form == null || !form.SelectedPropertyIds.Any()) && propertyOptions.Count == 1)
+            if (selectedPropertyIds.Count > 0)
+            {
+                foreach (var option in propertyOptions)
+                {
+                    option.IsSelected = selectedPropertyIds.Contains(option.Id);
+                }
+            }
+
+            if (selectedPropertyIds.Count == 0 && propertyOptions.Count == 1)
             {
                 propertyOptions[0].IsSelected = true;
             }
