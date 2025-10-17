@@ -1,0 +1,89 @@
+.logs-page .card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+.logs-page .card {
+    border: 1px solid #e2e6ea;
+}
+
+.logs-page #logList .list-group-item {
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.logs-page #logList .list-group-item.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+    font-weight: 600;
+}
+
+.logs-page #logList .list-group-item:not(.active):hover {
+    background-color: #f3f4f6;
+}
+
+.spreadsheet-container {
+    min-height: 420px;
+    position: relative;
+}
+
+.spreadsheet-table {
+    table-layout: fixed;
+    width: 100%;
+    border-color: #d9dde3;
+}
+
+.spreadsheet-table thead th {
+    background-color: #f1f3f5;
+    text-align: center;
+    font-weight: 600;
+    border-color: #d9dde3;
+    user-select: none;
+}
+
+.spreadsheet-table tbody th {
+    background-color: #f7f8fa;
+    font-weight: 600;
+    text-align: center;
+    border-color: #d9dde3;
+    user-select: none;
+    width: 40px;
+}
+
+.spreadsheet-table tbody td {
+    vertical-align: middle;
+    border-color: #e3e6eb;
+    background-color: #fff;
+    padding: 0.5rem;
+    min-width: 120px;
+    max-width: 200px;
+    overflow-wrap: anywhere;
+}
+
+.spreadsheet-table tbody td[contenteditable="true"]:focus {
+    outline: 2px solid #0d6efd;
+    outline-offset: -2px;
+    background-color: #eef5ff;
+}
+
+#spreadsheetPlaceholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+@media (max-width: 991.98px) {
+    .logs-page .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .spreadsheet-table tbody td {
+        min-width: 100px;
+    }
+}
