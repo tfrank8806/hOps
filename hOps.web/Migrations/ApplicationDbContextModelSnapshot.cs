@@ -765,98 +765,98 @@ namespace hOps.web.Migrations
                     b.ToTable("WorkOrderTypes");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.WorkOrder", b =>
+            modelBuilder.Entity<WorkOrder>(b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property(e => e.Id)
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property(e => e.CreatedAt)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("CreatedById")
+                    b.Property(e => e.CreatedById)
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("DepartmentId")
+                    b.Property(e => e.DepartmentId)
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("Details")
+                    b.Property(e => e.Details)
                         .HasMaxLength(2000)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime>("DueDate")
+                    b.Property(e => e.DueDate)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Issue")
+                    b.Property(e => e.Issue)
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Location")
+                    b.Property(e => e.Location)
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Status")
+                    b.Property(e => e.Status)
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("WorkOrderTypeId")
+                    b.Property(e => e.WorkOrderTypeId)
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
+                    b.HasKey(e => e.Id);
 
-                    b.HasIndex("CreatedById");
+                    b.HasIndex(e => e.CreatedById);
 
-                    b.HasIndex("DepartmentId");
+                    b.HasIndex(e => e.DepartmentId);
 
-                    b.HasIndex("WorkOrderTypeId");
+                    b.HasIndex(e => e.WorkOrderTypeId);
 
                     b.ToTable("WorkOrders");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.WorkOrderAttachment", b =>
+            modelBuilder.Entity<WorkOrderAttachment>(b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property(e => e.Id)
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("FilePath")
+                    b.Property(e => e.FilePath)
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("OriginalFileName")
+                    b.Property(e => e.OriginalFileName)
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("WorkOrderId")
+                    b.Property(e => e.WorkOrderId)
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
+                    b.HasKey(e => e.Id);
 
-                    b.HasIndex("WorkOrderId");
+                    b.HasIndex(e => e.WorkOrderId);
 
                     b.ToTable("WorkOrderAttachments");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.WorkOrderProperty", b =>
+            modelBuilder.Entity<WorkOrderProperty>(b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property(e => e.Id)
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("PropertyId")
+                    b.Property(e => e.PropertyId)
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("WorkOrderId")
+                    b.Property(e => e.WorkOrderId)
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
+                    b.HasKey(e => e.Id);
 
-                    b.HasIndex("PropertyId");
+                    b.HasIndex(e => e.PropertyId);
 
-                    b.HasIndex("WorkOrderId");
+                    b.HasIndex(e => e.WorkOrderId);
 
                     b.ToTable("WorkOrderProperties");
                 });
@@ -1090,59 +1090,59 @@ namespace hOps.web.Migrations
                     b.Navigation("Property");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.WorkOrder", b =>
+            modelBuilder.Entity<WorkOrder>(b =>
                 {
-                    b.HasOne("hOps.web.Models.ApplicationUser", "CreatedBy")
+                    b.HasOne(e => e.CreatedBy)
                         .WithMany()
-                        .HasForeignKey("CreatedById");
+                        .HasForeignKey(e => e.CreatedById);
 
-                    b.HasOne("hOps.web.Models.Department", "Department")
+                    b.HasOne(e => e.Department)
                         .WithMany()
-                        .HasForeignKey("DepartmentId");
+                        .HasForeignKey(e => e.DepartmentId);
 
-                    b.HasOne("hOps.web.Models.WorkOrderType", "WorkOrderType")
+                    b.HasOne(e => e.WorkOrderType)
                         .WithMany()
-                        .HasForeignKey("WorkOrderTypeId");
+                        .HasForeignKey(e => e.WorkOrderTypeId);
 
-                    b.Navigation("Attachments");
+                    b.Navigation(e => e.Attachments);
 
-                    b.Navigation("CreatedBy");
+                    b.Navigation(e => e.CreatedBy);
 
-                    b.Navigation("Department");
+                    b.Navigation(e => e.Department);
 
-                    b.Navigation("Properties");
+                    b.Navigation(e => e.Properties);
 
-                    b.Navigation("WorkOrderType");
+                    b.Navigation(e => e.WorkOrderType);
                 });
 
-            modelBuilder.Entity("hOps.web.Models.WorkOrderAttachment", b =>
+            modelBuilder.Entity<WorkOrderAttachment>(b =>
                 {
-                    b.HasOne("hOps.web.Models.WorkOrder", "WorkOrder")
-                        .WithMany("Attachments")
-                        .HasForeignKey("WorkOrderId")
+                    b.HasOne(e => e.WorkOrder)
+                        .WithMany(e => e.Attachments)
+                        .HasForeignKey(e => e.WorkOrderId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("WorkOrder");
+                    b.Navigation(e => e.WorkOrder);
                 });
 
-            modelBuilder.Entity("hOps.web.Models.WorkOrderProperty", b =>
+            modelBuilder.Entity<WorkOrderProperty>(b =>
                 {
-                    b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany("WorkOrderLinks")
-                        .HasForeignKey("PropertyId")
+                    b.HasOne(e => e.Property)
+                        .WithMany(e => e.WorkOrderLinks)
+                        .HasForeignKey(e => e.PropertyId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("hOps.web.Models.WorkOrder", "WorkOrder")
-                        .WithMany("Properties")
-                        .HasForeignKey("WorkOrderId")
+                    b.HasOne(e => e.WorkOrder)
+                        .WithMany(e => e.Properties)
+                        .HasForeignKey(e => e.WorkOrderId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Property");
+                    b.Navigation(e => e.Property);
 
-                    b.Navigation("WorkOrder");
+                    b.Navigation(e => e.WorkOrder);
                 });
 
             modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
