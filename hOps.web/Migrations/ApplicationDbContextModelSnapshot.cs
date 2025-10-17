@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using hOps.web.Data;
+using hOps.web.Models;
 
 #nullable disable
 
@@ -1182,11 +1183,11 @@ namespace hOps.web.Migrations
                     b.Navigation("WorkOrderLinks");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.WorkOrder", b =>
+            modelBuilder.Entity<WorkOrder>(b =>
                 {
-                    b.Navigation("Attachments");
+                    b.Navigation(e => e.Attachments);
 
-                    b.Navigation("Properties");
+                    b.Navigation(e => e.Properties);
                 });
 #pragma warning restore 612, 618
         }
