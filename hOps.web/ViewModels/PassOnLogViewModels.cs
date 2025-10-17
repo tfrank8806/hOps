@@ -1,0 +1,114 @@
+using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.Rendering;
+
+namespace hOps.web.ViewModels
+{
+    public class PassOnLogFormViewModel
+    {
+        public int? Id { get; set; }
+
+        [Required]
+        [StringLength(200)]
+        [Display(Name = "Log Title")]
+        public string Title { get; set; } = string.Empty;
+
+        [Required]
+        [Display(Name = "Body")]
+        [DataType(DataType.MultilineText)]
+        public string Body { get; set; } = string.Empty;
+
+        [Display(Name = "Properties")]
+        public List<int> SelectedPropertyIds { get; set; } = new();
+
+        public List<PassOnLogPropertyOptionViewModel> PropertyOptions { get; set; } = new();
+
+        public bool ShowPropertySelection => PropertyOptions.Count > 1;
+    }
+
+    public class PassOnLogPropertyOptionViewModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
+    }
+
+    public class PassOnLogIndexViewModel
+    {
+        public List<PassOnLogListItemViewModel> Logs { get; set; } = new();
+        public PassOnLogFiltersViewModel Filters { get; set; } = new();
+        public bool CanCreateLog { get; set; }
+    }
+
+    public class PassOnLogListItemViewModel
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string CreatorName { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public bool IsUnread { get; set; }
+        public List<string> PropertyNames { get; set; } = new();
+        public int CommentCount { get; set; }
+        public string Preview { get; set; } = string.Empty;
+    }
+
+    public class PassOnLogFiltersViewModel
+    {
+        public string SortOrder { get; set; } = "newest";
+
+        [DataType(DataType.Date)]
+        [Display(Name = "From")]
+        public DateTime? StartDate { get; set; }
+
+        [DataType(DataType.Date)]
+        [Display(Name = "To")]
+        public DateTime? EndDate { get; set; }
+
+        [Display(Name = "Creator")]
+        public string? CreatorId { get; set; }
+
+        [Display(Name = "Keyword")]
+        public string? SearchTerm { get; set; }
+
+        public List<SelectListItem> CreatorOptions { get; set; } = new();
+        public List<SelectListItem> SortOptions { get; set; } = new();
+    }
+
+    public class PassOnLogDetailsViewModel
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Body { get; set; } = string.Empty;
+        public string CreatorName { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+        public List<string> PropertyNames { get; set; } = new();
+        public List<PassOnLogCommentViewModel> Comments { get; set; } = new();
+        public List<PassOnLogViewerViewModel> Viewers { get; set; } = new();
+        public bool CanEdit { get; set; }
+        public PassOnLogCommentInputModel NewComment { get; set; } = new();
+    }
+
+    public class PassOnLogCommentViewModel
+    {
+        public int Id { get; set; }
+        public string Body { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public string CreatorName { get; set; } = string.Empty;
+    }
+
+    public class PassOnLogViewerViewModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public DateTime ViewedAt { get; set; }
+    }
+
+    public class PassOnLogCommentInputModel
+    {
+        public int LogId { get; set; }
+
+        [Required]
+        [MaxLength(2000)]
+        [Display(Name = "Comment")]
+        public string Body { get; set; } = string.Empty;
+    }
+}

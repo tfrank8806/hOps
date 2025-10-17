@@ -27,6 +27,11 @@ namespace hOps.web.Data
         public DbSet<CalendarEventProperty> CalendarEventProperties { get; set; }
         public DbSet<LostFoundEntry> LostFoundEntries { get; set; }
 
+        public DbSet<PassOnLog> PassOnLogs { get; set; }
+        public DbSet<PassOnLogProperty> PassOnLogProperties { get; set; }
+        public DbSet<PassOnLogComment> PassOnLogComments { get; set; }
+        public DbSet<PassOnLogView> PassOnLogViews { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -66,6 +71,42 @@ namespace hOps.web.Data
 
             // Similarly declare keys/relations for other models (if needed)
             // e.g., UserAccessRequest, RoomLayout etc.
+
+            builder.Entity<PassOnLogProperty>()
+                .HasKey(lp => new { lp.PassOnLogId, lp.PropertyId });
+
+            builder.Entity<PassOnLogProperty>()
+                .HasOne(lp => lp.PassOnLog)
+                .WithMany(l => l.Properties)
+                .HasForeignKey(lp => lp.PassOnLogId);
+
+            builder.Entity<PassOnLogProperty>()
+                .HasOne(lp => lp.Property)
+                .WithMany()
+                .HasForeignKey(lp => lp.PropertyId);
+
+            builder.Entity<PassOnLogView>()
+                .HasKey(v => new { v.PassOnLogId, v.ViewerId });
+
+            builder.Entity<PassOnLogView>()
+                .HasOne(v => v.PassOnLog)
+                .WithMany(l => l.Views)
+                .HasForeignKey(v => v.PassOnLogId);
+
+            builder.Entity<PassOnLogView>()
+                .HasOne(v => v.Viewer)
+                .WithMany()
+                .HasForeignKey(v => v.ViewerId);
+
+            builder.Entity<PassOnLogComment>()
+                .HasOne(c => c.PassOnLog)
+                .WithMany(l => l.Comments)
+                .HasForeignKey(c => c.PassOnLogId);
+
+            builder.Entity<PassOnLogComment>()
+                .HasOne(c => c.CreatedBy)
+                .WithMany()
+                .HasForeignKey(c => c.CreatedById);
         }
     }
 }

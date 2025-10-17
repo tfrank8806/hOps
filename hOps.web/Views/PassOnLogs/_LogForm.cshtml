@@ -1,0 +1,42 @@
+@model hOps.web.ViewModels.PassOnLogFormViewModel
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+<div class="mb-3">
+    <label asp-for="Title" class="form-label"></label>
+    <input asp-for="Title" class="form-control" />
+    <span asp-validation-for="Title" class="text-danger"></span>
+</div>
+
+<div class="mb-3">
+    <label asp-for="Body" class="form-label"></label>
+    <textarea asp-for="Body" class="form-control" rows="8"></textarea>
+    <span asp-validation-for="Body" class="text-danger"></span>
+</div>
+
+@if (Model.PropertyOptions.Count > 1)
+{
+    <div class="mb-3">
+        <label class="form-label">Select Properties</label>
+        <div class="form-text">Choose the properties that should receive this log.</div>
+        @foreach (var property in Model.PropertyOptions)
+        {
+            var inputId = $"property_{property.Id}";
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="SelectedPropertyIds" value="@property.Id" id="@inputId" @(Model.SelectedPropertyIds.Contains(property.Id) ? "checked" : string.Empty) />
+                <label class="form-check-label" for="@inputId">
+                    @property.Name (@property.Code)
+                </label>
+            </div>
+        }
+        <span asp-validation-for="SelectedPropertyIds" class="text-danger"></span>
+    </div>
+}
+else if (Model.PropertyOptions.Count == 1)
+{
+    <input type="hidden" name="SelectedPropertyIds" value="@Model.PropertyOptions[0].Id" />
+    <div class="mb-3">
+        <label class="form-label">Property</label>
+        <div class="form-control-plaintext">@Model.PropertyOptions[0].Name (@Model.PropertyOptions[0].Code)</div>
+    </div>
+}
