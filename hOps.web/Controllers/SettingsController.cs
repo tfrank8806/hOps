@@ -236,16 +236,12 @@ namespace hOps.web.Controllers
 
             List<Property> accessibleProps;
             if (roles.Contains("Admin"))
-            {
                 accessibleProps = await _db.Properties.ToListAsync();
-            }
             else
-            {
                 accessibleProps = await _db.UserPropertyAccesses
                     .Where(upa => upa.ApplicationUserId == currentUser.Id)
                     .Select(upa => upa.Property)
                     .ToListAsync();
-            }
 
             if (!accessibleProps.Any()) return Forbid();
             if (!accessibleProps.Any(p => p.Id == propertyId))
@@ -264,22 +260,17 @@ namespace hOps.web.Controllers
         {
             var currentUser = await _userManager.GetUserAsync(User);
             var roles = await _userManager.GetRolesAsync(currentUser);
-
-            bool allowed = roles.Contains("Admin")
-                || await _db.UserPropertyAccesses
-                    .AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == propertyId);
+            bool allowed = roles.Contains("Admin") ||
+                await _db.UserPropertyAccesses.AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == propertyId);
             if (!allowed) return Forbid();
 
             foreach (var r in rooms)
             {
                 r.PropertyId = propertyId;
                 if (string.IsNullOrWhiteSpace(r.RoomNumber)) continue;
-                if (r.Id == 0)
-                    _db.Rooms.Add(r);
-                else
-                    _db.Rooms.Update(r);
+                if (r.Id == 0) _db.Rooms.Add(r);
+                else _db.Rooms.Update(r);
             }
-
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(Rooms), new { propertyId });
         }
@@ -289,19 +280,16 @@ namespace hOps.web.Controllers
             var sb = new StringBuilder();
             sb.AppendLine("RoomNumber,Floor,RoomType,Description");
             sb.AppendLine("101,1,Standard,Sample description");
-            var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-            return File(bytes, "text/csv", "rooms_template.csv");
+            return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "rooms_template.csv");
         }
 
         [HttpPost]
         public async Task<IActionResult> ImportRooms(int propertyId, IFormFile csvFile)
         {
-            if (csvFile == null || csvFile.Length == 0)
-                return BadRequest("CSV file is empty");
+            if (csvFile == null || csvFile.Length == 0) return BadRequest("CSV file is empty");
 
             using var reader = new System.IO.StreamReader(csvFile.OpenReadStream());
-            await reader.ReadLineAsync(); // skip header
-
+            await reader.ReadLineAsync();
             var newRooms = new List<Room>();
             while (!reader.EndOfStream)
             {
@@ -309,37 +297,29 @@ namespace hOps.web.Controllers
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 var parts = line.Split(',');
                 if (parts.Length < 4) continue;
-
-                var room = new Room
+                newRooms.Add(new Room
                 {
                     PropertyId = propertyId,
                     RoomNumber = parts[0].Trim(),
                     Floor = int.TryParse(parts[1].Trim(), out int f) ? f : 0,
                     RoomType = parts[2].Trim(),
                     Description = parts[3].Trim()
-                };
-                newRooms.Add(room);
+                });
             }
-
             _db.Rooms.RemoveRange(_db.Rooms.Where(r => r.PropertyId == propertyId));
             await _db.Rooms.AddRangeAsync(newRooms);
             await _db.SaveChangesAsync();
-
             return RedirectToAction(nameof(Rooms), new { propertyId });
         }
 
-        // — Layout Editor & Save using Room.Floor —
+        // — Layout Editor —
         public async Task<IActionResult> LayoutEditor(int propertyId, int? floor)
         {
-            var rooms = await _db.Rooms
-                .Where(r => r.PropertyId == propertyId)
-                .ToListAsync();
+            var rooms = await _db.Rooms.Where(r => r.PropertyId == propertyId).ToListAsync();
+            if (!rooms.Any()) return NotFound("No rooms found for this property.");
 
-            if (!rooms.Any())
-                return NotFound("No rooms found for this property.");
-
-            var floorNumbers = rooms.Select(r => r.Floor).Distinct().OrderBy(f => f).ToList();
-            int selectedFloor = floor ?? floorNumbers.First();
+            var floors = rooms.Select(r => r.Floor).Distinct().OrderBy(f => f).ToList();
+            int selectedFloor = floor ?? floors.First();
 
             var layouts = await _db.RoomLayouts
                 .Where(l => l.PropertyId == propertyId && l.Floor == selectedFloor)
@@ -349,11 +329,10 @@ namespace hOps.web.Controllers
             {
                 PropertyId = propertyId,
                 SelectedFloor = selectedFloor,
-                AllFloors = floorNumbers,
+                AllFloors = floors,
                 Rooms = rooms,
                 Layouts = layouts
             };
-
             return View(vm);
         }
 
@@ -362,11 +341,8 @@ namespace hOps.web.Controllers
         {
             foreach (var dto in layoutDtos)
             {
-                var existing = await _db.RoomLayouts
-                    .FirstOrDefaultAsync(l =>
-                        l.RoomId == dto.RoomId &&
-                        l.PropertyId == dto.PropertyId &&
-                        l.Floor == dto.Floor);
+                var existing = await _db.RoomLayouts.FirstOrDefaultAsync(l =>
+                    l.PropertyId == dto.PropertyId && l.RoomId == dto.RoomId && l.Floor == dto.Floor);
 
                 if (existing != null)
                 {
@@ -374,6 +350,10 @@ namespace hOps.web.Controllers
                     existing.Y = dto.Y;
                     existing.Width = dto.Width;
                     existing.Height = dto.Height;
+                    if (!string.IsNullOrWhiteSpace(dto.Label))
+                    {
+                        existing.Label = dto.Label;
+                    }
                     _db.RoomLayouts.Update(existing);
                 }
                 else
@@ -386,13 +366,45 @@ namespace hOps.web.Controllers
                         X = dto.X,
                         Y = dto.Y,
                         Width = dto.Width,
-                        Height = dto.Height
+                        Height = dto.Height,
+                        Label = dto.Label
                     });
                 }
             }
-
             await _db.SaveChangesAsync();
             return Json(new { success = true });
         }
+
+        // — Add Floor (called from LayoutEditor via AJAX) —
+        [HttpPost]
+        public async Task<IActionResult> AddFloor([FromBody] AddFloorDto dto)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            var roles = await _userManager.GetRolesAsync(user);
+            bool allowed = roles.Contains("Admin") ||
+                await _db.UserPropertyAccesses.AnyAsync(a => a.ApplicationUserId == user.Id && a.PropertyId == dto.PropertyId);
+            if (!allowed) return Forbid();
+
+            bool exists = await _db.Rooms.AnyAsync(r => r.PropertyId == dto.PropertyId && r.Floor == dto.Floor);
+            if (!exists)
+            {
+                var dummy = new Room
+                {
+                    PropertyId = dto.PropertyId,
+                    RoomNumber = $"Floor{dto.Floor}-placeholder",
+                    Floor = dto.Floor,
+                    RoomType = "Custom"
+                };
+                _db.Rooms.Add(dummy);
+                await _db.SaveChangesAsync();
+            }
+            return Ok();
+        }
+    }
+
+    public class AddFloorDto
+    {
+        public int PropertyId { get; set; }
+        public int Floor { get; set; }
     }
 }
