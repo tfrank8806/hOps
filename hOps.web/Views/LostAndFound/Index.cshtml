@@ -30,8 +30,8 @@
             <div class="col-md-2">
                 <label class="form-label" for="sortOrder">Sort</label>
                 <select id="sortOrder" name="SortOrder" class="form-select">
-                    <option value="newest" @(Model.Filters.SortOrder?.Equals("newest", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)>Newest</option>
-                    <option value="oldest" @(Model.Filters.SortOrder?.Equals("oldest", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)>Oldest</option>
+                    <option value="newest" selected="@(Model.Filters.SortOrder?.Equals("newest", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Newest</option>
+                    <option value="oldest" selected="@(Model.Filters.SortOrder?.Equals("oldest", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Oldest</option>
                 </select>
             </div>
             <div class="col-md-2">
@@ -67,7 +67,7 @@
                 <select id="propertyId" name="PropertyId" class="form-select">
                     @foreach (var property in Model.AccessibleProperties)
                     {
-                        <option value="@property.Id" @(Model.Filters.PropertyId == property.Id ? "selected" : null)>@property.Name (@property.Code)</option>
+                        <option value="@property.Id" selected="@(Model.Filters.PropertyId == property.Id ? "selected" : null)">@property.Name (@property.Code)</option>
                     }
                 </select>
             </div>

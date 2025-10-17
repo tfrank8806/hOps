@@ -97,11 +97,11 @@ namespace hOps.web.Controllers
                 });
             }
 
-            var logsQuery = baseQuery
-                .Include(log => log.CreatedBy)
-                .Include(log => log.Properties).ThenInclude(lp => lp.Property)
-                .Include(log => log.Comments)
-                .Include(log => log.Views);
+            IQueryable<PassOnLog> logsQuery = baseQuery;
+            logsQuery = logsQuery.Include(log => log.CreatedBy);
+            logsQuery = logsQuery.Include(log => log.Properties).ThenInclude(lp => lp.Property);
+            logsQuery = logsQuery.Include(log => log.Comments);
+            logsQuery = logsQuery.Include(log => log.Views);
 
             if (filters.StartDate.HasValue)
             {
