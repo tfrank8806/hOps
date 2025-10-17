@@ -185,6 +185,9 @@ namespace hOps.web.Migrations
                     b.Property<string>("MobilePhone")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ProfilePhotoPath")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
