@@ -12,5 +12,7 @@ namespace hOps.web.Models
 
         [Display(Name = "Color Code (HEX)")]
         public string Color { get; set; } = "#198754"; // Default: Bootstrap green
+
+        public ICollection<CalendarEvent> Events { get; set; } = new List<CalendarEvent>();
     }
 }

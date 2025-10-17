@@ -23,8 +23,17 @@ namespace hOps.web.Data
         public DbSet<WorkOrderAttachment> WorkOrderAttachments { get; set; }
         public DbSet<WorkOrderProperty> WorkOrderProperties { get; set; }
         public DbSet<PhonebookType> PhonebookTypes { get; set; }
+        public DbSet<PhonebookContact> PhonebookContacts { get; set; }
         public DbSet<CalendarCategory> CalendarCategories { get; set; }
         public DbSet<RoomLayout> RoomLayouts { get; set; }
+        public DbSet<CalendarEvent> CalendarEvents { get; set; }
+        public DbSet<CalendarEventProperty> CalendarEventProperties { get; set; }
+        public DbSet<LostFoundEntry> LostFoundEntries { get; set; }
+
+        public DbSet<PassOnLog> PassOnLogs { get; set; }
+        public DbSet<PassOnLogProperty> PassOnLogProperties { get; set; }
+        public DbSet<PassOnLogComment> PassOnLogComments { get; set; }
+        public DbSet<PassOnLogView> PassOnLogViews { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -61,8 +70,63 @@ namespace hOps.web.Data
                 .WithMany(wo => wo.Attachments)
                 .HasForeignKey(wa => wa.WorkOrderId)
                 .OnDelete(DeleteBehavior.Cascade);
+            builder.Entity<CalendarEventProperty>()
+                .HasKey(cep => new { cep.CalendarEventId, cep.PropertyId });
+
+            builder.Entity<CalendarEventProperty>()
+                .HasOne(cep => cep.CalendarEvent)
+                .WithMany(e => e.EventProperties)
+                .HasForeignKey(cep => cep.CalendarEventId);
+
+            builder.Entity<CalendarEventProperty>()
+                .HasOne(cep => cep.Property)
+                .WithMany(p => p.CalendarEvents)
+                .HasForeignKey(cep => cep.PropertyId);
+
+            builder.Entity<CalendarEvent>()
+                .HasOne(e => e.CreatedBy)
+                .WithMany(u => u.CreatedCalendarEvents)
+                .HasForeignKey(e => e.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // Similarly declare keys/relations for other models (if needed)
             // e.g., UserAccessRequest, RoomLayout etc.
+
+            builder.Entity<PassOnLogProperty>()
+                .HasKey(lp => new { lp.PassOnLogId, lp.PropertyId });
+
+            builder.Entity<PassOnLogProperty>()
+                .HasOne(lp => lp.PassOnLog)
+                .WithMany(l => l.Properties)
+                .HasForeignKey(lp => lp.PassOnLogId);
+
+            builder.Entity<PassOnLogProperty>()
+                .HasOne(lp => lp.Property)
+                .WithMany()
+                .HasForeignKey(lp => lp.PropertyId);
+
+            builder.Entity<PassOnLogView>()
+                .HasKey(v => new { v.PassOnLogId, v.ViewerId });
+
+            builder.Entity<PassOnLogView>()
+                .HasOne(v => v.PassOnLog)
+                .WithMany(l => l.Views)
+                .HasForeignKey(v => v.PassOnLogId);
+
+            builder.Entity<PassOnLogView>()
+                .HasOne(v => v.Viewer)
+                .WithMany()
+                .HasForeignKey(v => v.ViewerId);
+
+            builder.Entity<PassOnLogComment>()
+                .HasOne(c => c.PassOnLog)
+                .WithMany(l => l.Comments)
+                .HasForeignKey(c => c.PassOnLogId);
+
+            builder.Entity<PassOnLogComment>()
+                .HasOne(c => c.CreatedBy)
+                .WithMany()
+                .HasForeignKey(c => c.CreatedById);
         }
     }
 }

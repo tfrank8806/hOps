@@ -10,5 +10,6 @@ namespace hOps.web.ViewModels
         public List<int> AllFloors { get; set; } = new List<int>();
         public List<Room> Rooms { get; set; } = new List<Room>();
         public List<RoomLayout> Layouts { get; set; } = new List<RoomLayout>();
+        public Dictionary<int, List<RoomLayout>> LayoutsByFloor { get; set; } = new Dictionary<int, List<RoomLayout>>();
     }
 }

@@ -1,0 +1,89 @@
+@model hOps.web.ViewModels.PassOnLogIndexViewModel
+@{
+    ViewData["Title"] = "Pass On Logs";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h2 class="mb-0">Pass On Logs</h2>
+    @if (Model.CanCreateLog)
+    {
+        <a asp-action="Create" class="btn btn-primary">New Log</a>
+    }
+</div>
+
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<form method="get" class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label" for="sortOrder">Sort</label>
+                <select class="form-select" id="sortOrder" name="sortOrder">
+                    @foreach (var option in Model.Filters.SortOptions)
+                    {
+                        <option value="@option.Value" @(option.Selected ? "selected" : null)>@option.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="startDate">From</label>
+                <input type="date" class="form-control" id="startDate" name="startDate" value="@Model.Filters.StartDate?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="endDate">To</label>
+                <input type="date" class="form-control" id="endDate" name="endDate" value="@Model.Filters.EndDate?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="creatorId">Creator</label>
+                <select class="form-select" id="creatorId" name="creatorId">
+                    @foreach (var option in Model.Filters.CreatorOptions)
+                    {
+                        <option value="@option.Value" @(option.Selected ? "selected" : null)>@option.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="searchTerm">Keyword</label>
+                <input type="text" class="form-control" id="searchTerm" name="searchTerm" value="@Model.Filters.SearchTerm" placeholder="Search title or body" />
+            </div>
+        </div>
+    </div>
+    <div class="card-footer d-flex justify-content-end gap-2">
+        <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
+        <button type="submit" class="btn btn-primary">Apply</button>
+    </div>
+</form>
+
+@if (!Model.Logs.Any())
+{
+    <div class="alert alert-info">No logs matched the selected filters.</div>
+}
+else
+{
+    <div class="list-group">
+        @foreach (var log in Model.Logs)
+        {
+            <a asp-action="Details" asp-route-id="@log.Id" class="list-group-item list-group-item-action log-list-item @(log.IsUnread ? "log-unread" : string.Empty)">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                    <div>
+                        <h5 class="mb-1">@log.Title</h5>
+                        <div class="text-muted small">By @log.CreatorName • @log.CreatedAt.ToLocalTime().ToString("g")</div>
+                    </div>
+                    @if (log.IsUnread)
+                    {
+                        <span class="badge bg-primary align-self-start">Unread</span>
+                    }
+                </div>
+                <p class="mb-2 text-muted">@log.Preview</p>
+                <div class="d-flex flex-wrap gap-2 small text-muted">
+                    <span><strong>Properties:</strong> @string.Join(", ", log.PropertyNames)</span>
+                    <span class="text-secondary">•</span>
+                    <span>@log.CommentCount comment@(log.CommentCount == 1 ? string.Empty : "s")</span>
+                </div>
+            </a>
+        }
+    </div>
+}

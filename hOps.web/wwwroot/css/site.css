@@ -8,7 +8,111 @@ nav ul {
     padding: 0;
 }
 
+nav ul li {
+    display: inline;
+    margin-right: 15px;
+}
+
+.log-list-item {
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+.log-list-item:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+}
+
+.log-unread {
+    border-left: 4px solid #0d6efd;
+    background-color: #f0f6ff;
+}
+
+.log-body,
+.comment-body {
+    white-space: pre-wrap;
     nav ul li {
         display: inline;
         margin-right: 15px;
     }
+
+.calendar-table th,
+.calendar-table td {
+    min-width: 130px;
+    vertical-align: top;
+    height: 120px;
+}
+
+.calendar-day {
+    padding: 0.75rem;
+    background-color: #ffffff;
+}
+
+.calendar-day--muted {
+    background-color: #f8f9fa;
+    color: #6c757d;
+}
+
+.calendar-day--today {
+    border: 2px solid #0d6efd;
+}
+
+.calendar-day-events {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.calendar-event {
+    border: 1px solid transparent;
+    border-radius: 0.35rem;
+    color: #212529;
+    background-color: #e9ecef;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.calendar-event:hover,
+.calendar-event:focus {
+    opacity: 0.9;
+    color: #212529;
+}
+
+.calendar-event-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    display: inline-block;
+}
+
+.calendar-event-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+.phonebook-list .list-group-item {
+    border-left-width: 6px;
+    border-left-style: solid;
+    border-left-color: #6c757d;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.phonebook-list .list-group-item:hover {
+    background-color: rgba(13, 110, 253, 0.08);
+    transform: translateX(2px);
+}
+
+.phonebook-list .list-group-item.active {
+    background-color: rgba(13, 110, 253, 0.15);
+    color: inherit;
+}
+
+.phonebook-layout .card {
+    min-height: 100%;
+}
+
+#contactType {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+}
