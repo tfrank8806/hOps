@@ -19,6 +19,9 @@ namespace hOps.web.Data
         public DbSet<UserAccessRequest> UserAccessRequests { get; set; }
         public DbSet<Department> Departments { get; set; }
         public DbSet<WorkOrderType> WorkOrderTypes { get; set; }
+        public DbSet<WorkOrder> WorkOrders { get; set; }
+        public DbSet<WorkOrderAttachment> WorkOrderAttachments { get; set; }
+        public DbSet<WorkOrderProperty> WorkOrderProperties { get; set; }
         public DbSet<PhonebookType> PhonebookTypes { get; set; }
         public DbSet<PhonebookContact> PhonebookContacts { get; set; }
         public DbSet<CalendarCategory> CalendarCategories { get; set; }
@@ -50,6 +53,23 @@ namespace hOps.web.Data
                 .WithMany(p => p.UserAccesses)
                 .HasForeignKey(upa => upa.PropertyId);
 
+            builder.Entity<WorkOrderProperty>()
+                .HasOne(wp => wp.WorkOrder)
+                .WithMany(wo => wo.Properties)
+                .HasForeignKey(wp => wp.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<WorkOrderProperty>()
+                .HasOne(wp => wp.Property)
+                .WithMany(p => p.WorkOrderLinks)
+                .HasForeignKey(wp => wp.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<WorkOrderAttachment>()
+                .HasOne(wa => wa.WorkOrder)
+                .WithMany(wo => wo.Attachments)
+                .HasForeignKey(wa => wa.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
             builder.Entity<CalendarEventProperty>()
                 .HasKey(cep => new { cep.CalendarEventId, cep.PropertyId });
 

@@ -1,0 +1,308 @@
+@using System
+@model hOps.web.ViewModels.WorkOrders.WorkOrdersViewModel
+@{
+    ViewData["Title"] = "Work Orders";
+    bool showPropertySelector = Model.PropertyOptions.Count > 1;
+}
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Create Work Order</h5>
+            </div>
+            <div class="card-body">
+                <form asp-action="Create" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Form.Status" class="form-label"></label>
+                        <select asp-for="Form.Status" class="form-select">
+                            @foreach (var status in Model.StatusOptions)
+                            {
+                                <option value="@status.Key" @(status.Key.Equals(Model.Form.Status, StringComparison.OrdinalIgnoreCase) ? "selected" : string.Empty)>@status.Label</option>
+                            }
+                        </select>
+                        <span asp-validation-for="Form.Status" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Form.Location" class="form-label"></label>
+                        <input asp-for="Form.Location" class="form-control" list="locationSuggestions" placeholder="Room number or location" />
+                        <datalist id="locationSuggestions">
+                            @foreach (var suggestion in Model.LocationSuggestions)
+                            {
+                                <option value="@suggestion"></option>
+                            }
+                        </datalist>
+                        <span asp-validation-for="Form.Location" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Form.WorkOrderTypeId" class="form-label"></label>
+                        <select asp-for="Form.WorkOrderTypeId" class="form-select">
+                            <option value="">-- Select Type --</option>
+                            @foreach (var type in Model.WorkOrderTypes)
+                            {
+                                <option value="@type.Id" @(Model.Form.WorkOrderTypeId == type.Id ? "selected" : string.Empty)>@type.Name</option>
+                            }
+                        </select>
+                        <span asp-validation-for="Form.WorkOrderTypeId" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Form.Issue" class="form-label"></label>
+                        <input asp-for="Form.Issue" class="form-control" placeholder="Short description" />
+                        <span asp-validation-for="Form.Issue" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Form.Details" class="form-label"></label>
+                        <textarea asp-for="Form.Details" class="form-control" rows="3" placeholder="Additional details"></textarea>
+                        <span asp-validation-for="Form.Details" class="text-danger"></span>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <label asp-for="Form.DueDate" class="form-label"></label>
+                            <input asp-for="Form.DueDate" class="form-control" type="date" />
+                            <span asp-validation-for="Form.DueDate" class="text-danger"></span>
+                        </div>
+                        <div class="col-sm-6">
+                            <label asp-for="Form.DepartmentId" class="form-label"></label>
+                            <select asp-for="Form.DepartmentId" class="form-select">
+                                <option value="">-- Unassigned --</option>
+                                @foreach (var dept in Model.Departments)
+                                {
+                                    <option value="@dept.Id" @(Model.Form.DepartmentId == dept.Id ? "selected" : string.Empty)>@dept.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="Form.DepartmentId" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 mt-3">
+                        <label asp-for="Form.Photos" class="form-label"></label>
+                        <input asp-for="Form.Photos" class="form-control" type="file" accept="image/*" multiple />
+                        <span class="form-text">Upload supporting photos (optional)</span>
+                        <span asp-validation-for="Form.Photos" class="text-danger"></span>
+                    </div>
+
+                    @if (showPropertySelector)
+                    {
+                        <fieldset class="mb-3">
+                            <legend class="fs-6">Properties</legend>
+                            <span asp-validation-for="Form.SelectedPropertyIds" class="text-danger"></span>
+                            @foreach (var property in Model.PropertyOptions)
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="@property.Id" name="Form.SelectedPropertyIds" id="property_@property.Id" @(property.IsSelected ? "checked" : string.Empty) />
+                                    <label class="form-check-label" for="property_@property.Id">@property.Name (@property.Code)</label>
+                                </div>
+                            }
+                        </fieldset>
+                    }
+                    else if (Model.PropertyOptions.Count == 1)
+                    {
+                        <input type="hidden" name="Form.SelectedPropertyIds" value="@Model.PropertyOptions.First().Id" />
+                        <div class="alert alert-info">
+                            Work order will be created for <strong>@Model.PropertyOptions.First().Name (@Model.PropertyOptions.First().Code)</strong>.
+                        </div>
+                    }
+
+                    <button type="submit" class="btn btn-primary w-100">Submit Work Order</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Filters</h5>
+            </div>
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="SortOrder" class="form-label">Sort</label>
+                        <select class="form-select" id="SortOrder" name="SortOrder">
+                            <option value="newest" @(Model.Filters.SortOrder == "newest" ? "selected" : string.Empty)>Newest First</option>
+                            <option value="oldest" @(Model.Filters.SortOrder == "oldest" ? "selected" : string.Empty)>Oldest First</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="RoomNumber" class="form-label">Room / Location</label>
+                        <input type="text" class="form-control" id="RoomNumber" name="RoomNumber" value="@Model.Filters.RoomNumber" />
+                    </div>
+                    <div class="col-md-4">
+                        <label for="Status" class="form-label">Status</label>
+                        <select class="form-select" id="Status" name="Status">
+                            <option value="">All</option>
+                            @foreach (var status in Model.StatusOptions)
+                            {
+                                <option value="@status.Key" @(string.Equals(Model.Filters.Status, status.Key, StringComparison.OrdinalIgnoreCase) ? "selected" : string.Empty)>@status.Label</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="DepartmentId" class="form-label">Department</label>
+                        <select class="form-select" id="DepartmentId" name="DepartmentId">
+                            <option value="">All</option>
+                            @foreach (var dept in Model.Departments)
+                            {
+                                <option value="@dept.Id" @(Model.Filters.DepartmentId == dept.Id ? "selected" : string.Empty)>@dept.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="WorkOrderTypeId" class="form-label">Work Order Type</label>
+                        <select class="form-select" id="WorkOrderTypeId" name="WorkOrderTypeId">
+                            <option value="">All</option>
+                            @foreach (var type in Model.WorkOrderTypes)
+                            {
+                                <option value="@type.Id" @(Model.Filters.WorkOrderTypeId == type.Id ? "selected" : string.Empty)>@type.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="CreatorId" class="form-label">Creator</label>
+                        <select class="form-select" id="CreatorId" name="CreatorId">
+                            <option value="">All</option>
+                            @foreach (var creator in Model.CreatorOptions)
+                            {
+                                <option value="@creator.Value" @(Model.Filters.CreatorId == creator.Value ? "selected" : string.Empty)>@creator.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="DateCreatedFrom" class="form-label">Created After</label>
+                        <input type="date" class="form-control" id="DateCreatedFrom" name="DateCreatedFrom" value="@(Model.Filters.DateCreatedFrom?.ToString("yyyy-MM-dd"))" />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="DateCreatedTo" class="form-label">Created Before</label>
+                        <input type="date" class="form-control" id="DateCreatedTo" name="DateCreatedTo" value="@(Model.Filters.DateCreatedTo?.ToString("yyyy-MM-dd"))" />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="DueDateFrom" class="form-label">Due After</label>
+                        <input type="date" class="form-control" id="DueDateFrom" name="DueDateFrom" value="@(Model.Filters.DueDateFrom?.ToString("yyyy-MM-dd"))" />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="DueDateTo" class="form-label">Due Before</label>
+                        <input type="date" class="form-control" id="DueDateTo" name="DueDateTo" value="@(Model.Filters.DueDateTo?.ToString("yyyy-MM-dd"))" />
+                    </div>
+                    @if (Model.PropertyOptions.Count > 1)
+                    {
+                        <div class="col-md-4">
+                            <label for="PropertyId" class="form-label">Property</label>
+                            <select class="form-select" id="PropertyId" name="PropertyId">
+                                <option value="">All</option>
+                            @foreach (var property in Model.PropertyOptions)
+                            {
+                                <option value="@property.Id" @(Model.Filters.PropertyId == property.Id ? "selected" : string.Empty)>@property.Name (@property.Code)</option>
+                            }
+                            </select>
+                        </div>
+                    }
+                    <div class="col-md-8">
+                        <label for="Search" class="form-label">Keyword Search</label>
+                        <input type="text" class="form-control" id="Search" name="Search" value="@Model.Filters.Search" placeholder="Search issue, details, or location" />
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end justify-content-end gap-2">
+                        <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
+                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Work Orders (@Model.WorkOrders.Count)</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Status</th>
+                            <th>Location</th>
+                            <th>Department</th>
+                            <th>Type</th>
+                            <th>Issue</th>
+                            <th>Due</th>
+                            <th>Created</th>
+                            <th>Creator</th>
+                            <th>Property</th>
+                            <th>Attachments</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.WorkOrders.Any())
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-4">No work orders found. Adjust filters or create a new work order.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            foreach (var order in Model.WorkOrders)
+                            {
+                                var isPastDue = order.DueDate.Date < DateTime.Today;
+                                <tr style="border-left: 4px solid @order.StatusColor;">
+                                    <td>
+                                        <span class="badge" style="background-color:@order.StatusColor;">@order.Status</span>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">@order.Location</div>
+                                        @if (!string.IsNullOrWhiteSpace(order.Details))
+                                        {
+                                            <small class="text-muted">@order.Details</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(order.Department))
+                                        {
+                                            <span class="badge" style="background-color:@order.DepartmentColor;">@order.Department</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Unassigned</span>
+                                        }
+                                    </td>
+                                    <td>@order.WorkOrderType</td>
+                                    <td>@order.Issue</td>
+                                    <td class="@(isPastDue ? "fw-bold text-danger" : string.Empty)">@order.DueDate.ToString("MMM dd, yyyy")</td>
+                                    <td>@order.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                                    <td>@(string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator)</td>
+                                    <td>
+                                        @foreach (var property in order.Properties)
+                                        {
+                                            <div>@property</div>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (order.Attachments.Any())
+                                        {
+                                            foreach (var attachment in order.Attachments)
+                                            {
+                                                <a href="@attachment.FilePath" target="_blank" class="d-block">@attachment.FileName</a>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">None</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
