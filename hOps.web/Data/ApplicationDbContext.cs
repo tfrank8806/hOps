@@ -23,6 +23,8 @@ namespace hOps.web.Data
         public DbSet<PhonebookContact> PhonebookContacts { get; set; }
         public DbSet<CalendarCategory> CalendarCategories { get; set; }
         public DbSet<RoomLayout> RoomLayouts { get; set; }
+        public DbSet<CalendarEvent> CalendarEvents { get; set; }
+        public DbSet<CalendarEventProperty> CalendarEventProperties { get; set; }
         public DbSet<LostFoundEntry> LostFoundEntries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
@@ -42,6 +44,25 @@ namespace hOps.web.Data
                 .HasOne(upa => upa.Property)
                 .WithMany(p => p.UserAccesses)
                 .HasForeignKey(upa => upa.PropertyId);
+
+            builder.Entity<CalendarEventProperty>()
+                .HasKey(cep => new { cep.CalendarEventId, cep.PropertyId });
+
+            builder.Entity<CalendarEventProperty>()
+                .HasOne(cep => cep.CalendarEvent)
+                .WithMany(e => e.EventProperties)
+                .HasForeignKey(cep => cep.CalendarEventId);
+
+            builder.Entity<CalendarEventProperty>()
+                .HasOne(cep => cep.Property)
+                .WithMany(p => p.CalendarEvents)
+                .HasForeignKey(cep => cep.PropertyId);
+
+            builder.Entity<CalendarEvent>()
+                .HasOne(e => e.CreatedBy)
+                .WithMany(u => u.CreatedCalendarEvents)
+                .HasForeignKey(e => e.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Similarly declare keys/relations for other models (if needed)
             // e.g., UserAccessRequest, RoomLayout etc.

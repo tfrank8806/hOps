@@ -24,6 +24,13 @@
 
                     @if (SignInManager.IsSignedIn(User))
                     {
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Calendar" asp-action="Index">Calendar</a>
+                        </li>
+                    }
+
+                    @if (SignInManager.IsSignedIn(User))
+                    {
                         var user = await UserManager.GetUserAsync(User);
                         IList<string> roles = new List<string>();
                         if (user is not null)
