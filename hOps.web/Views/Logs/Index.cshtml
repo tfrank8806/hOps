@@ -1,0 +1,84 @@
+@{
+    ViewData["Title"] = "Logs";
+}
+
+<div class="row g-4 logs-page">
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Logs</h2>
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createLogModal">
+                    Create New Log
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div id="logList" class="list-group list-group-flush">
+                    <div class="list-group-item text-muted" id="logEmptyState">
+                        No logs yet. Create one to get started.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card shadow-sm h-100">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h2 class="h5 mb-0" id="logTitle">Select a log</h2>
+                    <small class="text-muted" id="logSubtitle">Choose or create a log to start editing.</small>
+                </div>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-outline-secondary btn-sm" id="addRowBtn" type="button" disabled>Add Row</button>
+                    <button class="btn btn-outline-secondary btn-sm" id="addColumnBtn" type="button" disabled>Add Column</button>
+                    <button class="btn btn-outline-secondary btn-sm" id="clearLogBtn" type="button" disabled>Clear</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="spreadsheetContainer" class="spreadsheet-container">
+                    <div class="text-center text-muted" id="spreadsheetPlaceholder">
+                        <p class="mb-1 fw-semibold">No log selected</p>
+                        <p class="mb-0">Pick a log from the list or create a new one to start tracking.</p>
+                    </div>
+                    <div class="table-responsive d-none" id="spreadsheetWrapper">
+                        <table class="table table-bordered spreadsheet-table" id="spreadsheetTable">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="createLogModal" tabindex="-1" aria-labelledby="createLogModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="createLogForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createLogModalLabel">Create New Log</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="logNameInput" class="form-label">Log Name</label>
+                        <input type="text" class="form-control" id="logNameInput" name="logName" placeholder="e.g. Housekeeping" required maxlength="100">
+                        <div class="form-text">A clear name makes it easier to find your log later.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Log</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/logs.css" />
+}
+
+@section Scripts {
+    <script src="~/js/logs.js"></script>
+}
