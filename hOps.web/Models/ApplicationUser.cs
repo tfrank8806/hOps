@@ -8,6 +8,7 @@ namespace hOps.web.Models
         public string FirstName { get; set; } = "";
         public string LastName { get; set; } = "";
         public string? MobilePhone { get; set; }
+        public string? ProfilePhotoPath { get; set; }
 
         public ICollection<UserPropertyAccess>? UserPropertyAccesses { get; set; }
     }
