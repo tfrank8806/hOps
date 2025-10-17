@@ -1,0 +1,115 @@
+@model hOps.web.ViewModels.MyProfileViewModel
+
+@{
+    ViewData["Title"] = "My Profile";
+}
+
+<h2 class="mb-4">My Profile</h2>
+
+@if (TempData["ProfileUpdated"] != null)
+{
+    <div class="alert alert-success">Your profile has been updated.</div>
+}
+@if (TempData["PasswordChanged"] != null)
+{
+    <div class="alert alert-success">Your password has been changed.</div>
+}
+
+<div class="row">
+    <div class="col-lg-7">
+        <div class="card mb-4">
+            <div class="card-header fw-bold">Account Information</div>
+            <div class="card-body">
+                <form asp-action="UpdateProfile" method="post" enctype="multipart/form-data">
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                    <div class="text-center mb-3">
+                        @if (!string.IsNullOrEmpty(Model.Profile.ProfilePhotoPath))
+                        {
+                            <img src="@Model.Profile.ProfilePhotoPath" alt="Profile photo" class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover;" />
+                        }
+                        else
+                        {
+                            @{ 
+                                var initials = string.Empty;
+                                if (!string.IsNullOrWhiteSpace(Model.Profile.FirstName))
+                                {
+                                    initials += Model.Profile.FirstName![0].ToString().ToUpperInvariant();
+                                }
+                                if (!string.IsNullOrWhiteSpace(Model.Profile.LastName))
+                                {
+                                    initials += Model.Profile.LastName![0].ToString().ToUpperInvariant();
+                                }
+                                if (string.IsNullOrWhiteSpace(initials))
+                                {
+                                    initials = "U";
+                                }
+                            }
+                            <div class="rounded-circle bg-secondary d-inline-flex align-items-center justify-content-center" style="width: 120px; height: 120px;">
+                                <span class="text-white fw-semibold fs-4">@initials</span>
+                            </div>
+                        }
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Profile.ProfilePhoto" class="form-label"></label>
+                        <input asp-for="Profile.ProfilePhoto" class="form-control" type="file" accept="image/*" />
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Profile.FirstName" class="form-label"></label>
+                        <input asp-for="Profile.FirstName" class="form-control" />
+                        <span asp-validation-for="Profile.FirstName" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Profile.LastName" class="form-label"></label>
+                        <input asp-for="Profile.LastName" class="form-control" />
+                        <span asp-validation-for="Profile.LastName" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Profile.PhoneNumber" class="form-label"></label>
+                        <input asp-for="Profile.PhoneNumber" class="form-control" />
+                        <span asp-validation-for="Profile.PhoneNumber" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Profile.Email" class="form-label"></label>
+                        <input asp-for="Profile.Email" class="form-control" />
+                        <span asp-validation-for="Profile.Email" class="text-danger"></span>
+                    </div>
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header fw-bold">Change Password</div>
+            <div class="card-body">
+                <form asp-action="ChangePassword" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                    <div class="mb-3">
+                        <label asp-for="ChangePassword.CurrentPassword" class="form-label"></label>
+                        <input asp-for="ChangePassword.CurrentPassword" class="form-control" />
+                        <span asp-validation-for="ChangePassword.CurrentPassword" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="ChangePassword.NewPassword" class="form-label"></label>
+                        <input asp-for="ChangePassword.NewPassword" class="form-control" />
+                        <span asp-validation-for="ChangePassword.NewPassword" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="ChangePassword.ConfirmPassword" class="form-label"></label>
+                        <input asp-for="ChangePassword.ConfirmPassword" class="form-control" />
+                        <span asp-validation-for="ChangePassword.ConfirmPassword" class="text-danger"></span>
+                    </div>
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-outline-primary">Update Password</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

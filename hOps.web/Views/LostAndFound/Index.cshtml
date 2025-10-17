@@ -1,0 +1,437 @@
+@using System.Linq
+@model LostAndFoundIndexViewModel
+
+@{
+    Func<LostFoundStatus, string> statusBadge = status => status switch
+    {
+        LostFoundStatus.ReturnedToGuest => "bg-success",
+        LostFoundStatus.DisposedOf => "bg-danger",
+        _ => "bg-secondary"
+    };
+}
+@{
+    ViewData["Title"] = "Lost & Found Log";
+}
+
+<h1 class="mb-4">Lost &amp; Found Log</h1>
+
+@if (TempData["Success"] is string successMessage)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @successMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-header bg-light fw-semibold">Filter Entries</div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label" for="sortOrder">Sort</label>
+                <select id="sortOrder" name="SortOrder" class="form-select">
+                    <option value="newest" @(Model.Filters.SortOrder?.Equals("newest", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)>Newest</option>
+                    <option value="oldest" @(Model.Filters.SortOrder?.Equals("oldest", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)>Oldest</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="dateFrom">Date From</label>
+                <input type="date" id="dateFrom" name="DateFrom" class="form-control" value="@(Model.Filters.DateFrom?.ToString("yyyy-MM-dd"))" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="dateTo">Date To</label>
+                <input type="date" id="dateTo" name="DateTo" class="form-control" value="@(Model.Filters.DateTo?.ToString("yyyy-MM-dd"))" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="roomNumber">Room / Location</label>
+                <input type="text" id="roomNumber" name="RoomNumber" list="locationOptions" class="form-control" value="@Model.Filters.RoomNumber" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="guestName">Guest Name</label>
+                <input type="text" id="guestName" name="GuestName" class="form-control" value="@Model.Filters.GuestName" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="foundBy">Found By</label>
+                <input type="text" id="foundBy" name="FoundBy" list="foundByOptions" class="form-control" value="@Model.Filters.FoundBy" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="creator">Creator</label>
+                <input type="text" id="creator" name="Creator" list="creatorOptions" class="form-control" value="@Model.Filters.Creator" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="keyword">Keyword</label>
+                <input type="text" id="keyword" name="Keyword" class="form-control" value="@Model.Filters.Keyword" placeholder="Search notes, items, storage..." />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="propertyId">Property</label>
+                <select id="propertyId" name="PropertyId" class="form-select">
+                    @foreach (var property in Model.AccessibleProperties)
+                    {
+                        <option value="@property.Id" @(Model.Filters.PropertyId == property.Id ? "selected" : null)>@property.Name (@property.Code)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Apply Filters</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<datalist id="locationOptions">
+    @foreach (var option in Model.LocationOptions)
+    {
+        <option value="@option"></option>
+    }
+</datalist>
+
+<datalist id="foundByOptions">
+    @foreach (var option in Model.FoundByOptions)
+    {
+        <option value="@option"></option>
+    }
+</datalist>
+
+<datalist id="creatorOptions">
+    @foreach (var option in Model.CreatorOptions)
+    {
+        <option value="@option"></option>
+    }
+</datalist>
+
+<div class="card mb-4">
+    <div class="card-header bg-light fw-semibold">Log Lost &amp; Found Entry</div>
+    <div class="card-body">
+        <form asp-action="Create" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label asp-for="Submission.Type" class="form-label">Type</label>
+                    <select asp-for="Submission.Type" class="form-select" id="entryType">
+                        <option value="@LostFoundType.Found">Found</option>
+                        <option value="@LostFoundType.Lost">Lost</option>
+                    </select>
+                </div>
+
+                @if (!Model.ShowPropertySelection && Model.AccessibleProperties.Count == 1)
+                {
+                    <input type="hidden" name="Submission.SelectedPropertyIds" value="@Model.AccessibleProperties.First().Id" />
+                }
+                else
+                {
+                    <div class="col-12">
+                        <label class="form-label">Property</label>
+                        <div class="d-flex flex-wrap gap-3">
+                            @foreach (var property in Model.AccessibleProperties)
+                            {
+                                var isChecked = Model.Submission.SelectedPropertyIds?.Contains(property.Id) ?? false;
+                                <div class="form-check">
+                                    <input class="form-check-input property-checkbox" type="checkbox" id="property-@property.Id" name="Submission.SelectedPropertyIds" value="@property.Id" @(isChecked ? "checked" : null) />
+                                    <label class="form-check-label" for="property-@property.Id">@property.Name (@property.Code)</label>
+                                </div>
+                            }
+                        </div>
+                        <span asp-validation-for="Submission.SelectedPropertyIds" class="text-danger"></span>
+                    </div>
+                }
+
+                <div class="col-md-3 type-field type-found">
+                    <label asp-for="Submission.DateFound" class="form-label">Date Found</label>
+                    <input asp-for="Submission.DateFound" class="form-control" type="date" />
+                    <span asp-validation-for="Submission.DateFound" class="text-danger"></span>
+                </div>
+                <div class="col-md-3 type-field type-lost">
+                    <label asp-for="Submission.DateReportedLost" class="form-label">Date Reported Lost</label>
+                    <input asp-for="Submission.DateReportedLost" class="form-control" type="date" />
+                    <span asp-validation-for="Submission.DateReportedLost" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-3 type-field type-found">
+                    <label asp-for="Submission.FoundBy" class="form-label">Found By</label>
+                    <input asp-for="Submission.FoundBy" class="form-control" list="foundByOptions" />
+                </div>
+
+                <div class="col-md-3 type-field type-lost">
+                    <label asp-for="Submission.GuestName" class="form-label">Guest Name</label>
+                    <input asp-for="Submission.GuestName" class="form-control" />
+                </div>
+                <div class="col-md-3 type-field type-lost">
+                    <label asp-for="Submission.GuestPhone" class="form-label">Guest Phone</label>
+                    <input asp-for="Submission.GuestPhone" class="form-control" />
+                </div>
+                <div class="col-md-6 type-field type-lost">
+                    <label asp-for="Submission.GuestAddress" class="form-label">Guest Address</label>
+                    <input asp-for="Submission.GuestAddress" class="form-control" />
+                </div>
+
+                <div class="col-md-4">
+                    <label asp-for="Submission.Location" class="form-label">Location</label>
+                    <input asp-for="Submission.Location" class="form-control" list="locationOptions" />
+                </div>
+
+                <div class="col-md-4 type-field type-found">
+                    <label asp-for="Submission.ItemFound" class="form-label">Item Found</label>
+                    <input asp-for="Submission.ItemFound" class="form-control" />
+                    <span asp-validation-for="Submission.ItemFound" class="text-danger"></span>
+                </div>
+                <div class="col-md-4 type-field type-lost">
+                    <label asp-for="Submission.ItemLost" class="form-label">Item Lost</label>
+                    <input asp-for="Submission.ItemLost" class="form-control" />
+                    <span asp-validation-for="Submission.ItemLost" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-4 type-field type-found">
+                    <label asp-for="Submission.Stored" class="form-label">Stored</label>
+                    <input asp-for="Submission.Stored" class="form-control" placeholder="Storage location" />
+                </div>
+
+                <div class="col-md-8">
+                    <label asp-for="Submission.Notes" class="form-label">Notes</label>
+                    <textarea asp-for="Submission.Notes" class="form-control" rows="3"></textarea>
+                </div>
+
+                <div class="col-md-4">
+                    <label asp-for="Submission.Photo" class="form-label">Photo</label>
+                    <input asp-for="Submission.Photo" class="form-control" type="file" accept="image/*" />
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <button type="submit" class="btn btn-success">Save Entry</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+                <span>Found Items (@Model.FoundEntries.Count)</span>
+            </div>
+            <div class="card-body">
+                @if (!Model.FoundEntries.Any())
+                {
+                    <p class="text-muted mb-0">No found items logged for the selected filters.</p>
+                }
+                else
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var entry in Model.FoundEntries)
+                        {
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <button class="btn btn-link p-0 text-start" type="button" data-bs-toggle="modal" data-bs-target="#entryModal-@entry.Id">
+                                            <span class="fw-semibold">@(!string.IsNullOrWhiteSpace(entry.ItemFound) ? entry.ItemFound : "Found Item")</span>
+                                        </button>
+                                        <div class="small text-muted">
+                                            @entry.DateFound?.ToString("MMM d, yyyy") ?? entry.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")
+                                            @if (!string.IsNullOrWhiteSpace(entry.Location))
+                                            {
+                                                <span> • @entry.Location</span>
+                                            }
+                                        </div>
+                                    </div>
+                                    <span class="badge @statusBadge(entry.Status)">@entry.Status</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+                <span>Lost Items (@Model.LostEntries.Count)</span>
+            </div>
+            <div class="card-body">
+                @if (!Model.LostEntries.Any())
+                {
+                    <p class="text-muted mb-0">No lost items logged for the selected filters.</p>
+                }
+                else
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var entry in Model.LostEntries)
+                        {
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <button class="btn btn-link p-0 text-start" type="button" data-bs-toggle="modal" data-bs-target="#entryModal-@entry.Id">
+                                            <span class="fw-semibold">@(!string.IsNullOrWhiteSpace(entry.ItemLost) ? entry.ItemLost : "Lost Item")</span>
+                                        </button>
+                                        <div class="small text-muted">
+                                            @entry.DateReportedLost?.ToString("MMM d, yyyy") ?? entry.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")
+                                            @if (!string.IsNullOrWhiteSpace(entry.GuestName))
+                                            {
+                                                <span> • @entry.GuestName</span>
+                                            }
+                                        </div>
+                                    </div>
+                                    <span class="badge @statusBadge(entry.Status)">@entry.Status</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@foreach (var entry in Model.FoundEntries.Concat(Model.LostEntries))
+{
+    <div class="modal fade" id="entryModal-@entry.Id" tabindex="-1" aria-labelledby="entryModalLabel-@entry.Id" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="entryModalLabel-@entry.Id">@((entry.Type == LostFoundType.Found ? "Found" : "Lost")) Item Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row">
+                        <dt class="col-sm-4">Property</dt>
+                        <dd class="col-sm-8">@entry.Property?.Name (@entry.Property?.Code)</dd>
+
+                        <dt class="col-sm-4">Status</dt>
+                        <dd class="col-sm-8">@entry.Status</dd>
+
+                        <dt class="col-sm-4">Logged On</dt>
+                        <dd class="col-sm-8">@entry.CreatedAt.ToLocalTime().ToString("f")</dd>
+
+                        <dt class="col-sm-4">Logged By</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(entry.CreatedByDisplayName) ? entry.CreatedByDisplayName : entry.CreatedByUser?.Email)</dd>
+
+                        @if (!string.IsNullOrWhiteSpace(entry.Location))
+                        {
+                            <dt class="col-sm-4">Location</dt>
+                            <dd class="col-sm-8">@entry.Location</dd>
+                        }
+
+                        @if (entry.Type == LostFoundType.Found)
+                        {
+                            <dt class="col-sm-4">Date Found</dt>
+                            <dd class="col-sm-8">@entry.DateFound?.ToString("D")</dd>
+
+                            @if (!string.IsNullOrWhiteSpace(entry.FoundBy))
+                            {
+                                <dt class="col-sm-4">Found By</dt>
+                                <dd class="col-sm-8">@entry.FoundBy</dd>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(entry.ItemFound))
+                            {
+                                <dt class="col-sm-4">Item Found</dt>
+                                <dd class="col-sm-8">@entry.ItemFound</dd>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(entry.Stored))
+                            {
+                                <dt class="col-sm-4">Stored</dt>
+                                <dd class="col-sm-8">@entry.Stored</dd>
+                            }
+                        }
+                        else
+                        {
+                            <dt class="col-sm-4">Date Reported Lost</dt>
+                            <dd class="col-sm-8">@entry.DateReportedLost?.ToString("D")</dd>
+
+                            @if (!string.IsNullOrWhiteSpace(entry.GuestName))
+                            {
+                                <dt class="col-sm-4">Guest Name</dt>
+                                <dd class="col-sm-8">@entry.GuestName</dd>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(entry.GuestPhone))
+                            {
+                                <dt class="col-sm-4">Guest Phone</dt>
+                                <dd class="col-sm-8">@entry.GuestPhone</dd>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(entry.GuestAddress))
+                            {
+                                <dt class="col-sm-4">Guest Address</dt>
+                                <dd class="col-sm-8">@entry.GuestAddress</dd>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(entry.ItemLost))
+                            {
+                                <dt class="col-sm-4">Item Lost</dt>
+                                <dd class="col-sm-8">@entry.ItemLost</dd>
+                            }
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(entry.Notes))
+                        {
+                            <dt class="col-sm-4">Notes</dt>
+                            <dd class="col-sm-8">@entry.Notes</dd>
+                        }
+                    </dl>
+
+                    @if (!string.IsNullOrWhiteSpace(entry.PhotoPath))
+                    {
+                        <div class="mt-3">
+                            <img src="@entry.PhotoPath" alt="Item photo" class="img-fluid rounded" />
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                    <div>
+                        <form asp-action="UpdateStatus" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@entry.Id" />
+                            <input type="hidden" name="status" value="@LostFoundStatus.ReturnedToGuest" />
+                            <button type="submit" class="btn btn-outline-success btn-sm">Returned to Guest</button>
+                        </form>
+                        <form asp-action="UpdateStatus" method="post" class="d-inline ms-2">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@entry.Id" />
+                            <input type="hidden" name="status" value="@LostFoundStatus.DisposedOf" />
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Disposed of</button>
+                        </form>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            const typeSelect = document.getElementById('entryType');
+            const toggleFields = () => {
+                const value = typeSelect.value;
+                document.querySelectorAll('.type-field').forEach(el => {
+                    if (value === 'Found') {
+                        el.classList.toggle('d-none', el.classList.contains('type-lost'));
+                    } else {
+                        el.classList.toggle('d-none', el.classList.contains('type-found'));
+                    }
+                });
+            };
+
+            if (typeSelect) {
+                typeSelect.addEventListener('change', toggleFields);
+                toggleFields();
+            }
+
+            const propertyCheckboxes = document.querySelectorAll('.property-checkbox');
+            if (propertyCheckboxes.length > 1) {
+                propertyCheckboxes.forEach(cb => {
+                    cb.addEventListener('change', () => {
+                        if ([...propertyCheckboxes].every(box => !box.checked)) {
+                            cb.checked = true;
+                        }
+                    });
+                });
+            }
+        })();
+    </script>
+}

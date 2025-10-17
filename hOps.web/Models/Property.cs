@@ -24,5 +24,8 @@ namespace hOps.web.Models
         public ICollection<UserPropertyAccess> UserAccesses { get; set; } = new List<UserPropertyAccess>();
 
         public ICollection<Room> Rooms { get; set; } = new List<Room>();
+
+        public ICollection<CalendarEventProperty> CalendarEvents { get; set; } = new List<CalendarEventProperty>();
+        public ICollection<LostFoundEntry> LostFoundEntries { get; set; } = new List<LostFoundEntry>();
     }
 }

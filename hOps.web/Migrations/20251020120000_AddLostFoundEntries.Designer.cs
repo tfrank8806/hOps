@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using hOps.web.Data;
 
@@ -10,9 +11,11 @@ using hOps.web.Data;
 namespace hOps.web.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251020120000_AddLostFoundEntries")]
+    partial class AddLostFoundEntries : Migration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.9");
@@ -185,9 +188,6 @@ namespace hOps.web.Migrations
                     b.Property<string>("MobilePhone")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ProfilePhotoPath")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
@@ -246,69 +246,6 @@ namespace hOps.web.Migrations
                     b.ToTable("CalendarCategories");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarEvent", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("CalendarCategoryId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CreatedById")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Details")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("EndDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<TimeSpan?>("EndTime")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Recurrence")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<TimeSpan?>("StartTime")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CalendarCategoryId");
-
-                    b.HasIndex("CreatedById");
-
-                    b.ToTable("CalendarEvents");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.CalendarEventProperty", b =>
-                {
-                    b.Property<int>("CalendarEventId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("PropertyId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("CalendarEventId", "PropertyId");
-
-                    b.HasIndex("PropertyId");
-
-                    b.ToTable("CalendarEventProperties");
-                });
-
             modelBuilder.Entity("hOps.web.Models.Department", b =>
                 {
                     b.Property<int>("Id")
@@ -328,101 +265,6 @@ namespace hOps.web.Migrations
                     b.ToTable("Departments");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.PassOnLog", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CreatedById")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedById");
-
-                    b.ToTable("PassOnLogs");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.PassOnLogComment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CreatedById")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("PassOnLogId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedById");
-
-                    b.HasIndex("PassOnLogId");
-
-                    b.ToTable("PassOnLogComments");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.PassOnLogProperty", b =>
-                {
-                    b.Property<int>("PassOnLogId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("PropertyId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("PassOnLogId", "PropertyId");
-
-                    b.HasIndex("PropertyId");
-
-                    b.ToTable("PassOnLogProperties");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.PassOnLogView", b =>
-                {
-                    b.Property<int>("PassOnLogId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("ViewerId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("ViewedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("PassOnLogId", "ViewerId");
-
-                    b.HasIndex("ViewerId");
-
-                    b.ToTable("PassOnLogViews");
-                });
-
             modelBuilder.Entity("hOps.web.Models.PhonebookType", b =>
                 {
                     b.Property<int>("Id")
@@ -440,56 +282,6 @@ namespace hOps.web.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("PhonebookTypes");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.PhonebookContact", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Address")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Company")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Fax")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("FirstName")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LastName")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("PhoneNumber")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int?>("PhonebookTypeId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Title")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TypeName")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Website")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PhonebookTypeId");
-
-                    b.ToTable("PhonebookContacts");
                 });
 
             modelBuilder.Entity("hOps.web.Models.Property", b =>
@@ -815,54 +607,6 @@ namespace hOps.web.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarEvent", b =>
-                {
-                    b.HasOne("hOps.web.Models.CalendarCategory", "Category")
-                        .WithMany("Events")
-                        .HasForeignKey("CalendarCategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("hOps.web.Models.ApplicationUser", "CreatedBy")
-                        .WithMany("CreatedCalendarEvents")
-                        .HasForeignKey("CreatedById")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Category");
-
-                    b.Navigation("CreatedBy");
-
-                    b.Navigation("EventProperties");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.CalendarEventProperty", b =>
-                {
-                    b.HasOne("hOps.web.Models.CalendarEvent", "CalendarEvent")
-                        .WithMany("EventProperties")
-                        .HasForeignKey("CalendarEventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany("CalendarEvents")
-                        .HasForeignKey("PropertyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CalendarEvent");
-
-                    b.Navigation("Property");
-            modelBuilder.Entity("hOps.web.Models.PhonebookContact", b =>
-                {
-                    b.HasOne("hOps.web.Models.PhonebookType", "PhonebookType")
-                        .WithMany()
-                        .HasForeignKey("PhonebookTypeId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("PhonebookType");
-                });
-
             modelBuilder.Entity("hOps.web.Models.Room", b =>
                 {
                     b.HasOne("hOps.web.Models.Property", "Property")
@@ -885,46 +629,6 @@ namespace hOps.web.Migrations
                     b.Navigation("Property");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.PassOnLog", b =>
-                {
-                    b.HasOne("hOps.web.Models.ApplicationUser", "CreatedBy")
-                        .WithMany()
-                        .HasForeignKey("CreatedById")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CreatedBy");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.PassOnLogComment", b =>
-                {
-                    b.HasOne("hOps.web.Models.ApplicationUser", "CreatedBy")
-                        .WithMany()
-                        .HasForeignKey("CreatedById")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("hOps.web.Models.PassOnLog", "PassOnLog")
-                        .WithMany("Comments")
-                        .HasForeignKey("PassOnLogId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CreatedBy");
-
-                    b.Navigation("PassOnLog");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.PassOnLogProperty", b =>
-                {
-                    b.HasOne("hOps.web.Models.PassOnLog", "PassOnLog")
-                        .WithMany("Properties")
-                        .HasForeignKey("PassOnLogId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany()
             modelBuilder.Entity("hOps.web.Models.LostFoundEntry", b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "CreatedByUser")
@@ -939,29 +643,9 @@ namespace hOps.web.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("PassOnLog");
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("Property");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.PassOnLogView", b =>
-                {
-                    b.HasOne("hOps.web.Models.PassOnLog", "PassOnLog")
-                        .WithMany("Views")
-                        .HasForeignKey("PassOnLogId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("hOps.web.Models.ApplicationUser", "Viewer")
-                        .WithMany()
-                        .HasForeignKey("ViewerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("PassOnLog");
-
-                    b.Navigation("Viewer");
                 });
 
             modelBuilder.Entity("hOps.web.Models.UserPropertyAccess", b =>
@@ -985,31 +669,11 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
                 {
-                    b.Navigation("CreatedCalendarEvents");
-
                     b.Navigation("UserPropertyAccesses");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.PassOnLog", b =>
-                {
-                    b.Navigation("Comments");
-
-                    b.Navigation("Properties");
-
-                    b.Navigation("Views");
-            modelBuilder.Entity("hOps.web.Models.CalendarCategory", b =>
-                {
-                    b.Navigation("Events");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.CalendarEvent", b =>
-                {
-                    b.Navigation("EventProperties");
                 });
 
             modelBuilder.Entity("hOps.web.Models.Property", b =>
                 {
-                    b.Navigation("CalendarEvents");
                     b.Navigation("LostFoundEntries");
 
                     b.Navigation("Rooms");
