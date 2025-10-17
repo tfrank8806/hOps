@@ -150,7 +150,7 @@ namespace hOps.web.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
+            modelBuilder.Entity<ApplicationUser>(b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("TEXT");
@@ -1145,7 +1145,7 @@ namespace hOps.web.Migrations
                     b.Navigation(e => e.WorkOrder);
                 });
 
-            modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
+            modelBuilder.Entity<ApplicationUser>(b =>
                 {
                     b.Navigation("CreatedCalendarEvents");
 
