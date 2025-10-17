@@ -1,0 +1,21 @@
+@model hOps.web.ViewModels.PassOnLogFormViewModel
+@{
+    ViewData["Title"] = "Edit Pass On Log";
+}
+
+<h2 class="mb-4">Edit Pass On Log</h2>
+
+<form asp-action="Edit" method="post" class="card">
+    <div class="card-body">
+        <input type="hidden" asp-for="Id" />
+        <partial name="_LogForm" model="Model" />
+    </div>
+    <div class="card-footer d-flex justify-content-end gap-2">
+        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

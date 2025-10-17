@@ -8,7 +8,25 @@ nav ul {
     padding: 0;
 }
 
-    nav ul li {
-        display: inline;
-        margin-right: 15px;
-    }
+nav ul li {
+    display: inline;
+    margin-right: 15px;
+}
+
+.log-list-item {
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+.log-list-item:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+}
+
+.log-unread {
+    border-left: 4px solid #0d6efd;
+    background-color: #f0f6ff;
+}
+
+.log-body,
+.comment-body {
+    white-space: pre-wrap;
+}
