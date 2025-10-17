@@ -74,14 +74,14 @@ namespace hOps.web.Data
                 .HasKey(cep => new { cep.CalendarEventId, cep.PropertyId });
 
             builder.Entity<CalendarEventProperty>()
-                .HasOne(cep => cep.CalendarEvent)
-                .WithMany(e => e.EventProperties)
-                .HasForeignKey(cep => cep.CalendarEventId);
-
-            builder.Entity<CalendarEventProperty>()
                 .HasOne(cep => cep.Property)
                 .WithMany(p => p.CalendarEvents)
                 .HasForeignKey(cep => cep.PropertyId);
+
+            builder.Entity<CalendarEvent>()
+                .HasMany(e => e.EventProperties)
+                .WithOne(ep => ep.CalendarEvent)
+                .HasForeignKey(ep => ep.CalendarEventId);
 
             builder.Entity<CalendarEvent>()
                 .HasOne(e => e.CreatedBy)
