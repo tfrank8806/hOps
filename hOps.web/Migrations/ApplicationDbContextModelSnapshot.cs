@@ -949,6 +949,8 @@ namespace hOps.web.Migrations
                     b.Navigation("CalendarEvent");
 
                     b.Navigation("Property");
+                });
+
             modelBuilder.Entity("hOps.web.Models.PhonebookContact", b =>
                 {
                     b.HasOne("hOps.web.Models.PhonebookType", "PhonebookType")
@@ -1021,6 +1023,15 @@ namespace hOps.web.Migrations
 
                     b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PassOnLog");
+
+                    b.Navigation("Property");
+                });
+
             modelBuilder.Entity("hOps.web.Models.LostFoundEntry", b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "CreatedByUser")
@@ -1035,7 +1046,6 @@ namespace hOps.web.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("PassOnLog");
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("Property");
@@ -1148,6 +1158,8 @@ namespace hOps.web.Migrations
                     b.Navigation("Properties");
 
                     b.Navigation("Views");
+                });
+
             modelBuilder.Entity("hOps.web.Models.CalendarCategory", b =>
                 {
                     b.Navigation("Events");
