@@ -20,6 +20,6 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.20" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../hOps.web.csproj" />
+    <ProjectReference Include="../hOps.web/hOps.web.csproj" />
   </ItemGroup>
 </Project>
