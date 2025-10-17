@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Encodings.Web;
 using System.Threading;
 using System.Threading.Tasks;
+using hOps.web.Controllers;
 using hOps.web.Data;
 using hOps.web.Models;
 using Microsoft.AspNetCore.Authentication;
@@ -134,7 +135,13 @@ namespace hOps.web.Areas.Identity.Pages.Account
 
                 foreach (var mgr in managerUsers)
                 {
-                    var approveUrl = Url.Page("/Admin/AccessRequests", null, null, Request.Scheme);
+                    var approveUrl = Url.Action(nameof(AdminController.AccessRequests), "Admin", null, Request.Scheme);
+                    if (string.IsNullOrEmpty(approveUrl))
+                    {
+                        _logger.LogWarning("Unable to generate approval URL for user {ManagerId}. Email not sent.", mgr.Id);
+                        continue;
+                    }
+
                     var message = $@"
 Hello {mgr.UserName},<br/><br/>
 A new user has requested access:<br/>
