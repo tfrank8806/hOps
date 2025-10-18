@@ -247,7 +247,7 @@ namespace hOps.web.Migrations
                     b.ToTable("CalendarCategories");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarEvent", b =>
+            modelBuilder.Entity(typeof(CalendarEvent), b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -931,7 +931,7 @@ namespace hOps.web.Migrations
                     b.Navigation("Property");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarEvent", b =>
+            modelBuilder.Entity(typeof(CalendarEvent), b =>
                 {
                     b.HasOne("hOps.web.Models.CalendarCategory", "Category")
                         .WithMany("Events")
@@ -1161,17 +1161,17 @@ namespace hOps.web.Migrations
                     b.Navigation("Views");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarCategory", b =>
+            modelBuilder.Entity(typeof(CalendarCategory), b =>
                 {
                     b.Navigation("Events");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarEvent", b =>
+            modelBuilder.Entity(typeof(CalendarEvent), b =>
                 {
                     b.Navigation("EventProperties");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Property", b =>
+            modelBuilder.Entity(typeof(Property), b =>
                 {
                     b.Navigation("CalendarEvents");
                     b.Navigation("LostFoundEntries");
