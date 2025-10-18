@@ -11,7 +11,10 @@ body {
 
 .layout-wrapper {
     display: flex;
+    flex-direction: row;
+    align-items: stretch;
     min-height: 100vh;
+    width: 100%;
     background-color: inherit;
 }
 
@@ -29,6 +32,7 @@ body {
 .sidebar-inner {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
     min-height: 100%;
 }
 
@@ -76,6 +80,12 @@ body {
 
 .sidebar-toggle-icon::after {
     transform: translateY(6px);
+}
+
+.sidebar-menu .nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .sidebar-menu .nav-link {
@@ -127,6 +137,7 @@ body {
 
 .main-content {
     background-color: inherit;
+    min-width: 0;
 }
 
 .main-header {
@@ -317,6 +328,7 @@ body.sidebar-collapsed .sidebar-menu {
         max-width: 80%;
         padding: 1.5rem 1.25rem;
         box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        transform: translateX(0);
         transition: transform 0.3s ease;
     }
 
@@ -325,19 +337,25 @@ body.sidebar-collapsed .sidebar-menu {
         padding: 1.5rem 1.25rem;
     }
 
+    .main-header {
+        position: relative;
+    }
+}
+
+@media (min-width: 992px) {
+    body.sidebar-collapsed .sidebar {
+        width: 260px;
+        transform: none;
+        padding: 1.5rem 1rem;
+        border-right: 1px solid rgba(13, 110, 253, 0.08);
+        box-shadow: 2px 0 18px rgba(15, 46, 97, 0.08);
+    }
+
     body.sidebar-collapsed .sidebar-inner,
     body.sidebar-collapsed .sidebar-brand,
     body.sidebar-collapsed .sidebar-menu {
         opacity: 1;
         pointer-events: auto;
         display: block;
-    }
-
-    .main-content {
-        margin-left: 0;
-    }
-
-    .main-header {
-        position: relative;
     }
 }
