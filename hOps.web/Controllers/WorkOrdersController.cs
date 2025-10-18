@@ -207,27 +207,6 @@ namespace hOps.web.Controllers
                 query = query.Where(w => w.Status == filters.Status);
             }
 
-            if (filters.DateCreatedFrom.HasValue)
-            {
-                query = query.Where(w => w.CreatedAt >= filters.DateCreatedFrom.Value);
-            }
-
-            if (filters.DateCreatedTo.HasValue)
-            {
-                var endDate = filters.DateCreatedTo.Value.Date.AddDays(1).AddTicks(-1);
-                query = query.Where(w => w.CreatedAt <= endDate);
-            }
-
-            if (filters.DueDateFrom.HasValue)
-            {
-                query = query.Where(w => w.DueDate >= filters.DueDateFrom.Value);
-            }
-
-            if (filters.DueDateTo.HasValue)
-            {
-                query = query.Where(w => w.DueDate <= filters.DueDateTo.Value);
-            }
-
             if (!string.IsNullOrWhiteSpace(filters.CreatorId))
             {
                 query = query.Where(w => w.CreatedById == filters.CreatorId);
