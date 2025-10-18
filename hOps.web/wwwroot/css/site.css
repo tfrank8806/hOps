@@ -1,16 +1,156 @@
+html, body {
+    height: 100%;
+}
+
 body {
     font-family: Arial, sans-serif;
-    margin: 20px;
+    margin: 0;
+    background-color: #f5f7fb;
+    color: #212529;
 }
 
-nav ul {
-    list-style: none;
+.layout-wrapper {
+    display: flex;
+    min-height: 100vh;
+    background-color: inherit;
+}
+
+.sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background-color: #ffffff;
+    padding: 1.5rem 1rem;
+    overflow-y: auto;
+    transition: width 0.3s ease;
+}
+
+.sidebar-inner {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
+
+.sidebar-brand {
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 1rem;
+}
+
+.sidebar-title {
+    font-size: 1.25rem;
+    color: #0d6efd;
+}
+
+.sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+}
+
+.sidebar-toggle-icon {
+    position: relative;
+    width: 18px;
+    height: 2px;
+    background-color: currentColor;
+}
+
+.sidebar-toggle-icon::before,
+.sidebar-toggle-icon::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    width: 18px;
+    height: 2px;
+    background-color: currentColor;
+    transition: transform 0.3s ease;
+}
+
+.sidebar-toggle-icon::before {
+    transform: translateY(-6px);
+}
+
+.sidebar-toggle-icon::after {
+    transform: translateY(6px);
+}
+
+.sidebar-menu .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 0.5rem;
+    color: #495057;
+}
+
+.sidebar-menu .nav-link:hover,
+.sidebar-menu .nav-link:focus {
+    background-color: rgba(13, 110, 253, 0.1);
+    color: #0d6efd;
+}
+
+.sidebar-menu .dropdown-menu {
+    position: static;
+    float: none;
+    box-shadow: none;
+    padding: 0.5rem 0;
+    margin-top: 0.5rem;
+}
+
+.sidebar-menu .dropdown-item {
+    padding: 0.5rem 1rem;
+}
+
+.sidebar-menu .dropdown-divider {
+    margin: 0.5rem 0;
+}
+
+.sidebar-menu .dropdown-header {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #6c757d;
+}
+
+.main-content {
+    background-color: inherit;
+}
+
+.main-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.main-header .nav-link {
+    color: #495057;
+}
+
+.main-header .nav-link:hover,
+.main-header .nav-link:focus {
+    color: #0d6efd;
+}
+
+main .container-fluid {
+    max-width: 1140px;
+}
+
+body.sidebar-collapsed .sidebar {
+    width: 0;
     padding: 0;
+    border: none;
 }
 
-nav ul li {
-    display: inline;
-    margin-right: 15px;
+body.sidebar-collapsed .sidebar-inner {
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.sidebar-collapsed .sidebar-brand {
+    display: none;
+}
+
+body.sidebar-collapsed .sidebar-menu {
+    display: none;
 }
 
 .log-list-item {
@@ -29,10 +169,7 @@ nav ul li {
 .log-body,
 .comment-body {
     white-space: pre-wrap;
-    nav ul li {
-        display: inline;
-        margin-right: 15px;
-    }
+}
 
 .calendar-table th,
 .calendar-table td {
@@ -91,6 +228,8 @@ nav ul li {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
 .phonebook-list .list-group-item {
     border-left-width: 6px;
     border-left-style: solid;
@@ -115,4 +254,43 @@ nav ul li {
 #contactType {
     font-size: 0.85rem;
     padding: 0.5rem 0.75rem;
+}
+
+@media (max-width: 991.98px) {
+    .layout-wrapper {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 260px;
+        max-width: 80%;
+        padding: 1.5rem 1.25rem;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        transition: transform 0.3s ease;
+    }
+
+    body.sidebar-collapsed .sidebar {
+        transform: translateX(-100%);
+        padding: 1.5rem 1.25rem;
+    }
+
+    body.sidebar-collapsed .sidebar-inner,
+    body.sidebar-collapsed .sidebar-brand,
+    body.sidebar-collapsed .sidebar-menu {
+        opacity: 1;
+        pointer-events: auto;
+        display: block;
+    }
+
+    .main-content {
+        margin-left: 0;
+    }
+
+    .main-header {
+        position: relative;
+    }
 }
