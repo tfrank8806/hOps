@@ -34,6 +34,64 @@
                 </div>
             </div>
             <div class="card-body">
+                <div class="spreadsheet-toolbar mb-3" id="spreadsheetToolbar" aria-label="Formatting toolbar">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <div class="btn-group" role="group" aria-label="Font styles">
+                            <button class="btn btn-outline-secondary btn-sm" type="button" id="boldBtn" disabled title="Bold">
+                                <span class="fw-bold">B</span>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" type="button" id="italicBtn" disabled title="Italic">
+                                <span class="fst-italic">I</span>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" type="button" id="underlineBtn" disabled title="Underline">
+                                <span class="text-decoration-underline">U</span>
+                            </button>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <select class="form-select form-select-sm" id="fontFamilySelect" disabled aria-label="Font family">
+                                <option value="">Font Family</option>
+                                <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif">Segoe UI</option>
+                                <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
+                                <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                                <option value="'Courier New', Courier, monospace">Courier New</option>
+                                <option value="'Roboto', sans-serif">Roboto</option>
+                            </select>
+                            <select class="form-select form-select-sm" id="fontSizeSelect" disabled aria-label="Font size">
+                                <option value="">Font Size</option>
+                                <option value="12px">12</option>
+                                <option value="14px">14</option>
+                                <option value="16px">16</option>
+                                <option value="18px">18</option>
+                                <option value="20px">20</option>
+                                <option value="24px">24</option>
+                            </select>
+                        </div>
+                        <div class="btn-group" role="group" aria-label="Text alignment">
+                            <button class="btn btn-outline-secondary btn-sm" type="button" id="alignLeftBtn" disabled title="Align left">
+                                <span class="d-inline-block" aria-hidden="true">L</span>
+                                <span class="visually-hidden">Align left</span>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" type="button" id="alignCenterBtn" disabled title="Align center">
+                                <span class="d-inline-block" aria-hidden="true">C</span>
+                                <span class="visually-hidden">Align center</span>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" type="button" id="alignRightBtn" disabled title="Align right">
+                                <span class="d-inline-block" aria-hidden="true">R</span>
+                                <span class="visually-hidden">Align right</span>
+                            </button>
+                        </div>
+                        <div class="btn-group" role="group" aria-label="Cell merging">
+                            <button class="btn btn-outline-secondary btn-sm" type="button" id="mergeCellsBtn" disabled title="Merge cells">
+                                <span aria-hidden="true">Merge</span>
+                                <span class="visually-hidden">Merge cells</span>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" type="button" id="unmergeCellsBtn" disabled title="Unmerge cells">
+                                <span aria-hidden="true">Split</span>
+                                <span class="visually-hidden">Unmerge cells</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 <div id="spreadsheetContainer" class="spreadsheet-container">
                     <div class="text-center text-muted" id="spreadsheetPlaceholder">
                         <p class="mb-1 fw-semibold">No log selected</p>
