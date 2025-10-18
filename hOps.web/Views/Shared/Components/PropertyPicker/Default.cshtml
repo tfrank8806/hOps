@@ -12,15 +12,16 @@
         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
             @{
                 var sel = Model.FirstOrDefault(p => p.Id == currentId) ?? Model[0];
-                @($"{sel.Name} ({sel.Code})")
+                @sel.Name
             }
         </a>
         <ul class="dropdown-menu">
             @foreach (var p in Model)
             {
+                var propertyLabel = string.IsNullOrWhiteSpace(p.Code) ? p.Name : $"{p.Name} ({p.Code})";
                 <li>
                     <a class="dropdown-item" asp-controller="Home" asp-action="SwitchProperty" asp-route-propertyId="@p.Id">
-                        @p.Name (@p.Code)
+                        @propertyLabel
                     </a>
                 </li>
             }
