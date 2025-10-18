@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using ClosedXML.Excel;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels.WorkOrders;
@@ -40,6 +41,69 @@ namespace hOps.web.Controllers
         {
             var viewModel = await BuildViewModelAsync(filters, null);
             return View(viewModel);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Export([FromQuery] WorkOrderFilterInput filters)
+        {
+            var viewModel = await BuildViewModelAsync(filters, null);
+
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Work Orders");
+
+            var headers = new[]
+            {
+                "Status",
+                "Location",
+                "Department",
+                "Type",
+                "Issue",
+                "Due Date",
+                "Created Date",
+                "Creator",
+                "Properties",
+                "Attachments"
+            };
+
+            for (var i = 0; i < headers.Length; i++)
+            {
+                worksheet.Cell(1, i + 1).Value = headers[i];
+            }
+
+            var headerRange = worksheet.Range(1, 1, 1, headers.Length);
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+            for (var index = 0; index < viewModel.WorkOrders.Count; index++)
+            {
+                var rowNumber = index + 2;
+                var order = viewModel.WorkOrders[index];
+
+                worksheet.Cell(rowNumber, 1).Value = order.Status;
+                worksheet.Cell(rowNumber, 2).Value = order.Location;
+                worksheet.Cell(rowNumber, 3).Value = order.Department ?? "Unassigned";
+                worksheet.Cell(rowNumber, 4).Value = order.WorkOrderType ?? string.Empty;
+                worksheet.Cell(rowNumber, 5).Value = order.Issue;
+                worksheet.Cell(rowNumber, 6).Value = order.DueDate;
+                worksheet.Cell(rowNumber, 7).Value = order.CreatedAt.ToLocalTime();
+                worksheet.Cell(rowNumber, 8).Value = string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator;
+                worksheet.Cell(rowNumber, 9).Value = string.Join(Environment.NewLine, order.Properties);
+                worksheet.Cell(rowNumber, 10).Value = string.Join(Environment.NewLine, order.Attachments.Select(a => a.FileName));
+
+                worksheet.Cell(rowNumber, 6).Style.DateFormat.Format = "MMM dd, yyyy";
+                worksheet.Cell(rowNumber, 7).Style.DateFormat.Format = "MMM dd, yyyy";
+                worksheet.Row(rowNumber).Style.Alignment.SetVertical(XLAlignmentVerticalValues.Top);
+            }
+
+            worksheet.Columns().AdjustToContents();
+            worksheet.Rows().AdjustToContents();
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            stream.Position = 0;
+
+            var fileName = $"work-orders-{DateTime.UtcNow:yyyyMMddHHmmss}.xlsx";
+            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
 
         [HttpPost]
