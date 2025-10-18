@@ -24,7 +24,8 @@ body {
     background: linear-gradient(180deg, rgba(13, 110, 253, 0.06) 0%, rgba(255, 255, 255, 0.92) 65%, #ffffff 100%);
     padding: 1.5rem 1rem;
     overflow-y: auto;
-    transition: width 0.3s ease;
+    overflow-x: hidden;
+    transition: width 0.3s ease, padding 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
     border-right: 1px solid rgba(13, 110, 253, 0.08);
     box-shadow: 2px 0 18px rgba(15, 46, 97, 0.08);
 }
@@ -34,6 +35,7 @@ body {
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 100%;
+    transition: opacity 0.2s ease;
 }
 
 .sidebar-brand {
@@ -198,17 +200,10 @@ body.sidebar-collapsed .sidebar {
     box-shadow: none;
 }
 
-body.sidebar-collapsed .sidebar-inner {
+body.sidebar-collapsed .sidebar .sidebar-inner {
     opacity: 0;
+    visibility: hidden;
     pointer-events: none;
-}
-
-body.sidebar-collapsed .sidebar-brand {
-    display: none;
-}
-
-body.sidebar-collapsed .sidebar-menu {
-    display: none;
 }
 
 .log-list-item {
@@ -329,12 +324,13 @@ body.sidebar-collapsed .sidebar-menu {
         padding: 1.5rem 1.25rem;
         box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
         transform: translateX(0);
-        transition: transform 0.3s ease;
+        transition: transform 0.3s ease, opacity 0.2s ease;
     }
 
     body.sidebar-collapsed .sidebar {
+        width: 0;
+        padding: 0;
         transform: translateX(-100%);
-        padding: 1.5rem 1.25rem;
     }
 
     .main-header {
@@ -344,18 +340,9 @@ body.sidebar-collapsed .sidebar-menu {
 
 @media (min-width: 992px) {
     body.sidebar-collapsed .sidebar {
-        width: 260px;
-        transform: none;
-        padding: 1.5rem 1rem;
-        border-right: 1px solid rgba(13, 110, 253, 0.08);
-        box-shadow: 2px 0 18px rgba(15, 46, 97, 0.08);
-    }
-
-    body.sidebar-collapsed .sidebar-inner,
-    body.sidebar-collapsed .sidebar-brand,
-    body.sidebar-collapsed .sidebar-menu {
-        opacity: 1;
-        pointer-events: auto;
-        display: block;
+        width: 0;
+        padding: 0;
+        border: none;
+        box-shadow: none;
     }
 }

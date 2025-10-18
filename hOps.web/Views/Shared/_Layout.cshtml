@@ -203,12 +203,16 @@
     <script>
         (function () {
             const body = document.body;
+            const sidebar = document.getElementById('sidebar');
             const toggles = document.querySelectorAll('.sidebar-toggle');
             const mediaQuery = window.matchMedia('(max-width: 991.98px)');
 
             function updateAria() {
                 const expanded = !body.classList.contains('sidebar-collapsed');
                 toggles.forEach(btn => btn.setAttribute('aria-expanded', expanded.toString()));
+                if (sidebar) {
+                    sidebar.setAttribute('aria-hidden', (!expanded).toString());
+                }
             }
 
             function toggleSidebar() {
