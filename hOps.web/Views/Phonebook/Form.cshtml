@@ -1,5 +1,4 @@
 @model hOps.web.ViewModels.PhonebookContactFormViewModel
-@using System.Linq
 @{
     ViewData["Title"] = Model.Title;
 }
@@ -15,20 +14,23 @@
     <div class="row g-3">
         <div class="col-md-6">
             <label asp-for="Contact.TypeName" class="form-label"></label>
-            <input asp-for="Contact.TypeName" class="form-control" list="typeOptions" />
-            <datalist id="typeOptions">
+            <select asp-for="Contact.TypeName" class="form-select">
+                @if (string.IsNullOrWhiteSpace(Model.Contact.TypeName))
+                {
+                    <option value="" disabled selected>Select a type</option>
+                }
+                else
+                {
+                    <option value="" disabled>Select a type</option>
+                }
                 @foreach (var type in Model.Types)
                 {
                     <option value="@type.Name">@type.Name</option>
                 }
-            </datalist>
-            @if (Model.Types.Any())
+            </select>
+            @if (Model.Types.Count == 0)
             {
-                <div class="form-text">Start typing to select from existing types or enter a new one.</div>
-            }
-            else
-            {
-                <div class="form-text">Enter a type name to categorize this contact.</div>
+                <div class="form-text">No phonebook types available. Add types from the Settings &gt; Phonebook Types page.</div>
             }
             <span asp-validation-for="Contact.TypeName" class="text-danger"></span>
         </div>
