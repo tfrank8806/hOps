@@ -144,7 +144,7 @@
                             {
                                 <li class="nav-item dropdown me-2">
                                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                        @currentProp?.Name ?? "Select Property"
+                                        @(currentProp?.Name ?? "Select Property")
                                     </a>
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         @foreach (var prop in userProps)
