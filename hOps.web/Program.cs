@@ -4,6 +4,7 @@ using hOps.web.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -54,6 +55,8 @@ using (var scope = app.Services.CreateScope())
 
     // Apply pending migrations
     dbContext.Database.Migrate();
+
+    await EnsureProfilePhotoPathColumnAsync(dbContext);
 
     await SeedRolesAsync(roleManager);
     await SeedAdminUserAsync(userManager, roleManager);
@@ -137,6 +140,52 @@ static async Task SeedAdminUserAsync(UserManager<ApplicationUser> userManager, R
             {
                 Console.WriteLine($" - {error.Description}");
             }
+        }
+    }
+}
+
+static async Task EnsureProfilePhotoPathColumnAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        await using var checkCommand = connection.CreateCommand();
+        checkCommand.CommandText = "PRAGMA table_info('AspNetUsers');";
+
+        var columnExists = false;
+
+        await using (var reader = await checkCommand.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                var columnName = reader.GetString(1);
+                if (string.Equals(columnName, "ProfilePhotoPath", StringComparison.OrdinalIgnoreCase))
+                {
+                    columnExists = true;
+                    break;
+                }
+            }
+        }
+
+        if (!columnExists)
+        {
+            await using var alterCommand = connection.CreateCommand();
+            alterCommand.CommandText = "ALTER TABLE \"AspNetUsers\" ADD COLUMN \"ProfilePhotoPath\" TEXT;";
+            await alterCommand.ExecuteNonQueryAsync();
+        }
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
         }
     }
 }
