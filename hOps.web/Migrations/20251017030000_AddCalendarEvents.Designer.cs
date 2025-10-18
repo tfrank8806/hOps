@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using hOps.web.Data;
+using hOps.web.Models;
 
 #nullable disable
 
@@ -246,7 +247,7 @@ namespace hOps.web.Migrations
                     b.ToTable("CalendarCategories");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarEvent", b =>
+            modelBuilder.Entity(typeof(CalendarEvent), b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -607,7 +608,7 @@ namespace hOps.web.Migrations
                     b.Navigation("Property");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarEvent", b =>
+            modelBuilder.Entity(typeof(CalendarEvent), b =>
                 {
                     b.HasOne("hOps.web.Models.CalendarCategory", "Category")
                         .WithMany("Events")
@@ -669,7 +670,7 @@ namespace hOps.web.Migrations
                     b.Navigation("Property");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
+            modelBuilder.Entity(typeof(ApplicationUser), b =>
                 {
                     b.Navigation("CreatedCalendarEvents");
 
@@ -681,7 +682,7 @@ namespace hOps.web.Migrations
                     b.Navigation("Events");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarEvent", b =>
+            modelBuilder.Entity(typeof(CalendarEvent), b =>
                 {
                     b.Navigation("EventProperties");
                 });
