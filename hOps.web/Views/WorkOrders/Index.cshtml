@@ -175,22 +175,6 @@
                             }
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <label for="DateCreatedFrom" class="form-label">Created After</label>
-                        <input type="date" class="form-control" id="DateCreatedFrom" name="DateCreatedFrom" value="@(Model.Filters.DateCreatedFrom?.ToString("yyyy-MM-dd"))" />
-                    </div>
-                    <div class="col-md-3">
-                        <label for="DateCreatedTo" class="form-label">Created Before</label>
-                        <input type="date" class="form-control" id="DateCreatedTo" name="DateCreatedTo" value="@(Model.Filters.DateCreatedTo?.ToString("yyyy-MM-dd"))" />
-                    </div>
-                    <div class="col-md-3">
-                        <label for="DueDateFrom" class="form-label">Due After</label>
-                        <input type="date" class="form-control" id="DueDateFrom" name="DueDateFrom" value="@(Model.Filters.DueDateFrom?.ToString("yyyy-MM-dd"))" />
-                    </div>
-                    <div class="col-md-3">
-                        <label for="DueDateTo" class="form-label">Due Before</label>
-                        <input type="date" class="form-control" id="DueDateTo" name="DueDateTo" value="@(Model.Filters.DueDateTo?.ToString("yyyy-MM-dd"))" />
-                    </div>
                     @if (Model.PropertyOptions.Count > 1)
                     {
                         <div class="col-md-4">
