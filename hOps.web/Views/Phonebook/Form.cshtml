@@ -15,50 +15,10 @@
         <div class="col-md-6">
             <label asp-for="Contact.TypeName" class="form-label"></label>
             <select asp-for="Contact.TypeName" class="form-select">
-                @{ var selectedType = Model.Contact?.TypeName?.Trim(); }
-
-                @if (Model.Types.Count == 0)
+                <option value="" disabled @(string.IsNullOrWhiteSpace(Model.Contact.TypeName) ? "selected" : null)>Select a type</option>
+                @foreach (var type in Model.Types)
                 {
-                    <option value="" selected disabled>No phonebook types available</option>
-                }
-                else
-                {
-                    var hasSelection = false;
-
-                    if (!string.IsNullOrWhiteSpace(selectedType))
-                    {
-                        foreach (var type in Model.Types)
-                        {
-                            if (string.Equals(type.Name, selectedType, System.StringComparison.OrdinalIgnoreCase))
-                            {
-                                hasSelection = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (hasSelection)
-                    {
-                        <option value="" disabled>Select a type</option>
-                    }
-                    else
-                    {
-                        <option value="" selected disabled>Select a type</option>
-                    }
-
-                    foreach (var type in Model.Types)
-                    {
-                        var isSelected = hasSelection && string.Equals(type.Name, selectedType, System.StringComparison.OrdinalIgnoreCase);
-
-                        if (isSelected)
-                        {
-                            <option value="@type.Name" selected="selected">@type.Name</option>
-                        }
-                        else
-                        {
-                            <option value="@type.Name">@type.Name</option>
-                        }
-                    }
+                    <option value="@type.Name" selected="@(Model.Contact.TypeName == type.Name ? "selected" : null)">@type.Name</option>
                 }
             </select>
             @if (Model.Types.Count == 0)
