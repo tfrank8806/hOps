@@ -155,15 +155,15 @@ namespace hOps.web.Controllers
             var match = await _db.PhonebookTypes
                 .FirstOrDefaultAsync(t => t.Name.ToLower() == normalizedType);
 
-            if (match != null)
+            if (match == null)
             {
-                contact.PhonebookTypeId = match.Id;
-                contact.TypeName = match.Name;
-            }
-            else
-            {
+                ModelState.AddModelError("Contact.TypeName", "Selected type is no longer available.");
                 contact.PhonebookTypeId = null;
+                return;
             }
+
+            contact.PhonebookTypeId = match.Id;
+            contact.TypeName = match.Name;
         }
     }
 }
