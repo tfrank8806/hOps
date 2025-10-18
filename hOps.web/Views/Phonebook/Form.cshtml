@@ -15,10 +15,24 @@
         <div class="col-md-6">
             <label asp-for="Contact.TypeName" class="form-label"></label>
             <select asp-for="Contact.TypeName" class="form-select">
-                <option value="" disabled @(string.IsNullOrWhiteSpace(Model.Contact.TypeName) ? "selected" : null)>Select a type</option>
+                @if (string.IsNullOrWhiteSpace(Model.Contact.TypeName))
+                {
+                    <option value="" disabled selected>Select a type</option>
+                }
+                else
+                {
+                    <option value="" disabled>Select a type</option>
+                }
                 @foreach (var type in Model.Types)
                 {
-                    <option value="@type.Name" selected="@(Model.Contact.TypeName == type.Name ? "selected" : null)">@type.Name</option>
+                    if (Model.Contact.TypeName == type.Name)
+                    {
+                        <option value="@type.Name" selected>@type.Name</option>
+                    }
+                    else
+                    {
+                        <option value="@type.Name">@type.Name</option>
+                    }
                 }
             </select>
             @if (Model.Types.Count == 0)
