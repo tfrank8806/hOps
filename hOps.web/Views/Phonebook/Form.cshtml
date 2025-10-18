@@ -14,7 +14,13 @@
     <div class="row g-3">
         <div class="col-md-6">
             <label asp-for="Contact.TypeName" class="form-label"></label>
-            <select asp-for="Contact.TypeName" asp-items="Model.TypeOptions" class="form-select"></select>
+            <select asp-for="Contact.TypeName" class="form-select">
+                <option value="" disabled @(string.IsNullOrWhiteSpace(Model.Contact.TypeName) ? "selected" : null)>Select a type</option>
+                @foreach (var type in Model.Types)
+                {
+                    <option value="@type.Name" selected="@(Model.Contact.TypeName == type.Name ? "selected" : null)">@type.Name</option>
+                }
+            </select>
             @if (Model.Types.Count == 0)
             {
                 <div class="form-text">No phonebook types available. Add types from the Settings &gt; Phonebook Types page.</div>
