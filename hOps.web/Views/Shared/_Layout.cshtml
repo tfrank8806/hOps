@@ -17,123 +17,133 @@
         <nav class="navbar navbar-expand-lg navbar-light bg-light">
             <div class="container-fluid">
                 <a class="navbar-brand" asp-controller="Home" asp-action="Index">HotelOps</a>
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link" asp-controller="Home" asp-action="Index">Home</a>
-                    </li>
-
-                    @if (SignInManager.IsSignedIn(User))
-                    {
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="mainNavbar">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                         <li class="nav-item">
-                            <a class="nav-link" asp-controller="Calendar" asp-action="Index">Calendar</a>
+                            <a class="nav-link" asp-controller="Home" asp-action="Index">Home</a>
                         </li>
-                    }
 
-                    @if (SignInManager.IsSignedIn(User))
-                    {
-                        var user = await UserManager.GetUserAsync(User);
-                        IList<string> roles = new List<string>();
-                        if (user is not null)
+                        @if (SignInManager.IsSignedIn(User))
                         {
-                            roles = await UserManager.GetRolesAsync(user);
-                        }
-
-                        <li class="nav-item">
-                            <a class="nav-link" asp-controller="WorkOrders" asp-action="Index">Work Orders</a>
-                            <a class="nav-link" asp-controller="PassOnLogs" asp-action="Index">Pass On Logs</a>
-                            <a class="nav-link" asp-controller="Phonebook" asp-action="Index">Phonebook</a>
-                            <a class="nav-link" asp-controller="LostAndFound" asp-action="Index">Lost &amp; Found</a>
-                            <a class="nav-link" asp-controller="Logs" asp-action="Index">Logs</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <a class="nav-link" asp-controller="Reports" asp-action="Index">Reports</a>
-                        </li>
-
-                        if (roles.Contains("Manager") || roles.Contains("Admin"))
-                        {
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    Admin
-                                </a>
-                                <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" asp-controller="Admin" asp-action="Dashboard">Dashboard</a></li>
-                                    <li>
-                                        <a class="dropdown-item d-flex justify-content-between align-items-center"
-                                           asp-controller="Admin"
-                                           asp-action="AccessRequests">
-                                            Access Requests
-                                            <span id="accessRequestBadge" class="badge bg-danger ms-2" style="display: none;"></span>
-                                        </a>
-                                    </li>
-                                    <li><a class="dropdown-item" asp-controller="Admin" asp-action="Users">Users</a></li>
-                                    <li><hr class="dropdown-divider" /></li>
-                                    <li class="dropdown-header">Settings</li>
-                                    <li><a class="dropdown-item" asp-controller="Settings" asp-action="Departments">Departments</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Settings" asp-action="WorkOrderTypes">Work Order Types</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Settings" asp-action="Rooms" asp-route-propertyId="@(ViewBag.CurrentProperty?.Id ?? 0)">Rooms</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Settings" asp-action="PhonebookTypes">Phonebook Types</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Settings" asp-action="CalendarCategories">Calendar Categories</a></li>
-                                    <li>
-                                        <a class="dropdown-item"
-                                           asp-controller="Settings"
-                                           asp-action="LayoutEditor"
-                                           asp-route-propertyId="@(ViewBag.CurrentProperty?.Id ?? 0)">
-                                            Edit Layout
-                                        </a>
-                                    </li>
-                                    <li><a class="dropdown-item" asp-controller="Properties" asp-action="Index">Properties</a></li>
-                                </ul>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Calendar" asp-action="Index">Calendar</a>
                             </li>
-                        }
-                    }
-                    else
-                    {
-                        <li class="nav-item"><a class="nav-link" asp-area="Identity" asp-page="/Account/Login">Login</a></li>
-                        <li class="nav-item"><a class="nav-link" asp-area="Identity" asp-page="/Account/Register">Register</a></li>
-                    }
-                </ul>
 
-                <ul class="navbar-nav ms-auto">
-                    @if (SignInManager.IsSignedIn(User))
-                    {
-                        var userProps = ViewBag.UserProperties as List<Property>;
-                        var currentProp = ViewBag.CurrentProperty as Property;
+                            var user = await UserManager.GetUserAsync(User);
+                            IList<string> roles = new List<string>();
+                            if (user is not null)
+                            {
+                                roles = await UserManager.GetRolesAsync(user);
+                            }
 
-                        if (userProps != null && userProps.Count > 1)
-                        {
-                            <li class="nav-item dropdown me-2">
-                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    @currentProp?.Name ?? "Select Property"
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    @foreach (var prop in userProps)
-                                    {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="WorkOrders" asp-action="Index">Work Orders</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="PassOnLogs" asp-action="Index">Pass On Logs</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Phonebook" asp-action="Index">Phonebook</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="LostAndFound" asp-action="Index">Lost &amp; Found</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Logs" asp-action="Index">Logs</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Reports" asp-action="Index">Reports</a>
+                            </li>
+
+                            if (roles.Contains("Manager") || roles.Contains("Admin"))
+                            {
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        Admin
+                                    </a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" asp-controller="Admin" asp-action="Dashboard">Dashboard</a></li>
                                         <li>
-                                            <a class="dropdown-item"
-                                               asp-controller="Home"
-                                               asp-action="SwitchProperty"
-                                               asp-route-propertyId="@prop.Id">
-                                                @prop.Name (@prop.Code)
+                                            <a class="dropdown-item d-flex justify-content-between align-items-center"
+                                               asp-controller="Admin"
+                                               asp-action="AccessRequests">
+                                                Access Requests
+                                                <span id="accessRequestBadge" class="badge bg-danger ms-2" style="display: none;"></span>
                                             </a>
                                         </li>
-                                    }
-                                </ul>
+                                        <li><a class="dropdown-item" asp-controller="Admin" asp-action="Users">Users</a></li>
+                                        <li><hr class="dropdown-divider" /></li>
+                                        <li class="dropdown-header">Settings</li>
+                                        <li><a class="dropdown-item" asp-controller="Settings" asp-action="Departments">Departments</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Settings" asp-action="WorkOrderTypes">Work Order Types</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Settings" asp-action="Rooms" asp-route-propertyId="@(ViewBag.CurrentProperty?.Id ?? 0)">Rooms</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Settings" asp-action="PhonebookTypes">Phonebook Types</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Settings" asp-action="CalendarCategories">Calendar Categories</a></li>
+                                        <li>
+                                            <a class="dropdown-item"
+                                               asp-controller="Settings"
+                                               asp-action="LayoutEditor"
+                                               asp-route-propertyId="@(ViewBag.CurrentProperty?.Id ?? 0)">
+                                                Edit Layout
+                                            </a>
+                                        </li>
+                                        <li><a class="dropdown-item" asp-controller="Properties" asp-action="Index">Properties</a></li>
+                                    </ul>
+                                </li>
+                            }
+                        }
+                        else
+                        {
+                            <li class="nav-item"><a class="nav-link" asp-area="Identity" asp-page="/Account/Login">Login</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-area="Identity" asp-page="/Account/Register">Register</a></li>
+                        }
+                    </ul>
+
+                    <ul class="navbar-nav ms-auto">
+                        @if (SignInManager.IsSignedIn(User))
+                        {
+                            var userProps = ViewBag.UserProperties as List<Property>;
+                            var currentProp = ViewBag.CurrentProperty as Property;
+
+                            if (userProps != null && userProps.Count > 1)
+                            {
+                                <li class="nav-item dropdown me-2">
+                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        @currentProp?.Name ?? "Select Property"
+                                    </a>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        @foreach (var prop in userProps)
+                                        {
+                                            var propertyLabel = string.IsNullOrWhiteSpace(prop.Code) ? prop.Name : $"{prop.Name} ({prop.Code})";
+
+                                            <li>
+                                                <a class="dropdown-item"
+                                                   asp-controller="Home"
+                                                   asp-action="SwitchProperty"
+                                                   asp-route-propertyId="@prop.Id">
+                                                    @propertyLabel
+                                                </a>
+                                            </li>
+                                        }
+                                    </ul>
+                                </li>
+                            }
+
+                            <li class="nav-item me-2">
+                                <a class="nav-link" asp-controller="Profile" asp-action="Index">My Profile</a>
+                            </li>
+
+                            <li class="nav-item">
+                                <form method="post" asp-area="Identity" asp-page="/Account/Logout">
+                                    <button type="submit" class="btn btn-link nav-link">Log Out</button>
+                                </form>
                             </li>
                         }
-
-                        <li class="nav-item me-2">
-                            <a class="nav-link" asp-controller="Profile" asp-action="Index">My Profile</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <form method="post" asp-area="Identity" asp-page="/Account/Logout">
-                                <button type="submit" class="btn btn-link nav-link">Log Out</button>
-                            </form>
-                        </li>
-                    }
-                </ul>
-
+                    </ul>
+                </div>
             </div>
         </nav>
     </header>
