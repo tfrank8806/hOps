@@ -30,6 +30,8 @@ namespace hOps.web.Data
         public DbSet<CalendarEventProperty> CalendarEventProperties { get; set; }
         public DbSet<LostFoundEntry> LostFoundEntries { get; set; }
 
+        public DbSet<Bookmark> Bookmarks { get; set; }
+
         public DbSet<PassOnLog> PassOnLogs { get; set; }
         public DbSet<PassOnLogProperty> PassOnLogProperties { get; set; }
         public DbSet<PassOnLogComment> PassOnLogComments { get; set; }
@@ -127,6 +129,30 @@ namespace hOps.web.Data
                 .HasOne(c => c.CreatedBy)
                 .WithMany()
                 .HasForeignKey(c => c.CreatedById);
+
+            builder.Entity<Bookmark>()
+                .HasOne(b => b.CreatedBy)
+                .WithMany(u => u.CreatedBookmarks)
+                .HasForeignKey(b => b.CreatedById)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<Bookmark>()
+                .HasOne(b => b.Property)
+                .WithMany(p => p.Bookmarks)
+                .HasForeignKey(b => b.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<Bookmark>()
+                .Property(b => b.Name)
+                .HasMaxLength(200);
+
+            builder.Entity<Bookmark>()
+                .Property(b => b.Url)
+                .HasMaxLength(2048);
+
+            builder.Entity<Bookmark>()
+                .Property(b => b.Description)
+                .HasMaxLength(500);
         }
     }
 }

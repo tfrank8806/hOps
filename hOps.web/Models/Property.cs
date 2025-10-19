@@ -28,5 +28,7 @@ namespace hOps.web.Models
         public ICollection<WorkOrderProperty> WorkOrderLinks { get; set; } = new List<WorkOrderProperty>();
         public ICollection<CalendarEventProperty> CalendarEvents { get; set; } = new List<CalendarEventProperty>();
         public ICollection<LostFoundEntry> LostFoundEntries { get; set; } = new List<LostFoundEntry>();
+
+        public ICollection<Bookmark> Bookmarks { get; set; } = new List<Bookmark>();
     }
 }

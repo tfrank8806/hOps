@@ -1,0 +1,216 @@
+@model BookmarksIndexViewModel
+@{
+    ViewData["Title"] = "Bookmarks";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Bookmarks</h1>
+</div>
+
+@if (TempData["BookmarkSuccess"] is string successMessage)
+{
+    <div class="alert alert-success" role="alert">
+        @successMessage
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-xl-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Add Bookmark</h2>
+            </div>
+            <div class="card-body">
+                <form asp-action="Create" method="post" novalidate>
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                    <div class="mb-3">
+                        <label asp-for="Form.Name" class="form-label"></label>
+                        <input asp-for="Form.Name" class="form-control" />
+                        <span asp-validation-for="Form.Name" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Form.Url" class="form-label"></label>
+                        <input asp-for="Form.Url" class="form-control" placeholder="https://example.com" />
+                        <span asp-validation-for="Form.Url" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Form.Description" class="form-label"></label>
+                        <textarea asp-for="Form.Description" class="form-control" rows="3"></textarea>
+                        <span asp-validation-for="Form.Description" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Form.Section" class="form-label">Add To</label>
+                        <select asp-for="Form.Section" class="form-select">
+                            <option value="@BookmarkSection.User">User Bookmarks</option>
+                            @if (Model.HasCurrentProperty && Model.CanManagePropertyBookmarks)
+                            {
+                                <option value="@BookmarkSection.Property">Property Bookmarks (@(Model.CurrentPropertyName ?? "Current Property"))</option>
+                            }
+                            @if (Model.HasCurrentProperty)
+                            {
+                                <option value="@BookmarkSection.Team">Team Bookmarks (@(Model.CurrentPropertyName ?? "Current Property"))</option>
+                            }
+                        </select>
+                        <span asp-validation-for="Form.Section" class="text-danger"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Add Bookmark</button>
+                </form>
+                @if (!Model.HasCurrentProperty)
+                {
+                    <div class="alert alert-info mt-3" role="alert">
+                        Select a property to add team or property bookmarks.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-8">
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h2 class="h5 mb-0">Property Bookmarks</h2>
+                        @if (Model.HasCurrentProperty && Model.CurrentPropertyName is not null)
+                        {
+                            <span class="badge bg-light text-dark">@Model.CurrentPropertyName</span>
+                        }
+                    </div>
+                    <div class="card-body">
+                        @if (!Model.HasCurrentProperty)
+                        {
+                            <p class="text-muted mb-0">Select a property to view property bookmarks.</p>
+                        }
+                        else if (Model.PropertyBookmarks.Count == 0)
+                        {
+                            <p class="text-muted mb-0">No property bookmarks have been added yet.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-group list-group-flush">
+                                @foreach (var bookmark in Model.PropertyBookmarks)
+                                {
+                                    <li class="list-group-item px-0">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
+                                                @if (!string.IsNullOrWhiteSpace(bookmark.Description))
+                                                {
+                                                    <div class="text-muted small mt-1">@bookmark.Description</div>
+                                                }
+                                                @if (bookmark.CreatedBy is not null)
+                                                {
+                                                    var first = bookmark.CreatedBy.FirstName;
+                                                    var last = bookmark.CreatedBy.LastName;
+                                                    var displayName = !string.IsNullOrWhiteSpace(first) && !string.IsNullOrWhiteSpace(last)
+                                                        ? $"{first} {last}"
+                                                        : !string.IsNullOrWhiteSpace(first)
+                                                            ? first!
+                                                            : !string.IsNullOrWhiteSpace(last)
+                                                                ? last!
+                                                                : bookmark.CreatedBy.Email ?? "Unknown";
+                                                    <div class="text-muted small mt-1">Added by @displayName</div>
+                                                }
+                                            </div>
+                                            <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">Open</a>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h2 class="h5 mb-0">Team Bookmarks</h2>
+                        @if (Model.HasCurrentProperty && Model.CurrentPropertyName is not null)
+                        {
+                            <span class="badge bg-light text-dark">@Model.CurrentPropertyName</span>
+                        }
+                    </div>
+                    <div class="card-body">
+                        @if (!Model.HasCurrentProperty)
+                        {
+                            <p class="text-muted mb-0">Select a property to view team bookmarks.</p>
+                        }
+                        else if (Model.TeamBookmarks.Count == 0)
+                        {
+                            <p class="text-muted mb-0">No team bookmarks have been added yet.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-group list-group-flush">
+                                @foreach (var bookmark in Model.TeamBookmarks)
+                                {
+                                    <li class="list-group-item px-0">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
+                                                @if (!string.IsNullOrWhiteSpace(bookmark.Description))
+                                                {
+                                                    <div class="text-muted small mt-1">@bookmark.Description</div>
+                                                }
+                                                @if (bookmark.CreatedBy is not null)
+                                                {
+                                                    var first = bookmark.CreatedBy.FirstName;
+                                                    var last = bookmark.CreatedBy.LastName;
+                                                    var displayName = !string.IsNullOrWhiteSpace(first) && !string.IsNullOrWhiteSpace(last)
+                                                        ? $"{first} {last}"
+                                                        : !string.IsNullOrWhiteSpace(first)
+                                                            ? first!
+                                                            : !string.IsNullOrWhiteSpace(last)
+                                                                ? last!
+                                                                : bookmark.CreatedBy.Email ?? "Unknown";
+                                                    <div class="text-muted small mt-1">Added by @displayName</div>
+                                                }
+                                            </div>
+                                            <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">Open</a>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h2 class="h5 mb-0">Your Bookmarks</h2>
+                    </div>
+                    <div class="card-body">
+                        @if (Model.UserBookmarks.Count == 0)
+                        {
+                            <p class="text-muted mb-0">You haven't added any personal bookmarks yet.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-group list-group-flush">
+                                @foreach (var bookmark in Model.UserBookmarks)
+                                {
+                                    <li class="list-group-item px-0">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
+                                                @if (!string.IsNullOrWhiteSpace(bookmark.Description))
+                                                {
+                                                    <div class="text-muted small mt-1">@bookmark.Description</div>
+                                                }
+                                            </div>
+                                            <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">Open</a>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -13,5 +13,7 @@ namespace hOps.web.Models
         public ICollection<UserPropertyAccess>? UserPropertyAccesses { get; set; }
 
         public ICollection<CalendarEvent> CreatedCalendarEvents { get; set; } = new List<CalendarEvent>();
+
+        public ICollection<Bookmark> CreatedBookmarks { get; set; } = new List<Bookmark>();
     }
 }
