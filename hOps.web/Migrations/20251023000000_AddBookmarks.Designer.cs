@@ -534,7 +534,7 @@ namespace hOps.web.Migrations
                     b.ToTable("PhonebookContacts");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Property", b =>
+            modelBuilder.Entity<Property>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
