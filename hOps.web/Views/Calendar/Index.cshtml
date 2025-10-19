@@ -1,28 +1,30 @@
 @model CalendarViewModel
 @{
     ViewData["Title"] = "Calendar";
+    ViewData["MainContainerClass"] = "main-inner--wide";
     var dayHeaders = new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
     var disableForm = !Model.AccessibleProperties.Any();
 }
 
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
-    <h1 class="h3 mb-0">Calendar</h1>
-    <div class="d-flex align-items-center gap-2">
-        <a class="btn btn-outline-secondary btn-sm"
-           asp-action="Index"
-           asp-route-year="@Model.PreviousMonth.Year"
-           asp-route-month="@Model.PreviousMonth.Month">
-            &laquo; @Model.PreviousMonth.ToString("MMM yyyy")
-        </a>
-        <span class="fw-semibold">@Model.CurrentMonth.ToString("MMMM yyyy")</span>
-        <a class="btn btn-outline-secondary btn-sm"
-           asp-action="Index"
-           asp-route-year="@Model.NextMonth.Year"
-           asp-route-month="@Model.NextMonth.Month">
-            @Model.NextMonth.ToString("MMM yyyy") &raquo;
-        </a>
+<div class="calendar-page">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+        <h1 class="h3 mb-0">Calendar</h1>
+        <div class="d-flex align-items-center gap-2">
+            <a class="btn btn-outline-secondary btn-sm"
+               asp-action="Index"
+               asp-route-year="@Model.PreviousMonth.Year"
+               asp-route-month="@Model.PreviousMonth.Month">
+                &laquo; @Model.PreviousMonth.ToString("MMM yyyy")
+            </a>
+            <span class="fw-semibold">@Model.CurrentMonth.ToString("MMMM yyyy")</span>
+            <a class="btn btn-outline-secondary btn-sm"
+               asp-action="Index"
+               asp-route-year="@Model.NextMonth.Year"
+               asp-route-month="@Model.NextMonth.Month">
+                @Model.NextMonth.ToString("MMM yyyy") &raquo;
+            </a>
+        </div>
     </div>
-</div>
 
 @if (ViewBag.SuccessMessage is string successMessage)
 {
@@ -39,235 +41,240 @@
     </div>
 }
 
-<div class="row">
-    <div class="col-lg-8 mb-4">
-        <div class="table-responsive shadow-sm border rounded overflow-hidden">
-            <table class="table table-bordered mb-0 calendar-table">
-                <thead class="table-light">
-                    <tr>
-                        @foreach (var header in dayHeaders)
-                        {
-                            <th scope="col" class="text-center">@header</th>
-                        }
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (var index = 0; index < Model.Days.Count; index += 7)
-                    {
-                        <tr>
-                            @for (var offset = 0; offset < 7; offset++)
-                            {
-                                var day = Model.Days[index + offset];
-                                var isToday = day.Date.Date == DateTime.Today;
-                                var cellClasses = $"calendar-day {(day.IsCurrentMonth ? string.Empty : "calendar-day--muted")}";
-                                if (isToday)
+    <div class="calendar-page__layout">
+        <section class="calendar-page__calendar">
+            <div class="calendar-page__calendar-surface shadow-sm border rounded overflow-hidden">
+                <div class="table-responsive">
+                    <table class="table table-bordered mb-0 calendar-table">
+                        <thead class="table-light">
+                            <tr>
+                                @foreach (var header in dayHeaders)
                                 {
-                                    cellClasses += " calendar-day--today";
+                                    <th scope="col" class="text-center">@header</th>
                                 }
-                                <td class="@cellClasses">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <span class="fw-semibold">@day.Date.Day</span>
-                                        @if (isToday)
-                                        {
-                                            <span class="badge bg-primary">Today</span>
-                                        }
-                                    </div>
-                                    <div class="calendar-day-events mt-2">
-                                        @if (day.Events.Any())
-                                        {
-                                            foreach (var calendarEvent in day.Events)
-                                            {
-                                                <button type="button"
-                                                        class="btn btn-sm text-start w-100 calendar-event"
-                                                        data-calendar-event="true"
-                                                        data-event-id="@calendarEvent.Id"
-                                                        data-event-title="@calendarEvent.Title"
-                                                        data-event-category="@calendarEvent.CategoryName"
-                                                        data-event-color="@calendarEvent.CategoryColor"
-                                                        data-event-date="@calendarEvent.DateDisplay"
-                                                        data-event-time="@(calendarEvent.TimeDisplay ?? string.Empty)"
-                                                        data-event-recurrence="@calendarEvent.RecurrenceDisplay"
-                                                        data-event-details="@(calendarEvent.Details ?? string.Empty)"
-                                                        data-event-properties="@calendarEvent.PropertiesDisplay"
-                                                        data-event-created-by="@calendarEvent.CreatedByDisplay"
-                                                        data-event-created-at="@calendarEvent.CreatedAtUtc.ToLocalTime().ToString("f")">
-                                                    <span class="calendar-event-indicator" style="background-color: @calendarEvent.CategoryColor"></span>
-                                                    <span class="calendar-event-title">@calendarEvent.Title</span>
-                                                </button>
-                                            }
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted small">No events</span>
-                                        }
-                                    </div>
-                                </td>
-                            }
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </div>
-    <div class="col-lg-4 mb-4">
-        <div class="card shadow-sm mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Upcoming Events</span>
-                <span class="badge bg-secondary">Next 10</span>
-            </div>
-            <div class="list-group list-group-flush">
-                @if (Model.UpcomingEvents.Any())
-                {
-                    foreach (var upcoming in Model.UpcomingEvents)
-                    {
-                        <button type="button"
-                                class="list-group-item list-group-item-action d-flex flex-column gap-1"
-                                data-calendar-event="true"
-                                data-event-id="@upcoming.Id"
-                                data-event-title="@upcoming.Title"
-                                data-event-category="@upcoming.CategoryName"
-                                data-event-color="@upcoming.CategoryColor"
-                                data-event-date="@upcoming.DateDisplay"
-                                data-event-time="@(upcoming.TimeDisplay ?? string.Empty)"
-                                data-event-recurrence="@upcoming.RecurrenceDisplay"
-                                data-event-details="@(upcoming.Details ?? string.Empty)"
-                                data-event-properties="@upcoming.PropertiesDisplay"
-                                data-event-created-by="@upcoming.CreatedByDisplay"
-                                data-event-created-at="@upcoming.CreatedAtUtc.ToLocalTime().ToString("f")">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="fw-semibold">@upcoming.Title</span>
-                                <span class="badge" style="background-color: @upcoming.CategoryColor">@upcoming.CategoryName</span>
-                            </div>
-                            <small class="text-muted">@upcoming.DateDisplay</small>
-                            @if (!string.IsNullOrWhiteSpace(upcoming.TimeDisplay))
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (var index = 0; index < Model.Days.Count; index += 7)
                             {
-                                <small class="text-muted">@upcoming.TimeDisplay</small>
+                                <tr>
+                                    @for (var offset = 0; offset < 7; offset++)
+                                    {
+                                        var day = Model.Days[index + offset];
+                                        var isToday = day.Date.Date == DateTime.Today;
+                                        var cellClasses = $"calendar-day {(day.IsCurrentMonth ? string.Empty : "calendar-day--muted")}";
+                                        if (isToday)
+                                        {
+                                            cellClasses += " calendar-day--today";
+                                        }
+                                        <td class="@cellClasses">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <span class="fw-semibold">@day.Date.Day</span>
+                                                @if (isToday)
+                                                {
+                                                    <span class="badge bg-primary">Today</span>
+                                                }
+                                            </div>
+                                            <div class="calendar-day-events mt-2">
+                                                @if (day.Events.Any())
+                                                {
+                                                    foreach (var calendarEvent in day.Events)
+                                                    {
+                                                        <button type="button"
+                                                                class="btn btn-sm text-start w-100 calendar-event"
+                                                                data-calendar-event="true"
+                                                                data-event-id="@calendarEvent.Id"
+                                                                data-event-title="@calendarEvent.Title"
+                                                                data-event-category="@calendarEvent.CategoryName"
+                                                                data-event-color="@calendarEvent.CategoryColor"
+                                                                data-event-date="@calendarEvent.DateDisplay"
+                                                                data-event-time="@(calendarEvent.TimeDisplay ?? string.Empty)"
+                                                                data-event-recurrence="@calendarEvent.RecurrenceDisplay"
+                                                                data-event-details="@(calendarEvent.Details ?? string.Empty)"
+                                                                data-event-properties="@calendarEvent.PropertiesDisplay"
+                                                                data-event-created-by="@calendarEvent.CreatedByDisplay"
+                                                                data-event-created-at="@calendarEvent.CreatedAtUtc.ToLocalTime().ToString("f")">
+                                                            <span class="calendar-event-indicator" style="background-color: @calendarEvent.CategoryColor"></span>
+                                                            <span class="calendar-event-title">@calendarEvent.Title</span>
+                                                        </button>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted small">No events</span>
+                                                }
+                                            </div>
+                                        </td>
+                                    }
+                                </tr>
                             }
-                        </button>
-                    }
-                }
-                else
-                {
-                    <div class="list-group-item text-muted">No upcoming events.</div>
-                }
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        </section>
 
-        <div class="card shadow-sm">
-            <div class="card-header">
-                <span>Create Event</span>
-            </div>
-            <div class="card-body">
-                <form asp-action="Create" method="post">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="month" value="@Model.CurrentMonth.Month" />
-                    <input type="hidden" name="year" value="@Model.CurrentMonth.Year" />
-
-                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-
-                    <div class="mb-3">
-                        <label asp-for="Form.CategoryId" class="form-label"></label>
-                        <select asp-for="Form.CategoryId" class="form-select" asp-items="Model.CategoryOptions"></select>
-                        <span asp-validation-for="Form.CategoryId" class="text-danger"></span>
-                    </div>
-
-                    <div class="mb-3">
-                        <label asp-for="Form.Title" class="form-label"></label>
-                        <input asp-for="Form.Title" class="form-control" />
-                        <span asp-validation-for="Form.Title" class="text-danger"></span>
-                    </div>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label asp-for="Form.StartDate" class="form-label"></label>
-                            <input asp-for="Form.StartDate" class="form-control" />
-                            <span asp-validation-for="Form.StartDate" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-6">
-                            <label asp-for="Form.StartTime" class="form-label"></label>
-                            <input asp-for="Form.StartTime" class="form-control" />
-                            <span class="form-text">Optional</span>
-                            <span asp-validation-for="Form.StartTime" class="text-danger"></span>
-                        </div>
-                    </div>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label asp-for="Form.EndDate" class="form-label"></label>
-                            <input asp-for="Form.EndDate" class="form-control" />
-                            <span asp-validation-for="Form.EndDate" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-6">
-                            <label asp-for="Form.EndTime" class="form-label"></label>
-                            <input asp-for="Form.EndTime" class="form-control" />
-                            <span class="form-text">Optional</span>
-                            <span asp-validation-for="Form.EndTime" class="text-danger"></span>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label asp-for="Form.Recurrence" class="form-label"></label>
-                        <select asp-for="Form.Recurrence" class="form-select" asp-items="Html.GetEnumSelectList<CalendarRecurrenceType>()"></select>
-                        <span asp-validation-for="Form.Recurrence" class="text-danger"></span>
-                    </div>
-
-                    <div class="mb-3">
-                        <label asp-for="Form.Details" class="form-label"></label>
-                        <textarea asp-for="Form.Details" class="form-control" rows="3"></textarea>
-                        <span asp-validation-for="Form.Details" class="text-danger"></span>
-                    </div>
-
-                    @if (Model.ShowPropertySelection)
+        <aside class="calendar-page__sidebar">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Upcoming Events</span>
+                    <span class="badge bg-secondary">Next 10</span>
+                </div>
+                <div class="list-group list-group-flush">
+                    @if (Model.UpcomingEvents.Any())
                     {
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Properties</label>
-                            <div class="row g-2">
-                                @foreach (var property in Model.AccessibleProperties)
+                        foreach (var upcoming in Model.UpcomingEvents)
+                        {
+                            <button type="button"
+                                    class="list-group-item list-group-item-action d-flex flex-column gap-1"
+                                    data-calendar-event="true"
+                                    data-event-id="@upcoming.Id"
+                                    data-event-title="@upcoming.Title"
+                                    data-event-category="@upcoming.CategoryName"
+                                    data-event-color="@upcoming.CategoryColor"
+                                    data-event-date="@upcoming.DateDisplay"
+                                    data-event-time="@(upcoming.TimeDisplay ?? string.Empty)"
+                                    data-event-recurrence="@upcoming.RecurrenceDisplay"
+                                    data-event-details="@(upcoming.Details ?? string.Empty)"
+                                    data-event-properties="@upcoming.PropertiesDisplay"
+                                    data-event-created-by="@upcoming.CreatedByDisplay"
+                                    data-event-created-at="@upcoming.CreatedAtUtc.ToLocalTime().ToString("f")">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-semibold">@upcoming.Title</span>
+                                    <span class="badge" style="background-color: @upcoming.CategoryColor">@upcoming.CategoryName</span>
+                                </div>
+                                <small class="text-muted">@upcoming.DateDisplay</small>
+                                @if (!string.IsNullOrWhiteSpace(upcoming.TimeDisplay))
                                 {
-                                    var checkboxId = $"property_{property.Id}";
-                                    <div class="col-sm-6">
-                                        <div class="form-check">
-                                            <input class="form-check-input"
-                                                   type="checkbox"
-                                                   value="@property.Id"
-                                                   id="@checkboxId"
-                                                   name="Form.SelectedPropertyIds"
-                                                   @(Model.Form.SelectedPropertyIds.Contains(property.Id) ? "checked" : string.Empty) />
-                                            <label class="form-check-label" for="@checkboxId">
-                                                <span class="d-block">@property.Name</span>
-                                                <small class="text-muted">@property.Code</small>
-                                            </label>
+                                    <small class="text-muted">@upcoming.TimeDisplay</small>
+                                }
+                            </button>
+                        }
+                    }
+                    else
+                    {
+                        <div class="list-group-item text-muted">No upcoming events.</div>
+                    }
+                </div>
+            </div>
+
+            <div class="card shadow-sm calendar-page__form">
+                <div class="card-header">
+                    <span>Create Event</span>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Create" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="month" value="@Model.CurrentMonth.Month" />
+                        <input type="hidden" name="year" value="@Model.CurrentMonth.Year" />
+
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                        <div class="mb-3">
+                            <label asp-for="Form.CategoryId" class="form-label"></label>
+                            <select asp-for="Form.CategoryId" class="form-select" asp-items="Model.CategoryOptions"></select>
+                            <span asp-validation-for="Form.CategoryId" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Form.Title" class="form-label"></label>
+                            <input asp-for="Form.Title" class="form-control" />
+                            <span asp-validation-for="Form.Title" class="text-danger"></span>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label asp-for="Form.StartDate" class="form-label"></label>
+                                <input asp-for="Form.StartDate" class="form-control" />
+                                <span asp-validation-for="Form.StartDate" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="Form.StartTime" class="form-label"></label>
+                                <input asp-for="Form.StartTime" class="form-control" />
+                                <span class="form-text">Optional</span>
+                                <span asp-validation-for="Form.StartTime" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label asp-for="Form.EndDate" class="form-label"></label>
+                                <input asp-for="Form.EndDate" class="form-control" />
+                                <span asp-validation-for="Form.EndDate" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="Form.EndTime" class="form-label"></label>
+                                <input asp-for="Form.EndTime" class="form-control" />
+                                <span class="form-text">Optional</span>
+                                <span asp-validation-for="Form.EndTime" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Form.Recurrence" class="form-label"></label>
+                            <select asp-for="Form.Recurrence" class="form-select" asp-items="Html.GetEnumSelectList<CalendarRecurrenceType>()"></select>
+                            <span asp-validation-for="Form.Recurrence" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Form.Details" class="form-label"></label>
+                            <textarea asp-for="Form.Details" class="form-control" rows="3"></textarea>
+                            <span asp-validation-for="Form.Details" class="text-danger"></span>
+                        </div>
+
+                        @if (Model.ShowPropertySelection)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Properties</label>
+                                <div class="row g-2">
+                                    @foreach (var property in Model.AccessibleProperties)
+                                    {
+                                        var checkboxId = $"property_{property.Id}";
+                                        <div class="col-sm-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input"
+                                                       type="checkbox"
+                                                       value="@property.Id"
+                                                       id="@checkboxId"
+                                                       name="Form.SelectedPropertyIds"
+                                                       @(Model.Form.SelectedPropertyIds.Contains(property.Id) ? "checked" : string.Empty) />
+                                                <label class="form-check-label" for="@checkboxId">
+                                                    <span class="d-block">@property.Name</span>
+                                                    <small class="text-muted">@property.Code</small>
+                                                </label>
+                                            </div>
                                         </div>
-                                    </div>
-                                }
+                                    }
+                                </div>
+                                <span asp-validation-for="Form.SelectedPropertyIds" class="text-danger"></span>
                             </div>
-                            <span asp-validation-for="Form.SelectedPropertyIds" class="text-danger"></span>
-                        </div>
-                    }
-                    else if (Model.AccessibleProperties.Any())
-                    {
-                        foreach (var propertyId in Model.Form.SelectedPropertyIds)
-                        {
-                            <input type="hidden" name="Form.SelectedPropertyIds" value="@propertyId" />
                         }
-                        var singleProperty = Model.AccessibleProperties.FirstOrDefault();
-                        var propertyName = singleProperty?.Name ?? "Property";
-                        var propertyCode = singleProperty?.Code ?? "N/A";
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Property</label>
-                            <div class="form-control-plaintext">
-                                @propertyName <span class="text-muted">(@propertyCode)</span>
+                        else if (Model.AccessibleProperties.Any())
+                        {
+                            foreach (var propertyId in Model.Form.SelectedPropertyIds)
+                            {
+                                <input type="hidden" name="Form.SelectedPropertyIds" value="@propertyId" />
+                            }
+                            var singleProperty = Model.AccessibleProperties.FirstOrDefault();
+                            var propertyName = singleProperty?.Name ?? "Property";
+                            var propertyCode = singleProperty?.Code ?? "N/A";
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Property</label>
+                                <div class="form-control-plaintext">
+                                    @propertyName <span class="text-muted">(@propertyCode)</span>
+                                </div>
                             </div>
-                        </div>
-                    }
+                        }
 
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary" @(disableForm ? "disabled" : string.Empty)>Save Event</button>
-                    </div>
-                </form>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary" @(disableForm ? "disabled" : string.Empty)>Save Event</button>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </div>
+        </aside>
     </div>
+
 </div>
 
 <div class="modal fade" id="eventDetailsModal" tabindex="-1" aria-labelledby="eventDetailsLabel" aria-hidden="true">
