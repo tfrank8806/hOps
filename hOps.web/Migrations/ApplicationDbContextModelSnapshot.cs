@@ -329,7 +329,7 @@ namespace hOps.web.Migrations
                     b.ToTable("Departments");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Bookmark", b =>
+            modelBuilder.Entity<Bookmark>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1053,22 +1053,22 @@ namespace hOps.web.Migrations
                     b.Navigation("PassOnLog");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Bookmark", b =>
+            modelBuilder.Entity<Bookmark>(b =>
                 {
-                    b.HasOne("hOps.web.Models.ApplicationUser", "CreatedBy")
-                        .WithMany("CreatedBookmarks")
+                    b.HasOne(d => d.CreatedBy)
+                        .WithMany(p => p.CreatedBookmarks)
                         .HasForeignKey("CreatedById")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany("Bookmarks")
+                    b.HasOne(d => d.Property)
+                        .WithMany(p => p.Bookmarks)
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade);
 
-                    b.Navigation("CreatedBy");
+                    b.Navigation(e => e.CreatedBy);
 
-                    b.Navigation("Property");
+                    b.Navigation(e => e.Property);
                 });
 
             modelBuilder.Entity("hOps.web.Models.PassOnLogProperty", b =>
