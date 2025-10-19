@@ -249,7 +249,7 @@ namespace hOps.web.Migrations
                     b.ToTable("CalendarCategories");
                 });
 
-            modelBuilder.Entity(typeof(CalendarEvent), b =>
+            modelBuilder.Entity<CalendarEvent>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -297,7 +297,7 @@ namespace hOps.web.Migrations
                     b.ToTable("CalendarEvents");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarEventProperty", b =>
+            modelBuilder.Entity<CalendarEventProperty>(b =>
                 {
                     b.Property<int>("CalendarEventId")
                         .HasColumnType("INTEGER");
@@ -953,7 +953,7 @@ namespace hOps.web.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarEventProperty", b =>
+            modelBuilder.Entity<CalendarEventProperty>(b =>
                 {
                     b.HasOne("hOps.web.Models.CalendarEvent", "CalendarEvent")
                         .WithMany("EventProperties")
@@ -972,7 +972,7 @@ namespace hOps.web.Migrations
                     b.Navigation("Property");
                 });
 
-            modelBuilder.Entity(typeof(CalendarEvent), b =>
+            modelBuilder.Entity<CalendarEvent>(b =>
                 {
                     b.HasOne("hOps.web.Models.CalendarCategory", "Category")
                         .WithMany("Events")
@@ -1227,7 +1227,7 @@ namespace hOps.web.Migrations
                     b.Navigation("Events");
                 });
 
-            modelBuilder.Entity(typeof(CalendarEvent), b =>
+            modelBuilder.Entity<CalendarEvent>(b =>
                 {
                     b.Navigation("EventProperties");
                 });
