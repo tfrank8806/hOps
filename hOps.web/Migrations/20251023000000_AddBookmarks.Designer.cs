@@ -230,7 +230,7 @@ namespace hOps.web.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarCategory", b =>
+            modelBuilder.Entity<CalendarCategory>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1222,9 +1222,9 @@ namespace hOps.web.Migrations
                     b.Navigation("Views");
                 });
 
-            modelBuilder.Entity(typeof(CalendarCategory), b =>
+            modelBuilder.Entity<CalendarCategory>(b =>
                 {
-                    b.Navigation("Events");
+                    b.Navigation(e => e.Events);
                 });
 
             modelBuilder.Entity<CalendarEvent>(b =>
