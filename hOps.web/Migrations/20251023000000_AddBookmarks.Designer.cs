@@ -955,15 +955,15 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity<CalendarEventProperty>(b =>
                 {
-                    b.HasOne("hOps.web.Models.CalendarEvent", "CalendarEvent")
-                        .WithMany("EventProperties")
-                        .HasForeignKey("CalendarEventId")
+                    b.HasOne<CalendarEvent>(d => d.CalendarEvent)
+                        .WithMany(p => p.EventProperties)
+                        .HasForeignKey(d => d.CalendarEventId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany("CalendarEvents")
-                        .HasForeignKey("PropertyId")
+                    b.HasOne<Property>(d => d.Property)
+                        .WithMany(p => p.CalendarEvents)
+                        .HasForeignKey(d => d.PropertyId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -990,7 +990,7 @@ namespace hOps.web.Migrations
 
                     b.Navigation("CreatedBy");
 
-                    b.Navigation("EventProperties");
+                    b.Navigation(e => e.EventProperties);
                 });
 
             modelBuilder.Entity("hOps.web.Models.PhonebookContact", b =>
@@ -1229,7 +1229,7 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity<CalendarEvent>(b =>
                 {
-                    b.Navigation("EventProperties");
+                    b.Navigation(e => e.EventProperties);
                 });
 
             modelBuilder.Entity(typeof(Property), b =>
