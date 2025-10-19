@@ -274,7 +274,7 @@ namespace hOps.web.Migrations
                     b.Property<TimeSpan?>("EndTime")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Recurrence")
+                    b.Property<CalendarRecurrenceType>("Recurrence")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("StartDate")
