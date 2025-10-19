@@ -80,6 +80,12 @@ namespace hOps.web.Data
                 .WithMany(p => p.CalendarEvents)
                 .HasForeignKey(cep => cep.PropertyId);
 
+            builder.Entity<CalendarEventProperty>()
+                .HasOne(cep => cep.CalendarEvent)
+                .WithMany(e => e.EventProperties)
+                .HasForeignKey(cep => cep.CalendarEventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             builder.Entity<CalendarEvent>()
                 .HasMany(e => e.EventProperties)
                 .WithOne(ep => ep.CalendarEvent)
