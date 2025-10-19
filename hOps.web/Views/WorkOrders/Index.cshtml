@@ -5,6 +5,44 @@
     bool showPropertySelector = Model.PropertyOptions.Count > 1;
 }
 
+@section Styles {
+    <style>
+        @media print {
+            body {
+                background: #fff !important;
+            }
+
+            body * {
+                visibility: hidden;
+            }
+
+            #workorders-print-area,
+            #workorders-print-area * {
+                visibility: visible;
+            }
+
+            #workorders-print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 0 1.5rem;
+                background: #fff;
+            }
+
+            #workorders-print-area .card {
+                box-shadow: none !important;
+                border: none !important;
+            }
+
+            #workorders-print-area .card-header .btn,
+            #workorders-print-area .card-header a {
+                display: none !important;
+            }
+        }
+    </style>
+}
+
 <div class="row g-4">
     <div class="col-lg-4">
         <div class="card shadow-sm">
@@ -200,100 +238,107 @@
             </div>
         </div>
 
-        <div class="card shadow-sm">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Work Orders (@Model.WorkOrders.Count)</h5>
-                <a asp-action="Export"
-                   asp-route-SortOrder="@Model.Filters.SortOrder"
-                   asp-route-RoomNumber="@Model.Filters.RoomNumber"
-                   asp-route-DepartmentId="@Model.Filters.DepartmentId"
-                   asp-route-WorkOrderTypeId="@Model.Filters.WorkOrderTypeId"
-                   asp-route-Status="@Model.Filters.Status"
-                   asp-route-CreatorId="@Model.Filters.CreatorId"
-                   asp-route-Search="@Model.Filters.Search"
-                   asp-route-PropertyId="@Model.Filters.PropertyId"
-                   class="btn btn-outline-success btn-sm">
-                    Export to Excel
-                </a>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Status</th>
-                            <th>Location</th>
-                            <th>Department</th>
-                            <th>Type</th>
-                            <th>Issue</th>
-                            <th>Due</th>
-                            <th>Created</th>
-                            <th>Creator</th>
-                            <th>Property</th>
-                            <th>Attachments</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @if (!Model.WorkOrders.Any())
-                        {
+        <div id="workorders-print-area">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                    <h5 class="mb-0">Work Orders (@Model.WorkOrders.Count)</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="printWorkOrdersButton">
+                            Print Current List
+                        </button>
+                        <a asp-action="Export"
+                           asp-route-SortOrder="@Model.Filters.SortOrder"
+                           asp-route-RoomNumber="@Model.Filters.RoomNumber"
+                           asp-route-DepartmentId="@Model.Filters.DepartmentId"
+                           asp-route-WorkOrderTypeId="@Model.Filters.WorkOrderTypeId"
+                           asp-route-Status="@Model.Filters.Status"
+                           asp-route-CreatorId="@Model.Filters.CreatorId"
+                           asp-route-Search="@Model.Filters.Search"
+                           asp-route-PropertyId="@Model.Filters.PropertyId"
+                           class="btn btn-outline-success btn-sm">
+                            Export to Excel
+                        </a>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
                             <tr>
-                                <td colspan="10" class="text-center py-4">No work orders found. Adjust filters or create a new work order.</td>
+                                <th>Status</th>
+                                <th>Location</th>
+                                <th>Department</th>
+                                <th>Type</th>
+                                <th>Issue</th>
+                                <th>Due</th>
+                                <th>Created</th>
+                                <th>Creator</th>
+                                <th>Property</th>
+                                <th>Attachments</th>
                             </tr>
-                        }
-                        else
-                        {
-                            foreach (var order in Model.WorkOrders)
+                        </thead>
+                        <tbody>
+                            @if (!Model.WorkOrders.Any())
                             {
-                                var isPastDue = order.DueDate.Date < DateTime.Today;
-                                <tr style="border-left: 4px solid @order.StatusColor;">
-                                    <td>
-                                        <span class="badge" style="background-color:@order.StatusColor;">@order.Status</span>
-                                    </td>
-                                    <td>
-                                        <div class="fw-semibold">@order.Location</div>
-                                        @if (!string.IsNullOrWhiteSpace(order.Details))
-                                        {
-                                            <small class="text-muted">@order.Details</small>
-                                        }
-                                    </td>
-                                    <td>
-                                        @if (!string.IsNullOrWhiteSpace(order.Department))
-                                        {
-                                            <span class="badge" style="background-color:@order.DepartmentColor;">@order.Department</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted">Unassigned</span>
-                                        }
-                                    </td>
-                                    <td>@order.WorkOrderType</td>
-                                    <td>@order.Issue</td>
-                                    <td class="@(isPastDue ? "fw-bold text-danger" : string.Empty)">@order.DueDate.ToString("MMM dd, yyyy")</td>
-                                    <td>@order.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
-                                    <td>@(string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator)</td>
-                                    <td>
-                                        @foreach (var property in order.Properties)
-                                        {
-                                            <div>@property</div>
-                                        }
-                                    </td>
-                                    <td>
-                                        @if (order.Attachments.Any())
-                                        {
-                                            foreach (var attachment in order.Attachments)
-                                            {
-                                                <a href="@attachment.FilePath" target="_blank" class="d-block">@attachment.FileName</a>
-                                            }
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted">None</span>
-                                        }
-                                    </td>
+                                <tr>
+                                    <td colspan="10" class="text-center py-4">No work orders found. Adjust filters or create a new work order.</td>
                                 </tr>
                             }
-                        }
-                    </tbody>
-                </table>
+                            else
+                            {
+                                foreach (var order in Model.WorkOrders)
+                                {
+                                    var isPastDue = order.DueDate.Date < DateTime.Today;
+                                    <tr style="border-left: 4px solid @order.StatusColor;">
+                                        <td>
+                                            <span class="badge" style="background-color:@order.StatusColor;">@order.Status</span>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold">@order.Location</div>
+                                            @if (!string.IsNullOrWhiteSpace(order.Details))
+                                            {
+                                                <small class="text-muted">@order.Details</small>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (!string.IsNullOrWhiteSpace(order.Department))
+                                            {
+                                                <span class="badge" style="background-color:@order.DepartmentColor;">@order.Department</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">Unassigned</span>
+                                            }
+                                        </td>
+                                        <td>@order.WorkOrderType</td>
+                                        <td>@order.Issue</td>
+                                        <td class="@(isPastDue ? "fw-bold text-danger" : string.Empty)">@order.DueDate.ToString("MMM dd, yyyy")</td>
+                                        <td>@order.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                                        <td>@(string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator)</td>
+                                        <td>
+                                            @foreach (var property in order.Properties)
+                                            {
+                                                <div>@property</div>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (order.Attachments.Any())
+                                            {
+                                                foreach (var attachment in order.Attachments)
+                                                {
+                                                    <a href="@attachment.FilePath" target="_blank" class="d-block">@attachment.FileName</a>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">None</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -301,4 +346,16 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            const printButton = document.getElementById('printWorkOrdersButton');
+            if (!printButton) {
+                return;
+            }
+
+            printButton.addEventListener('click', function () {
+                window.print();
+            });
+        })();
+    </script>
 }
