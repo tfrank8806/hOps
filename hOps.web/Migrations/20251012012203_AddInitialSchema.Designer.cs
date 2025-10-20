@@ -292,7 +292,7 @@ namespace hOps.web.Migrations
                     b.ToTable("UserAccessRequests");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.UserPropertyAccess", b =>
+            modelBuilder.Entity<UserPropertyAccess>(b =>
                 {
                     b.Property<string>("ApplicationUserId")
                         .HasColumnType("TEXT");
@@ -358,28 +358,28 @@ namespace hOps.web.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("hOps.web.Models.UserPropertyAccess", b =>
+            modelBuilder.Entity<UserPropertyAccess>(b =>
                 {
-                    b.HasOne("hOps.web.Models.ApplicationUser", "ApplicationUser")
-                        .WithMany("PropertyAccesses")
+                    b.HasOne(upa => upa.ApplicationUser)
+                        .WithMany(u => u.UserPropertyAccesses)
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("hOps.web.Models.Property", "Property")
+                    b.HasOne(upa => upa.Property)
                         .WithMany()
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("ApplicationUser");
+                    b.Navigation(upa => upa.ApplicationUser);
 
-                    b.Navigation("Property");
+                    b.Navigation(upa => upa.Property);
                 });
 
             modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
                 {
-                    b.Navigation("PropertyAccesses");
+                    b.Navigation(u => u.UserPropertyAccesses);
                 });
 #pragma warning restore 612, 618
         }
