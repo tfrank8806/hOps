@@ -93,7 +93,8 @@
                                                                 data-event-details="@(calendarEvent.Details ?? string.Empty)"
                                                                 data-event-properties="@calendarEvent.PropertiesDisplay"
                                                                 data-event-created-by="@calendarEvent.CreatedByDisplay"
-                                                                data-event-created-at="@calendarEvent.CreatedAtUtc.ToLocalTime().ToString("f")">
+                                                                data-event-created-at="@calendarEvent.CreatedAtUtc.ToLocalTime().ToString("f")"
+                                                                data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = calendarEvent.Id })">
                                                             <span class="calendar-event-indicator" style="background-color: @calendarEvent.CategoryColor"></span>
                                                             <span class="calendar-event-title">@calendarEvent.Title</span>
                                                         </button>
@@ -138,7 +139,8 @@
                                     data-event-details="@(upcoming.Details ?? string.Empty)"
                                     data-event-properties="@upcoming.PropertiesDisplay"
                                     data-event-created-by="@upcoming.CreatedByDisplay"
-                                    data-event-created-at="@upcoming.CreatedAtUtc.ToLocalTime().ToString("f")">
+                                    data-event-created-at="@upcoming.CreatedAtUtc.ToLocalTime().ToString("f")"
+                                    data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = upcoming.Id })">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="fw-semibold">@upcoming.Title</span>
                                     <span class="badge" style="background-color: @upcoming.CategoryColor">@upcoming.CategoryName</span>
@@ -311,6 +313,10 @@
                     <dd class="col-sm-8" data-details="created-at"></dd>
                 </dl>
             </div>
+            <div class="modal-footer">
+                <a class="btn btn-primary d-none" data-details="edit-link" href="#">Edit Event</a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
         </div>
     </div>
 </div>
@@ -334,6 +340,7 @@
             const detailsEl = modalElement.querySelector('[data-details="details"]');
             const createdByEl = modalElement.querySelector('[data-details="created-by"]');
             const createdAtEl = modalElement.querySelector('[data-details="created-at"]');
+            const editButton = modalElement.querySelector('[data-details="edit-link"]');
 
             const renderDetails = (value) => {
                 if (!value) {
@@ -355,6 +362,18 @@
                 detailsEl.innerHTML = renderDetails(dataset.eventDetails);
                 createdByEl.textContent = dataset.eventCreatedBy || 'Unknown';
                 createdAtEl.textContent = dataset.eventCreatedAt || '';
+
+                if (editButton) {
+                    const editUrl = dataset.eventEditUrl;
+                    if (editUrl) {
+                        editButton.classList.remove('d-none');
+                        editButton.setAttribute('href', editUrl);
+                    } else {
+                        editButton.classList.add('d-none');
+                        editButton.removeAttribute('href');
+                    }
+                }
+
                 modal.show();
             };
 
