@@ -1,6 +1,0 @@
-C:\hOps\hOps.web.Tests\obj\Debug\net8.0\hOps.web.Tests.csproj.AssemblyReference.cache
-C:\hOps\hOps.web.Tests\obj\Debug\net8.0\hOps.web.Tests.GeneratedMSBuildEditorConfig.editorconfig
-C:\hOps\hOps.web.Tests\obj\Debug\net8.0\hOps.web.Tests.AssemblyInfoInputs.cache
-C:\hOps\hOps.web.Tests\obj\Debug\net8.0\hOps.web.Tests.AssemblyInfo.cs
-C:\hOps\hOps.web.Tests\obj\Debug\net8.0\hOps.web.Tests.csproj.CoreCompileInputs.cache
-C:\hOps\hOps.web.Tests\obj\Debug\net8.0\hOps.web.Tests.sourcelink.json
