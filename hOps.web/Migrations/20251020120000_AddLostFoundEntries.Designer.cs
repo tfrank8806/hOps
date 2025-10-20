@@ -523,7 +523,7 @@ namespace hOps.web.Migrations
                     b.ToTable("LostFoundEntries");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.UserPropertyAccess", b =>
+            modelBuilder.Entity<UserPropertyAccess>(b =>
                 {
                     b.Property<string>("ApplicationUserId")
                         .HasColumnType("TEXT");
@@ -610,24 +610,24 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity("hOps.web.Models.Room", b =>
                 {
-                    b.HasOne("hOps.web.Models.Property", "Property")
+                    b.HasOne(upa => upa.Property)
                         .WithMany("Rooms")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Property");
+                    b.Navigation(upa => upa.Property);
                 });
 
             modelBuilder.Entity("hOps.web.Models.RoomLayout", b =>
                 {
-                    b.HasOne("hOps.web.Models.Property", "Property")
+                    b.HasOne(upa => upa.Property)
                         .WithMany()
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Property");
+                    b.Navigation(upa => upa.Property);
                 });
 
             modelBuilder.Entity<LostFoundEntry>(b =>
@@ -638,7 +638,7 @@ namespace hOps.web.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("hOps.web.Models.Property", "Property")
+                    b.HasOne(upa => upa.Property)
                         .WithMany("LostFoundEntries")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -646,31 +646,31 @@ namespace hOps.web.Migrations
 
                     b.Navigation("CreatedByUser");
 
-                    b.Navigation("Property");
+                    b.Navigation(upa => upa.Property);
                 });
 
-            modelBuilder.Entity("hOps.web.Models.UserPropertyAccess", b =>
+            modelBuilder.Entity<UserPropertyAccess>(b =>
                 {
-                    b.HasOne("hOps.web.Models.ApplicationUser", "ApplicationUser")
-                        .WithMany("UserPropertyAccesses")
+                    b.HasOne(upa => upa.ApplicationUser)
+                        .WithMany(u => u.UserPropertyAccesses)
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany("UserAccesses")
+                    b.HasOne(upa => upa.Property)
+                        .WithMany(p => p.UserAccesses)
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("ApplicationUser");
+                    b.Navigation(upa => upa.ApplicationUser);
 
-                    b.Navigation("Property");
+                    b.Navigation(upa => upa.Property);
                 });
 
             modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
                 {
-                    b.Navigation("UserPropertyAccesses");
+                    b.Navigation(u => u.UserPropertyAccesses);
                 });
 
             modelBuilder.Entity("hOps.web.Models.Property", b =>
