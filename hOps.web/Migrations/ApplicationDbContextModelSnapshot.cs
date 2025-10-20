@@ -967,7 +967,7 @@ namespace hOps.web.Migrations
 
                     b.Navigation("CalendarEvent");
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity<CalendarEvent>(b =>
@@ -988,7 +988,7 @@ namespace hOps.web.Migrations
 
                     b.Navigation("CreatedBy");
 
-                    b.Navigation(e => e.EventProperties);
+                    b.Navigation("EventProperties");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PhonebookContact", b =>
@@ -1003,24 +1003,24 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity("hOps.web.Models.Room", b =>
                 {
-                    b.HasOne(upa => upa.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany("Rooms")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity("hOps.web.Models.RoomLayout", b =>
                 {
-                    b.HasOne(upa => upa.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany()
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PassOnLog", b =>
@@ -1055,20 +1055,20 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity<Bookmark>(b =>
                 {
-                    b.HasOne(d => d.CreatedBy)
+                    b.HasOne("hOps.web.Models.ApplicationUser", "CreatedBy")
                         .WithMany(p => p.CreatedBookmarks)
                         .HasForeignKey("CreatedById")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne(d => d.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany(p => p.Bookmarks)
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade);
 
-                    b.Navigation(e => e.CreatedBy);
+                    b.Navigation("CreatedBy");
 
-                    b.Navigation(e => e.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PassOnLogProperty", b =>
@@ -1079,7 +1079,7 @@ namespace hOps.web.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne(upa => upa.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany()
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1087,7 +1087,7 @@ namespace hOps.web.Migrations
 
                     b.Navigation("PassOnLog");
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity<LostFoundEntry>(b =>
@@ -1098,7 +1098,7 @@ namespace hOps.web.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne(upa => upa.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany("LostFoundEntries")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1106,7 +1106,7 @@ namespace hOps.web.Migrations
 
                     b.Navigation("CreatedByUser");
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PassOnLogView", b =>
@@ -1130,76 +1130,76 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity<UserPropertyAccess>(b =>
                 {
-                    b.HasOne(upa => upa.ApplicationUser)
+                    b.HasOne("hOps.web.Models.ApplicationUser", "ApplicationUser")
                         .WithMany(u => u.UserPropertyAccesses)
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne(upa => upa.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany(p => p.UserAccesses)
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation(upa => upa.ApplicationUser);
+                    b.Navigation("ApplicationUser");
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity<WorkOrder>(b =>
                 {
-                    b.HasOne(e => e.CreatedBy)
+                    b.HasOne("hOps.web.Models.ApplicationUser", "CreatedBy")
                         .WithMany()
                         .HasForeignKey(e => e.CreatedById);
 
-                    b.HasOne(e => e.Department)
+                    b.HasOne("hOps.web.Models.Department", "Department")
                         .WithMany()
                         .HasForeignKey(e => e.DepartmentId);
 
-                    b.HasOne(e => e.WorkOrderType)
+                    b.HasOne("hOps.web.Models.WorkOrderType", "WorkOrderType")
                         .WithMany()
                         .HasForeignKey(e => e.WorkOrderTypeId);
 
-                    b.Navigation(e => e.Attachments);
+                    b.Navigation("Attachments");
 
-                    b.Navigation(e => e.CreatedBy);
+                    b.Navigation("CreatedBy");
 
-                    b.Navigation(e => e.Department);
+                    b.Navigation("Department");
 
-                    b.Navigation(e => e.Properties);
+                    b.Navigation("Properties");
 
-                    b.Navigation(e => e.WorkOrderType);
+                    b.Navigation("WorkOrderType");
                 });
 
             modelBuilder.Entity<WorkOrderAttachment>(b =>
                 {
-                    b.HasOne(e => e.WorkOrder)
+                    b.HasOne("hOps.web.Models.WorkOrder", "WorkOrder")
                         .WithMany(e => e.Attachments)
                         .HasForeignKey(e => e.WorkOrderId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation(e => e.WorkOrder);
+                    b.Navigation("WorkOrder");
                 });
 
             modelBuilder.Entity<WorkOrderProperty>(b =>
                 {
-                    b.HasOne(e => e.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany(e => e.WorkOrderLinks)
                         .HasForeignKey(e => e.PropertyId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne(e => e.WorkOrder)
+                    b.HasOne("hOps.web.Models.WorkOrder", "WorkOrder")
                         .WithMany(e => e.Properties)
                         .HasForeignKey(e => e.WorkOrderId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation(e => e.Property);
+                    b.Navigation("Property");
 
-                    b.Navigation(e => e.WorkOrder);
+                    b.Navigation("WorkOrder");
                 });
 
             modelBuilder.Entity<ApplicationUser>(b =>
@@ -1208,7 +1208,7 @@ namespace hOps.web.Migrations
 
                     b.Navigation("CreatedCalendarEvents");
 
-                    b.Navigation(u => u.UserPropertyAccesses);
+                    b.Navigation("UserPropertyAccesses");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PassOnLog", b =>
@@ -1222,12 +1222,12 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity<CalendarCategory>(b =>
                 {
-                    b.Navigation(e => e.Events);
+                    b.Navigation("Events");
                 });
 
             modelBuilder.Entity<CalendarEvent>(b =>
                 {
-                    b.Navigation(e => e.EventProperties);
+                    b.Navigation("EventProperties");
                 });
 
             modelBuilder.Entity(typeof(Property), b =>
@@ -1246,9 +1246,9 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity<WorkOrder>(b =>
                 {
-                    b.Navigation(e => e.Attachments);
+                    b.Navigation("Attachments");
 
-                    b.Navigation(e => e.Properties);
+                    b.Navigation("Properties");
                 });
 #pragma warning restore 612, 618
         }

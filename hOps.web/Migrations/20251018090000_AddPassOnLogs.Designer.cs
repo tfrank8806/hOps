@@ -622,24 +622,24 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity("hOps.web.Models.Room", b =>
                 {
-                    b.HasOne(upa => upa.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany("Rooms")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity("hOps.web.Models.RoomLayout", b =>
                 {
-                    b.HasOne(upa => upa.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany()
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PassOnLog", b =>
@@ -680,7 +680,7 @@ namespace hOps.web.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne(upa => upa.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany()
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -688,7 +688,7 @@ namespace hOps.web.Migrations
 
                     b.Navigation("PassOnLog");
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PassOnLogView", b =>
@@ -712,26 +712,26 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity<UserPropertyAccess>(b =>
                 {
-                    b.HasOne(upa => upa.ApplicationUser)
+                    b.HasOne("hOps.web.Models.ApplicationUser", "ApplicationUser")
                         .WithMany(u => u.UserPropertyAccesses)
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne(upa => upa.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany(p => p.UserAccesses)
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation(upa => upa.ApplicationUser);
+                    b.Navigation("ApplicationUser");
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
                 {
-                    b.Navigation(u => u.UserPropertyAccesses);
+                    b.Navigation("UserPropertyAccesses");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PassOnLog", b =>

@@ -606,7 +606,7 @@ namespace hOps.web.Migrations
 
                     b.Navigation("CalendarEvent");
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity<CalendarEvent>(b =>
@@ -627,55 +627,55 @@ namespace hOps.web.Migrations
 
                     b.Navigation("CreatedBy");
 
-                    b.Navigation(e => e.EventProperties);
+                    b.Navigation("EventProperties");
                 });
 
             modelBuilder.Entity("hOps.web.Models.Room", b =>
                 {
-                    b.HasOne(upa => upa.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany("Rooms")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity("hOps.web.Models.RoomLayout", b =>
                 {
-                    b.HasOne(upa => upa.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany()
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity<UserPropertyAccess>(b =>
                 {
-                    b.HasOne(upa => upa.ApplicationUser)
+                    b.HasOne("hOps.web.Models.ApplicationUser", "ApplicationUser")
                         .WithMany(u => u.UserPropertyAccesses)
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne(upa => upa.Property)
+                    b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany(p => p.UserAccesses)
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation(upa => upa.ApplicationUser);
+                    b.Navigation("ApplicationUser");
 
-                    b.Navigation(upa => upa.Property);
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity(typeof(ApplicationUser), b =>
                 {
                     b.Navigation("CreatedCalendarEvents");
 
-                    b.Navigation(u => u.UserPropertyAccesses);
+                    b.Navigation("UserPropertyAccesses");
                 });
 
             modelBuilder.Entity("hOps.web.Models.CalendarCategory", b =>
@@ -685,7 +685,7 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity<CalendarEvent>(b =>
                 {
-                    b.Navigation(e => e.EventProperties);
+                    b.Navigation("EventProperties");
                 });
 
             modelBuilder.Entity("hOps.web.Models.Property", b =>
