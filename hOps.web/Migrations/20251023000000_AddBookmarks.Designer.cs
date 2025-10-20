@@ -1164,8 +1164,6 @@ namespace hOps.web.Migrations
                         .WithMany()
                         .HasForeignKey(e => e.WorkOrderTypeId);
 
-                    b.Navigation("Attachments");
-
                     b.Navigation(e => e.CreatedBy);
 
                     b.Navigation(e => e.Department);
