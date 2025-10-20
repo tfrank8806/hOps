@@ -88,6 +88,42 @@
     background-color: #eef5ff;
 }
 
+.mail-log-card .card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+.mail-log-card .card-body {
+    background-color: #fff;
+}
+
+.mail-log-table th,
+.mail-log-table td {
+    vertical-align: top;
+}
+
+.mail-log-table .notes-cell {
+    min-width: 200px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.mail-log-table .delivered-cell {
+    width: 90px;
+}
+
+.mail-log-table .actions-cell {
+    width: 110px;
+    white-space: nowrap;
+}
+
+.mail-log-card .btn-outline-secondary {
+    border-color: #d0d5dd;
+}
+
+.mail-log-card .btn-outline-secondary:hover {
+    background-color: #f8f9fa;
+}
+
 .spreadsheet-table tbody td.selected-cell {
     box-shadow: inset 0 0 0 2px #0d6efd;
     background-color: #e3f2ff;
