@@ -788,7 +788,7 @@ namespace hOps.web.Migrations
                     b.ToTable("UserPropertyAccesses");
                 });
 
-            modelBuilder.Entity<WorkOrderType>(b =>
+            modelBuilder.Entity<hOps.web.Models.WorkOrderType>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
