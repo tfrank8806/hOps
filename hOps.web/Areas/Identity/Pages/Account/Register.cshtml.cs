@@ -142,13 +142,23 @@ namespace hOps.web.Areas.Identity.Pages.Account
                         continue;
                     }
 
+                    var encoder = HtmlEncoder.Default;
+                    var managerDisplayName = encoder.Encode(string.IsNullOrWhiteSpace(mgr.UserName)
+                        ? (mgr.Email ?? "Manager")
+                        : mgr.UserName);
+                    var requestFirstName = encoder.Encode(request.FirstName ?? string.Empty);
+                    var requestLastName = encoder.Encode(request.LastName ?? string.Empty);
+                    var requestEmail = encoder.Encode(request.Email ?? string.Empty);
+                    var requestPropertyCode = encoder.Encode(request.PropertyCode ?? string.Empty);
+                    var encodedApproveUrl = encoder.Encode(approveUrl);
+
                     var message = $@"
-Hello {mgr.UserName},<br/><br/>
+Hello {managerDisplayName},<br/><br/>
 A new user has requested access:<br/>
-Name: {request.FirstName} {request.LastName}<br/>
-Email: {request.Email}<br/>
-Property Code: {request.PropertyCode}<br/><br/>
-Please <a href='{HtmlEncoder.Default.Encode(approveUrl)}'>review pending requests</a>.
+Name: {requestFirstName} {requestLastName}<br/>
+Email: {requestEmail}<br/>
+Property Code: {requestPropertyCode}<br/><br/>
+Please <a href='{encodedApproveUrl}'>review pending requests</a>.
 ";
                     await _emailSender.SendEmailAsync(mgr.Email, "New Access Request", message);
                 }
