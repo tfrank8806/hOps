@@ -8,5 +8,9 @@ namespace hOps.web.ViewModels
         public List<PhonebookContact> Contacts { get; set; } = new();
 
         public List<PhonebookType> Types { get; set; } = new();
+
+        public string? SearchTerm { get; set; }
+
+        public int? SelectedTypeId { get; set; }
     }
 }
