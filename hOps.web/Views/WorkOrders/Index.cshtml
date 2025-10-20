@@ -9,6 +9,11 @@
 @section Styles {
     <style>
         @@media print {
+            @@page {
+                size: landscape;
+                margin: 0.5in;
+            }
+
             body {
                 background: #fff !important;
             }
@@ -39,6 +44,84 @@
             #workorders-print-area .card-header .btn,
             #workorders-print-area .card-header a {
                 display: none !important;
+            }
+
+            #workorders-print-area .card-header {
+                padding: 0.75rem 0;
+            }
+
+            #workorders-print-area .table {
+                width: 100%;
+                table-layout: fixed;
+                font-size: 0.72rem;
+            }
+
+            #workorders-print-area th,
+            #workorders-print-area td {
+                padding: 0.25rem 0.35rem !important;
+                vertical-align: top;
+                word-break: break-word;
+                white-space: normal;
+            }
+
+            #workorders-print-area th:nth-child(1),
+            #workorders-print-area td:nth-child(1) {
+                width: 8%;
+            }
+
+            #workorders-print-area th:nth-child(2),
+            #workorders-print-area td:nth-child(2) {
+                width: 14%;
+            }
+
+            #workorders-print-area th:nth-child(3),
+            #workorders-print-area td:nth-child(3) {
+                width: 12%;
+            }
+
+            #workorders-print-area th:nth-child(4),
+            #workorders-print-area td:nth-child(4) {
+                width: 10%;
+            }
+
+            #workorders-print-area th:nth-child(5),
+            #workorders-print-area td:nth-child(5) {
+                width: 18%;
+            }
+
+            #workorders-print-area th:nth-child(6),
+            #workorders-print-area td:nth-child(6) {
+                width: 7%;
+            }
+
+            #workorders-print-area th:nth-child(7),
+            #workorders-print-area td:nth-child(7) {
+                width: 8%;
+            }
+
+            #workorders-print-area th:nth-child(8),
+            #workorders-print-area td:nth-child(8) {
+                width: 8%;
+            }
+
+            #workorders-print-area th:nth-child(9),
+            #workorders-print-area td:nth-child(9) {
+                width: 8%;
+            }
+
+            #workorders-print-area th:nth-child(10),
+            #workorders-print-area td:nth-child(10) {
+                width: 7%;
+            }
+
+            #workorders-print-area .badge {
+                display: inline-block;
+                padding: 0.15rem 0.35rem;
+                font-size: 0.65rem;
+            }
+
+            #workorders-print-area small {
+                font-size: 0.65rem;
             }
         }
     </style>
