@@ -3,8 +3,8 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using hOps.web.Data;
 using hOps.web.Models;
+using hOps.web.Data;
 
 #nullable disable
 
