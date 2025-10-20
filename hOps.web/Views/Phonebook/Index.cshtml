@@ -49,7 +49,7 @@
                     <option value="">All types</option>
                     @foreach (var type in Model.Types.OrderBy(t => t.Name))
                     {
-                        <option value="@type.Id" @(Model.SelectedTypeId == type.Id ? "selected" : string.Empty)>@type.Name</option>
+                        <option value="@type.Id" selected="@(Model.SelectedTypeId == type.Id ? "selected" : null)">@type.Name</option>
                     }
                 </select>
             </div>
