@@ -753,14 +753,14 @@ namespace hOps.web.Migrations
                     b.Property<int>("PropertyId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("Status")
+                    b.Property<LostFoundStatus>("Status")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Stored")
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Type")
+                    b.Property<LostFoundType>("Type")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
