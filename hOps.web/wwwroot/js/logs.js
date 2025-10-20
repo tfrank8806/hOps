@@ -26,6 +26,13 @@
     const alignRightButton = document.getElementById('alignRightBtn');
     const mergeCellsButton = document.getElementById('mergeCellsBtn');
     const unmergeCellsButton = document.getElementById('unmergeCellsBtn');
+    const textColorInput = document.getElementById('textColorInput');
+    const fillColorInput = document.getElementById('fillColorInput');
+    const clearTextColorButton = document.getElementById('clearTextColorBtn');
+    const clearFillColorButton = document.getElementById('clearFillColorBtn');
+    const exportExcelButton = document.getElementById('exportExcelBtn');
+
+    const HEX_COLOR_REGEX = /^#(?:[0-9a-f]{3}){1,2}$/i;
 
     if (!logListEl) {
         return;
@@ -66,6 +73,12 @@
         if (typeof format.align === 'string' && ['left', 'center', 'right'].includes(format.align)) {
             normalized.align = format.align;
         }
+        if (isValidHexColor(format.textColor)) {
+            normalized.textColor = normalizeHexColor(format.textColor);
+        }
+        if (isValidHexColor(format.fillColor)) {
+            normalized.fillColor = normalizeHexColor(format.fillColor);
+        }
         if (format.merge && typeof format.merge === 'object') {
             const rowSpan = Number(format.merge.rowSpan);
             const colSpan = Number(format.merge.colSpan);
@@ -97,6 +110,51 @@
             return createCell('', {});
         }
         return createCell(String(cell ?? ''), {});
+    }
+
+    function isValidHexColor(value) {
+        return typeof value === 'string' && HEX_COLOR_REGEX.test(value.trim());
+    }
+
+    function normalizeHexColor(value) {
+        if (!isValidHexColor(value)) {
+            return '';
+        }
+        const trimmed = value.trim();
+        if (trimmed.length === 4) {
+            const expanded = trimmed
+                .slice(1)
+                .split('')
+                .map((char) => char + char)
+                .join('');
+            return `#${expanded.toUpperCase()}`;
+        }
+        return trimmed.toUpperCase();
+    }
+
+    function getDefaultColorValue(input, fallback) {
+        if (!input) {
+            return fallback;
+        }
+        const candidate = input.dataset?.defaultColor;
+        return isValidHexColor(candidate) ? normalizeHexColor(candidate) : fallback;
+    }
+
+    function updateColorInputState(input, clearButton, colorValue, fallback) {
+        if (input) {
+            const defaultColor = getDefaultColorValue(input, fallback);
+            if (isValidHexColor(colorValue)) {
+                const normalized = normalizeHexColor(colorValue);
+                input.value = normalized;
+                input.dataset.appliedColor = normalized;
+            } else {
+                input.value = defaultColor;
+                input.dataset.appliedColor = '';
+            }
+        }
+        if (clearButton) {
+            clearButton.disabled = !isValidHexColor(colorValue);
+        }
     }
 
     function createEmptyData(rows = defaultRows, columns = defaultColumns) {
@@ -207,6 +265,9 @@
         addRowButton.disabled = false;
         addColumnButton.disabled = false;
         clearLogButton.disabled = false;
+        if (exportExcelButton) {
+            exportExcelButton.disabled = typeof XLSX === 'undefined';
+        }
         spreadsheetPlaceholderEl.classList.add('d-none');
         spreadsheetWrapperEl.classList.remove('d-none');
         renderSpreadsheet(log);
@@ -219,6 +280,9 @@
         addRowButton.disabled = true;
         addColumnButton.disabled = true;
         clearLogButton.disabled = true;
+        if (exportExcelButton) {
+            exportExcelButton.disabled = true;
+        }
         spreadsheetPlaceholderEl.classList.remove('d-none');
         spreadsheetWrapperEl.classList.add('d-none');
         selectionRange = null;
@@ -513,7 +577,11 @@
             alignCenterButton,
             alignRightButton,
             mergeCellsButton,
-            unmergeCellsButton
+            unmergeCellsButton,
+            textColorInput,
+            fillColorInput,
+            clearTextColorButton,
+            clearFillColorButton
         ];
         controls.forEach((control) => {
             if (!control) {
@@ -540,6 +608,8 @@
         const alignState = getUniformFormatValue('align');
         const fontSizeState = getUniformFormatValue('fontSize');
         const fontFamilyState = getUniformFormatValue('fontFamily');
+        const textColorState = getUniformFormatValue('textColor');
+        const fillColorState = getUniformFormatValue('fillColor');
 
         setToggleState(boldButton, !!boldState);
         setToggleState(italicButton, !!italicState);
@@ -555,6 +625,9 @@
         setToggleState(alignLeftButton, alignState === 'left');
         setToggleState(alignCenterButton, alignState === 'center');
         setToggleState(alignRightButton, alignState === 'right');
+
+        updateColorInputState(textColorInput, clearTextColorButton, textColorState, '#000000');
+        updateColorInputState(fillColorInput, clearFillColorButton, fillColorState, '#ffffff');
 
         const selectionInfo = getSelectionInfo();
         if (mergeCellsButton) {
@@ -633,6 +706,8 @@
         td.style.fontSize = format.fontSize ?? '';
         td.style.fontFamily = format.fontFamily ?? '';
         td.style.textAlign = format.align ?? '';
+        td.style.color = format.textColor ?? '';
+        td.style.backgroundColor = format.fillColor ?? '';
     }
 
     function getCellElement(row, column) {
@@ -783,6 +858,112 @@
         persistLogs();
         updateSelectedCellStyles();
         updateToolbarState();
+    }
+
+    function applyColorToSelection(key, color) {
+        if (!selectionRange) {
+            return;
+        }
+        const normalized = isValidHexColor(color) ? normalizeHexColor(color) : null;
+        forEachCellInSelection(selectionRange, ({ cellData }) => {
+            cellData.format = cellData.format || {};
+            if (normalized) {
+                cellData.format[key] = normalized;
+            } else {
+                delete cellData.format[key];
+            }
+        });
+        persistLogs();
+        updateSelectedCellStyles();
+        updateToolbarState();
+    }
+
+    function setTextColor(color) {
+        applyColorToSelection('textColor', color);
+    }
+
+    function setFillColor(color) {
+        applyColorToSelection('fillColor', color);
+    }
+
+    function clearTextColor() {
+        applyColorToSelection('textColor', null);
+    }
+
+    function clearFillColor() {
+        applyColorToSelection('fillColor', null);
+    }
+
+    function exportCurrentLogToExcel() {
+        const log = getCurrentLog();
+        if (!log || typeof XLSX === 'undefined') {
+            return;
+        }
+
+        const rowCount = Math.max(log.data.length, 1);
+        let columnCount = 0;
+        for (let row = 0; row < log.data.length; row++) {
+            const length = Array.isArray(log.data[row]) ? log.data[row].length : 0;
+            if (length > columnCount) {
+                columnCount = length;
+            }
+        }
+        columnCount = Math.max(columnCount, 1);
+
+        const sheetData = Array.from({ length: rowCount }, () => Array.from({ length: columnCount }, () => ''));
+        const merges = [];
+
+        for (let row = 0; row < rowCount; row++) {
+            for (let column = 0; column < columnCount; column++) {
+                const cell = log.data[row]?.[column];
+                if (!cell) {
+                    continue;
+                }
+                if (cell.format?.mergedInto) {
+                    continue;
+                }
+                sheetData[row][column] = cell.value ?? '';
+                if (cell.format?.merge) {
+                    const merge = cell.format.merge;
+                    merges.push({
+                        s: { r: row, c: column },
+                        e: { r: row + merge.rowSpan - 1, c: column + merge.colSpan - 1 }
+                    });
+                }
+            }
+        }
+
+        const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+        if (merges.length) {
+            worksheet['!merges'] = merges;
+        }
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, createSheetName(log.name));
+        const workbookArray = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([workbookArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${createFileName(log.name)}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
+
+    function createSheetName(name) {
+        const sanitized = (name ?? '').toString().replace(/[\[\]\\/*:?]/g, ' ').trim();
+        if (!sanitized) {
+            return 'Log';
+        }
+        return sanitized.slice(0, 31) || 'Log';
+    }
+
+    function createFileName(name) {
+        const sanitized = (name ?? '').toString().replace(/[\\/:*?"<>|]/g, '_').trim();
+        const fallback = sanitized || 'log';
+        return fallback.slice(0, 64);
     }
 
     function mergeSelectedCells() {
@@ -945,8 +1126,27 @@
         }
     });
 
+    textColorInput?.addEventListener('input', (event) => {
+        const target = event.target;
+        if (target instanceof HTMLInputElement) {
+            setTextColor(target.value);
+        }
+    });
+
+    fillColorInput?.addEventListener('input', (event) => {
+        const target = event.target;
+        if (target instanceof HTMLInputElement) {
+            setFillColor(target.value);
+        }
+    });
+
+    clearTextColorButton?.addEventListener('click', clearTextColor);
+    clearFillColorButton?.addEventListener('click', clearFillColor);
+
     mergeCellsButton?.addEventListener('click', mergeSelectedCells);
     unmergeCellsButton?.addEventListener('click', unmergeSelectedCells);
+
+    exportExcelButton?.addEventListener('click', exportCurrentLogToExcel);
 
     createLogForm?.addEventListener('submit', handleCreateLog);
     logNameInput?.addEventListener('input', () => {
