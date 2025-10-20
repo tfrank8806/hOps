@@ -50,16 +50,16 @@
             <div class="card-header bg-light d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Filters</h5>
                 <button type="button"
-                        class="btn btn-sm btn-outline-secondary"
+                        class="btn btn-sm btn-outline-secondary collapsed"
                         data-bs-toggle="collapse"
                         data-bs-target="#workOrdersFiltersCollapse"
-                        aria-expanded="true"
+                        aria-expanded="false"
                         aria-controls="workOrdersFiltersCollapse"
                         id="toggleFiltersButton">
-                    Hide Filters
+                    Show Filters
                 </button>
             </div>
-            <div id="workOrdersFiltersCollapse" class="collapse show">
+            <div id="workOrdersFiltersCollapse" class="collapse">
                 <div class="card-body">
                     <form method="get" class="row g-3">
                     <div class="col-md-4">
@@ -334,9 +334,9 @@
                             <span asp-validation-for="Form.SelectedPropertyIds" class="text-danger"></span>
                             @foreach (var property in Model.PropertyOptions)
                             {
-                                <div class="form-check">
+                                <div class="form-check d-flex align-items-center gap-2 mb-2">
                                     <input class="form-check-input" type="checkbox" value="@property.Id" name="Form.SelectedPropertyIds" id="property_@property.Id" @(property.IsSelected ? "checked" : string.Empty) />
-                                    <label class="form-check-label" for="property_@property.Id">@property.Name (@property.Code)</label>
+                                    <label class="form-check-label mb-0" for="property_@property.Id">@property.Name (@property.Code)</label>
                                 </div>
                             }
                         </fieldset>
