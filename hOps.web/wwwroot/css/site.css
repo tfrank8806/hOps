@@ -319,6 +319,68 @@ body.sidebar-collapsed .sidebar .sidebar-inner {
     padding: 0.5rem 0.75rem;
 }
 
+.lost-found-container .content-surface {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.lost-found-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    gap: 1.5rem;
+    min-height: 0;
+}
+
+.lost-found-results {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.lost-found-results > [class*="col-"] {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.lost-found-results .card {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.lost-found-results .card-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.lost-found-entry-card .card-body {
+    max-height: 22rem;
+    overflow-y: auto;
+}
+
+@media (max-width: 991.98px) {
+    .lost-found-results > [class*="col-"] {
+        display: block;
+    }
+
+    .lost-found-results .card {
+        display: block;
+    }
+
+    .lost-found-results .card-body {
+        overflow: visible;
+    }
+
+    .lost-found-entry-card .card-body {
+        max-height: none;
+    }
+}
+
 @media (max-width: 991.98px) {
     .layout-wrapper {
         flex-direction: column;
