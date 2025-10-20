@@ -1,0 +1,51 @@
+.mail-log-page {
+    gap: 1.5rem;
+}
+
+.mail-log-card .card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+.mail-log-card .card-body {
+    background-color: #fff;
+}
+
+.mail-log-table {
+    font-size: 0.95rem;
+}
+
+.mail-log-table th,
+.mail-log-table td {
+    vertical-align: top;
+}
+
+.mail-log-table .notes-cell {
+    min-width: 200px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.mail-log-table .delivered-cell {
+    width: 90px;
+}
+
+.mail-log-table .actions-cell {
+    width: 110px;
+    white-space: nowrap;
+}
+
+.mail-log-card .btn-outline-secondary {
+    border-color: #d0d5dd;
+}
+
+.mail-log-card .btn-outline-secondary:hover {
+    background-color: #f8f9fa;
+}
+
+@media (max-width: 991.98px) {
+    .mail-log-page .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+}
