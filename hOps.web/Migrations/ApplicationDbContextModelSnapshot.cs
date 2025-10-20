@@ -688,7 +688,7 @@ namespace hOps.web.Migrations
                     b.ToTable("UserAccessRequests");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.LostFoundEntry", b =>
+            modelBuilder.Entity<LostFoundEntry>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1090,7 +1090,7 @@ namespace hOps.web.Migrations
                     b.Navigation("Property");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.LostFoundEntry", b =>
+            modelBuilder.Entity<LostFoundEntry>(b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "CreatedByUser")
                         .WithMany()
