@@ -23,6 +23,7 @@
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     });
+    var hasFilters = !string.IsNullOrWhiteSpace(Model.SearchTerm) || Model.SelectedTypeId.HasValue;
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -30,9 +31,49 @@
     <a class="btn btn-primary" asp-action="Create">Add Contact</a>
 </div>
 
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-lg-6">
+                <label class="form-label" for="searchTerm">Search</label>
+                <input type="text"
+                       class="form-control"
+                       id="searchTerm"
+                       name="search"
+                       value="@Model.SearchTerm"
+                       placeholder="Search by name, company, or contact details" />
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label" for="typeFilter">Filter by Type</label>
+                <select class="form-select" id="typeFilter" name="typeId">
+                    <option value="">All types</option>
+                    @foreach (var type in Model.Types.OrderBy(t => t.Name))
+                    {
+                        <option value="@type.Id" selected="@(Model.SelectedTypeId == type.Id ? "selected" : null)">@type.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-lg-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-grow-1">Apply</button>
+                @if (hasFilters)
+                {
+                    <a class="btn btn-outline-secondary flex-grow-1" asp-action="Index">Clear</a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
+
 @if (!Model.Contacts.Any())
 {
-    <div class="alert alert-info">There are no contacts yet. Start by adding your first contact.</div>
+    if (hasFilters)
+    {
+        <div class="alert alert-warning">No contacts match the current search or type filter.</div>
+    }
+    else
+    {
+        <div class="alert alert-info">There are no contacts yet. Start by adding your first contact.</div>
+    }
 }
 else
 {

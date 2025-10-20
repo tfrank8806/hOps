@@ -1,0 +1,127 @@
+@model CalendarEventManageViewModel
+@{
+    ViewData["Title"] = "Edit Event";
+    var disableForm = !Model.AccessibleProperties.Any();
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <h1 class="h3 mb-0">@Model.Heading</h1>
+    <a class="btn btn-outline-secondary" asp-action="Index">Back to Calendar</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form asp-action="Edit" asp-route-id="@Model.Form.Id" method="post">
+            @Html.AntiForgeryToken()
+            <input asp-for="Form.Id" type="hidden" />
+
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="mb-3">
+                <label asp-for="Form.CategoryId" class="form-label"></label>
+                <select asp-for="Form.CategoryId" class="form-select" asp-items="Model.CategoryOptions"></select>
+                <span asp-validation-for="Form.CategoryId" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Form.Title" class="form-label"></label>
+                <input asp-for="Form.Title" class="form-control" />
+                <span asp-validation-for="Form.Title" class="text-danger"></span>
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                    <label asp-for="Form.StartDate" class="form-label"></label>
+                    <input asp-for="Form.StartDate" class="form-control" />
+                    <span asp-validation-for="Form.StartDate" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Form.StartTime" class="form-label"></label>
+                    <input asp-for="Form.StartTime" class="form-control" />
+                    <span class="form-text">Optional</span>
+                    <span asp-validation-for="Form.StartTime" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                    <label asp-for="Form.EndDate" class="form-label"></label>
+                    <input asp-for="Form.EndDate" class="form-control" />
+                    <span asp-validation-for="Form.EndDate" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Form.EndTime" class="form-label"></label>
+                    <input asp-for="Form.EndTime" class="form-control" />
+                    <span class="form-text">Optional</span>
+                    <span asp-validation-for="Form.EndTime" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Form.Recurrence" class="form-label"></label>
+                <select asp-for="Form.Recurrence" class="form-select" asp-items="Html.GetEnumSelectList<CalendarRecurrenceType>()"></select>
+                <span asp-validation-for="Form.Recurrence" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Form.Details" class="form-label"></label>
+                <textarea asp-for="Form.Details" class="form-control" rows="3"></textarea>
+                <span asp-validation-for="Form.Details" class="text-danger"></span>
+            </div>
+
+            @if (Model.ShowPropertySelection)
+            {
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Properties</label>
+                    <div class="row g-2">
+                        @foreach (var property in Model.AccessibleProperties)
+                        {
+                            var checkboxId = $"property_{property.Id}";
+                            <div class="col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           value="@property.Id"
+                                           id="@checkboxId"
+                                           name="Form.SelectedPropertyIds"
+                                           @(Model.Form.SelectedPropertyIds.Contains(property.Id) ? "checked" : string.Empty) />
+                                    <label class="form-check-label" for="@checkboxId">
+                                        <span class="d-block">@property.Name</span>
+                                        <small class="text-muted">@property.Code</small>
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <span asp-validation-for="Form.SelectedPropertyIds" class="text-danger"></span>
+                </div>
+            }
+            else if (Model.AccessibleProperties.Any())
+            {
+                foreach (var propertyId in Model.Form.SelectedPropertyIds)
+                {
+                    <input type="hidden" name="Form.SelectedPropertyIds" value="@propertyId" />
+                }
+
+                var singleProperty = Model.AccessibleProperties.FirstOrDefault();
+                var propertyName = singleProperty?.Name ?? "Property";
+                var propertyCode = singleProperty?.Code ?? "N/A";
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Property</label>
+                    <div class="form-control-plaintext">
+                        @propertyName <span class="text-muted">(@propertyCode)</span>
+                    </div>
+                </div>
+            }
+
+            <div class="d-flex justify-content-between gap-2">
+                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+                <button type="submit" class="btn btn-primary" @(disableForm ? "disabled" : string.Empty)>Update Event</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,18 +1,19 @@
 @{
     ViewData["Title"] = "Logs";
+    ViewData["MainContainerClass"] = "main-inner--wide";
 }
 
-<div class="row g-4 logs-page">
-    <div class="col-lg-4">
-        <div class="card shadow-sm h-100">
+<div class="row g-4 logs-page align-items-stretch flex-grow-1">
+    <div class="col-lg-4 d-flex">
+        <div class="card shadow-sm flex-fill">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h2 class="h5 mb-0">Logs</h2>
                 <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createLogModal">
                     Create New Log
                 </button>
             </div>
-            <div class="card-body p-0">
-                <div id="logList" class="list-group list-group-flush">
+            <div class="card-body p-0 d-flex flex-column">
+                <div id="logList" class="list-group list-group-flush flex-grow-1 overflow-auto">
                     <div class="list-group-item text-muted" id="logEmptyState">
                         No logs yet. Create one to get started.
                     </div>
@@ -20,8 +21,8 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-8">
-        <div class="card shadow-sm h-100">
+    <div class="col-lg-8 d-flex">
+        <div class="card shadow-sm flex-fill">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
                     <h2 class="h5 mb-0" id="logTitle">Select a log</h2>
@@ -31,9 +32,10 @@
                     <button class="btn btn-outline-secondary btn-sm" id="addRowBtn" type="button" disabled>Add Row</button>
                     <button class="btn btn-outline-secondary btn-sm" id="addColumnBtn" type="button" disabled>Add Column</button>
                     <button class="btn btn-outline-secondary btn-sm" id="clearLogBtn" type="button" disabled>Clear</button>
+                    <button class="btn btn-outline-success btn-sm" id="exportExcelBtn" type="button" disabled>Export Excel</button>
                 </div>
             </div>
-            <div class="card-body">
+            <div class="card-body d-flex flex-column">
                 <div class="spreadsheet-toolbar mb-3" id="spreadsheetToolbar" aria-label="Formatting toolbar">
                     <div class="d-flex flex-wrap align-items-center gap-2">
                         <div class="btn-group" role="group" aria-label="Font styles">
@@ -80,6 +82,18 @@
                                 <span class="visually-hidden">Align right</span>
                             </button>
                         </div>
+                        <div class="d-flex flex-wrap align-items-center gap-3">
+                            <div class="d-flex align-items-center gap-2 color-control">
+                                <label class="form-label form-label-sm mb-0 text-muted" for="textColorInput">Text</label>
+                                <input type="color" class="form-control form-control-color form-control-color-sm" id="textColorInput" value="#000000" data-default-color="#000000" title="Text color" disabled />
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="clearTextColorBtn" disabled>Clear</button>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 color-control">
+                                <label class="form-label form-label-sm mb-0 text-muted" for="fillColorInput">Fill</label>
+                                <input type="color" class="form-control form-control-color form-control-color-sm" id="fillColorInput" value="#ffffff" data-default-color="#ffffff" title="Fill color" disabled />
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="clearFillColorBtn" disabled>Clear</button>
+                            </div>
+                        </div>
                         <div class="btn-group" role="group" aria-label="Cell merging">
                             <button class="btn btn-outline-secondary btn-sm" type="button" id="mergeCellsBtn" disabled title="Merge cells">
                                 <span aria-hidden="true">Merge</span>
@@ -109,10 +123,119 @@
     </div>
 </div>
 
+<div class="row g-4 mt-0">
+    <div class="col-12">
+        <div class="card shadow-sm mail-log-card">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <h2 class="h5 mb-0">Package &amp; Mail Log</h2>
+                    <small class="text-muted">Keep track of deliveries and pickups for guests.</small>
+                </div>
+            </div>
+            <div class="card-body">
+                <p id="mailLogStorageMessage" class="text-muted small mb-4">
+                    Entries are stored locally in this browser so each device keeps its own package log.
+                </p>
+                <form id="mailLogForm" class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label for="mailLogGuestName" class="form-label">Guest Name <span class="text-muted">(optional)</span></label>
+                        <input type="text" class="form-control" id="mailLogGuestName" name="guestName" maxlength="150" placeholder="e.g. Jamie Rivera" />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="mailLogCourier" class="form-label">Courier <span class="text-muted">(optional)</span></label>
+                        <input type="text" class="form-control" id="mailLogCourier" name="courier" maxlength="100" placeholder="e.g. FedEx" />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="mailLogTrackingNumber" class="form-label">Tracking Number <span class="text-muted">(optional)</span></label>
+                        <input type="text" class="form-control" id="mailLogTrackingNumber" name="trackingNumber" maxlength="100" placeholder="e.g. 1234 5678 9012" />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="mailLogRoomNumber" class="form-label">Room Number <span class="text-muted">(optional)</span></label>
+                        <input type="text" class="form-control" id="mailLogRoomNumber" name="roomNumber" maxlength="50" placeholder="e.g. 204" />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="mailLogArrivalDate" class="form-label">Arrival Date <span class="text-muted">(optional)</span></label>
+                        <input type="date" class="form-control" id="mailLogArrivalDate" name="arrivalDate" />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="mailLogDepartureDate" class="form-label">Departure Date <span class="text-muted">(optional)</span></label>
+                        <input type="date" class="form-control" id="mailLogDepartureDate" name="departureDate" />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="mailLogStorageLocation" class="form-label">Storage Location <span class="text-muted">(optional)</span></label>
+                        <input type="text" class="form-control" id="mailLogStorageLocation" name="storageLocation" maxlength="150" placeholder="e.g. Front desk closet" />
+                    </div>
+                    <div class="col-12">
+                        <label for="mailLogNotes" class="form-label">Notes <span class="text-muted">(optional)</span></label>
+                        <textarea class="form-control" id="mailLogNotes" name="notes" rows="2" maxlength="500" placeholder="Add any special instructions or identifying details"></textarea>
+                    </div>
+                    <div class="col-12 d-flex justify-content-end gap-2">
+                        <button type="reset" class="btn btn-outline-secondary">Clear</button>
+                        <button type="submit" class="btn btn-primary">Add Entry</button>
+                    </div>
+                </form>
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle mail-log-table" id="mailLogTable">
+                        <thead>
+                            <tr>
+                                <th scope="col">Logged At</th>
+                                <th scope="col">Guest Name</th>
+                                <th scope="col">Courier</th>
+                                <th scope="col">Tracking Number</th>
+                                <th scope="col">Room #</th>
+                                <th scope="col">Arrival Date</th>
+                                <th scope="col">Departure Date</th>
+                                <th scope="col">Storage Location</th>
+                                <th scope="col">Notes</th>
+                                <th scope="col" class="text-center">Delivered?</th>
+                                <th scope="col">Delivered At</th>
+                                <th scope="col" class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mailLogTableBody">
+                            <tr id="mailLogEmptyState">
+                                <td colspan="12" class="text-center text-muted py-4">
+                                    No packages logged yet. Use the form above to record the first delivery.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="createLogModal" tabindex="-1" aria-labelledby="createLogModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="createLogForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createLogModalLabel">Create New Log</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="logNameInput" class="form-label">Log Name</label>
+                        <input type="text" class="form-control" id="logNameInput" name="logName" placeholder="e.g. Housekeeping" required maxlength="100">
+                        <div class="form-text">A clear name makes it easier to find your log later.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Log</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @section Styles {
     <link rel="stylesheet" href="~/css/logs.css" />
 }
 
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
     <script src="~/js/logs.js"></script>
+    <script src="~/js/mailLog.js"></script>
 }

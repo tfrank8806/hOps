@@ -20,10 +20,36 @@ namespace hOps.web.Controllers
             _db = db;
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? search, int? typeId)
         {
-            var contacts = await _db.PhonebookContacts
+            var contactsQuery = _db.PhonebookContacts
                 .Include(c => c.PhonebookType)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var trimmedSearch = search.Trim();
+                var likeTerm = $"%{trimmedSearch}%";
+
+                contactsQuery = contactsQuery.Where(c =>
+                    (c.FirstName != null && EF.Functions.Like(c.FirstName, likeTerm)) ||
+                    (c.LastName != null && EF.Functions.Like(c.LastName, likeTerm)) ||
+                    (c.Company != null && EF.Functions.Like(c.Company, likeTerm)) ||
+                    (c.Title != null && EF.Functions.Like(c.Title, likeTerm)) ||
+                    (c.PhoneNumber != null && EF.Functions.Like(c.PhoneNumber, likeTerm)) ||
+                    (c.Email != null && EF.Functions.Like(c.Email, likeTerm)) ||
+                    (c.Address != null && EF.Functions.Like(c.Address, likeTerm)) ||
+                    (c.Notes != null && EF.Functions.Like(c.Notes, likeTerm)) ||
+                    (c.TypeName != null && EF.Functions.Like(c.TypeName, likeTerm))
+                );
+            }
+
+            if (typeId.HasValue)
+            {
+                contactsQuery = contactsQuery.Where(c => c.PhonebookTypeId == typeId);
+            }
+
+            var contacts = await contactsQuery
                 .OrderBy(c => c.TypeName)
                 .ThenBy(c => c.LastName)
                 .ThenBy(c => c.FirstName)
@@ -37,7 +63,9 @@ namespace hOps.web.Controllers
             var vm = new PhonebookIndexViewModel
             {
                 Contacts = contacts,
-                Types = types
+                Types = types,
+                SearchTerm = search,
+                SelectedTypeId = typeId
             };
 
             return View(vm);

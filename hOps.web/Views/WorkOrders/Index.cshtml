@@ -9,6 +9,11 @@
 @section Styles {
     <style>
         @@media print {
+            @@page {
+                size: landscape;
+                margin: 0.5in;
+            }
+
             body {
                 background: #fff !important;
             }
@@ -40,6 +45,84 @@
             #workorders-print-area .card-header a {
                 display: none !important;
             }
+
+            #workorders-print-area .card-header {
+                padding: 0.75rem 0;
+            }
+
+            #workorders-print-area .table {
+                width: 100%;
+                table-layout: fixed;
+                font-size: 0.72rem;
+            }
+
+            #workorders-print-area th,
+            #workorders-print-area td {
+                padding: 0.25rem 0.35rem !important;
+                vertical-align: top;
+                word-break: break-word;
+                white-space: normal;
+            }
+
+            #workorders-print-area th:nth-child(1),
+            #workorders-print-area td:nth-child(1) {
+                width: 8%;
+            }
+
+            #workorders-print-area th:nth-child(2),
+            #workorders-print-area td:nth-child(2) {
+                width: 14%;
+            }
+
+            #workorders-print-area th:nth-child(3),
+            #workorders-print-area td:nth-child(3) {
+                width: 12%;
+            }
+
+            #workorders-print-area th:nth-child(4),
+            #workorders-print-area td:nth-child(4) {
+                width: 10%;
+            }
+
+            #workorders-print-area th:nth-child(5),
+            #workorders-print-area td:nth-child(5) {
+                width: 18%;
+            }
+
+            #workorders-print-area th:nth-child(6),
+            #workorders-print-area td:nth-child(6) {
+                width: 7%;
+            }
+
+            #workorders-print-area th:nth-child(7),
+            #workorders-print-area td:nth-child(7) {
+                width: 8%;
+            }
+
+            #workorders-print-area th:nth-child(8),
+            #workorders-print-area td:nth-child(8) {
+                width: 8%;
+            }
+
+            #workorders-print-area th:nth-child(9),
+            #workorders-print-area td:nth-child(9) {
+                width: 8%;
+            }
+
+            #workorders-print-area th:nth-child(10),
+            #workorders-print-area td:nth-child(10) {
+                width: 7%;
+            }
+
+            #workorders-print-area .badge {
+                display: inline-block;
+                padding: 0.15rem 0.35rem;
+                font-size: 0.65rem;
+            }
+
+            #workorders-print-area small {
+                font-size: 0.65rem;
+            }
         }
     </style>
 }
@@ -50,16 +133,16 @@
             <div class="card-header bg-light d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Filters</h5>
                 <button type="button"
-                        class="btn btn-sm btn-outline-secondary"
+                        class="btn btn-sm btn-outline-secondary collapsed"
                         data-bs-toggle="collapse"
                         data-bs-target="#workOrdersFiltersCollapse"
-                        aria-expanded="true"
+                        aria-expanded="false"
                         aria-controls="workOrdersFiltersCollapse"
                         id="toggleFiltersButton">
-                    Hide Filters
+                    Show Filters
                 </button>
             </div>
-            <div id="workOrdersFiltersCollapse" class="collapse show">
+            <div id="workOrdersFiltersCollapse" class="collapse">
                 <div class="card-body">
                     <form method="get" class="row g-3">
                     <div class="col-md-4">
@@ -334,9 +417,9 @@
                             <span asp-validation-for="Form.SelectedPropertyIds" class="text-danger"></span>
                             @foreach (var property in Model.PropertyOptions)
                             {
-                                <div class="form-check">
+                                <div class="form-check d-flex align-items-center gap-2 mb-2">
                                     <input class="form-check-input" type="checkbox" value="@property.Id" name="Form.SelectedPropertyIds" id="property_@property.Id" @(property.IsSelected ? "checked" : string.Empty) />
-                                    <label class="form-check-label" for="property_@property.Id">@property.Name (@property.Code)</label>
+                                    <label class="form-check-label mb-0" for="property_@property.Id">@property.Name (@property.Code)</label>
                                 </div>
                             }
                         </fieldset>
