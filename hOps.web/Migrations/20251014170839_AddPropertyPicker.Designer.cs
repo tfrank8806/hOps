@@ -560,7 +560,7 @@ namespace hOps.web.Migrations
             modelBuilder.Entity<UserPropertyAccess>(b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "ApplicationUser")
-                        .WithMany(u => u.UserPropertyAccesses)
+                        .WithMany("UserPropertyAccesses")
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -572,7 +572,7 @@ namespace hOps.web.Migrations
                         .IsRequired();
 
                     b.HasOne("hOps.web.Models.Property", null)
-                        .WithMany(p => p.UserAccesses)
+                        .WithMany("UserAccesses")
                         .HasForeignKey("PropertyId1");
 
                     b.Navigation("ApplicationUser");

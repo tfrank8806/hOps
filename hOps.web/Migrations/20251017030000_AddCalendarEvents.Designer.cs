@@ -593,13 +593,13 @@ namespace hOps.web.Migrations
             modelBuilder.Entity<CalendarEventProperty>(b =>
                 {
                     b.HasOne<CalendarEvent>(d => d.CalendarEvent)
-                        .WithMany(p => p.EventProperties)
+                        .WithMany("EventProperties")
                         .HasForeignKey(d => d.CalendarEventId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne<Property>(d => d.Property)
-                        .WithMany(p => p.CalendarEvents)
+                        .WithMany("CalendarEvents")
                         .HasForeignKey(d => d.PropertyId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -655,13 +655,13 @@ namespace hOps.web.Migrations
             modelBuilder.Entity<UserPropertyAccess>(b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "ApplicationUser")
-                        .WithMany(u => u.UserPropertyAccesses)
+                        .WithMany("UserPropertyAccesses")
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany(p => p.UserAccesses)
+                        .WithMany("UserAccesses")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
