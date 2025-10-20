@@ -1152,57 +1152,57 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity<WorkOrder>(b =>
                 {
-                    b.HasOne("hOps.web.Models.ApplicationUser", "CreatedBy")
+                    b.HasOne(e => e.CreatedBy)
                         .WithMany()
-                        .HasForeignKey("CreatedById");
+                        .HasForeignKey(e => e.CreatedById);
 
-                    b.HasOne("hOps.web.Models.Department", "Department")
+                    b.HasOne(e => e.Department)
                         .WithMany()
-                        .HasForeignKey("DepartmentId");
+                        .HasForeignKey(e => e.DepartmentId);
 
-                    b.HasOne("hOps.web.Models.WorkOrderType", "WorkOrderType")
+                    b.HasOne(e => e.WorkOrderType)
                         .WithMany()
-                        .HasForeignKey("WorkOrderTypeId");
+                        .HasForeignKey(e => e.WorkOrderTypeId);
 
-                    b.Navigation("Attachments");
+                    b.Navigation(e => e.Attachments);
 
-                    b.Navigation("CreatedBy");
+                    b.Navigation(e => e.CreatedBy);
 
-                    b.Navigation("Department");
+                    b.Navigation(e => e.Department);
 
-                    b.Navigation("Properties");
+                    b.Navigation(e => e.Properties);
 
-                    b.Navigation("WorkOrderType");
+                    b.Navigation(e => e.WorkOrderType);
                 });
 
             modelBuilder.Entity<WorkOrderAttachment>(b =>
                 {
-                    b.HasOne("hOps.web.Models.WorkOrder", "WorkOrder")
-                        .WithMany("Attachments")
-                        .HasForeignKey("WorkOrderId")
+                    b.HasOne(e => e.WorkOrder)
+                        .WithMany(e => e.Attachments)
+                        .HasForeignKey(e => e.WorkOrderId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("WorkOrder");
+                    b.Navigation(e => e.WorkOrder);
                 });
 
             modelBuilder.Entity<WorkOrderProperty>(b =>
                 {
-                    b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany("WorkOrderLinks")
-                        .HasForeignKey("PropertyId")
+                    b.HasOne(e => e.Property)
+                        .WithMany(e => e.WorkOrderLinks)
+                        .HasForeignKey(e => e.PropertyId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("hOps.web.Models.WorkOrder", "WorkOrder")
-                        .WithMany("Properties")
-                        .HasForeignKey("WorkOrderId")
+                    b.HasOne(e => e.WorkOrder)
+                        .WithMany(e => e.Properties)
+                        .HasForeignKey(e => e.WorkOrderId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Property");
+                    b.Navigation(e => e.Property);
 
-                    b.Navigation("WorkOrder");
+                    b.Navigation(e => e.WorkOrder);
                 });
 
             modelBuilder.Entity<ApplicationUser>(b =>
@@ -1249,9 +1249,9 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity<WorkOrder>(b =>
                 {
-                    b.Navigation("Attachments");
+                    b.Navigation(e => e.Attachments);
 
-                    b.Navigation("Properties");
+                    b.Navigation(e => e.Properties);
                 });
 #pragma warning restore 612, 618
         }
