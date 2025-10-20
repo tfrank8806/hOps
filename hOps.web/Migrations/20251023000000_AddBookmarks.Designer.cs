@@ -957,13 +957,13 @@ namespace hOps.web.Migrations
             modelBuilder.Entity<CalendarEventProperty>(b =>
                 {
                     b.HasOne<CalendarEvent>(d => d.CalendarEvent)
-                        .WithMany(p => p.EventProperties)
+                        .WithMany("EventProperties")
                         .HasForeignKey(d => d.CalendarEventId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne<Property>(d => d.Property)
-                        .WithMany(p => p.CalendarEvents)
+                        .WithMany("CalendarEvents")
                         .HasForeignKey(d => d.PropertyId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1059,13 +1059,13 @@ namespace hOps.web.Migrations
             modelBuilder.Entity<Bookmark>(b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "CreatedBy")
-                        .WithMany(p => p.CreatedBookmarks)
+                        .WithMany("CreatedBookmarks")
                         .HasForeignKey("CreatedById")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany(p => p.Bookmarks)
+                        .WithMany("Bookmarks")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade);
 
@@ -1134,13 +1134,13 @@ namespace hOps.web.Migrations
             modelBuilder.Entity<UserPropertyAccess>(b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "ApplicationUser")
-                        .WithMany(u => u.UserPropertyAccesses)
+                        .WithMany("UserPropertyAccesses")
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany(p => p.UserAccesses)
+                        .WithMany("UserAccesses")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1154,15 +1154,15 @@ namespace hOps.web.Migrations
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "CreatedBy")
                         .WithMany()
-                        .HasForeignKey(e => e.CreatedById);
+                        .HasForeignKey("CreatedById");
 
                     b.HasOne("hOps.web.Models.Department", "Department")
                         .WithMany()
-                        .HasForeignKey(e => e.DepartmentId);
+                        .HasForeignKey("DepartmentId");
 
                     b.HasOne("hOps.web.Models.WorkOrderType", "WorkOrderType")
                         .WithMany()
-                        .HasForeignKey(e => e.WorkOrderTypeId);
+                        .HasForeignKey("WorkOrderTypeId");
 
                     b.Navigation("Attachments");
 
@@ -1178,8 +1178,8 @@ namespace hOps.web.Migrations
             modelBuilder.Entity<WorkOrderAttachment>(b =>
                 {
                     b.HasOne("hOps.web.Models.WorkOrder", "WorkOrder")
-                        .WithMany(e => e.Attachments)
-                        .HasForeignKey(e => e.WorkOrderId)
+                        .WithMany("Attachments")
+                        .HasForeignKey("WorkOrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1189,14 +1189,14 @@ namespace hOps.web.Migrations
             modelBuilder.Entity<WorkOrderProperty>(b =>
                 {
                     b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany(e => e.WorkOrderLinks)
-                        .HasForeignKey(e => e.PropertyId)
+                        .WithMany("WorkOrderLinks")
+                        .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("hOps.web.Models.WorkOrder", "WorkOrder")
-                        .WithMany(e => e.Properties)
-                        .HasForeignKey(e => e.WorkOrderId)
+                        .WithMany("Properties")
+                        .HasForeignKey("WorkOrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

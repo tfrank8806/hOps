@@ -555,13 +555,13 @@ namespace hOps.web.Migrations
             modelBuilder.Entity<UserPropertyAccess>(b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "ApplicationUser")
-                        .WithMany(u => u.UserPropertyAccesses)
+                        .WithMany("UserPropertyAccesses")
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany(p => p.UserAccesses)
+                        .WithMany("UserAccesses")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
