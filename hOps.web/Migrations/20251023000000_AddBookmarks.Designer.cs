@@ -1168,8 +1168,6 @@ namespace hOps.web.Migrations
 
                     b.Navigation(e => e.Department);
 
-                    b.Navigation(e => e.Properties);
-
                     b.Navigation(e => e.WorkOrderType);
                 });
 
@@ -1248,8 +1246,6 @@ namespace hOps.web.Migrations
             modelBuilder.Entity<WorkOrder>(b =>
                 {
                     b.Navigation(e => e.Attachments);
-
-                    b.Navigation(e => e.Properties);
                 });
 #pragma warning restore 612, 618
         }
