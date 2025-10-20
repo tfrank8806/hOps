@@ -1164,7 +1164,7 @@ namespace hOps.web.Migrations
                         .WithMany()
                         .HasForeignKey(e => e.WorkOrderTypeId);
 
-                    b.Navigation(e => e.Attachments);
+                    b.Navigation("Attachments");
 
                     b.Navigation(e => e.CreatedBy);
 
@@ -1178,7 +1178,7 @@ namespace hOps.web.Migrations
             modelBuilder.Entity<WorkOrderAttachment>(b =>
                 {
                     b.HasOne(e => e.WorkOrder)
-                        .WithMany(e => e.Attachments)
+                        .WithMany("Attachments")
                         .HasForeignKey(e => e.WorkOrderId)
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
