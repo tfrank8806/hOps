@@ -7,6 +7,8 @@ namespace hOps.web.ViewModels
 {
     public class CalendarEventFormViewModel
     {
+        public int? Id { get; set; }
+
         [Required]
         [Display(Name = "Category")]
         public int CategoryId { get; set; }
@@ -137,6 +139,15 @@ namespace hOps.web.ViewModels
         public DateTime NextMonth { get; set; }
         public List<CalendarDayViewModel> Days { get; set; } = new();
         public List<CalendarEventDisplayViewModel> UpcomingEvents { get; set; } = new();
+        public CalendarEventFormViewModel Form { get; set; } = new();
+        public IEnumerable<SelectListItem> CategoryOptions { get; set; } = Enumerable.Empty<SelectListItem>();
+        public List<Property> AccessibleProperties { get; set; } = new();
+        public bool ShowPropertySelection { get; set; }
+    }
+
+    public class CalendarEventManageViewModel
+    {
+        public string Heading { get; set; } = "Edit Event";
         public CalendarEventFormViewModel Form { get; set; } = new();
         public IEnumerable<SelectListItem> CategoryOptions { get; set; } = Enumerable.Empty<SelectListItem>();
         public List<Property> AccessibleProperties { get; set; } = new();

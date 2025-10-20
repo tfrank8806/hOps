@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace hOps.web.Controllers
@@ -46,11 +47,7 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
-            var accessibleProperties = await _context.UserPropertyAccesses
-                .Where(upa => upa.ApplicationUserId == user.Id)
-                .Select(upa => upa.Property)
-                .OrderBy(p => p.Name)
-                .ToListAsync();
+            var accessibleProperties = await GetAccessiblePropertiesAsync(user.Id);
 
             var propertyIds = accessibleProperties.Select(p => p.Id).ToList();
             var propertySelectionKey = "Form.SelectedPropertyIds";
@@ -131,22 +128,227 @@ namespace hOps.web.Controllers
             return RedirectToAction(nameof(Index), new { month = calendarEvent.StartDate.Month, year = calendarEvent.StartDate.Year });
         }
 
+        [HttpGet]
+        public async Task<IActionResult> Edit(int id)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var accessibleProperties = await GetAccessiblePropertiesAsync(user.Id);
+            if (!accessibleProperties.Any())
+            {
+                return NotFound();
+            }
+
+            var calendarEvent = await _context.CalendarEvents
+                .Include(e => e.EventProperties)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (calendarEvent == null)
+            {
+                return NotFound();
+            }
+
+            var accessiblePropertyIds = accessibleProperties
+                .Select(p => p.Id)
+                .ToHashSet();
+
+            var selectedPropertyIds = calendarEvent.EventProperties
+                .Where(ep => accessiblePropertyIds.Contains(ep.PropertyId))
+                .Select(ep => ep.PropertyId)
+                .Distinct()
+                .ToList();
+
+            if (!selectedPropertyIds.Any())
+            {
+                return NotFound();
+            }
+
+            var categoryOptions = await GetCalendarCategoryOptionsAsync();
+
+            var form = new CalendarEventFormViewModel
+            {
+                Id = calendarEvent.Id,
+                CategoryId = calendarEvent.CalendarCategoryId,
+                Title = calendarEvent.Title,
+                StartDate = calendarEvent.StartDate,
+                StartTime = calendarEvent.StartTime,
+                EndDate = calendarEvent.EndDate,
+                EndTime = calendarEvent.EndTime,
+                Recurrence = calendarEvent.Recurrence,
+                Details = calendarEvent.Details,
+                SelectedPropertyIds = selectedPropertyIds
+            };
+
+            var viewModel = new CalendarEventManageViewModel
+            {
+                Heading = "Edit Event",
+                Form = form,
+                CategoryOptions = categoryOptions,
+                AccessibleProperties = accessibleProperties,
+                ShowPropertySelection = accessibleProperties.Count > 1
+            };
+
+            return View(viewModel);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, [Bind(Prefix = "Form")] CalendarEventFormViewModel form)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            if (form.Id.HasValue && form.Id.Value != id)
+            {
+                return BadRequest();
+            }
+
+            var accessibleProperties = await GetAccessiblePropertiesAsync(user.Id);
+            if (!accessibleProperties.Any())
+            {
+                return NotFound();
+            }
+
+            var accessiblePropertyIds = accessibleProperties
+                .Select(p => p.Id)
+                .ToHashSet();
+
+            var calendarEvent = await _context.CalendarEvents
+                .Include(e => e.EventProperties)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (calendarEvent == null)
+            {
+                return NotFound();
+            }
+
+            var existingAccessiblePropertyIds = calendarEvent.EventProperties
+                .Where(ep => accessiblePropertyIds.Contains(ep.PropertyId))
+                .Select(ep => ep.PropertyId)
+                .Distinct()
+                .ToList();
+
+            if (!existingAccessiblePropertyIds.Any())
+            {
+                return NotFound();
+            }
+
+            form.Id = id;
+            form.SelectedPropertyIds = form.SelectedPropertyIds?.Distinct().ToList() ?? new List<int>();
+
+            var propertySelectionKey = "Form.SelectedPropertyIds";
+
+            if (!form.SelectedPropertyIds.Any() && accessibleProperties.Count == 1)
+            {
+                form.SelectedPropertyIds = new List<int> { accessibleProperties[0].Id };
+            }
+
+            if (!form.SelectedPropertyIds.Any())
+            {
+                ModelState.AddModelError(propertySelectionKey, "Select at least one property.");
+            }
+            else if (form.SelectedPropertyIds.Any(selectedId => !accessiblePropertyIds.Contains(selectedId)))
+            {
+                ModelState.AddModelError(propertySelectionKey, "You can only select properties you have access to.");
+            }
+
+            form.StartDate = form.StartDate == default ? calendarEvent.StartDate.Date : form.StartDate.Date;
+            form.EndDate = form.EndDate == default ? form.StartDate : form.EndDate.Date;
+
+            if (form.EndDate < form.StartDate)
+            {
+                ModelState.AddModelError("Form.EndDate", "End date cannot be before start date.");
+            }
+
+            if (form.StartDate == form.EndDate && form.StartTime.HasValue && form.EndTime.HasValue && form.EndTime < form.StartTime)
+            {
+                ModelState.AddModelError("Form.EndTime", "End time cannot be before start time when the event occurs on a single day.");
+            }
+
+            var categoryExists = await _context.CalendarCategories.AnyAsync(c => c.Id == form.CategoryId);
+            if (!categoryExists)
+            {
+                ModelState.AddModelError("Form.CategoryId", "Select a valid category.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                var categoryOptions = await GetCalendarCategoryOptionsAsync();
+
+                var viewModel = new CalendarEventManageViewModel
+                {
+                    Heading = "Edit Event",
+                    Form = form,
+                    CategoryOptions = categoryOptions,
+                    AccessibleProperties = accessibleProperties,
+                    ShowPropertySelection = accessibleProperties.Count > 1
+                };
+
+                return View(viewModel);
+            }
+
+            calendarEvent.CalendarCategoryId = form.CategoryId;
+            calendarEvent.Title = form.Title.Trim();
+            calendarEvent.StartDate = form.StartDate.Date;
+            calendarEvent.StartTime = form.StartTime;
+            calendarEvent.EndDate = form.EndDate.Date;
+            calendarEvent.EndTime = form.EndTime;
+            calendarEvent.Recurrence = form.Recurrence;
+            calendarEvent.Details = string.IsNullOrWhiteSpace(form.Details) ? null : form.Details.Trim();
+
+            var newPropertyIds = form.SelectedPropertyIds;
+
+            var currentAccessiblePropertyIds = calendarEvent.EventProperties
+                .Where(ep => accessiblePropertyIds.Contains(ep.PropertyId))
+                .Select(ep => ep.PropertyId)
+                .Distinct()
+                .ToList();
+
+            var propertiesToRemove = currentAccessiblePropertyIds
+                .Except(newPropertyIds)
+                .ToList();
+
+            var propertiesToAdd = newPropertyIds
+                .Except(currentAccessiblePropertyIds)
+                .ToList();
+
+            if (propertiesToRemove.Any())
+            {
+                var eventPropertiesToRemove = calendarEvent.EventProperties
+                    .Where(ep => propertiesToRemove.Contains(ep.PropertyId))
+                    .ToList();
+
+                _context.CalendarEventProperties.RemoveRange(eventPropertiesToRemove);
+            }
+
+            foreach (var propertyId in propertiesToAdd)
+            {
+                calendarEvent.EventProperties.Add(new CalendarEventProperty
+                {
+                    PropertyId = propertyId,
+                    CalendarEventId = calendarEvent.Id
+                });
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "Event updated successfully.";
+
+            return RedirectToAction(nameof(Index), new { month = calendarEvent.StartDate.Month, year = calendarEvent.StartDate.Year });
+        }
+
         private async Task<CalendarViewModel> BuildViewModelAsync(ApplicationUser user, DateTime targetMonth, CalendarEventFormViewModel? formOverride = null)
         {
-            var accessibleProperties = await _context.UserPropertyAccesses
-                .Where(upa => upa.ApplicationUserId == user.Id)
-                .Select(upa => upa.Property)
-                .OrderBy(p => p.Name)
-                .ToListAsync();
+            var accessibleProperties = await GetAccessiblePropertiesAsync(user.Id);
 
-            var categoryOptions = await _context.CalendarCategories
-                .OrderBy(c => c.Name)
-                .Select(c => new SelectListItem
-                {
-                    Value = c.Id.ToString(),
-                    Text = c.Name
-                })
-                .ToListAsync();
+            var categoryOptions = await GetCalendarCategoryOptionsAsync();
 
             var form = formOverride ?? new CalendarEventFormViewModel();
 
@@ -235,6 +437,27 @@ namespace hOps.web.Controllers
                 AccessibleProperties = accessibleProperties,
                 ShowPropertySelection = accessibleProperties.Count > 1
             };
+        }
+
+        private async Task<List<Property>> GetAccessiblePropertiesAsync(string userId)
+        {
+            return await _context.UserPropertyAccesses
+                .Where(upa => upa.ApplicationUserId == userId)
+                .Select(upa => upa.Property)
+                .OrderBy(p => p.Name)
+                .ToListAsync();
+        }
+
+        private async Task<List<SelectListItem>> GetCalendarCategoryOptionsAsync()
+        {
+            return await _context.CalendarCategories
+                .OrderBy(c => c.Name)
+                .Select(c => new SelectListItem
+                {
+                    Value = c.Id.ToString(),
+                    Text = c.Name
+                })
+                .ToListAsync();
         }
 
         private static CalendarEventDisplayViewModel MapToDisplayModel(CalendarEvent calendarEvent)
