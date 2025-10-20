@@ -310,7 +310,7 @@ namespace hOps.web.Migrations
                     b.ToTable("CalendarEventProperties");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Department", b =>
+            modelBuilder.Entity<Department>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
