@@ -55,5 +55,19 @@ namespace hOps.web.Models
         /// Optional display label (used for custom shapes).
         /// </summary>
         public string? Label { get; set; }
+
+        /// <summary>
+        /// Optional identifier describing the visual shape of the layout element
+        /// (e.g., rectangle, l-shape, custom polygon).
+        /// </summary>
+        public string? ShapeType { get; set; }
+
+        /// <summary>
+        /// Optional serialized data used to render the custom shape. When
+        /// <see cref="ShapeType"/> is a pre-defined value this may be null, but it
+        /// can also contain a CSS clip-path polygon or other data needed by the
+        /// layout editor to reproduce the custom appearance.
+        /// </summary>
+        public string? ShapeData { get; set; }
     }
 }

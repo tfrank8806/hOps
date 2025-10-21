@@ -272,7 +272,7 @@ namespace hOps.web.Migrations
                     b.Property<TimeSpan?>("EndTime")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Recurrence")
+                    b.Property<CalendarRecurrenceType>("Recurrence")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("StartDate")
@@ -351,7 +351,7 @@ namespace hOps.web.Migrations
                     b.Property<int?>("PropertyId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("Section")
+                    b.Property<BookmarkSection>("Section")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Url")
@@ -554,7 +554,7 @@ namespace hOps.web.Migrations
                     b.ToTable("Properties");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Room", b =>
+            modelBuilder.Entity<Room>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -610,6 +610,12 @@ namespace hOps.web.Migrations
 
                     b.Property<int>("RoomId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("ShapeData")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ShapeType")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Width")
                         .HasColumnType("INTEGER");
@@ -1001,10 +1007,10 @@ namespace hOps.web.Migrations
                     b.Navigation("PhonebookType");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Room", b =>
+            modelBuilder.Entity<Room>(b =>
                 {
-                    b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany("Rooms")
+                    b.HasOne<Property>("Property")
+                        .WithMany(p => p.Rooms)
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1160,6 +1166,12 @@ namespace hOps.web.Migrations
                     b.HasOne(e => e.WorkOrderType)
                         .WithMany()
                         .HasForeignKey(e => e.WorkOrderTypeId);
+
+                    b.HasMany(e => e.Properties)
+                        .WithOne(e => e.WorkOrder)
+                        .HasForeignKey(e => e.WorkOrderId)
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation(e => e.CreatedBy);
 
