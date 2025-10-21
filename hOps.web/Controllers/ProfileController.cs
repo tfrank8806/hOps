@@ -41,7 +41,7 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateProfile(ProfileFormViewModel model)
+        public async Task<IActionResult> UpdateProfile([Bind(Prefix = "Profile")] ProfileFormViewModel model)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
