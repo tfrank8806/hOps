@@ -1,6 +1,13 @@
+@using System.Text.Json
+
 @{
     ViewData["Title"] = "Logs";
     ViewData["MainContainerClass"] = "main-inner--wide";
+    var currentUserInfo = new
+    {
+        id = ViewBag.CurrentUserId as string ?? string.Empty,
+        name = ViewBag.CurrentUserName as string ?? "Unknown user"
+    };
 }
 
 <div class="row g-4 logs-page align-items-stretch flex-grow-1">
@@ -52,6 +59,11 @@
                         </button>
                     </div>
                     <button class="btn btn-outline-success btn-sm" id="exportExcelBtn" type="button" disabled>Export Excel</button>
+                    <button class="btn btn-outline-primary btn-sm" id="viewAuditLogBtn" type="button" disabled>View History</button>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-outline-secondary btn-sm" id="duplicateLogBtn" type="button" disabled>Duplicate</button>
+                        <button class="btn btn-outline-danger btn-sm" id="deleteLogBtn" type="button" disabled>Delete</button>
+                    </div>
                 </div>
             </div>
             <div class="card-body d-flex flex-column">
@@ -166,11 +178,32 @@
     </div>
 </div>
 
+<div class="modal fade" id="auditLogModal" tabindex="-1" aria-labelledby="auditLogModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="auditLogModalLabel">Change History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="auditLogEmptyState" class="text-center text-muted py-4">
+                    <p class="mb-0">No changes recorded yet.</p>
+                </div>
+                <div class="list-group" id="auditLogList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Styles {
     <link rel="stylesheet" href="~/css/logs.css" />
 }
 
 @section Scripts {
+    <script>
+        window.hOps = window.hOps || {};
+        window.hOps.currentUser = @Html.Raw(JsonSerializer.Serialize(currentUserInfo));
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
     <script src="~/js/logs.js"></script>
 }

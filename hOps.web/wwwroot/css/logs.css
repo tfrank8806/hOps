@@ -48,6 +48,58 @@
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+.logs-page #logList .log-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logs-page #logList .log-item-select {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    flex: 1 1 auto;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: inherit;
+    text-align: left;
+}
+
+.logs-page #logList .log-item-select:hover,
+.logs-page #logList .log-item-select:focus {
+    text-decoration: underline;
+    outline: none;
+}
+
+.logs-page #logList .log-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logs-page #logList .log-item-actions .btn-sm {
+    padding-inline: 0.5rem;
+}
+
+.logs-page #logList .log-item-actions .btn {
+    white-space: nowrap;
+}
+
+.logs-page #logList .log-item.active .log-item-select {
+    color: inherit;
+}
+
+.audit-log-entry {
+    border: 0;
+    border-bottom: 1px solid #e5e7eb;
+    border-radius: 0;
+}
+
+.audit-log-entry:last-child {
+    border-bottom: 0;
+}
+
 .logs-page #logList .list-group-item.active {
     background-color: #0d6efd;
     border-color: #0d6efd;
