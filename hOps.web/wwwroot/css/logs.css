@@ -2,6 +2,14 @@
     min-height: calc(100vh - 280px);
 }
 
+.logs-page .log-list-column {
+    min-width: 260px;
+}
+
+.logs-page .log-editor-column {
+    min-width: 0;
+}
+
 .logs-page > [class*='col-'] {
     display: flex;
 }
