@@ -414,7 +414,7 @@ namespace hOps.web.Migrations
                     b.Property<int?>("PropertyId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<BookmarkSection>("Section")
+                    b.Property<int>("Section")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Url")
@@ -1184,10 +1184,10 @@ namespace hOps.web.Migrations
                     b.Navigation("PhonebookType");
                 });
 
-            modelBuilder.Entity<Room>(b =>
+            modelBuilder.Entity("hOps.web.Models.Room", b =>
                 {
-                    b.HasOne<Property>("Property")
-                        .WithMany(p => p.Rooms)
+                    b.HasOne("hOps.web.Models.Property", "Property")
+                        .WithMany("Rooms")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1344,12 +1344,6 @@ namespace hOps.web.Migrations
                         .WithMany()
                         .HasForeignKey(e => e.WorkOrderTypeId);
 
-                    b.HasMany(e => e.Properties)
-                        .WithOne(e => e.WorkOrder)
-                        .HasForeignKey(e => e.WorkOrderId)
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation(e => e.CreatedBy);
 
                     b.Navigation(e => e.Department);
@@ -1444,6 +1438,7 @@ namespace hOps.web.Migrations
 
                     b.Navigation(e => e.Properties);
                 });
+
 #pragma warning restore 612, 618
         }
     }
