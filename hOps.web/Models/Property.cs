@@ -30,5 +30,11 @@ namespace hOps.web.Models
         public ICollection<LostFoundEntry> LostFoundEntries { get; set; } = new List<LostFoundEntry>();
 
         public ICollection<Bookmark> Bookmarks { get; set; } = new List<Bookmark>();
+
+        public ICollection<ManagerAnnouncement> ManagerAnnouncements { get; set; } = new List<ManagerAnnouncement>();
+
+        public ICollection<BulletinPost> BulletinPosts { get; set; } = new List<BulletinPost>();
+
+        public ICollection<PackageLogEntry> PackageLogEntries { get; set; } = new List<PackageLogEntry>();
     }
 }
