@@ -72,20 +72,6 @@
     outline: none;
 }
 
-.logs-page #logList .log-item-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.logs-page #logList .log-item-actions .btn-sm {
-    padding-inline: 0.5rem;
-}
-
-.logs-page #logList .log-item-actions .btn {
-    white-space: nowrap;
-}
-
 .logs-page #logList .log-item.active .log-item-select {
     color: inherit;
 }
@@ -120,6 +106,7 @@
 }
 
 #spreadsheetWrapper {
+    position: relative;
     flex: 1 1 auto;
     overflow: auto;
     --spreadsheet-zoom-scale: 1;
@@ -249,6 +236,11 @@
     background-color: #e3f2ff;
 }
 
+.spreadsheet-table tbody td.fill-preview {
+    outline: 2px dashed rgba(13, 110, 253, 0.6);
+    outline-offset: -2px;
+}
+
 .spreadsheet-table tbody td.editing-cell {
     background-color: #eef5ff;
 }
@@ -261,6 +253,22 @@
     align-items: center;
     justify-content: center;
     pointer-events: none;
+}
+
+.fill-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background-color: #0d6efd;
+    border: 2px solid #ffffff;
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px rgba(13, 110, 253, 0.4);
+    cursor: crosshair;
+    z-index: 5;
+}
+
+.fill-handle.d-none {
+    display: none !important;
 }
 
 @media (max-width: 991.98px) {
