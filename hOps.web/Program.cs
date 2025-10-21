@@ -4,6 +4,7 @@ using hOps.web.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using Microsoft.Data.Sqlite;
@@ -59,6 +60,7 @@ using (var scope = app.Services.CreateScope())
     await ApplyMigrationsWithLegacySupportAsync(dbContext);
 
     await EnsureProfilePhotoPathColumnAsync(dbContext);
+    await EnsureRoomLayoutShapeColumnsAsync(dbContext);
 
     await SeedRolesAsync(roleManager);
     await SeedAdminUserAsync(userManager, roleManager);
@@ -180,6 +182,59 @@ static async Task EnsureProfilePhotoPathColumnAsync(ApplicationDbContext dbConte
         {
             await using var alterCommand = connection.CreateCommand();
             alterCommand.CommandText = "ALTER TABLE \"AspNetUsers\" ADD COLUMN \"ProfilePhotoPath\" TEXT;";
+            await alterCommand.ExecuteNonQueryAsync();
+        }
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
+        }
+    }
+}
+
+static async Task EnsureRoomLayoutShapeColumnsAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        await using (var checkCommand = connection.CreateCommand())
+        {
+            checkCommand.CommandText = "PRAGMA table_info('RoomLayouts');";
+
+            await using var reader = await checkCommand.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                existingColumns.Add(reader.GetString(1));
+            }
+        }
+
+        var missingColumns = new List<(string Name, string Sql)>();
+
+        if (!existingColumns.Contains("ShapeType"))
+        {
+            missingColumns.Add(("ShapeType", "ALTER TABLE \"RoomLayouts\" ADD COLUMN \"ShapeType\" TEXT;"));
+        }
+
+        if (!existingColumns.Contains("ShapeData"))
+        {
+            missingColumns.Add(("ShapeData", "ALTER TABLE \"RoomLayouts\" ADD COLUMN \"ShapeData\" TEXT;"));
+        }
+
+        foreach (var (_, sql) in missingColumns)
+        {
+            await using var alterCommand = connection.CreateCommand();
+            alterCommand.CommandText = sql;
             await alterCommand.ExecuteNonQueryAsync();
         }
     }
