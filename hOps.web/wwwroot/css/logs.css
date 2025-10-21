@@ -70,6 +70,11 @@
 #spreadsheetWrapper {
     flex: 1 1 auto;
     overflow: auto;
+    --spreadsheet-zoom-scale: 1;
+}
+
+#spreadsheetWrapper .spreadsheet-table {
+    font-size: calc(1rem * var(--spreadsheet-zoom-scale));
 }
 
 .logs-page .form-label-sm {
@@ -123,6 +128,7 @@
     font-weight: 600;
     border-color: #d9dde3;
     user-select: none;
+    padding: calc(0.5rem * var(--spreadsheet-zoom-scale));
 }
 
 .spreadsheet-table tbody th {
@@ -131,16 +137,17 @@
     text-align: center;
     border-color: #d9dde3;
     user-select: none;
-    width: 40px;
+    width: calc(40px * var(--spreadsheet-zoom-scale));
+    padding: calc(0.5rem * var(--spreadsheet-zoom-scale));
 }
 
 .spreadsheet-table tbody td {
     vertical-align: middle;
     border-color: #e3e6eb;
     background-color: #fff;
-    padding: 0.5rem;
-    min-width: 120px;
-    max-width: 200px;
+    padding: calc(0.5rem * var(--spreadsheet-zoom-scale));
+    min-width: calc(120px * var(--spreadsheet-zoom-scale));
+    max-width: calc(200px * var(--spreadsheet-zoom-scale));
     overflow-wrap: anywhere;
 }
 
