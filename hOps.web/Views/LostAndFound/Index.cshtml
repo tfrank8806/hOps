@@ -166,11 +166,11 @@
     <div class="card mb-4">
         <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
             <span>Filter Entries</span>
-            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapse" aria-expanded="@(hasActiveFilters ? "true" : "false")" aria-controls="filtersCollapse">
-                Show Filters
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapse" aria-expanded="false" aria-controls="filtersCollapse">
+                @(hasActiveFilters ? "Show Filters (Active)" : "Show Filters")
             </button>
         </div>
-        <div id="filtersCollapse" class="collapse@(hasActiveFilters ? " show" : string.Empty)">
+        <div id="filtersCollapse" class="collapse">
             <div class="card-body">
                 <form method="get" class="row g-3 align-items-end">
                     <div class="col-md-2">
