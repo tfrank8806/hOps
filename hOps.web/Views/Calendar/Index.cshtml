@@ -330,7 +330,6 @@
                 return;
             }
 
-            const modal = new bootstrap.Modal(modalElement);
             const titleEl = modalElement.querySelector('[data-details="title"]');
             const categoryEl = modalElement.querySelector('[data-details="category"]');
             const datesEl = modalElement.querySelector('[data-details="dates"]');
@@ -342,6 +341,15 @@
             const createdAtEl = modalElement.querySelector('[data-details="created-at"]');
             const editButton = modalElement.querySelector('[data-details="edit-link"]');
 
+            const getModalInstance = () => {
+                if (window.bootstrap && window.bootstrap.Modal) {
+                    return window.bootstrap.Modal.getOrCreateInstance(modalElement);
+                }
+
+                console.error('Bootstrap modal library is unavailable.');
+                return null;
+            };
+
             const renderDetails = (value) => {
                 if (!value) {
                     return '<span class="text-muted">No additional details</span>';
@@ -350,6 +358,11 @@
             };
 
             const updateModal = (element) => {
+                const modal = getModalInstance();
+                if (!modal) {
+                    return;
+                }
+
                 const dataset = element.dataset;
                 titleEl.textContent = dataset.eventTitle || 'Event Details';
                 categoryEl.textContent = dataset.eventCategory || 'Category';
