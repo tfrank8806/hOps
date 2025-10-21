@@ -358,61 +358,84 @@ namespace hOps.web.Controllers
             var floor = request.Floor;
             var layoutDtos = request.Layouts ?? new List<RoomLayoutDto>();
 
-            var existingLayouts = await _db.RoomLayouts
+            var layoutsOnFloor = await _db.RoomLayouts
                 .Where(l => l.PropertyId == propertyId && l.Floor == floor)
                 .ToListAsync();
 
-            var dtoLookup = layoutDtos
-                .GroupBy(dto => dto.RoomId)
-                .ToDictionary(g => g.Key, g => g.First());
-
-            foreach (var existing in existingLayouts)
-            {
-                if (!dtoLookup.ContainsKey(existing.RoomId))
-                {
-                    _db.RoomLayouts.Remove(existing);
-                }
-            }
+            var keepSet = new HashSet<RoomLayout>();
+            var orderedLayouts = new List<RoomLayout>();
 
             foreach (var dto in layoutDtos)
             {
                 dto.PropertyId = propertyId;
                 dto.Floor = floor;
 
-                var existing = existingLayouts.FirstOrDefault(l =>
-                    l.PropertyId == dto.PropertyId && l.RoomId == dto.RoomId && l.Floor == dto.Floor);
+                var trimmedLabel = string.IsNullOrWhiteSpace(dto.Label) ? null : dto.Label!.Trim();
+                var normalizedShapeType = string.IsNullOrWhiteSpace(dto.ShapeType) ? null : dto.ShapeType!.Trim();
+                var normalizedShapeData = string.IsNullOrWhiteSpace(dto.ShapeData) ? null : dto.ShapeData!.Trim();
 
-                if (existing != null)
+                RoomLayout? layoutEntity = null;
+                if (dto.Id > 0)
                 {
-                    existing.X = dto.X;
-                    existing.Y = dto.Y;
-                    existing.Width = dto.Width;
-                    existing.Height = dto.Height;
-                    existing.Label = dto.Label;
-                    existing.ShapeType = dto.ShapeType;
-                    existing.ShapeData = dto.ShapeData;
-                    _db.RoomLayouts.Update(existing);
+                    layoutEntity = layoutsOnFloor.FirstOrDefault(l => l.Id == dto.Id);
                 }
-                else
+
+                if (layoutEntity == null && dto.RoomId != 0)
                 {
-                    _db.RoomLayouts.Add(new RoomLayout
+                    layoutEntity = layoutsOnFloor.FirstOrDefault(l => l.RoomId == dto.RoomId);
+                }
+
+                if (layoutEntity == null)
+                {
+                    layoutEntity = new RoomLayout
                     {
                         PropertyId = dto.PropertyId,
                         RoomId = dto.RoomId,
-                        Floor = dto.Floor,
-                        X = dto.X,
-                        Y = dto.Y,
-                        Width = dto.Width,
-                        Height = dto.Height,
-                        Label = dto.Label,
-                        ShapeType = dto.ShapeType,
-                        ShapeData = dto.ShapeData
-                    });
+                        Floor = dto.Floor
+                    };
+                    _db.RoomLayouts.Add(layoutEntity);
+                    layoutsOnFloor.Add(layoutEntity);
+                }
+
+                layoutEntity.X = dto.X;
+                layoutEntity.Y = dto.Y;
+                layoutEntity.Width = dto.Width;
+                layoutEntity.Height = dto.Height;
+                layoutEntity.Label = trimmedLabel;
+                layoutEntity.ShapeType = normalizedShapeType;
+                layoutEntity.ShapeData = normalizedShapeData;
+
+                keepSet.Add(layoutEntity);
+                orderedLayouts.Add(layoutEntity);
+            }
+
+            foreach (var existing in layoutsOnFloor.ToList())
+            {
+                if (!keepSet.Contains(existing))
+                {
+                    _db.RoomLayouts.Remove(existing);
+                    layoutsOnFloor.Remove(existing);
                 }
             }
 
             await _db.SaveChangesAsync();
-            return Json(new { success = true });
+
+            var responseLayouts = orderedLayouts
+                .Select(l => new
+                {
+                    id = l.Id,
+                    roomId = l.RoomId,
+                    label = l.Label ?? string.Empty,
+                    x = l.X,
+                    y = l.Y,
+                    width = l.Width,
+                    height = l.Height,
+                    shapeType = string.IsNullOrWhiteSpace(l.ShapeType) ? "rectangle" : l.ShapeType,
+                    shapeData = l.ShapeData ?? string.Empty
+                })
+                .ToList();
+
+            return Json(new { success = true, layouts = responseLayouts });
         }
 
         // — Add Floor (called from LayoutEditor via AJAX) —
