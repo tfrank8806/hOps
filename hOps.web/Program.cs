@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
+using System.Data.Common;
+using Microsoft.Data.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,8 +55,8 @@ using (var scope = app.Services.CreateScope())
     var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
 
-    // Apply pending migrations
-    dbContext.Database.Migrate();
+    // Apply pending migrations with fallback support for legacy schemas
+    await ApplyMigrationsWithLegacySupportAsync(dbContext);
 
     await EnsureProfilePhotoPathColumnAsync(dbContext);
 
@@ -188,4 +190,117 @@ static async Task EnsureProfilePhotoPathColumnAsync(ApplicationDbContext dbConte
             await connection.CloseAsync();
         }
     }
+}
+
+static async Task ApplyMigrationsWithLegacySupportAsync(ApplicationDbContext dbContext)
+{
+    try
+    {
+        await dbContext.Database.MigrateAsync();
+    }
+    catch (SqliteException ex) when (IsMissingWorkOrderTypeTableError(ex))
+    {
+        await EnsureLegacyWorkOrderTypeTableAsync(dbContext);
+        await dbContext.Database.MigrateAsync();
+    }
+
+    await ConsolidateLegacyWorkOrderTypeTableAsync(dbContext);
+}
+
+static bool IsMissingWorkOrderTypeTableError(SqliteException ex)
+    => ex.SqliteErrorCode == 1 && ex.Message.Contains("no such table: WorkOrderType", StringComparison.OrdinalIgnoreCase);
+
+static async Task EnsureLegacyWorkOrderTypeTableAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        await using var createCommand = connection.CreateCommand();
+        createCommand.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS "WorkOrderType" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_WorkOrderType" PRIMARY KEY AUTOINCREMENT,
+                "Name" TEXT NOT NULL,
+                "Color" TEXT NOT NULL
+            );
+            """;
+
+        await createCommand.ExecuteNonQueryAsync();
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
+        }
+    }
+}
+
+static async Task ConsolidateLegacyWorkOrderTypeTableAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        if (!await TableExistsAsync(connection, "WorkOrderType"))
+        {
+            return;
+        }
+
+        if (!await TableExistsAsync(connection, "WorkOrderTypes"))
+        {
+            return;
+        }
+
+        await using var syncCommand = connection.CreateCommand();
+        syncCommand.CommandText =
+            """
+            INSERT INTO "WorkOrderTypes" ("Id", "Name", "Color")
+            SELECT legacy."Id", legacy."Name", legacy."Color"
+            FROM "WorkOrderType" AS legacy
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "WorkOrderTypes" AS current WHERE current."Id" = legacy."Id"
+            );
+            """;
+
+        await syncCommand.ExecuteNonQueryAsync();
+
+        await using var dropCommand = connection.CreateCommand();
+        dropCommand.CommandText = "DROP TABLE IF EXISTS \"WorkOrderType\";";
+        await dropCommand.ExecuteNonQueryAsync();
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
+        }
+    }
+}
+
+static async Task<bool> TableExistsAsync(DbConnection connection, string tableName)
+{
+    await using var checkCommand = connection.CreateCommand();
+    checkCommand.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name = @name LIMIT 1;";
+
+    var parameter = checkCommand.CreateParameter();
+    parameter.ParameterName = "@name";
+    parameter.Value = tableName;
+    checkCommand.Parameters.Add(parameter);
+
+    var result = await checkCommand.ExecuteScalarAsync();
+    return result != null;
 }
