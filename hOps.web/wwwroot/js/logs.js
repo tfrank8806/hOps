@@ -42,6 +42,17 @@
     let currentLogId = null;
     let selectionRange = null;
     let anchorCell = null;
+    let activeEditingCell = null;
+
+    function clamp(value, min, max) {
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
+    }
 
     function createCell(value = '', format = {}) {
         return {
@@ -291,6 +302,8 @@
     }
 
     function renderSpreadsheet(log) {
+        stopEditingActiveCell({ commit: true });
+
         const data = log.data;
         const columnCount = data[0]?.length ?? defaultColumns;
         const headerRow = document.createElement('tr');
@@ -326,14 +339,19 @@
                 }
 
                 const td = document.createElement('td');
-                td.contentEditable = 'true';
+                td.contentEditable = 'false';
                 td.dataset.row = String(rowIndex);
                 td.dataset.column = String(colIndex);
+                td.dataset.editing = 'false';
+                td.tabIndex = 0;
                 td.textContent = cellData.value ?? '';
                 applyCellFormatting(td, cellData.format);
                 td.addEventListener('input', handleCellInput);
                 td.addEventListener('mousedown', handleCellMouseDown);
                 td.addEventListener('focus', handleCellFocus);
+                td.addEventListener('keydown', handleCellKeyDown);
+                td.addEventListener('dblclick', handleCellDoubleClick);
+                td.addEventListener('blur', handleCellBlur);
 
                 const merge = cellData.format?.merge;
                 if (merge) {
@@ -416,6 +434,9 @@
         if (!(target instanceof HTMLElement)) {
             return;
         }
+        if (target.dataset.editing === 'true') {
+            return;
+        }
         const rowIndex = Number(target.dataset.row ?? '-1');
         const columnIndex = Number(target.dataset.column ?? '-1');
         if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
@@ -427,6 +448,238 @@
         }
         anchorCell = { row: display.row, column: display.column };
         setSelection(display.row, display.column, display.row, display.column, { focus: false });
+    }
+
+    function beginEditingCell(cell, options = {}) {
+        if (!(cell instanceof HTMLElement)) {
+            return;
+        }
+        if (cell.dataset.editing === 'true') {
+            return;
+        }
+        const selectionMode = options.selectionMode === 'end' ? 'end' : 'all';
+        stopEditingActiveCell({ commit: true });
+        cell.dataset.originalValue = cell.textContent ?? '';
+        cell.dataset.editing = 'true';
+        cell.contentEditable = 'true';
+        cell.classList.add('editing-cell');
+        activeEditingCell = cell;
+        requestAnimationFrame(() => {
+            if (typeof cell.focus === 'function') {
+                try {
+                    cell.focus({ preventScroll: true });
+                } catch (error) {
+                    cell.focus();
+                }
+            }
+            selectCellContents(cell, selectionMode);
+        });
+    }
+
+    function selectCellContents(cell, mode = 'all') {
+        if (!(cell instanceof HTMLElement) || typeof window.getSelection !== 'function') {
+            return;
+        }
+        const selection = window.getSelection();
+        if (!selection) {
+            return;
+        }
+        selection.removeAllRanges();
+        const range = document.createRange();
+        range.selectNodeContents(cell);
+        if (mode === 'end') {
+            range.collapse(false);
+        }
+        selection.addRange(range);
+    }
+
+    function stopEditingActiveCell(options = {}) {
+        if (!activeEditingCell) {
+            return;
+        }
+        const commit = options.commit !== false;
+        const cell = activeEditingCell;
+        const rowIndex = Number(cell.dataset.row ?? '-1');
+        const columnIndex = Number(cell.dataset.column ?? '-1');
+        const originalValue = cell.dataset.originalValue ?? '';
+        const log = getCurrentLog();
+
+        if (!commit && log && !Number.isNaN(rowIndex) && !Number.isNaN(columnIndex)) {
+            cell.textContent = originalValue;
+            ensureCellExists(log, rowIndex, columnIndex);
+            const dataCell = log.data[rowIndex][columnIndex];
+            dataCell.value = originalValue;
+            persistLogs();
+        }
+
+        cell.contentEditable = 'false';
+        cell.dataset.editing = 'false';
+        cell.classList.remove('editing-cell');
+        delete cell.dataset.originalValue;
+        if (activeEditingCell === cell) {
+            activeEditingCell = null;
+        }
+    }
+
+    function handleCellDoubleClick(event) {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+        event.preventDefault();
+        const rowIndex = Number(target.dataset.row ?? '-1');
+        const columnIndex = Number(target.dataset.column ?? '-1');
+        if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
+            return;
+        }
+        anchorCell = { row: rowIndex, column: columnIndex };
+        beginEditingCell(target, { selectionMode: 'all' });
+    }
+
+    function handleCellBlur(event) {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+        if (target.dataset.editing === 'true') {
+            stopEditingActiveCell({ commit: true });
+        }
+    }
+
+    function handleCellKeyDown(event) {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+        const rowIndex = Number(target.dataset.row ?? '-1');
+        const columnIndex = Number(target.dataset.column ?? '-1');
+        if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
+            return;
+        }
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const rowCount = log.data.length;
+        const columnCount = log.data[0]?.length ?? 0;
+        if (!rowCount || !columnCount) {
+            return;
+        }
+
+        const isEditing = target.dataset.editing === 'true';
+        if (isEditing) {
+            switch (event.key) {
+                case 'Enter':
+                    event.preventDefault();
+                    stopEditingActiveCell({ commit: true });
+                    moveSelection(event.shiftKey ? -1 : 1, 0);
+                    break;
+                case 'Tab':
+                    event.preventDefault();
+                    stopEditingActiveCell({ commit: true });
+                    moveSelection(0, event.shiftKey ? -1 : 1, { wrap: true });
+                    break;
+                case 'Escape':
+                    event.preventDefault();
+                    stopEditingActiveCell({ commit: false });
+                    anchorCell = { row: rowIndex, column: columnIndex };
+                    setSelection(rowIndex, columnIndex, rowIndex, columnIndex);
+                    break;
+                default:
+                    break;
+            }
+            return;
+        }
+
+        switch (event.key) {
+            case 'ArrowUp':
+                event.preventDefault();
+                navigateSelection(rowIndex, columnIndex, -1, 0, event.shiftKey);
+                break;
+            case 'ArrowDown':
+                event.preventDefault();
+                navigateSelection(rowIndex, columnIndex, 1, 0, event.shiftKey);
+                break;
+            case 'ArrowLeft':
+                event.preventDefault();
+                navigateSelection(rowIndex, columnIndex, 0, -1, event.shiftKey);
+                break;
+            case 'ArrowRight':
+                event.preventDefault();
+                navigateSelection(rowIndex, columnIndex, 0, 1, event.shiftKey);
+                break;
+            case 'Tab':
+                event.preventDefault();
+                moveSelection(0, event.shiftKey ? -1 : 1, { wrap: true });
+                break;
+            case 'Enter':
+                event.preventDefault();
+                beginEditingCell(target, { selectionMode: 'all' });
+                break;
+            case 'F2':
+                event.preventDefault();
+                beginEditingCell(target, { selectionMode: 'end' });
+                break;
+            default:
+                break;
+        }
+    }
+
+    function navigateSelection(rowIndex, columnIndex, deltaRow, deltaColumn, extend) {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const rowCount = log.data.length;
+        const columnCount = log.data[0]?.length ?? 0;
+        if (!rowCount || !columnCount) {
+            return;
+        }
+        const targetRow = clamp(rowIndex + deltaRow, 0, rowCount - 1);
+        const targetColumn = clamp(columnIndex + deltaColumn, 0, columnCount - 1);
+        if (extend) {
+            const anchor = anchorCell ?? { row: rowIndex, column: columnIndex };
+            if (!anchorCell) {
+                anchorCell = { row: anchor.row, column: anchor.column };
+            }
+            ensureCellExists(log, anchor.row, anchor.column);
+            ensureCellExists(log, targetRow, targetColumn);
+            setSelection(anchor.row, anchor.column, targetRow, targetColumn);
+        } else {
+            ensureCellExists(log, targetRow, targetColumn);
+            anchorCell = { row: targetRow, column: targetColumn };
+            setSelection(targetRow, targetColumn, targetRow, targetColumn);
+        }
+    }
+
+    function moveSelection(deltaRow, deltaColumn, options = {}) {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const rowCount = log.data.length;
+        const columnCount = log.data[0]?.length ?? 0;
+        if (!rowCount || !columnCount) {
+            return;
+        }
+        const currentRow = selectionRange ? selectionRange.endRow : 0;
+        const currentColumn = selectionRange ? selectionRange.endColumn : 0;
+        let targetRow = currentRow + deltaRow;
+        let targetColumn = currentColumn + deltaColumn;
+        if (options.wrap) {
+            if (targetColumn > columnCount - 1) {
+                targetColumn = 0;
+                targetRow = currentRow + 1;
+            } else if (targetColumn < 0) {
+                targetColumn = columnCount - 1;
+                targetRow = currentRow - 1;
+            }
+        }
+        targetRow = clamp(targetRow, 0, rowCount - 1);
+        targetColumn = clamp(targetColumn, 0, columnCount - 1);
+        ensureCellExists(log, targetRow, targetColumn);
+        anchorCell = { row: targetRow, column: targetColumn };
+        setSelection(targetRow, targetColumn, targetRow, targetColumn);
     }
 
     function addRow() {
@@ -519,6 +772,7 @@
         if (!log) {
             return;
         }
+        stopEditingActiveCell({ commit: true });
         const normalized = {
             startRow: Math.min(startRow, endRow),
             endRow: Math.max(startRow, endRow),
@@ -1133,7 +1387,21 @@
         }
     });
 
+    textColorInput?.addEventListener('change', (event) => {
+        const target = event.target;
+        if (target instanceof HTMLInputElement) {
+            setTextColor(target.value);
+        }
+    });
+
     fillColorInput?.addEventListener('input', (event) => {
+        const target = event.target;
+        if (target instanceof HTMLInputElement) {
+            setFillColor(target.value);
+        }
+    });
+
+    fillColorInput?.addEventListener('change', (event) => {
         const target = event.target;
         if (target instanceof HTMLInputElement) {
             setFillColor(target.value);
