@@ -59,17 +59,19 @@
                     else
                     {
                         <div class="col-12">
-                            <label class="form-label">Property</label>
-                            <div class="d-flex flex-wrap gap-3">
+                            <label class="form-label" for="propertySelection">Property</label>
+                            <select
+                                class="form-select"
+                                id="propertySelection"
+                                name="Submission.SelectedPropertyIds"
+                                multiple
+                                size="@(Math.Min(Model.AccessibleProperties.Count, 8))">
                                 @foreach (var property in Model.AccessibleProperties)
                                 {
-                                    var isChecked = Model.Submission.SelectedPropertyIds?.Contains(property.Id) ?? false;
-                                    <div class="form-check">
-                                        <input class="form-check-input property-checkbox" type="checkbox" id="property-@property.Id" name="Submission.SelectedPropertyIds" value="@property.Id" @(isChecked ? "checked" : null) />
-                                        <label class="form-check-label" for="property-@property.Id">@property.Name (@property.Code)</label>
-                                    </div>
+                                    var isSelected = Model.Submission.SelectedPropertyIds?.Contains(property.Id) ?? false;
+                                    <option value="@property.Id" @(isSelected ? "selected" : null)>@property.Name (@property.Code)</option>
                                 }
-                            </div>
+                            </select>
                             <span asp-validation-for="Submission.SelectedPropertyIds" class="text-danger"></span>
                         </div>
                     }
@@ -443,15 +445,9 @@
                 toggleFields();
             }
 
-            const propertyCheckboxes = document.querySelectorAll('.property-checkbox');
-            if (propertyCheckboxes.length > 1) {
-                propertyCheckboxes.forEach(cb => {
-                    cb.addEventListener('change', () => {
-                        if ([...propertyCheckboxes].every(box => !box.checked)) {
-                            cb.checked = true;
-                        }
-                    });
-                });
+            const propertySelect = document.getElementById('propertySelection');
+            if (propertySelect && propertySelect.options.length > 0 && propertySelect.selectedOptions.length === 0) {
+                propertySelect.options[0].selected = true;
             }
 
             const filterToggleButton = document.querySelector('[data-bs-target="#filtersCollapse"]');
