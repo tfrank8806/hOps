@@ -1,6 +1,7 @@
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -57,9 +58,17 @@ namespace hOps.web.Controllers
                 ModelState.AddModelError(string.Empty, "You do not have access to any properties to associate with this event.");
             }
 
-            if (!form.SelectedPropertyIds.Any() && accessibleProperties.Count == 1)
+            if (!form.SelectedPropertyIds.Any())
             {
-                form.SelectedPropertyIds = new List<int> { accessibleProperties[0].Id };
+                var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+                if (currentPropertyId.HasValue && propertyIds.Contains(currentPropertyId.Value))
+                {
+                    form.SelectedPropertyIds = new List<int> { currentPropertyId.Value };
+                }
+                else if (accessibleProperties.Count == 1)
+                {
+                    form.SelectedPropertyIds = new List<int> { accessibleProperties[0].Id };
+                }
             }
 
             if (!form.SelectedPropertyIds.Any())
@@ -364,9 +373,17 @@ namespace hOps.web.Controllers
                 }
             }
 
-            if (!form.SelectedPropertyIds.Any() && accessibleProperties.Count == 1)
+            if (!form.SelectedPropertyIds.Any())
             {
-                form.SelectedPropertyIds = new List<int> { accessibleProperties[0].Id };
+                var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+                if (currentPropertyId.HasValue && accessibleProperties.Any(p => p.Id == currentPropertyId.Value))
+                {
+                    form.SelectedPropertyIds = new List<int> { currentPropertyId.Value };
+                }
+                else if (accessibleProperties.Count == 1)
+                {
+                    form.SelectedPropertyIds = new List<int> { accessibleProperties[0].Id };
+                }
             }
 
             var propertyIds = accessibleProperties.Select(p => p.Id).ToList();
