@@ -554,7 +554,7 @@ namespace hOps.web.Migrations
                     b.ToTable("Properties");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Room", b =>
+            modelBuilder.Entity<Room>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1007,10 +1007,10 @@ namespace hOps.web.Migrations
                     b.Navigation("PhonebookType");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Room", b =>
+            modelBuilder.Entity<Room>(b =>
                 {
-                    b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany("Rooms")
+                    b.HasOne<Property>("Property")
+                        .WithMany(p => p.Rooms)
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
