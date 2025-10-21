@@ -17,6 +17,12 @@
     const logNameInput = document.getElementById('logNameInput');
     const importLogButton = document.getElementById('importLogBtn');
     const importLogInput = document.getElementById('importLogInput');
+    const duplicateLogButton = document.getElementById('duplicateLogBtn');
+    const deleteLogButton = document.getElementById('deleteLogBtn');
+    const viewAuditLogButton = document.getElementById('viewAuditLogBtn');
+    const auditLogModalElement = document.getElementById('auditLogModal');
+    const auditLogListElement = document.getElementById('auditLogList');
+    const auditLogEmptyStateElement = document.getElementById('auditLogEmptyState');
 
     const boldButton = document.getElementById('boldBtn');
     const italicButton = document.getElementById('italicBtn');
@@ -60,6 +66,8 @@
     const MIN_ZOOM = 0.5;
     const MAX_ZOOM = 2;
     const ZOOM_STEP = 0.1;
+    const MAX_AUDIT_ENTRIES = 500;
+    const DEFAULT_USER_NAME = 'Unknown user';
 
     if (!logListEl) {
         return;
@@ -73,6 +81,7 @@
     let zoomLevel = 1;
     let isMouseSelecting = false;
     let selectionDragAnchor = null;
+    let auditLogModalInstance = null;
 
     const logHistory = new Map();
 
@@ -161,6 +170,7 @@
         log.data = cloneLogData(snapshot.data);
         selectionRange = snapshot.selectionRange ? { ...snapshot.selectionRange } : null;
         anchorCell = snapshot.anchorCell ? { ...snapshot.anchorCell } : null;
+        recordAudit(log, 'Undo', 'Reverted the most recent change.');
         persistLogs();
         renderSpreadsheet(log);
         if (selectionRange) {
@@ -356,7 +366,8 @@
         return {
             id: generateId(),
             name,
-            data: createEmptyData()
+            data: createEmptyData(),
+            auditTrail: []
         };
     }
 
@@ -381,7 +392,8 @@
         return {
             id: generateId(),
             name,
-            data
+            data,
+            auditTrail: []
         };
     }
 
@@ -394,6 +406,22 @@
         while (existingNames.has(candidate)) {
             candidate = `${defaultName} (${counter})`;
             counter += 1;
+        }
+        return candidate;
+    }
+
+    function generateDuplicateLogName(originalName) {
+        const trimmed = typeof originalName === 'string' ? originalName.trim() : '';
+        const baseName = trimmed.length ? `${trimmed} (Copy)` : 'Duplicated Log';
+        const existingNames = new Set(logs.map((log) => log.name));
+        if (!existingNames.has(baseName)) {
+            return baseName;
+        }
+        let counter = 2;
+        let candidate = `${baseName} ${counter}`;
+        while (existingNames.has(candidate)) {
+            counter += 1;
+            candidate = `${baseName} ${counter}`;
         }
         return candidate;
     }
@@ -437,15 +465,182 @@
             });
         }
 
+        const auditTrail = Array.isArray(log.auditTrail)
+            ? log.auditTrail.map(normalizeAuditEntry).filter(Boolean)
+            : [];
+
         return {
             id: log.id ?? generateId(),
             name: typeof log.name === 'string' && log.name.trim().length ? log.name.trim() : 'Untitled Log',
-            data
+            data,
+            auditTrail
         };
     }
 
-    function generateId() {
-        return `log_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    function generateId(prefix = 'log') {
+        return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    }
+
+    function normalizeAuditEntry(entry) {
+        if (!entry || typeof entry !== 'object') {
+            return null;
+        }
+        const id = typeof entry.id === 'string' && entry.id.trim().length ? entry.id : generateId('audit');
+        const timestampValue = typeof entry.timestamp === 'string' ? entry.timestamp : '';
+        const timestamp = new Date(timestampValue);
+        const sanitizedTimestamp = Number.isNaN(timestamp.getTime())
+            ? new Date().toISOString()
+            : timestamp.toISOString();
+        const userName = typeof entry.user === 'string' && entry.user.trim().length ? entry.user.trim() : DEFAULT_USER_NAME;
+        const action = typeof entry.action === 'string' && entry.action.trim().length ? entry.action.trim() : 'Update';
+        const details = typeof entry.details === 'string' ? entry.details : '';
+
+        return {
+            id,
+            timestamp: sanitizedTimestamp,
+            user: userName,
+            action,
+            details
+        };
+    }
+
+    function ensureAuditTrail(log) {
+        if (!log) {
+            return [];
+        }
+        if (!Array.isArray(log.auditTrail)) {
+            log.auditTrail = [];
+        }
+        return log.auditTrail;
+    }
+
+    function getCurrentUserName() {
+        const user = window.hOps?.currentUser;
+        if (user && typeof user === 'object') {
+            const name = typeof user.name === 'string' ? user.name.trim() : '';
+            if (name.length) {
+                return name;
+            }
+        }
+        return DEFAULT_USER_NAME;
+    }
+
+    function recordAudit(log, action, details = '') {
+        if (!log) {
+            return;
+        }
+        const title = typeof action === 'string' && action.trim().length ? action.trim() : 'Update';
+        const message = typeof details === 'string' ? details : '';
+        const trail = ensureAuditTrail(log);
+        trail.push({
+            id: generateId('audit'),
+            timestamp: new Date().toISOString(),
+            user: getCurrentUserName(),
+            action: title,
+            details: message
+        });
+        if (trail.length > MAX_AUDIT_ENTRIES) {
+            trail.splice(0, trail.length - MAX_AUDIT_ENTRIES);
+        }
+        if (log.id === currentLogId) {
+            updateLogManagementButtons();
+            if (isAuditModalOpen()) {
+                renderAuditTrail(log);
+            }
+        }
+    }
+
+    function isAuditModalOpen() {
+        return !!auditLogModalElement && auditLogModalElement.classList.contains('show');
+    }
+
+    function formatAuditTimestamp(value) {
+        const date = value ? new Date(value) : null;
+        if (!date || Number.isNaN(date.getTime())) {
+            return 'Unknown time';
+        }
+        return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    }
+
+    function renderAuditTrail(log) {
+        if (!auditLogListElement || !auditLogEmptyStateElement) {
+            return;
+        }
+        auditLogListElement.innerHTML = '';
+        const entries = [...ensureAuditTrail(log)].sort((a, b) => {
+            const aTime = new Date(a.timestamp).getTime();
+            const bTime = new Date(b.timestamp).getTime();
+            if (Number.isNaN(aTime) && Number.isNaN(bTime)) {
+                return 0;
+            }
+            if (Number.isNaN(aTime)) {
+                return 1;
+            }
+            if (Number.isNaN(bTime)) {
+                return -1;
+            }
+            return bTime - aTime;
+        });
+
+        if (!entries.length) {
+            auditLogEmptyStateElement.classList.remove('d-none');
+            return;
+        }
+
+        auditLogEmptyStateElement.classList.add('d-none');
+
+        entries.forEach((entry) => {
+            const item = document.createElement('div');
+            item.className = 'list-group-item audit-log-entry';
+
+            const header = document.createElement('div');
+            header.className = 'd-flex justify-content-between align-items-start flex-wrap gap-2';
+
+            const title = document.createElement('h6');
+            title.className = 'mb-1 fw-semibold';
+            title.textContent = entry.action;
+
+            const meta = document.createElement('small');
+            meta.className = 'text-muted';
+            meta.textContent = `${entry.user} • ${formatAuditTimestamp(entry.timestamp)}`;
+
+            header.appendChild(title);
+            header.appendChild(meta);
+            item.appendChild(header);
+
+            if (entry.details) {
+                const detailsEl = document.createElement('p');
+                detailsEl.className = 'mb-0 text-muted';
+                detailsEl.textContent = entry.details;
+                item.appendChild(detailsEl);
+            }
+
+            auditLogListElement.appendChild(item);
+        });
+    }
+
+    function updateLogManagementButtons() {
+        const log = getCurrentLog();
+        const hasLog = !!log;
+
+        if (duplicateLogButton) {
+            duplicateLogButton.disabled = !hasLog;
+        }
+
+        if (deleteLogButton) {
+            deleteLogButton.disabled = !hasLog;
+        }
+
+        if (viewAuditLogButton) {
+            if (!hasLog) {
+                viewAuditLogButton.disabled = true;
+                viewAuditLogButton.textContent = 'View History';
+            } else {
+                viewAuditLogButton.disabled = false;
+                const count = ensureAuditTrail(log).length;
+                viewAuditLogButton.textContent = count ? `View History (${count})` : 'View History';
+            }
+        }
     }
 
     function persistLogs() {
@@ -457,22 +652,69 @@
 
         if (!logs.length) {
             logEmptyStateEl?.classList.remove('d-none');
+            updateLogManagementButtons();
             return;
         }
 
         logEmptyStateEl?.classList.add('d-none');
 
         logs.forEach((log) => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.textContent = log.name;
-            button.className = 'list-group-item list-group-item-action log-item';
-            if (log.id === currentLogId) {
-                button.classList.add('active');
+            const isActive = log.id === currentLogId;
+            const item = document.createElement('div');
+            item.className = 'list-group-item list-group-item-action log-item';
+            if (isActive) {
+                item.classList.add('active');
             }
-            button.addEventListener('click', () => selectLog(log.id));
-            logListEl.appendChild(button);
+            item.dataset.logId = log.id;
+            item.tabIndex = 0;
+
+            const selectButton = document.createElement('button');
+            selectButton.type = 'button';
+            selectButton.className = 'log-item-select';
+            selectButton.textContent = log.name;
+            selectButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                selectLog(log.id);
+            });
+
+            const actions = document.createElement('div');
+            actions.className = 'log-item-actions';
+
+            const duplicateBtn = document.createElement('button');
+            duplicateBtn.type = 'button';
+            duplicateBtn.className = isActive ? 'btn btn-light btn-sm' : 'btn btn-outline-secondary btn-sm';
+            duplicateBtn.textContent = 'Duplicate';
+            duplicateBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                duplicateLog(log.id);
+            });
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = isActive ? 'btn btn-light btn-sm text-danger' : 'btn btn-outline-danger btn-sm';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                deleteLog(log.id);
+            });
+
+            actions.appendChild(duplicateBtn);
+            actions.appendChild(deleteBtn);
+
+            item.addEventListener('click', () => selectLog(log.id));
+            item.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    selectLog(log.id);
+                }
+            });
+
+            item.appendChild(selectButton);
+            item.appendChild(actions);
+            logListEl.appendChild(item);
         });
+
+        updateLogManagementButtons();
     }
 
     function getCurrentLog() {
@@ -525,6 +767,7 @@
         setToolbarEnabled(false);
         updateUndoButtonState();
         updateZoomButtonState();
+        updateLogManagementButtons();
     }
 
     function parseCellReference(reference) {
@@ -1126,6 +1369,33 @@
         return label;
     }
 
+    function formatCellLabel(row, column) {
+        return `${columnLabel(column)}${row + 1}`;
+    }
+
+    function describeSelection(range) {
+        if (!range) {
+            return 'selected cells';
+        }
+        const startLabel = formatCellLabel(range.startRow, range.startColumn);
+        const endLabel = formatCellLabel(range.endRow, range.endColumn);
+        if (startLabel === endLabel) {
+            return `cell ${startLabel}`;
+        }
+        return `cells ${startLabel} to ${endLabel}`;
+    }
+
+    function formatAuditValue(value) {
+        if (value === null || value === undefined) {
+            return 'empty';
+        }
+        const text = value.toString();
+        if (!text.trim().length) {
+            return 'empty';
+        }
+        return `"${text}"`;
+    }
+
     function handleCellInput(event) {
         void event;
     }
@@ -1298,9 +1568,11 @@
             const dataCell = log.data[rowIndex][columnIndex];
             if (commit) {
                 const newValue = cell.textContent ?? '';
+                const previousValue = dataCell.value ?? '';
                 if (newValue !== dataCell.value) {
                     pushUndoState();
                     dataCell.value = newValue;
+                    recordAudit(log, 'Updated cell', `Updated ${formatCellLabel(rowIndex, columnIndex)} from ${formatAuditValue(previousValue)} to ${formatAuditValue(newValue)}.`);
                     persistLogs();
                     shouldRefresh = true;
                 }
@@ -1470,6 +1742,7 @@
                     startColumn: rangeToClear.startColumn,
                     endColumn: rangeToClear.endColumn
                 };
+                recordAudit(activeLog, 'Cleared cells', `Cleared ${describeSelection(selectionRange)}.`);
                 persistLogs();
                 renderSpreadsheet(activeLog);
                 anchorCell = { row: rangeToClear.startRow, column: rangeToClear.startColumn };
@@ -1558,7 +1831,9 @@
         }
         pushUndoState();
         const columns = log.data[0]?.length ?? defaultColumns;
+        const newRowIndex = log.data.length;
         log.data.push(Array.from({ length: columns }, () => createCell()));
+        recordAudit(log, 'Added row', `Added row ${newRowIndex + 1}.`);
         persistLogs();
         renderSpreadsheet(log);
     }
@@ -1577,11 +1852,13 @@
             columnCount = log.data[0].length;
         }
 
+        const newColumnIndex = columnCount;
         log.data.forEach((row) => {
             if (Array.isArray(row)) {
                 row.push(createCell());
             }
         });
+        recordAudit(log, 'Added column', `Added column ${columnLabel(newColumnIndex)}.`);
         persistLogs();
         renderSpreadsheet(log);
     }
@@ -1597,6 +1874,7 @@
         log.data = createEmptyData(rows, cols);
         selectionRange = null;
         anchorCell = null;
+        recordAudit(log, 'Cleared log', `Cleared all cells in "${log.name}".`);
         persistLogs();
         renderSpreadsheet(log);
         focusFirstCell();
@@ -1614,6 +1892,7 @@
         const newLog = createLog(name);
         logs.push(newLog);
         logHistory.set(newLog.id, []);
+        recordAudit(newLog, 'Log created', 'Log created manually.');
         persistLogs();
         createLogForm.reset();
         const modalElement = document.getElementById('createLogModal');
@@ -1622,7 +1901,6 @@
             modal.hide();
         }
         selectLog(newLog.id);
-        renderLogList();
     }
 
     function triggerImportLogPicker() {
@@ -1677,14 +1955,85 @@
             const newLog = createLogFromData(logName, rows);
             logs.push(newLog);
             logHistory.set(newLog.id, []);
+            recordAudit(newLog, 'Log imported', `Imported from "${file.name}".`);
             persistLogs();
-            renderLogList();
             selectLog(newLog.id);
         } catch (error) {
             console.error('Failed to import log', error);
             window.alert('Unable to import the selected file. Please ensure it is a valid .xls, .xlsx, or .csv document.');
         } finally {
             target.value = '';
+        }
+    }
+
+    function duplicateLog(logId = currentLogId) {
+        const source = logs.find((log) => log.id === logId);
+        if (!source) {
+            return;
+        }
+        const duplicateName = generateDuplicateLogName(source.name);
+        const newLog = {
+            id: generateId(),
+            name: duplicateName,
+            data: cloneLogData(source.data),
+            auditTrail: []
+        };
+        logs.push(newLog);
+        logHistory.set(newLog.id, []);
+        recordAudit(newLog, 'Log duplicated', `Created by duplicating "${source.name}".`);
+        recordAudit(source, 'Log duplicated', `Duplicated to create "${newLog.name}".`);
+        persistLogs();
+        selectLog(newLog.id);
+    }
+
+    function deleteLog(logId = currentLogId) {
+        if (!logId) {
+            return;
+        }
+        const index = logs.findIndex((log) => log.id === logId);
+        if (index === -1) {
+            return;
+        }
+        const log = logs[index];
+        const confirmed = window.confirm(`Delete log "${log.name}"? This action cannot be undone.`);
+        if (!confirmed) {
+            return;
+        }
+        logs.splice(index, 1);
+        logHistory.delete(log.id);
+        if (auditLogModalElement && auditLogModalElement.classList.contains('show') && typeof bootstrap !== 'undefined' && bootstrap?.Modal) {
+            bootstrap.Modal.getOrCreateInstance(auditLogModalElement).hide();
+        }
+        let nextLogId = null;
+        if (logs.length) {
+            nextLogId = logs[index]?.id ?? logs[index - 1]?.id ?? logs[0].id;
+        }
+        const deletingCurrent = currentLogId === log.id;
+        if (deletingCurrent) {
+            currentLogId = null;
+        }
+        persistLogs();
+        if (deletingCurrent) {
+            if (nextLogId) {
+                selectLog(nextLogId);
+            } else {
+                renderLogList();
+                showPlaceholder();
+            }
+        } else {
+            renderLogList();
+        }
+    }
+
+    function openAuditLogModal() {
+        const log = getCurrentLog();
+        if (!log || !auditLogModalElement) {
+            return;
+        }
+        renderAuditTrail(log);
+        if (typeof bootstrap !== 'undefined' && bootstrap?.Modal) {
+            auditLogModalInstance = bootstrap.Modal.getOrCreateInstance(auditLogModalElement);
+            auditLogModalInstance.show();
         }
     }
 
@@ -1984,17 +2333,35 @@
         if (!selectionRange) {
             return;
         }
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
         pushUndoState();
         const currentValue = !!getUniformFormatValue(key);
         const targetValue = !currentValue;
+        let changed = false;
         forEachCellInSelection(selectionRange, ({ cellData }) => {
             cellData.format = cellData.format || {};
             if (targetValue) {
-                cellData.format[key] = true;
-            } else {
+                if (!cellData.format[key]) {
+                    cellData.format[key] = true;
+                    changed = true;
+                }
+            } else if (cellData.format[key]) {
                 delete cellData.format[key];
+                changed = true;
             }
         });
+        if (!changed) {
+            const history = logHistory.get(log.id);
+            history?.pop();
+            updateUndoButtonState();
+            return;
+        }
+        const label = key === 'bold' ? 'bold formatting' : key === 'italic' ? 'italic formatting' : 'underline formatting';
+        const actionTitle = targetValue ? `Applied ${label}` : `Removed ${label}`;
+        recordAudit(log, actionTitle, `${actionTitle} on ${describeSelection(selectionRange)}.`);
         persistLogs();
         updateSelectedCellStyles();
         updateToolbarState();
@@ -2004,15 +2371,34 @@
         if (!selectionRange) {
             return;
         }
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
         pushUndoState();
+        const normalizedAlignment = alignment || '';
+        let changed = false;
         forEachCellInSelection(selectionRange, ({ cellData }) => {
             cellData.format = cellData.format || {};
-            if (alignment) {
-                cellData.format.align = alignment;
-            } else {
+            const current = cellData.format.align || '';
+            if (normalizedAlignment) {
+                if (current !== normalizedAlignment) {
+                    cellData.format.align = normalizedAlignment;
+                    changed = true;
+                }
+            } else if (current) {
                 delete cellData.format.align;
+                changed = true;
             }
         });
+        if (!changed) {
+            const history = logHistory.get(log.id);
+            history?.pop();
+            updateUndoButtonState();
+            return;
+        }
+        const actionTitle = normalizedAlignment ? `Set alignment to ${normalizedAlignment}` : 'Cleared alignment';
+        recordAudit(log, actionTitle, `${actionTitle} for ${describeSelection(selectionRange)}.`);
         persistLogs();
         updateSelectedCellStyles();
         updateToolbarState();
@@ -2022,15 +2408,34 @@
         if (!selectionRange) {
             return;
         }
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
         pushUndoState();
+        const normalizedSize = size || '';
+        let changed = false;
         forEachCellInSelection(selectionRange, ({ cellData }) => {
             cellData.format = cellData.format || {};
-            if (size) {
-                cellData.format.fontSize = size;
-            } else {
+            const current = cellData.format.fontSize || '';
+            if (normalizedSize) {
+                if (current !== normalizedSize) {
+                    cellData.format.fontSize = normalizedSize;
+                    changed = true;
+                }
+            } else if (current) {
                 delete cellData.format.fontSize;
+                changed = true;
             }
         });
+        if (!changed) {
+            const history = logHistory.get(log.id);
+            history?.pop();
+            updateUndoButtonState();
+            return;
+        }
+        const actionTitle = normalizedSize ? `Set font size to ${normalizedSize}` : 'Cleared font size';
+        recordAudit(log, actionTitle, `${actionTitle} for ${describeSelection(selectionRange)}.`);
         persistLogs();
         updateSelectedCellStyles();
         updateToolbarState();
@@ -2040,15 +2445,34 @@
         if (!selectionRange) {
             return;
         }
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
         pushUndoState();
+        const normalizedFamily = family || '';
+        let changed = false;
         forEachCellInSelection(selectionRange, ({ cellData }) => {
             cellData.format = cellData.format || {};
-            if (family) {
-                cellData.format.fontFamily = family;
-            } else {
+            const current = cellData.format.fontFamily || '';
+            if (normalizedFamily) {
+                if (current !== normalizedFamily) {
+                    cellData.format.fontFamily = normalizedFamily;
+                    changed = true;
+                }
+            } else if (current) {
                 delete cellData.format.fontFamily;
+                changed = true;
             }
         });
+        if (!changed) {
+            const history = logHistory.get(log.id);
+            history?.pop();
+            updateUndoButtonState();
+            return;
+        }
+        const actionTitle = normalizedFamily ? `Set font family to ${normalizedFamily}` : 'Cleared font family';
+        recordAudit(log, actionTitle, `${actionTitle} for ${describeSelection(selectionRange)}.`);
         persistLogs();
         updateSelectedCellStyles();
         updateToolbarState();
@@ -2058,16 +2482,35 @@
         if (!selectionRange) {
             return;
         }
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
         pushUndoState();
         const normalized = isValidHexColor(color) ? normalizeHexColor(color) : null;
+        let changed = false;
         forEachCellInSelection(selectionRange, ({ cellData }) => {
             cellData.format = cellData.format || {};
+            const current = cellData.format[key] || '';
             if (normalized) {
-                cellData.format[key] = normalized;
-            } else {
+                if (current !== normalized) {
+                    cellData.format[key] = normalized;
+                    changed = true;
+                }
+            } else if (current) {
                 delete cellData.format[key];
+                changed = true;
             }
         });
+        if (!changed) {
+            const history = logHistory.get(log.id);
+            history?.pop();
+            updateUndoButtonState();
+            return;
+        }
+        const label = key === 'textColor' ? 'text color' : 'fill color';
+        const actionTitle = normalized ? `Set ${label} to ${normalized}` : `Cleared ${label}`;
+        recordAudit(log, actionTitle, `${actionTitle} for ${describeSelection(selectionRange)}.`);
         persistLogs();
         updateSelectedCellStyles();
         updateToolbarState();
@@ -2177,6 +2620,7 @@
 
         const masterRow = selectionRange.startRow;
         const masterColumn = selectionRange.startColumn;
+        const selectionDescription = describeSelection(selectionRange);
 
         for (let row = selectionRange.startRow; row <= selectionRange.endRow; row++) {
             for (let column = selectionRange.startColumn; column <= selectionRange.endColumn; column++) {
@@ -2234,6 +2678,7 @@
         };
         delete masterCell.format.mergedInto;
 
+        recordAudit(log, 'Merged cells', `Merged ${selectionDescription} into ${formatCellLabel(masterRow, masterColumn)}.`);
         persistLogs();
         renderSpreadsheet(log);
         anchorCell = { row: masterRow, column: masterColumn };
@@ -2265,6 +2710,8 @@
         }
         pushUndoState();
         masters.forEach(({ row, column }) => unmergeCell(row, column));
+        const selectionDescription = describeSelection(selectionRange);
+        recordAudit(log, 'Unmerged cells', `Unmerged ${selectionDescription}.`);
         persistLogs();
         renderSpreadsheet(log);
         const master = masters[0];
@@ -2369,6 +2816,10 @@
 
     importLogButton?.addEventListener('click', triggerImportLogPicker);
     importLogInput?.addEventListener('change', handleImportLogInputChange);
+
+    duplicateLogButton?.addEventListener('click', () => duplicateLog());
+    deleteLogButton?.addEventListener('click', () => deleteLog());
+    viewAuditLogButton?.addEventListener('click', openAuditLogModal);
 
     applyZoomLevel();
     updateZoomButtonState();
