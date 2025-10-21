@@ -102,10 +102,10 @@
                      data-room-label="@label"
                      style="
                              position:absolute;
-                             left:@layout.X px;
-                             top:@layout.Y px;
-                             width:@layout.Width px;
-                             height:@layout.Height px;
+                             left:@($"{layout.X}px");
+                             top:@($"{layout.Y}px");
+                             width:@($"{layout.Width}px");
+                             height:@($"{layout.Height}px");
                              border:1px solid #333;
                              background-color:#cce5ff;
                              z-index:1;
@@ -389,6 +389,62 @@
                 });
             });
 
+            function setupBoxInteractions(div) {
+                if (!(div instanceof HTMLElement) || div.dataset.initialized === "true") {
+                    return;
+                }
+
+                div.dataset.initialized = "true";
+
+                const labelSpan = div.querySelector(".room-label");
+                if (labelSpan) {
+                    labelSpan.addEventListener("dblclick", e => {
+                        const newLabel = prompt("Enter new label:", labelSpan.textContent ?? "");
+                        if (newLabel !== null) {
+                            labelSpan.textContent = newLabel;
+                            div.setAttribute("data-room-label", newLabel);
+                        }
+                        e.stopPropagation();
+                    });
+                }
+
+                const controls = div.querySelector(".box-controls");
+                if (controls) {
+                    div.addEventListener("mouseenter", () => {
+                        controls.style.opacity = "1";
+                    });
+                    div.addEventListener("mouseleave", () => {
+                        controls.style.opacity = "0";
+                    });
+                }
+
+                const handleRemove = () => {
+                    const roomId = div.getAttribute("data-room-id") ?? "0";
+                    const currentLabel = div.getAttribute("data-room-label")
+                        ?? (labelSpan ? labelSpan.textContent ?? "" : "");
+                    moveBackToPalette(roomId, currentLabel);
+                    div.remove();
+                };
+
+                const moveBackBtn = div.querySelector(".btn-move-back");
+                if (moveBackBtn) {
+                    moveBackBtn.addEventListener("click", evt => {
+                        evt.stopPropagation();
+                        handleRemove();
+                    });
+                }
+
+                const deleteBtn = div.querySelector(".btn-delete-shape");
+                if (deleteBtn) {
+                    deleteBtn.addEventListener("click", evt => {
+                        evt.stopPropagation();
+                        handleRemove();
+                    });
+                }
+
+                div.addEventListener("mousedown", startDrag);
+            }
+
             function addBox(roomId, roomLabel, x, y) {
                 const div = document.createElement("div");
                 div.classList.add("room-box");
@@ -411,14 +467,6 @@
                 const span = document.createElement("span");
                 span.classList.add("room-label");
                 span.textContent = roomLabel;
-                span.addEventListener("dblclick", e => {
-                    const newLabel = prompt("Enter new label:", span.textContent);
-                    if (newLabel !== null) {
-                        span.textContent = newLabel;
-                        div.setAttribute("data-room-label", newLabel);
-                    }
-                    e.stopPropagation();
-                });
                 div.appendChild(span);
 
                 const controls = document.createElement("div");
@@ -436,10 +484,6 @@
                 btnMoveBack.innerText = "⮐";
                 btnMoveBack.style.padding = "2px 6px";
                 btnMoveBack.style.fontSize = "0.8em";
-                btnMoveBack.addEventListener("click", () => {
-                    moveBackToPalette(roomId, roomLabel);
-                    div.remove();
-                });
                 controls.appendChild(btnMoveBack);
 
                 const btnDel = document.createElement("button");
@@ -448,10 +492,6 @@
                 btnDel.innerText = "✖";
                 btnDel.style.padding = "2px 6px";
                 btnDel.style.fontSize = "0.8em";
-                btnDel.addEventListener("click", () => {
-                    moveBackToPalette(roomId, roomLabel);
-                    div.remove();
-                });
                 controls.appendChild(btnDel);
 
                 div.appendChild(controls);
@@ -467,20 +507,23 @@
                 rh.style.cursor = "se-resize";
                 div.appendChild(rh);
 
-                // Only show controls on hover
-                div.addEventListener("mouseenter", () => {
-                    controls.style.opacity = "1";
-                });
-                div.addEventListener("mouseleave", () => {
-                    controls.style.opacity = "0";
-                });
-
                 container.appendChild(div);
-                div.addEventListener("mousedown", startDrag);
+                setupBoxInteractions(div);
             }
 
             function moveBackToPalette(roomId, roomLabel) {
                 const pal = document.getElementById("palette");
+                if (!pal) {
+                    return;
+                }
+
+                const existing = pal.querySelector(`.pal-shape[data-room-id="${roomId}"]`);
+                if (existing && roomId !== "0") {
+                    existing.setAttribute("data-room-label", roomLabel);
+                    existing.textContent = roomLabel;
+                    return;
+                }
+
                 const p = document.createElement("div");
                 p.classList.add("pal-shape");
                 p.setAttribute("data-room-id", roomId);
@@ -500,6 +543,8 @@
                 });
                 pal.appendChild(p);
             }
+
+            container.querySelectorAll(".room-box").forEach(box => setupBoxInteractions(box));
 
             // Drag / Resize logic (re-use your existing handlers)
             let dragBox = null, offsetX = 0, offsetY = 0;
