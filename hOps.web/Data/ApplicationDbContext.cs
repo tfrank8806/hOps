@@ -67,6 +67,9 @@ namespace hOps.web.Data
                 .HasForeignKey(wp => wp.WorkOrderId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            builder.Entity<WorkOrderType>()
+                .ToTable("WorkOrderTypes");
+
             builder.Entity<WorkOrderProperty>()
                 .HasOne(wp => wp.Property)
                 .WithMany(p => p.WorkOrderLinks)
