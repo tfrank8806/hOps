@@ -460,30 +460,64 @@ namespace hOps.web.Controllers
 
         private async Task PopulateUpcomingEventsAsync(HomeIndexViewModel viewModel, int propertyId)
         {
-            var now = DateTime.UtcNow.Date;
+            var now = DateTime.Now;
 
             var upcomingEvents = await _context.CalendarEventProperties
                 .Where(cep => cep.PropertyId == propertyId)
                 .Select(cep => cep.CalendarEvent)
-                .Where(e => (e.End ?? e.Start) >= now)
-                .OrderBy(e => e.Start)
+                .Where(e => e.EndDate >= now.Date)
                 .Include(e => e.Category)
                 .AsNoTracking()
-                .Take(8)
                 .ToListAsync();
 
             viewModel.UpcomingEvents = upcomingEvents
-                .Select(e => new CalendarEventSummaryViewModel
+                .Select(e =>
                 {
-                    Id = e.Id,
-                    Title = e.Title,
-                    Start = e.Start,
-                    End = e.End,
-                    CategoryName = e.Category?.Name ?? "",
-                    CategoryColor = e.Category?.ColorHex,
-                    DetailUrl = Url.Action("Index", "Calendar") ?? string.Empty,
+                    var start = CombineDateAndTime(e.StartDate, e.StartTime);
+                    var displayEnd = e.EndTime.HasValue
+                        ? CombineDateAndTime(e.EndDate, e.EndTime)
+                        : (DateTime?)null;
+                    var endBoundary = CalculateEventEndBoundary(e);
+
+                    return new
+                    {
+                        Summary = new CalendarEventSummaryViewModel
+                        {
+                            Id = e.Id,
+                            Title = e.Title,
+                            Start = start,
+                            End = displayEnd,
+                            CategoryName = e.Category?.Name ?? string.Empty,
+                            CategoryColor = e.Category?.ColorHex,
+                            DetailUrl = Url.Action("Index", "Calendar") ?? string.Empty,
+                        },
+                        Start = start,
+                        EndBoundary = endBoundary,
+                    };
                 })
+                .Where(x => x.EndBoundary >= now)
+                .OrderBy(x => x.Start)
+                .Take(8)
+                .Select(x => x.Summary)
                 .ToList();
+        }
+
+        private static DateTime CombineDateAndTime(DateTime date, TimeSpan? time)
+        {
+            var baseDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Unspecified);
+            return baseDate.Add(time ?? TimeSpan.Zero);
+        }
+
+        private static DateTime CalculateEventEndBoundary(CalendarEvent calendarEvent)
+        {
+            var endDate = DateTime.SpecifyKind(calendarEvent.EndDate.Date, DateTimeKind.Unspecified);
+
+            if (calendarEvent.EndTime.HasValue)
+            {
+                return endDate.Add(calendarEvent.EndTime.Value);
+            }
+
+            return endDate.AddDays(1).AddTicks(-1);
         }
 
         private static string BuildDisplayName(ApplicationUser? user)
