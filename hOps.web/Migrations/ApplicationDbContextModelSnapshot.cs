@@ -611,6 +611,12 @@ namespace hOps.web.Migrations
                     b.Property<int>("RoomId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("ShapeData")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ShapeType")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Width")
                         .HasColumnType("INTEGER");
 

@@ -10,5 +10,7 @@
         public int Width { get; set; }
         public int Height { get; set; }
         public string? Label { get; set; } // Optional label for display purposes
+        public string? ShapeType { get; set; }
+        public string? ShapeData { get; set; }
     }
 }

@@ -389,6 +389,8 @@ namespace hOps.web.Controllers
                     existing.Width = dto.Width;
                     existing.Height = dto.Height;
                     existing.Label = dto.Label;
+                    existing.ShapeType = dto.ShapeType;
+                    existing.ShapeData = dto.ShapeData;
                     _db.RoomLayouts.Update(existing);
                 }
                 else
@@ -402,7 +404,9 @@ namespace hOps.web.Controllers
                         Y = dto.Y,
                         Width = dto.Width,
                         Height = dto.Height,
-                        Label = dto.Label
+                        Label = dto.Label,
+                        ShapeType = dto.ShapeType,
+                        ShapeData = dto.ShapeData
                     });
                 }
             }
