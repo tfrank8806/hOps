@@ -2444,8 +2444,12 @@
         }
         let textMatrix = [];
         let customData = null;
+        let hasPlainText = false;
         if (event instanceof ClipboardEvent && event.clipboardData) {
             const text = event.clipboardData.getData('text/plain');
+            if (typeof text === 'string' && text.length > 0) {
+                hasPlainText = true;
+            }
             textMatrix = parseClipboardText(text);
             const custom = event.clipboardData.getData('application/x-hops-log-cells');
             if (custom) {
@@ -2459,7 +2463,7 @@
                 }
             }
         }
-        if (!customData && lastClipboardSnapshot) {
+        if (!customData && !hasPlainText && lastClipboardSnapshot) {
             customData = lastClipboardSnapshot;
         }
         if ((!textMatrix || !textMatrix.length) && (!customData || !customData.data?.length)) {
