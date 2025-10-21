@@ -69,7 +69,14 @@
                                 @foreach (var property in Model.AccessibleProperties)
                                 {
                                     var isSelected = Model.Submission.SelectedPropertyIds?.Contains(property.Id) ?? false;
-                                    <option value="@property.Id" @(isSelected ? "selected" : null)>@property.Name (@property.Code)</option>
+                                    if (isSelected)
+                                    {
+                                        <option value="@property.Id" selected>@property.Name (@property.Code)</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@property.Id">@property.Name (@property.Code)</option>
+                                    }
                                 }
                             </select>
                             <span asp-validation-for="Submission.SelectedPropertyIds" class="text-danger"></span>
