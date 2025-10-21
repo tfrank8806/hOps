@@ -21,8 +21,7 @@
         !string.IsNullOrWhiteSpace(Model.Filters.GuestName) ||
         !string.IsNullOrWhiteSpace(Model.Filters.FoundBy) ||
         !string.IsNullOrWhiteSpace(Model.Filters.Creator) ||
-        !string.IsNullOrWhiteSpace(Model.Filters.Keyword) ||
-        Model.Filters.PropertyId.HasValue;
+        !string.IsNullOrWhiteSpace(Model.Filters.Keyword);
 }
 
 <div class="lost-found-page d-flex flex-column flex-grow-1">
@@ -51,37 +50,6 @@
                             <option value="@LostFoundType.Lost">Lost</option>
                         </select>
                     </div>
-
-                    @if (!Model.ShowPropertySelection && Model.AccessibleProperties.Count == 1)
-                    {
-                        <input type="hidden" name="Submission.SelectedPropertyIds" value="@Model.AccessibleProperties.First().Id" />
-                    }
-                    else
-                    {
-                        <div class="col-12">
-                            <label class="form-label" for="propertySelection">Property</label>
-                            <select
-                                class="form-select"
-                                id="propertySelection"
-                                name="Submission.SelectedPropertyIds"
-                                multiple
-                                size="@(Math.Min(Model.AccessibleProperties.Count, 8))">
-                                @foreach (var property in Model.AccessibleProperties)
-                                {
-                                    var isSelected = Model.Submission.SelectedPropertyIds?.Contains(property.Id) ?? false;
-                                    if (isSelected)
-                                    {
-                                        <option value="@property.Id" selected>@property.Name (@property.Code)</option>
-                                    }
-                                    else
-                                    {
-                                        <option value="@property.Id">@property.Name (@property.Code)</option>
-                                    }
-                                }
-                            </select>
-                            <span asp-validation-for="Submission.SelectedPropertyIds" class="text-danger"></span>
-                        </div>
-                    }
 
                     <div class="col-sm-6 col-lg-3 type-field type-found">
                         <label asp-for="Submission.DateFound" class="form-label">Date Found</label>
@@ -216,15 +184,6 @@
                     <div class="col-md-3">
                         <label class="form-label" for="keyword">Keyword</label>
                         <input type="text" id="keyword" name="Keyword" class="form-control" value="@Model.Filters.Keyword" placeholder="Search notes, items, storage..." />
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label" for="propertyId">Property</label>
-                        <select id="propertyId" name="PropertyId" class="form-select">
-                            @foreach (var property in Model.AccessibleProperties)
-                            {
-                                <option value="@property.Id" selected="@(Model.Filters.PropertyId == property.Id ? "selected" : null)">@property.Name (@property.Code)</option>
-                            }
-                        </select>
                     </div>
                     <div class="col-md-12 d-flex gap-2">
                         <button type="submit" class="btn btn-primary">Apply Filters</button>

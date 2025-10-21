@@ -31,8 +31,6 @@ namespace hOps.web.ViewModels
     {
         public LostFoundType Type { get; set; } = LostFoundType.Found;
 
-        public List<int> SelectedPropertyIds { get; set; } = new();
-
         [DataType(DataType.Date)]
         public DateTime? DateFound { get; set; }
 
@@ -77,7 +75,5 @@ namespace hOps.web.ViewModels
         public List<string> FoundByOptions { get; set; } = new();
 
         public List<string> CreatorOptions { get; set; } = new();
-
-        public bool ShowPropertySelection => AccessibleProperties.Count > 1;
     }
 }

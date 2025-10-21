@@ -46,21 +46,26 @@ namespace hOps.web.Controllers
             }
 
             var accessiblePropertyIds = viewModel.AccessibleProperties.Select(p => p.Id).ToList();
-            var targetPropertyIds = submission.SelectedPropertyIds
-                .Where(id => accessiblePropertyIds.Contains(id))
-                .Distinct()
-                .ToList();
+            var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+            int? targetPropertyId = null;
 
-            if (!targetPropertyIds.Any())
+            if (currentPropertyId.HasValue && accessiblePropertyIds.Contains(currentPropertyId.Value))
             {
-                if (accessiblePropertyIds.Count == 1)
-                {
-                    targetPropertyIds.Add(accessiblePropertyIds.First());
-                }
-                else
-                {
-                    ModelState.AddModelError("Submission.SelectedPropertyIds", "Please select at least one property.");
-                }
+                targetPropertyId = currentPropertyId.Value;
+            }
+            else if (filters.PropertyId.HasValue && accessiblePropertyIds.Contains(filters.PropertyId.Value))
+            {
+                targetPropertyId = filters.PropertyId.Value;
+            }
+            else if (accessiblePropertyIds.Count == 1)
+            {
+                targetPropertyId = accessiblePropertyIds.First();
+                HttpContext.Session.SetInt32("CurrentPropertyId", targetPropertyId.Value);
+            }
+
+            if (!targetPropertyId.HasValue)
+            {
+                ModelState.AddModelError(string.Empty, "Unable to determine the current property for this entry.");
             }
 
             if (submission.Type == LostFoundType.Found)
@@ -116,11 +121,11 @@ namespace hOps.web.Controllers
                 displayName = currentUser.Email ?? currentUser.UserName ?? "";
             }
 
-            foreach (var propertyId in targetPropertyIds)
+            if (targetPropertyId.HasValue)
             {
                 var entry = new LostFoundEntry
                 {
-                    PropertyId = propertyId,
+                    PropertyId = targetPropertyId.Value,
                     Type = submission.Type,
                     Status = LostFoundStatus.Logged,
                     DateFound = submission.Type == LostFoundType.Found ? submission.DateFound : null,
@@ -147,11 +152,7 @@ namespace hOps.web.Controllers
 
             TempData["Success"] = "Lost & Found entry logged successfully.";
 
-            int? redirectPropertyId = targetPropertyIds.Count == 1
-                ? targetPropertyIds.First()
-                : filters.PropertyId;
-
-            return RedirectToAction(nameof(Index), new { propertyId = redirectPropertyId });
+            return RedirectToAction(nameof(Index), new { propertyId = targetPropertyId });
         }
 
         [HttpPost]
@@ -361,11 +362,6 @@ namespace hOps.web.Controllers
 
             submission ??= new LostFoundSubmissionViewModel();
 
-            submission.SelectedPropertyIds = submission.SelectedPropertyIds
-                .Where(id => accessiblePropertyIds.Contains(id))
-                .Distinct()
-                .ToList();
-
             if (!submission.DateFound.HasValue)
             {
                 submission.DateFound = DateTime.Today;
@@ -373,11 +369,6 @@ namespace hOps.web.Controllers
             if (!submission.DateReportedLost.HasValue)
             {
                 submission.DateReportedLost = DateTime.Today;
-            }
-
-            if (!submission.SelectedPropertyIds.Any() && filters.PropertyId.HasValue)
-            {
-                submission.SelectedPropertyIds.Add(filters.PropertyId.Value);
             }
 
             return new LostAndFoundIndexViewModel
