@@ -30,6 +30,12 @@ namespace hOps.web.Data
         public DbSet<CalendarEventProperty> CalendarEventProperties { get; set; }
         public DbSet<LostFoundEntry> LostFoundEntries { get; set; }
 
+        public DbSet<ManagerAnnouncement> ManagerAnnouncements { get; set; }
+
+        public DbSet<BulletinPost> BulletinPosts { get; set; }
+
+        public DbSet<PackageLogEntry> PackageLogEntries { get; set; }
+
         public DbSet<Bookmark> Bookmarks { get; set; }
 
         public DbSet<PassOnLog> PassOnLogs { get; set; }

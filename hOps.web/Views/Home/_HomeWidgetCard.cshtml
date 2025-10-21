@@ -1,0 +1,120 @@
+@using System.Linq
+@using hOps.web.ViewModels
+@using hOps.web.ViewModels.Home
+@model HomeWidgetViewModel
+
+<div class="card shadow-sm h-100">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="h6 mb-0">@Model.Title</h2>
+        <a class="btn btn-sm btn-outline-primary" asp-controller="@Model.ControllerName" asp-action="@Model.ActionName">View All</a>
+    </div>
+    <div class="card-body">
+        @if (Model.Items == null || !Model.Items.Any())
+        {
+            <p class="text-muted mb-0">No records to show.</p>
+        }
+        else if (Model.Items.First() is WorkOrderSummaryViewModel)
+        {
+            var workOrders = Model.Items.Cast<WorkOrderSummaryViewModel>();
+            <ul class="list-unstyled mb-0 widget-list">
+                @foreach (var order in workOrders)
+                {
+                    var hasLink = !string.IsNullOrWhiteSpace(order.DetailUrl);
+                    <li class="widget-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                @if (hasLink)
+                                {
+                                    <a class="fw-semibold" href="@order.DetailUrl">@order.Issue</a>
+                                }
+                                else
+                                {
+                                    <span class="fw-semibold">@order.Issue</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(order.Location))
+                                {
+                                    <div class="text-muted small">@order.Location</div>
+                                }
+                            </div>
+                            <span class="badge" style="background-color:@hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetColor(order.Status)">@order.Status</span>
+                        </div>
+                        <div class="text-muted small mt-1">Opened @order.CreatedAt.ToLocalTime().ToString("g")</div>
+                    </li>
+                }
+            </ul>
+        }
+        else if (Model.Items.First() is LostFoundSummaryViewModel)
+        {
+            var entries = Model.Items.Cast<LostFoundSummaryViewModel>();
+            <ul class="list-unstyled mb-0 widget-list">
+                @foreach (var entry in entries)
+                {
+                    var hasLink = !string.IsNullOrWhiteSpace(entry.DetailUrl);
+                    <li class="widget-item">
+                        @if (hasLink)
+                        {
+                            <a class="fw-semibold" href="@entry.DetailUrl">@entry.Title</a>
+                        }
+                        else
+                        {
+                            <span class="fw-semibold">@entry.Title</span>
+                        }
+                        <div class="text-muted small">@entry.Type.ToString() · @entry.Status.ToString()</div>
+                        <div class="text-muted small">Logged @entry.CreatedAt.ToLocalTime().ToString("g")</div>
+                    </li>
+                }
+            </ul>
+        }
+        else if (Model.Items.First() is PackageLogSummaryViewModel)
+        {
+            var packages = Model.Items.Cast<PackageLogSummaryViewModel>();
+            <ul class="list-unstyled mb-0 widget-list">
+                @foreach (var package in packages)
+                {
+                    var hasLink = !string.IsNullOrWhiteSpace(package.DetailUrl);
+                    <li class="widget-item">
+                        @if (hasLink)
+                        {
+                            <a class="fw-semibold" href="@package.DetailUrl">@package.RecipientName</a>
+                        }
+                        else
+                        {
+                            <span class="fw-semibold">@package.RecipientName</span>
+                        }
+                        <div class="text-muted small">@if (!string.IsNullOrWhiteSpace(package.RoomNumber)){<text>Room @package.RoomNumber</text>} @if (!string.IsNullOrWhiteSpace(package.Carrier)){<text>· @package.Carrier</text>}</div>
+                        <div class="text-muted small">Logged @package.LoggedAt.ToLocalTime().ToString("g")</div>
+                    </li>
+                }
+            </ul>
+        }
+        else if (Model.Items.First() is CalendarEventSummaryViewModel)
+        {
+            var events = Model.Items.Cast<CalendarEventSummaryViewModel>();
+            <ul class="list-unstyled mb-0 widget-list">
+                @foreach (var calendarEvent in events)
+                {
+                    var hasLink = !string.IsNullOrWhiteSpace(calendarEvent.DetailUrl);
+                    <li class="widget-item">
+                        @if (hasLink)
+                        {
+                            <a class="fw-semibold" href="@calendarEvent.DetailUrl">@calendarEvent.Title</a>
+                        }
+                        else
+                        {
+                            <span class="fw-semibold">@calendarEvent.Title</span>
+                        }
+                        <div class="text-muted small">@calendarEvent.Start.ToLocalTime().ToString("g") @if (calendarEvent.End.HasValue){<text>- @calendarEvent.End.Value.ToLocalTime().ToString("g")</text>}</div>
+                        @if (!string.IsNullOrWhiteSpace(calendarEvent.CategoryName))
+                        {
+                            <span class="badge rounded-pill" style="background-color:@(calendarEvent.CategoryColor ?? "#0d6efd");">@calendarEvent.CategoryName</span>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p class="text-muted mb-0">Unsupported widget type.</p>
+        }
+    </div>
+</div>
