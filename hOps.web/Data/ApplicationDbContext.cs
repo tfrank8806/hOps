@@ -55,6 +55,12 @@ namespace hOps.web.Data
                 .WithMany(p => p.UserAccesses)
                 .HasForeignKey(upa => upa.PropertyId);
 
+            builder.Entity<WorkOrder>()
+                .HasMany(wo => wo.Properties)
+                .WithOne(wp => wp.WorkOrder)
+                .HasForeignKey(wp => wp.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             builder.Entity<WorkOrderProperty>()
                 .HasOne(wp => wp.WorkOrder)
                 .WithMany(wo => wo.Properties)
