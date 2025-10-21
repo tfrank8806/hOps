@@ -176,6 +176,7 @@
                 var shapeData = layout.ShapeData ?? string.Empty;
                 var clipStyle = string.IsNullOrWhiteSpace(shapeData) ? string.Empty : $"clip-path:{shapeData}; -webkit-clip-path:{shapeData};";
                 <div class="room-box"
+                     data-layout-id="@layout.Id"
                      data-room-id="@layout.RoomId"
                      data-room-label="@label"
                      data-shape-type="@shapeType"
@@ -463,6 +464,8 @@
                 const state = boxes.map(b => {
                     const ridValue = b.getAttribute("data-room-id");
                     const roomId = parseInt(ridValue ?? "0", 10) || 0;
+                    const layoutIdValue = b.getAttribute("data-layout-id");
+                    const layoutId = parseInt(layoutIdValue ?? "0", 10) || 0;
                     const label = b.getAttribute("data-room-label") ?? "";
                     const x = parseInt(b.style.left) || 0;
                     const y = parseInt(b.style.top) || 0;
@@ -470,12 +473,15 @@
                     const height = parseInt(b.style.height) || b.offsetHeight;
                     const shapeType = b.getAttribute("data-shape-type") ?? "rectangle";
                     const shapeData = b.getAttribute("data-shape-data") ?? "";
-                    return { roomId, label, x, y, width, height, shapeType, shapeData };
+                    return { layoutId, roomId, label, x, y, width, height, shapeType, shapeData };
                 });
 
                 state.sort((a, b) => {
                     if (a.roomId !== b.roomId) {
                         return a.roomId - b.roomId;
+                    }
+                    if (a.layoutId !== b.layoutId) {
+                        return a.layoutId - b.layoutId;
                     }
                     if (a.x !== b.x) {
                         return a.x - b.x;
@@ -488,6 +494,7 @@
 
             function serializeState(state) {
                 return JSON.stringify(state.map(entry => [
+                    entry.layoutId,
                     entry.roomId,
                     entry.label,
                     entry.x,
@@ -512,6 +519,7 @@
                         entry.x ?? 0,
                         entry.y ?? 0,
                         {
+                            layoutId: entry.layoutId ?? 0,
                             width: entry.width ?? gridSize,
                             height: entry.height ?? gridSize,
                             shapeType: entry.shapeType ?? "rectangle",
@@ -903,6 +911,8 @@
                 div.classList.add("room-box");
                 div.setAttribute("data-room-id", roomId);
                 div.setAttribute("data-room-label", roomLabel);
+                const layoutId = typeof opts.layoutId === "number" ? opts.layoutId : 0;
+                div.setAttribute("data-layout-id", String(layoutId));
 
                 div.style.left = x + "px";
                 div.style.top = y + "px";
@@ -1109,11 +1119,14 @@
             }
 
             document.getElementById("save-layout-btn").addEventListener("click", async () => {
-                const boxes = container.querySelectorAll(".room-box");
+                const boxesNodeList = container.querySelectorAll(".room-box");
+                const boxes = Array.from(boxesNodeList);
                 const layoutDtos = [];
                 boxes.forEach(b => {
                     const ridValue = b.getAttribute("data-room-id");
                     const roomId = parseInt(ridValue ?? "", 10);
+                    const layoutIdValue = b.getAttribute("data-layout-id");
+                    const layoutId = parseInt(layoutIdValue ?? "", 10);
                     const fl = selectedFloor;
                     const x = parseInt(b.style.left) || 0;
                     const y = parseInt(b.style.top) || 0;
@@ -1123,6 +1136,7 @@
                     const shapeType = b.getAttribute("data-shape-type") ?? "rectangle";
                     const shapeData = b.getAttribute("data-shape-data") ?? "";
                     layoutDtos.push({
+                        id: Number.isNaN(layoutId) ? 0 : layoutId,
                         propertyId: propertyId,
                         roomId: Number.isNaN(roomId) ? 0 : roomId,
                         floor: fl,
@@ -1149,6 +1163,54 @@
                 });
                 const result = await resp.json();
                 if (result.success) {
+                    if (Array.isArray(result.layouts)) {
+                        result.layouts.forEach((layout, index) => {
+                            const box = boxes[index];
+                            if (!(box instanceof HTMLElement)) {
+                                return;
+                            }
+
+                            if (layout && typeof layout.id === "number") {
+                                box.setAttribute("data-layout-id", String(layout.id));
+                            }
+
+                            if (layout && typeof layout.label === "string") {
+                                const trimmedLabel = layout.label.trim();
+                                if (trimmedLabel.length > 0) {
+                                    box.setAttribute("data-room-label", trimmedLabel);
+                                    const labelSpan = box.querySelector(".room-label");
+                                    if (labelSpan) {
+                                        labelSpan.textContent = trimmedLabel;
+                                    }
+                                }
+                            }
+
+                            const normalizedShapeType = layout && typeof layout.shapeType === "string" && layout.shapeType.trim().length > 0
+                                ? layout.shapeType.trim()
+                                : (box.getAttribute("data-shape-type") ?? "rectangle");
+                            const normalizedShapeData = layout && typeof layout.shapeData === "string"
+                                ? layout.shapeData
+                                : (box.getAttribute("data-shape-data") ?? "");
+                            applyShapeToElement(box, normalizedShapeType, normalizedShapeData);
+                        });
+                    }
+
+                    const currentState = captureLayoutState();
+                    const serialized = serializeState(currentState);
+                    if (undoStack.length > 0) {
+                        undoStack[undoStack.length - 1] = {
+                            state: JSON.parse(JSON.stringify(currentState)),
+                            serialized
+                        };
+                    } else {
+                        undoStack.push({
+                            state: JSON.parse(JSON.stringify(currentState)),
+                            serialized
+                        });
+                    }
+                    redoStack = [];
+                    updateUndoRedoButtons();
+
                     alert("Layout saved!");
                 } else {
                     alert("Error saving layout");
