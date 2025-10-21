@@ -1898,8 +1898,21 @@
         createLogForm.reset();
         const modalElement = document.getElementById('createLogModal');
         if (modalElement) {
-            const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
-            modal.hide();
+            if (typeof bootstrap !== 'undefined' && bootstrap?.Modal) {
+                const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+                modal.hide();
+            } else {
+                modalElement.classList.remove('show');
+                modalElement.setAttribute('aria-hidden', 'true');
+                modalElement.style.display = 'none';
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.querySelectorAll('.modal-backdrop').forEach((backdrop) => {
+                    if (backdrop instanceof HTMLElement && backdrop.parentElement) {
+                        backdrop.parentElement.removeChild(backdrop);
+                    }
+                });
+            }
         }
         selectLog(newLog.id);
     }
