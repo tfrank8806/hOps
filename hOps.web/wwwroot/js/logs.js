@@ -36,8 +36,24 @@
     const zoomOutButton = document.getElementById('zoomOutBtn');
 
     const HEX_COLOR_REGEX = /^#(?:[0-9a-f]{3}){1,2}$/i;
-    const CELL_REFERENCE_REGEX = /\b([A-Za-z]+)(\d+)\b/g;
     const SINGLE_CELL_REFERENCE_REGEX = /^([A-Za-z]+)(\d+)$/;
+    const FORMULA_FUNCTIONS = {
+        SUM: createAggregateFormula((values) => values.reduce((total, value) => total + value, 0), {
+            emptyResult: 0
+        }),
+        AVERAGE: createAggregateFormula((values) => values.reduce((sum, value) => sum + value, 0) / values.length, {
+            emptyResult: '#DIV/0!'
+        }),
+        MIN: createAggregateFormula((values) => values.reduce((min, value) => Math.min(min, value))),
+        MAX: createAggregateFormula((values) => values.reduce((max, value) => Math.max(max, value))),
+        COUNT: (args) => {
+            const extraction = extractNumericValues(args);
+            if (extraction.error) {
+                return extraction.error;
+            }
+            return extraction.values.length;
+        }
+    };
     const MAX_HISTORY_LENGTH = 50;
     const MIN_ZOOM = 0.5;
     const MAX_ZOOM = 2;
@@ -53,6 +69,8 @@
     let anchorCell = null;
     let activeEditingCell = null;
     let zoomLevel = 1;
+    let isMouseSelecting = false;
+    let selectionDragAnchor = null;
 
     const logHistory = new Map();
 
@@ -502,69 +520,451 @@
             return '';
         }
 
-        const singleReferenceMatch = expression.match(SINGLE_CELL_REFERENCE_REGEX);
-        if (singleReferenceMatch) {
-            const reference = parseCellReference(expression);
-            if (!reference) {
-                visited.delete(key);
-                return '#REF!';
-            }
-            const result = evaluateCellValue(log, reference.row, reference.column, visited);
-            visited.delete(key);
-            return result;
-        }
-
-        let hadError = false;
-        let errorValue = '#ERROR';
-        const substituted = expression.replace(CELL_REFERENCE_REGEX, (match) => {
-            const reference = parseCellReference(match);
-            if (!reference) {
-                hadError = true;
-                errorValue = '#REF!';
-                return '0';
-            }
-            const referencedValue = evaluateCellValue(log, reference.row, reference.column, visited);
-            if (typeof referencedValue === 'string' && referencedValue.startsWith('#')) {
-                hadError = true;
-                errorValue = referencedValue;
-                return '0';
-            }
-            const numericValue = Number(referencedValue);
-            if (Number.isFinite(numericValue)) {
-                return numericValue.toString();
-            }
-            if (typeof referencedValue === 'string' && referencedValue.trim().length === 0) {
-                return '0';
-            }
-            return '0';
-        });
-
-        if (hadError) {
-            visited.delete(key);
-            return errorValue;
-        }
-
-        const sanitized = substituted.replace(/[^0-9+\-*/().\s]/g, '');
-        if (!sanitized.trim().length) {
-            visited.delete(key);
-            return '#ERROR';
-        }
-
-        let result;
-        try {
-            // eslint-disable-next-line no-new-func
-            result = Function('"use strict";return (' + sanitized + ');')();
-        } catch (error) {
-            visited.delete(key);
-            return '#ERROR';
-        }
-
+        const result = evaluateFormulaExpression(log, expression, visited);
         visited.delete(key);
+        return result;
+    }
 
-        if (typeof result === 'number' && Number.isFinite(result)) {
-            return result;
+    function evaluateFormulaExpression(log, expression, visited) {
+        const tokens = tokenizeFormula(expression);
+        if (!tokens) {
+            return '#ERROR';
+        }
+        const parser = createFormulaParser(tokens);
+        let ast;
+        try {
+            ast = parser.parseExpression();
+            if (parser.hasMoreTokens()) {
+                return '#ERROR';
+            }
+        } catch (error) {
+            return normalizeFormulaError(error);
+        }
+
+        try {
+            const value = evaluateFormulaAst(ast, log, visited);
+            if (Array.isArray(value)) {
+                return '#VALUE!';
+            }
+            if (value === true) {
+                return 1;
+            }
+            if (value === false) {
+                return 0;
+            }
+            return value;
+        } catch (error) {
+            return normalizeFormulaError(error);
+        }
+    }
+
+    function normalizeFormulaError(error) {
+        if (typeof error === 'string' && error.startsWith('#')) {
+            return error;
+        }
+        if (error && typeof error.message === 'string' && error.message.startsWith('#')) {
+            return error.message;
         }
         return '#ERROR';
+    }
+
+    function tokenizeFormula(expression) {
+        const tokens = [];
+        let index = 0;
+        const length = expression.length;
+        while (index < length) {
+            const char = expression[index];
+            if (/\s/.test(char)) {
+                index += 1;
+                continue;
+            }
+            if (char === '(') {
+                tokens.push({ type: 'parenOpen' });
+                index += 1;
+                continue;
+            }
+            if (char === ')') {
+                tokens.push({ type: 'parenClose' });
+                index += 1;
+                continue;
+            }
+            if (char === ',') {
+                tokens.push({ type: 'comma' });
+                index += 1;
+                continue;
+            }
+            if (char === ':') {
+                tokens.push({ type: 'colon' });
+                index += 1;
+                continue;
+            }
+            if (char === '+' || char === '-' || char === '*' || char === '/') {
+                tokens.push({ type: 'operator', value: char });
+                index += 1;
+                continue;
+            }
+            if (/[0-9.]/.test(char)) {
+                let hasDecimal = false;
+                const start = index;
+                while (index < length) {
+                    const current = expression[index];
+                    if (current === '.') {
+                        if (hasDecimal) {
+                            return null;
+                        }
+                        hasDecimal = true;
+                        index += 1;
+                        continue;
+                    }
+                    if (/[0-9]/.test(current)) {
+                        index += 1;
+                        continue;
+                    }
+                    break;
+                }
+                const numberText = expression.slice(start, index);
+                if (!numberText.length || numberText === '.') {
+                    return null;
+                }
+                const numericValue = Number(numberText);
+                if (!Number.isFinite(numericValue)) {
+                    return null;
+                }
+                tokens.push({ type: 'number', value: numericValue });
+                continue;
+            }
+            if (/[A-Za-z_]/.test(char)) {
+                const start = index;
+                index += 1;
+                while (index < length && /[A-Za-z0-9_]/.test(expression[index])) {
+                    index += 1;
+                }
+                const text = expression.slice(start, index);
+                if (/^[A-Za-z]+\d+$/.test(text)) {
+                    tokens.push({ type: 'cell', value: text.toUpperCase() });
+                } else {
+                    tokens.push({ type: 'identifier', value: text.toUpperCase() });
+                }
+                continue;
+            }
+            return null;
+        }
+        return tokens;
+    }
+
+    function createFormulaParser(tokens) {
+        let position = 0;
+
+        function peek(offset = 0) {
+            return tokens[position + offset] ?? null;
+        }
+
+        function match(type, value) {
+            const token = tokens[position];
+            if (!token || token.type !== type) {
+                return null;
+            }
+            if (value !== undefined && token.value !== value) {
+                return null;
+            }
+            position += 1;
+            return token;
+        }
+
+        function expect(type, value) {
+            const token = match(type, value);
+            if (!token) {
+                throw '#ERROR';
+            }
+            return token;
+        }
+
+        function check(type, value) {
+            const token = tokens[position];
+            if (!token || token.type !== type) {
+                return false;
+            }
+            if (value !== undefined && token.value !== value) {
+                return false;
+            }
+            return true;
+        }
+
+        function parseExpression() {
+            let node = parseTerm();
+            while (true) {
+                const token = peek();
+                if (!token || token.type !== 'operator' || (token.value !== '+' && token.value !== '-')) {
+                    break;
+                }
+                position += 1;
+                const right = parseTerm();
+                node = { type: 'binary', operator: token.value, left: node, right };
+            }
+            return node;
+        }
+
+        function parseTerm() {
+            let node = parseFactor();
+            while (true) {
+                const token = peek();
+                if (!token || token.type !== 'operator' || (token.value !== '*' && token.value !== '/')) {
+                    break;
+                }
+                position += 1;
+                const right = parseFactor();
+                node = { type: 'binary', operator: token.value, left: node, right };
+            }
+            return node;
+        }
+
+        function parseFactor() {
+            const token = peek();
+            if (token && token.type === 'operator' && (token.value === '+' || token.value === '-')) {
+                position += 1;
+                const argument = parseFactor();
+                return { type: 'unary', operator: token.value, argument };
+            }
+            return parsePrimary();
+        }
+
+        function parsePrimary() {
+            const token = peek();
+            if (!token) {
+                throw '#ERROR';
+            }
+            if (token.type === 'number') {
+                position += 1;
+                return { type: 'number', value: token.value };
+            }
+            if (token.type === 'cell') {
+                position += 1;
+                let node = { type: 'cell', reference: token.value };
+                if (check('colon')) {
+                    position += 1;
+                    const endToken = match('cell');
+                    if (!endToken) {
+                        throw '#REF!';
+                    }
+                    node = { type: 'range', start: token.value, end: endToken.value };
+                }
+                return node;
+            }
+            if (token.type === 'identifier') {
+                position += 1;
+                expect('parenOpen');
+                const args = [];
+                if (!check('parenClose')) {
+                    do {
+                        args.push(parseExpression());
+                    } while (match('comma'));
+                }
+                expect('parenClose');
+                return { type: 'function', name: token.value, args };
+            }
+            if (token.type === 'parenOpen') {
+                position += 1;
+                const expr = parseExpression();
+                expect('parenClose');
+                return expr;
+            }
+            throw '#ERROR';
+        }
+
+        return {
+            parseExpression,
+            hasMoreTokens: () => position < tokens.length
+        };
+    }
+
+    function evaluateFormulaAst(node, log, visited) {
+        switch (node.type) {
+            case 'number':
+                return node.value;
+            case 'cell':
+                return evaluateCellReferenceValue(node.reference, log, visited);
+            case 'range':
+                return evaluateRangeValues(node.start, node.end, log, visited);
+            case 'unary': {
+                const value = evaluateFormulaAst(node.argument, log, visited);
+                if (isErrorValue(value)) {
+                    return value;
+                }
+                if (Array.isArray(value)) {
+                    return '#VALUE!';
+                }
+                const numeric = coerceValueToNumber(value);
+                if (numeric == null) {
+                    return '#VALUE!';
+                }
+                return node.operator === '-' ? -numeric : numeric;
+            }
+            case 'binary': {
+                const left = evaluateFormulaAst(node.left, log, visited);
+                if (isErrorValue(left)) {
+                    return left;
+                }
+                const right = evaluateFormulaAst(node.right, log, visited);
+                if (isErrorValue(right)) {
+                    return right;
+                }
+                if (Array.isArray(left) || Array.isArray(right)) {
+                    return '#VALUE!';
+                }
+                const leftNumber = coerceValueToNumber(left);
+                const rightNumber = coerceValueToNumber(right);
+                if (leftNumber == null || rightNumber == null) {
+                    return '#VALUE!';
+                }
+                switch (node.operator) {
+                    case '+':
+                        return leftNumber + rightNumber;
+                    case '-':
+                        return leftNumber - rightNumber;
+                    case '*':
+                        return leftNumber * rightNumber;
+                    case '/':
+                        if (rightNumber === 0) {
+                            return '#DIV/0!';
+                        }
+                        return leftNumber / rightNumber;
+                    default:
+                        return '#ERROR';
+                }
+            }
+            case 'function': {
+                const evaluatedArgs = node.args.map((arg) => evaluateFormulaAst(arg, log, visited));
+                for (const value of evaluatedArgs) {
+                    if (isErrorValue(value)) {
+                        return value;
+                    }
+                }
+                const formulaFn = FORMULA_FUNCTIONS[node.name];
+                if (!formulaFn) {
+                    return '#NAME?';
+                }
+                return formulaFn(evaluatedArgs);
+            }
+            default:
+                return '#ERROR';
+        }
+    }
+
+    function evaluateCellReferenceValue(reference, log, visited) {
+        const coordinates = parseCellReference(reference);
+        if (!coordinates) {
+            return '#REF!';
+        }
+        return evaluateCellValue(log, coordinates.row, coordinates.column, visited);
+    }
+
+    function evaluateRangeValues(startReference, endReference, log, visited) {
+        const start = parseCellReference(startReference);
+        const end = parseCellReference(endReference);
+        if (!start || !end) {
+            return '#REF!';
+        }
+        const values = [];
+        const startRow = Math.min(start.row, end.row);
+        const endRow = Math.max(start.row, end.row);
+        const startColumn = Math.min(start.column, end.column);
+        const endColumn = Math.max(start.column, end.column);
+        for (let row = startRow; row <= endRow; row++) {
+            for (let column = startColumn; column <= endColumn; column++) {
+                values.push(evaluateCellValue(log, row, column, visited));
+            }
+        }
+        return values;
+    }
+
+    function isErrorValue(value) {
+        return typeof value === 'string' && value.startsWith('#');
+    }
+
+    function coerceValueToNumber(value) {
+        if (value == null) {
+            return 0;
+        }
+        if (typeof value === 'number') {
+            return Number.isFinite(value) ? value : null;
+        }
+        if (typeof value === 'boolean') {
+            return value ? 1 : 0;
+        }
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (!trimmed.length) {
+                return 0;
+            }
+            const numeric = Number(trimmed);
+            if (Number.isFinite(numeric)) {
+                return numeric;
+            }
+            return null;
+        }
+        return null;
+    }
+
+    function extractNumericValues(values) {
+        const collected = [];
+        for (const value of values) {
+            const extraction = extractNumericValuesFromValue(value);
+            if (extraction.error) {
+                return { error: extraction.error };
+            }
+            collected.push(...extraction.values);
+        }
+        return { values: collected };
+    }
+
+    function extractNumericValuesFromValue(value) {
+        if (Array.isArray(value)) {
+            return extractNumericValues(value);
+        }
+        if (isErrorValue(value)) {
+            return { error: value };
+        }
+        if (value == null) {
+            return { values: [] };
+        }
+        if (typeof value === 'number') {
+            if (Number.isFinite(value)) {
+                return { values: [value] };
+            }
+            return { values: [] };
+        }
+        if (typeof value === 'boolean') {
+            return { values: [value ? 1 : 0] };
+        }
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (!trimmed.length) {
+                return { values: [] };
+            }
+            const numeric = Number(trimmed);
+            if (Number.isFinite(numeric)) {
+                return { values: [numeric] };
+            }
+            return { values: [] };
+        }
+        return { values: [] };
+    }
+
+    function createAggregateFormula(reducer, options = {}) {
+        return (args) => {
+            const extraction = extractNumericValues(args);
+            if (extraction.error) {
+                return extraction.error;
+            }
+            const numbers = extraction.values;
+            if (!numbers.length) {
+                if (Object.prototype.hasOwnProperty.call(options, 'emptyResult')) {
+                    return options.emptyResult;
+                }
+                return '#VALUE!';
+            }
+            return reducer(numbers);
+        };
     }
 
     function getCellDisplayValue(log, row, column) {
@@ -626,6 +1026,7 @@
                 applyCellFormatting(td, cellData.format);
                 td.addEventListener('input', handleCellInput);
                 td.addEventListener('mousedown', handleCellMouseDown);
+                td.addEventListener('mouseenter', handleCellMouseEnter);
                 td.addEventListener('focus', handleCellFocus);
                 td.addEventListener('keydown', handleCellKeyDown);
                 td.addEventListener('dblclick', handleCellDoubleClick);
@@ -675,6 +1076,9 @@
         if (!(target instanceof HTMLElement)) {
             return;
         }
+        if (target.dataset.editing === 'true') {
+            return;
+        }
         const rowIndex = Number(target.dataset.row ?? '-1');
         const columnIndex = Number(target.dataset.column ?? '-1');
         if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
@@ -686,12 +1090,62 @@
             return;
         }
 
+        const isLeftButton = event.button === 0;
+        let dragAnchor = anchorCell ? { ...anchorCell } : null;
+
         if (event.shiftKey && anchorCell) {
             setSelection(anchorCell.row, anchorCell.column, display.row, display.column);
+            dragAnchor = { ...anchorCell };
         } else {
             anchorCell = { row: display.row, column: display.column };
+            dragAnchor = { ...anchorCell };
             setSelection(display.row, display.column, display.row, display.column);
         }
+
+        if (isLeftButton && dragAnchor) {
+            event.preventDefault();
+            beginSelectionDrag(dragAnchor);
+        }
+    }
+
+    function beginSelectionDrag(anchor) {
+        if (!anchor) {
+            return;
+        }
+        selectionDragAnchor = { ...anchor };
+        if (!isMouseSelecting) {
+            isMouseSelecting = true;
+            document.addEventListener('mouseup', handleDocumentMouseUp);
+        }
+    }
+
+    function handleCellMouseEnter(event) {
+        if (!isMouseSelecting || !selectionDragAnchor) {
+            return;
+        }
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+        if (target.dataset.editing === 'true') {
+            return;
+        }
+        const rowIndex = Number(target.dataset.row ?? '-1');
+        const columnIndex = Number(target.dataset.column ?? '-1');
+        if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
+            return;
+        }
+        const display = getDisplayCellCoordinates(rowIndex, columnIndex);
+        if (!display) {
+            return;
+        }
+        setSelection(selectionDragAnchor.row, selectionDragAnchor.column, display.row, display.column, { focus: false });
+    }
+
+    function handleDocumentMouseUp() {
+        isMouseSelecting = false;
+        selectionDragAnchor = null;
+        document.removeEventListener('mouseup', handleDocumentMouseUp);
     }
 
     function handleCellFocus(event) {
