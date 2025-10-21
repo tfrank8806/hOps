@@ -31,8 +31,17 @@
     const clearTextColorButton = document.getElementById('clearTextColorBtn');
     const clearFillColorButton = document.getElementById('clearFillColorBtn');
     const exportExcelButton = document.getElementById('exportExcelBtn');
+    const undoButton = document.getElementById('undoBtn');
+    const zoomInButton = document.getElementById('zoomInBtn');
+    const zoomOutButton = document.getElementById('zoomOutBtn');
 
     const HEX_COLOR_REGEX = /^#(?:[0-9a-f]{3}){1,2}$/i;
+    const CELL_REFERENCE_REGEX = /\b([A-Za-z]+)(\d+)\b/g;
+    const SINGLE_CELL_REFERENCE_REGEX = /^([A-Za-z]+)(\d+)$/;
+    const MAX_HISTORY_LENGTH = 50;
+    const MIN_ZOOM = 0.5;
+    const MAX_ZOOM = 2;
+    const ZOOM_STEP = 0.1;
 
     if (!logListEl) {
         return;
@@ -43,6 +52,9 @@
     let selectionRange = null;
     let anchorCell = null;
     let activeEditingCell = null;
+    let zoomLevel = 1;
+
+    const logHistory = new Map();
 
     function clamp(value, min, max) {
         if (value < min) {
@@ -52,6 +64,135 @@
             return max;
         }
         return value;
+    }
+
+    function cloneFormat(format) {
+        if (!format || typeof format !== 'object') {
+            return undefined;
+        }
+        return JSON.parse(JSON.stringify(format));
+    }
+
+    function cloneCellData(cell) {
+        if (!cell) {
+            return createCell();
+        }
+        const cloned = {
+            value: typeof cell.value === 'string' ? cell.value : String(cell.value ?? '')
+        };
+        const clonedFormat = cloneFormat(cell.format);
+        if (clonedFormat) {
+            cloned.format = clonedFormat;
+        }
+        return cloned;
+    }
+
+    function cloneLogData(data) {
+        return data.map((row) => {
+            if (!Array.isArray(row)) {
+                return [];
+            }
+            return row.map((cell) => cloneCellData(cell));
+        });
+    }
+
+    function pushUndoState() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const snapshot = {
+            data: cloneLogData(log.data),
+            selectionRange: selectionRange ? { ...selectionRange } : null,
+            anchorCell: anchorCell ? { ...anchorCell } : null
+        };
+        const history = logHistory.get(log.id) ?? [];
+        history.push(snapshot);
+        if (history.length > MAX_HISTORY_LENGTH) {
+            history.shift();
+        }
+        logHistory.set(log.id, history);
+        updateUndoButtonState();
+    }
+
+    function updateUndoButtonState() {
+        if (!undoButton) {
+            return;
+        }
+        const log = getCurrentLog();
+        if (!log) {
+            undoButton.disabled = true;
+            return;
+        }
+        const history = logHistory.get(log.id);
+        undoButton.disabled = !(history && history.length);
+    }
+
+    function undoLastChange() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const history = logHistory.get(log.id);
+        if (!history || !history.length) {
+            return;
+        }
+        const snapshot = history.pop();
+        log.data = cloneLogData(snapshot.data);
+        selectionRange = snapshot.selectionRange ? { ...snapshot.selectionRange } : null;
+        anchorCell = snapshot.anchorCell ? { ...snapshot.anchorCell } : null;
+        persistLogs();
+        renderSpreadsheet(log);
+        if (selectionRange) {
+            restoreSelection();
+        } else {
+            setToolbarEnabled(false);
+        }
+        updateUndoButtonState();
+    }
+
+    function applyZoomLevel() {
+        if (!spreadsheetWrapperEl) {
+            return;
+        }
+        spreadsheetWrapperEl.style.setProperty('--spreadsheet-zoom-scale', zoomLevel.toString());
+    }
+
+    function updateZoomButtonState() {
+        if (!zoomInButton || !zoomOutButton) {
+            return;
+        }
+        const hasLog = !!getCurrentLog();
+        zoomInButton.disabled = !hasLog || zoomLevel >= MAX_ZOOM - 0.001;
+        zoomOutButton.disabled = !hasLog || zoomLevel <= MIN_ZOOM + 0.001;
+    }
+
+    function setZoom(level) {
+        const clamped = clamp(level, MIN_ZOOM, MAX_ZOOM);
+        const rounded = Math.round(clamped * 100) / 100;
+        if (Math.abs(rounded - zoomLevel) < 0.001) {
+            return;
+        }
+        zoomLevel = rounded;
+        applyZoomLevel();
+        updateZoomButtonState();
+    }
+
+    function changeZoom(delta) {
+        setZoom(zoomLevel + delta);
+    }
+
+    function isPrintableKey(event) {
+        if (!event || typeof event.key !== 'string') {
+            return false;
+        }
+        if (event.ctrlKey || event.metaKey || event.altKey) {
+            return false;
+        }
+        if (event.key.length === 1) {
+            return event.key >= ' ';
+        }
+        return false;
     }
 
     function createCell(value = '', format = {}) {
@@ -271,6 +412,9 @@
             showPlaceholder();
             return;
         }
+        if (!logHistory.has(log.id)) {
+            logHistory.set(log.id, []);
+        }
         logTitleEl.textContent = log.name;
         logSubtitleEl.textContent = 'Changes are saved automatically in this browser.';
         addRowButton.disabled = false;
@@ -279,6 +423,9 @@
         if (exportExcelButton) {
             exportExcelButton.disabled = typeof XLSX === 'undefined';
         }
+        updateUndoButtonState();
+        updateZoomButtonState();
+        applyZoomLevel();
         spreadsheetPlaceholderEl.classList.add('d-none');
         spreadsheetWrapperEl.classList.remove('d-none');
         renderSpreadsheet(log);
@@ -299,6 +446,137 @@
         selectionRange = null;
         anchorCell = null;
         setToolbarEnabled(false);
+        updateUndoButtonState();
+        updateZoomButtonState();
+    }
+
+    function parseCellReference(reference) {
+        if (typeof reference !== 'string') {
+            return null;
+        }
+        const normalized = reference.trim().toUpperCase();
+        const match = normalized.match(SINGLE_CELL_REFERENCE_REGEX);
+        if (!match) {
+            return null;
+        }
+        const letters = match[1];
+        const rowIndex = Number(match[2]) - 1;
+        if (!Number.isInteger(rowIndex) || rowIndex < 0) {
+            return null;
+        }
+        let columnIndex = 0;
+        for (let i = 0; i < letters.length; i++) {
+            columnIndex *= 26;
+            columnIndex += letters.charCodeAt(i) - 64;
+        }
+        columnIndex -= 1;
+        if (columnIndex < 0) {
+            return null;
+        }
+        return { row: rowIndex, column: columnIndex };
+    }
+
+    function evaluateCellValue(log, row, column, visited = new Set()) {
+        if (!log || !Array.isArray(log.data[row])) {
+            return '';
+        }
+        ensureCellExists(log, row, column);
+        const cell = log.data[row][column];
+        if (!cell) {
+            return '';
+        }
+        const rawValue = typeof cell.value === 'string' ? cell.value : String(cell.value ?? '');
+        if (!rawValue.startsWith('=')) {
+            return rawValue;
+        }
+
+        const key = `${row}:${column}`;
+        if (visited.has(key)) {
+            return '#CYCLE!';
+        }
+        visited.add(key);
+
+        const expression = rawValue.slice(1).trim();
+        if (!expression.length) {
+            visited.delete(key);
+            return '';
+        }
+
+        const singleReferenceMatch = expression.match(SINGLE_CELL_REFERENCE_REGEX);
+        if (singleReferenceMatch) {
+            const reference = parseCellReference(expression);
+            if (!reference) {
+                visited.delete(key);
+                return '#REF!';
+            }
+            const result = evaluateCellValue(log, reference.row, reference.column, visited);
+            visited.delete(key);
+            return result;
+        }
+
+        let hadError = false;
+        let errorValue = '#ERROR';
+        const substituted = expression.replace(CELL_REFERENCE_REGEX, (match) => {
+            const reference = parseCellReference(match);
+            if (!reference) {
+                hadError = true;
+                errorValue = '#REF!';
+                return '0';
+            }
+            const referencedValue = evaluateCellValue(log, reference.row, reference.column, visited);
+            if (typeof referencedValue === 'string' && referencedValue.startsWith('#')) {
+                hadError = true;
+                errorValue = referencedValue;
+                return '0';
+            }
+            const numericValue = Number(referencedValue);
+            if (Number.isFinite(numericValue)) {
+                return numericValue.toString();
+            }
+            if (typeof referencedValue === 'string' && referencedValue.trim().length === 0) {
+                return '0';
+            }
+            return '0';
+        });
+
+        if (hadError) {
+            visited.delete(key);
+            return errorValue;
+        }
+
+        const sanitized = substituted.replace(/[^0-9+\-*/().\s]/g, '');
+        if (!sanitized.trim().length) {
+            visited.delete(key);
+            return '#ERROR';
+        }
+
+        let result;
+        try {
+            // eslint-disable-next-line no-new-func
+            result = Function('"use strict";return (' + sanitized + ');')();
+        } catch (error) {
+            visited.delete(key);
+            return '#ERROR';
+        }
+
+        visited.delete(key);
+
+        if (typeof result === 'number' && Number.isFinite(result)) {
+            return result;
+        }
+        return '#ERROR';
+    }
+
+    function getCellDisplayValue(log, row, column) {
+        const value = evaluateCellValue(log, row, column, new Set());
+        if (value == null) {
+            return '';
+        }
+        if (typeof value === 'number') {
+            const rounded = Number(value.toPrecision(12));
+            return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+        }
+        return value;
     }
 
     function renderSpreadsheet(log) {
@@ -344,7 +622,7 @@
                 td.dataset.column = String(colIndex);
                 td.dataset.editing = 'false';
                 td.tabIndex = 0;
-                td.textContent = cellData.value ?? '';
+                td.textContent = getCellDisplayValue(log, rowIndex, colIndex);
                 applyCellFormatting(td, cellData.format);
                 td.addEventListener('input', handleCellInput);
                 td.addEventListener('mousedown', handleCellMouseDown);
@@ -389,20 +667,7 @@
     }
 
     function handleCellInput(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
-        const rowIndex = Number(target.dataset.row ?? '-1');
-        const columnIndex = Number(target.dataset.column ?? '-1');
-        const log = getCurrentLog();
-        if (!log || Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
-            return;
-        }
-        ensureCellExists(log, rowIndex, columnIndex);
-        const cell = log.data[rowIndex][columnIndex];
-        cell.value = target.textContent ?? '';
-        persistLogs();
+        void event;
     }
 
     function handleCellMouseDown(event) {
@@ -459,7 +724,17 @@
         }
         const selectionMode = options.selectionMode === 'end' ? 'end' : 'all';
         stopEditingActiveCell({ commit: true });
-        cell.dataset.originalValue = cell.textContent ?? '';
+        const rowIndex = Number(cell.dataset.row ?? '-1');
+        const columnIndex = Number(cell.dataset.column ?? '-1');
+        let originalValue = cell.textContent ?? '';
+        const log = getCurrentLog();
+        if (log && !Number.isNaN(rowIndex) && !Number.isNaN(columnIndex)) {
+            ensureCellExists(log, rowIndex, columnIndex);
+            const dataCell = log.data[rowIndex][columnIndex];
+            originalValue = dataCell.value ?? '';
+            cell.textContent = originalValue;
+        }
+        cell.dataset.originalValue = originalValue;
         cell.dataset.editing = 'true';
         cell.contentEditable = 'true';
         cell.classList.add('editing-cell');
@@ -503,13 +778,25 @@
         const columnIndex = Number(cell.dataset.column ?? '-1');
         const originalValue = cell.dataset.originalValue ?? '';
         const log = getCurrentLog();
+        let shouldRefresh = false;
 
-        if (!commit && log && !Number.isNaN(rowIndex) && !Number.isNaN(columnIndex)) {
-            cell.textContent = originalValue;
+        if (log && !Number.isNaN(rowIndex) && !Number.isNaN(columnIndex)) {
             ensureCellExists(log, rowIndex, columnIndex);
             const dataCell = log.data[rowIndex][columnIndex];
-            dataCell.value = originalValue;
-            persistLogs();
+            if (commit) {
+                const newValue = cell.textContent ?? '';
+                if (newValue !== dataCell.value) {
+                    pushUndoState();
+                    dataCell.value = newValue;
+                    persistLogs();
+                    shouldRefresh = true;
+                }
+                cell.textContent = getCellDisplayValue(log, rowIndex, columnIndex);
+            } else {
+                cell.textContent = getCellDisplayValue(log, rowIndex, columnIndex);
+            }
+        } else if (!commit) {
+            cell.textContent = originalValue;
         }
 
         cell.contentEditable = 'false';
@@ -518,6 +805,24 @@
         delete cell.dataset.originalValue;
         if (activeEditingCell === cell) {
             activeEditingCell = null;
+        }
+
+        if (shouldRefresh && log) {
+            const targetRow = rowIndex;
+            const targetColumn = columnIndex;
+            requestAnimationFrame(() => {
+                const currentLog = getCurrentLog();
+                if (!currentLog || currentLog.id !== log.id) {
+                    return;
+                }
+                renderSpreadsheet(currentLog);
+                if (selectionRange) {
+                    restoreSelection();
+                } else if (!Number.isNaN(targetRow) && !Number.isNaN(targetColumn)) {
+                    anchorCell = { row: targetRow, column: targetColumn };
+                    setSelection(targetRow, targetColumn, targetRow, targetColumn, { focus: false });
+                }
+            });
         }
     }
 
@@ -620,7 +925,58 @@
                 event.preventDefault();
                 beginEditingCell(target, { selectionMode: 'end' });
                 break;
+            case 'Backspace':
+            case 'Delete': {
+                event.preventDefault();
+                const activeLog = getCurrentLog();
+                if (!activeLog) {
+                    return;
+                }
+                const rangeToClear = selectionRange ? { ...selectionRange } : {
+                    startRow: rowIndex,
+                    endRow: rowIndex,
+                    startColumn: columnIndex,
+                    endColumn: columnIndex
+                };
+                let hasChanges = false;
+                forEachCellInSelection(rangeToClear, ({ cellData }) => {
+                    if (cellData.value) {
+                        hasChanges = true;
+                    }
+                }, { includeHidden: true });
+                if (!hasChanges) {
+                    return;
+                }
+                pushUndoState();
+                forEachCellInSelection(rangeToClear, ({ cellData }) => {
+                    cellData.value = '';
+                }, { includeHidden: true });
+                selectionRange = {
+                    startRow: rangeToClear.startRow,
+                    endRow: rangeToClear.endRow,
+                    startColumn: rangeToClear.startColumn,
+                    endColumn: rangeToClear.endColumn
+                };
+                persistLogs();
+                renderSpreadsheet(activeLog);
+                anchorCell = { row: rangeToClear.startRow, column: rangeToClear.startColumn };
+                setSelection(rangeToClear.startRow, rangeToClear.startColumn, rangeToClear.endRow, rangeToClear.endColumn);
+                break;
+            }
             default:
+                if (isPrintableKey(event)) {
+                    event.preventDefault();
+                    beginEditingCell(target, { selectionMode: 'all' });
+                    requestAnimationFrame(() => {
+                        if (target.dataset.editing === 'true') {
+                            target.textContent = '';
+                            if (event.key.length === 1) {
+                                target.textContent = event.key;
+                                selectCellContents(target, 'end');
+                            }
+                        }
+                    });
+                }
                 break;
         }
     }
@@ -687,6 +1043,7 @@
         if (!log) {
             return;
         }
+        pushUndoState();
         const columns = log.data[0]?.length ?? defaultColumns;
         log.data.push(Array.from({ length: columns }, () => createCell()));
         persistLogs();
@@ -698,6 +1055,7 @@
         if (!log) {
             return;
         }
+        pushUndoState();
         let columnCount = defaultColumns;
         if (log.data.length && Array.isArray(log.data[0])) {
             columnCount = log.data[0].length;
@@ -720,6 +1078,7 @@
         if (!log) {
             return;
         }
+        pushUndoState();
         const rows = log.data.length || defaultRows;
         const cols = log.data[0]?.length || defaultColumns;
         log.data = createEmptyData(rows, cols);
@@ -741,6 +1100,7 @@
         logNameInput?.classList.remove('is-invalid');
         const newLog = createLog(name);
         logs.push(newLog);
+        logHistory.set(newLog.id, []);
         persistLogs();
         createLogForm.reset();
         const modalElement = document.getElementById('createLogModal');
@@ -1048,6 +1408,7 @@
         if (!selectionRange) {
             return;
         }
+        pushUndoState();
         const currentValue = !!getUniformFormatValue(key);
         const targetValue = !currentValue;
         forEachCellInSelection(selectionRange, ({ cellData }) => {
@@ -1067,6 +1428,7 @@
         if (!selectionRange) {
             return;
         }
+        pushUndoState();
         forEachCellInSelection(selectionRange, ({ cellData }) => {
             cellData.format = cellData.format || {};
             if (alignment) {
@@ -1084,6 +1446,7 @@
         if (!selectionRange) {
             return;
         }
+        pushUndoState();
         forEachCellInSelection(selectionRange, ({ cellData }) => {
             cellData.format = cellData.format || {};
             if (size) {
@@ -1101,6 +1464,7 @@
         if (!selectionRange) {
             return;
         }
+        pushUndoState();
         forEachCellInSelection(selectionRange, ({ cellData }) => {
             cellData.format = cellData.format || {};
             if (family) {
@@ -1118,6 +1482,7 @@
         if (!selectionRange) {
             return;
         }
+        pushUndoState();
         const normalized = isValidHexColor(color) ? normalizeHexColor(color) : null;
         forEachCellInSelection(selectionRange, ({ cellData }) => {
             cellData.format = cellData.format || {};
@@ -1252,6 +1617,7 @@
         }
 
         // Unmerge any existing merges within the selection
+        pushUndoState();
         const affectedMasters = [];
         forEachCellInSelection(selectionRange, ({ row, column, cellData }) => {
             if (cellData.format?.merge) {
@@ -1321,6 +1687,7 @@
         if (!masters.length) {
             return;
         }
+        pushUndoState();
         masters.forEach(({ row, column }) => unmergeCell(row, column));
         persistLogs();
         renderSpreadsheet(log);
@@ -1415,12 +1782,18 @@
     unmergeCellsButton?.addEventListener('click', unmergeSelectedCells);
 
     exportExcelButton?.addEventListener('click', exportCurrentLogToExcel);
+    undoButton?.addEventListener('click', undoLastChange);
+    zoomInButton?.addEventListener('click', () => changeZoom(ZOOM_STEP));
+    zoomOutButton?.addEventListener('click', () => changeZoom(-ZOOM_STEP));
 
     createLogForm?.addEventListener('submit', handleCreateLog);
     logNameInput?.addEventListener('input', () => {
         logNameInput?.classList.remove('is-invalid');
     });
 
+    applyZoomLevel();
+    updateZoomButtonState();
+    updateUndoButtonState();
     renderLogList();
     if (logs.length) {
         selectLog(logs[0].id);
