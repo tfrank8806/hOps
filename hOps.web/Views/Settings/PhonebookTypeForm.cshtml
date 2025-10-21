@@ -1,11 +1,15 @@
-﻿@model hOps.web.Models.PhonebookType
+﻿@using System
+@model hOps.web.Models.PhonebookType
 @{
-    ViewData["Title"] = ViewData["FormAction"].ToString()?.Contains("Edit") == true ? "Edit Phonebook Type" : "Create Phonebook Type";
+    var formAction = ViewData["FormAction"] as string ?? string.Empty;
+    ViewData["Title"] = formAction.Contains("Edit", StringComparison.OrdinalIgnoreCase)
+        ? "Edit Phonebook Type"
+        : "Create Phonebook Type";
 }
 
 <h2>@ViewData["Title"]</h2>
 
-<form asp-action="@ViewData["FormAction"]" method="post">
+<form asp-action="@formAction" method="post">
     <input type="hidden" asp-for="Id" />
     <div class="form-group">
         <label asp-for="Name"></label>
