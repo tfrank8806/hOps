@@ -12,6 +12,73 @@
 
 <h2>Layout Editor — Property @propertyId, Floor @selFloor</h2>
 
+@section Styles {
+    <style>
+        .layout-editor-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .layout-editor-controls .control-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .room-box .box-controls {
+            position: absolute;
+            right: 0;
+            bottom: 100%;
+            display: flex;
+            opacity: 0;
+            margin-bottom: 4px;
+            gap: 4px;
+            padding: 2px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #333;
+            border-radius: 4px;
+            transition: opacity 0.2s;
+            pointer-events: auto;
+            z-index: 5;
+        }
+
+        .room-box:hover .box-controls,
+        .room-box:focus-within .box-controls {
+            opacity: 1;
+        }
+
+        .room-box .box-controls button {
+            padding: 2px 6px;
+            font-size: 0.8em;
+        }
+
+        .shape-dialog-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .shape-dialog {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 1.5rem;
+            width: 320px;
+            max-width: 90vw;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        }
+
+        .shape-dialog h5 {
+            margin-bottom: 1rem;
+        }
+    </style>
+}
+
 @if (floors != null && floors.Count > 1)
 {
     <div class="mb-3 d-flex align-items-center flex-wrap gap-3">
@@ -50,12 +117,20 @@
     </div>
 }
 
-<p>
-    <label><input type="checkbox" id="chkSnap" /> Snap to grid</label>
-    &nbsp;&nbsp;
-    <button id="zoomInBtn" class="btn btn-sm btn-outline-secondary">＋</button>
-    <button id="zoomOutBtn" class="btn btn-sm btn-outline-secondary">－</button>
-</p>
+<div class="layout-editor-controls mb-3">
+    <div class="control-group form-check mb-0">
+        <input class="form-check-input" type="checkbox" id="chkSnap" />
+        <label class="form-check-label" for="chkSnap">Snap to grid</label>
+    </div>
+    <div class="control-group">
+        <button id="zoomInBtn" class="btn btn-sm btn-outline-secondary" type="button">＋</button>
+        <button id="zoomOutBtn" class="btn btn-sm btn-outline-secondary" type="button">－</button>
+    </div>
+    <div class="control-group">
+        <button id="undoBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>Undo</button>
+        <button id="redoBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>Redo</button>
+    </div>
+</div>
 
 <div style="display:flex; height:650px;">
     <!-- Palette sidebar -->
@@ -97,9 +172,14 @@
             {
                 var label = Model.Rooms.FirstOrDefault(r => r.Id == layout.RoomId)?.RoomNumber
                     ?? (!string.IsNullOrWhiteSpace(layout.Label) ? layout.Label : layout.RoomId.ToString());
+                var shapeType = string.IsNullOrWhiteSpace(layout.ShapeType) ? "rectangle" : layout.ShapeType;
+                var shapeData = layout.ShapeData ?? string.Empty;
+                var clipStyle = string.IsNullOrWhiteSpace(shapeData) ? string.Empty : $"clip-path:{shapeData}; -webkit-clip-path:{shapeData};";
                 <div class="room-box"
                      data-room-id="@layout.RoomId"
                      data-room-label="@label"
+                     data-shape-type="@shapeType"
+                     data-shape-data="@shapeData"
                      style="
                              position:absolute;
                              left:@($"{layout.X}px");
@@ -110,12 +190,13 @@
                              background-color:#cce5ff;
                              z-index:1;
                              display:flex; align-items:center; justify-content:center;
-                             cursor:move;
+                             cursor:move; @clipStyle
                          ">
                     <span class="room-label">@label</span>
-                    <div class="box-controls" style="position:absolute; top:0; right:0; display:flex; opacity:0; transition: opacity 0.2s;">
-                        <button class="btn btn-sm btn-light btn-move-back" title="Move back" style="margin:2px; padding:2px 6px; font-size:0.8em;">⮐</button>
-                        <button class="btn btn-sm btn-light btn-delete-shape" title="Delete" style="margin:2px; padding:2px 6px; font-size:0.8em;">✖</button>
+                    <div class="box-controls">
+                        <button class="btn btn-sm btn-light btn-customize-shape" title="Customize shape">✎</button>
+                        <button class="btn btn-sm btn-light btn-move-back" title="Move back">⮐</button>
+                        <button class="btn btn-sm btn-light btn-delete-shape" title="Delete">✖</button>
                     </div>
                     <div class="resize-handle" style="
                             position:absolute; right:0; bottom:0;
@@ -124,6 +205,33 @@
                         "></div>
                 </div>
             }
+        </div>
+    </div>
+</div>
+
+<div id="shapeDialogOverlay" class="shape-dialog-overlay">
+    <div class="shape-dialog">
+        <h5>Customize Shape</h5>
+        <div class="mb-3">
+            <label for="shapePresetSelect" class="form-label">Preset</label>
+            <select id="shapePresetSelect" class="form-select form-select-sm">
+                <option value="rectangle">Rectangle</option>
+                <option value="l-top-left">L — Top Left</option>
+                <option value="l-top-right">L — Top Right</option>
+                <option value="l-bottom-left">L — Bottom Left</option>
+                <option value="l-bottom-right">L — Bottom Right</option>
+                <option value="custom">Custom (clip-path)</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="shapeClipPathInput" class="form-label">CSS clip-path</label>
+            <textarea id="shapeClipPathInput" class="form-control" rows="3"
+                      placeholder="polygon(0% 0%, 100% 0%, ...)"></textarea>
+            <small class="text-muted">Use CSS clip-path syntax to define advanced shapes.</small>
+        </div>
+        <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-secondary" id="shapeDialogCancel">Cancel</button>
+            <button type="button" class="btn btn-primary" id="shapeDialogApply">Apply</button>
         </div>
     </div>
 </div>
@@ -152,6 +260,44 @@
             const addFloorBtn = document.getElementById("btnAddFloor");
             const ghostFloorSelect = document.getElementById("ghostFloorSelect");
             const ghostLayer = document.getElementById("ghost-layer");
+            const palette = document.getElementById("palette");
+            const undoBtn = document.getElementById("undoBtn");
+            const redoBtn = document.getElementById("redoBtn");
+            const shapeDialogOverlay = document.getElementById("shapeDialogOverlay");
+            const shapePresetSelect = document.getElementById("shapePresetSelect");
+            const shapeClipPathInput = document.getElementById("shapeClipPathInput");
+            const shapeDialogApply = document.getElementById("shapeDialogApply");
+            const shapeDialogCancel = document.getElementById("shapeDialogCancel");
+
+            const shapePresets = new Map([
+                ["rectangle", ""],
+                ["l-top-left", "polygon(0% 0%, 100% 0%, 100% 30%, 35% 30%, 35% 100%, 0% 100%)"],
+                ["l-top-right", "polygon(0% 0%, 100% 0%, 100% 100%, 65% 100%, 65% 30%, 0% 30%, 0% 0%)"],
+                ["l-bottom-left", "polygon(0% 0%, 35% 0%, 35% 70%, 100% 70%, 100% 100%, 0% 100%)"],
+                ["l-bottom-right", "polygon(65% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 70%, 65% 70%)"]
+            ]);
+
+            const initialPaletteRooms = new Map();
+            const paletteRoomLabels = new Map();
+            if (palette) {
+                palette.querySelectorAll(".pal-shape").forEach(tile => {
+                    const rid = tile.getAttribute("data-room-id");
+                    const label = tile.getAttribute("data-room-label") ?? tile.textContent ?? "";
+                    if (!rid) {
+                        return;
+                    }
+                    const trimmedLabel = label.trim();
+                    paletteRoomLabels.set(rid, trimmedLabel);
+                    if (rid !== "0") {
+                        initialPaletteRooms.set(rid, trimmedLabel);
+                    }
+                });
+            }
+
+            const undoStack = [];
+            let redoStack = [];
+            let isApplyingState = false;
+            let shapeDialogTarget = null;
 
             const layoutsByFloor = new Map();
             if (layoutsByFloorRaw && typeof layoutsByFloorRaw === 'object') {
@@ -254,6 +400,231 @@
                 }
             }
 
+            function applyShapeToElement(element, shapeType, shapeData) {
+                if (!(element instanceof HTMLElement)) {
+                    return;
+                }
+                const normalizedType = (typeof shapeType === "string" && shapeType.trim().length > 0)
+                    ? shapeType.trim()
+                    : "rectangle";
+                const normalizedData = (typeof shapeData === "string" && shapeData.trim().length > 0)
+                    ? shapeData.trim()
+                    : "";
+
+                element.setAttribute("data-shape-type", normalizedType);
+                element.setAttribute("data-shape-data", normalizedData);
+
+                if (normalizedData.length > 0) {
+                    element.style.clipPath = normalizedData;
+                    element.style.webkitClipPath = normalizedData;
+                } else {
+                    element.style.removeProperty("clip-path");
+                    element.style.removeProperty("-webkit-clip-path");
+                }
+            }
+
+            function syncPaletteFromState(state) {
+                if (!palette) {
+                    return;
+                }
+
+                const placedRoomIds = new Set();
+                state.forEach(entry => {
+                    const rid = entry && typeof entry.roomId !== "undefined" ? String(entry.roomId) : "";
+                    if (!rid || rid === "0") {
+                        return;
+                    }
+                    placedRoomIds.add(rid);
+                    if (entry.label && entry.label.trim().length > 0) {
+                        paletteRoomLabels.set(rid, entry.label.trim());
+                    }
+                });
+
+                palette.querySelectorAll(".pal-shape").forEach(tile => {
+                    const rid = tile.getAttribute("data-room-id");
+                    if (rid && rid !== "0") {
+                        tile.remove();
+                    }
+                });
+
+                initialPaletteRooms.forEach((_, rid) => {
+                    if (placedRoomIds.has(rid)) {
+                        return;
+                    }
+                    const label = paletteRoomLabels.get(rid)
+                        ?? initialPaletteRooms.get(rid)
+                        ?? (roomLabelLookup && roomLabelLookup[rid] ? roomLabelLookup[rid] : `Room ${rid}`);
+                    moveBackToPalette(rid, label);
+                });
+            }
+
+            function captureLayoutState() {
+                const boxes = Array.from(container.querySelectorAll(".room-box"));
+                const state = boxes.map(b => {
+                    const ridValue = b.getAttribute("data-room-id");
+                    const roomId = parseInt(ridValue ?? "0", 10) || 0;
+                    const label = b.getAttribute("data-room-label") ?? "";
+                    const x = parseInt(b.style.left) || 0;
+                    const y = parseInt(b.style.top) || 0;
+                    const width = parseInt(b.style.width) || b.offsetWidth;
+                    const height = parseInt(b.style.height) || b.offsetHeight;
+                    const shapeType = b.getAttribute("data-shape-type") ?? "rectangle";
+                    const shapeData = b.getAttribute("data-shape-data") ?? "";
+                    return { roomId, label, x, y, width, height, shapeType, shapeData };
+                });
+
+                state.sort((a, b) => {
+                    if (a.roomId !== b.roomId) {
+                        return a.roomId - b.roomId;
+                    }
+                    if (a.x !== b.x) {
+                        return a.x - b.x;
+                    }
+                    return a.y - b.y;
+                });
+
+                return state;
+            }
+
+            function serializeState(state) {
+                return JSON.stringify(state.map(entry => [
+                    entry.roomId,
+                    entry.label,
+                    entry.x,
+                    entry.y,
+                    entry.width,
+                    entry.height,
+                    entry.shapeType,
+                    entry.shapeData
+                ]));
+            }
+
+            function restoreLayoutState(state) {
+                if (!Array.isArray(state)) {
+                    return;
+                }
+                isApplyingState = true;
+                container.querySelectorAll(".room-box").forEach(box => box.remove());
+                state.forEach(entry => {
+                    addBox(
+                        String(entry.roomId),
+                        entry.label ?? "",
+                        entry.x ?? 0,
+                        entry.y ?? 0,
+                        {
+                            width: entry.width ?? gridSize,
+                            height: entry.height ?? gridSize,
+                            shapeType: entry.shapeType ?? "rectangle",
+                            shapeData: entry.shapeData ?? "",
+                            skipRecord: true
+                        }
+                    );
+                });
+                isApplyingState = false;
+                syncPaletteFromState(state);
+                updateUndoRedoButtons();
+            }
+
+            function recordState(force = false) {
+                if (isApplyingState) {
+                    return;
+                }
+                const state = captureLayoutState();
+                const serialized = serializeState(state);
+                if (!force && undoStack.length > 0) {
+                    const last = undoStack[undoStack.length - 1];
+                    if (last.serialized === serialized) {
+                        syncPaletteFromState(state);
+                        return;
+                    }
+                }
+                undoStack.push({ state: JSON.parse(JSON.stringify(state)), serialized });
+                if (undoStack.length > 100) {
+                    undoStack.shift();
+                }
+                redoStack = [];
+                syncPaletteFromState(state);
+                updateUndoRedoButtons();
+            }
+
+            function updateUndoRedoButtons() {
+                if (undoBtn) {
+                    undoBtn.disabled = undoStack.length <= 1;
+                }
+                if (redoBtn) {
+                    redoBtn.disabled = redoStack.length === 0;
+                }
+            }
+
+            function undo() {
+                if (undoStack.length <= 1) {
+                    return;
+                }
+                const current = undoStack.pop();
+                redoStack.push(current);
+                const previous = undoStack[undoStack.length - 1];
+                restoreLayoutState(previous.state);
+            }
+
+            function redo() {
+                if (redoStack.length === 0) {
+                    return;
+                }
+                const next = redoStack.pop();
+                undoStack.push({ state: JSON.parse(JSON.stringify(next.state)), serialized: next.serialized });
+                restoreLayoutState(next.state);
+            }
+
+            function updateShapeDialogInputs(selectedType, providedData) {
+                if (!shapePresetSelect || !shapeClipPathInput) {
+                    return;
+                }
+                const normalizedType = shapePresets.has(selectedType) || selectedType === "custom"
+                    ? selectedType
+                    : "custom";
+                shapePresetSelect.value = normalizedType;
+                if (normalizedType === "custom") {
+                    shapeClipPathInput.disabled = false;
+                    shapeClipPathInput.value = providedData ?? "";
+                } else {
+                    const presetValue = shapePresets.get(normalizedType) ?? "";
+                    shapeClipPathInput.disabled = true;
+                    shapeClipPathInput.value = presetValue;
+                }
+            }
+
+            function openShapeDialog(target) {
+                if (!shapeDialogOverlay || !shapePresetSelect || !shapeClipPathInput) {
+                    return;
+                }
+                shapeDialogTarget = target instanceof HTMLElement ? target : null;
+                if (!shapeDialogTarget) {
+                    return;
+                }
+                const currentType = shapeDialogTarget.getAttribute("data-shape-type") ?? "rectangle";
+                const currentData = shapeDialogTarget.getAttribute("data-shape-data") ?? "";
+                if (shapePresets.has(currentType) || currentType === "custom") {
+                    updateShapeDialogInputs(currentType, currentData);
+                } else {
+                    updateShapeDialogInputs("custom", currentData);
+                }
+                shapeDialogOverlay.style.display = "flex";
+                if (!shapeClipPathInput.disabled) {
+                    shapeClipPathInput.focus();
+                    shapeClipPathInput.select();
+                } else if (shapePresetSelect) {
+                    shapePresetSelect.focus();
+                }
+            }
+
+            function closeShapeDialog() {
+                if (!shapeDialogOverlay) {
+                    return;
+                }
+                shapeDialogOverlay.style.display = "none";
+                shapeDialogTarget = null;
+            }
+
             function resolveLayoutLabel(layout) {
                 if (!layout) {
                     return "";
@@ -313,10 +684,84 @@
                     ghostBox.style.fontSize = "0.8rem";
                     ghostBox.style.pointerEvents = "none";
                     ghostBox.style.zIndex = "0";
+                    const ghostShapeData = typeof layout.ShapeData === "string" ? layout.ShapeData : "";
+                    if (ghostShapeData && ghostShapeData.trim().length > 0) {
+                        ghostBox.style.clipPath = ghostShapeData.trim();
+                        ghostBox.style.webkitClipPath = ghostShapeData.trim();
+                    }
                     ghostBox.textContent = resolveLayoutLabel(layout);
                     ghostLayer.appendChild(ghostBox);
                 });
             }
+
+            if (undoBtn) {
+                undoBtn.addEventListener("click", evt => {
+                    evt.preventDefault();
+                    undo();
+                });
+            }
+
+            if (redoBtn) {
+                redoBtn.addEventListener("click", evt => {
+                    evt.preventDefault();
+                    redo();
+                });
+            }
+
+            if (shapePresetSelect) {
+                shapePresetSelect.addEventListener("change", () => {
+                    const selected = shapePresetSelect.value;
+                    const existing = selected === "custom"
+                        ? (shapeDialogTarget?.getAttribute("data-shape-data") ?? shapeClipPathInput?.value ?? "")
+                        : (shapePresets.get(selected) ?? "");
+                    updateShapeDialogInputs(selected, existing);
+                });
+            }
+
+            if (shapeDialogApply) {
+                shapeDialogApply.addEventListener("click", evt => {
+                    evt.preventDefault();
+                    if (!shapeDialogTarget) {
+                        closeShapeDialog();
+                        return;
+                    }
+                    const selectedType = shapePresetSelect ? shapePresetSelect.value : "rectangle";
+                    let clipPath = "";
+                    if (selectedType === "custom") {
+                        clipPath = shapeClipPathInput ? shapeClipPathInput.value.trim() : "";
+                        if (clipPath.length === 0) {
+                            alert("Please provide a clip-path definition for the custom shape.");
+                            return;
+                        }
+                    } else {
+                        clipPath = shapePresets.get(selectedType) ?? "";
+                    }
+                    applyShapeToElement(shapeDialogTarget, selectedType, clipPath);
+                    closeShapeDialog();
+                    recordState();
+                });
+            }
+
+            if (shapeDialogCancel) {
+                shapeDialogCancel.addEventListener("click", evt => {
+                    evt.preventDefault();
+                    closeShapeDialog();
+                });
+            }
+
+            if (shapeDialogOverlay) {
+                shapeDialogOverlay.addEventListener("click", evt => {
+                    if (evt.target === shapeDialogOverlay) {
+                        closeShapeDialog();
+                    }
+                });
+            }
+
+            document.addEventListener("keydown", evt => {
+                if (evt.key === "Escape" && shapeDialogOverlay && shapeDialogOverlay.style.display === "flex") {
+                    closeShapeDialog();
+                }
+            });
 
             document.getElementById("zoomInBtn").addEventListener("click", () => {
                 scale = Math.min(maxScale, scale + scaleStep);
@@ -396,6 +841,12 @@
 
                 div.dataset.initialized = "true";
 
+                applyShapeToElement(
+                    div,
+                    div.getAttribute("data-shape-type") ?? "rectangle",
+                    div.getAttribute("data-shape-data") ?? ""
+                );
+
                 const labelSpan = div.querySelector(".room-label");
                 if (labelSpan) {
                     labelSpan.addEventListener("dblclick", e => {
@@ -403,18 +854,9 @@
                         if (newLabel !== null) {
                             labelSpan.textContent = newLabel;
                             div.setAttribute("data-room-label", newLabel);
+                            recordState();
                         }
                         e.stopPropagation();
-                    });
-                }
-
-                const controls = div.querySelector(".box-controls");
-                if (controls) {
-                    div.addEventListener("mouseenter", () => {
-                        controls.style.opacity = "1";
-                    });
-                    div.addEventListener("mouseleave", () => {
-                        controls.style.opacity = "0";
                     });
                 }
 
@@ -424,7 +866,17 @@
                         ?? (labelSpan ? labelSpan.textContent ?? "" : "");
                     moveBackToPalette(roomId, currentLabel);
                     div.remove();
+                    recordState();
                 };
+
+                const customizeBtn = div.querySelector(".btn-customize-shape");
+                if (customizeBtn) {
+                    customizeBtn.addEventListener("click", evt => {
+                        evt.preventDefault();
+                        evt.stopPropagation();
+                        openShapeDialog(div);
+                    });
+                }
 
                 const moveBackBtn = div.querySelector(".btn-move-back");
                 if (moveBackBtn) {
@@ -445,7 +897,8 @@
                 div.addEventListener("mousedown", startDrag);
             }
 
-            function addBox(roomId, roomLabel, x, y) {
+            function addBox(roomId, roomLabel, x, y, options) {
+                const opts = options ?? {};
                 const div = document.createElement("div");
                 div.classList.add("room-box");
                 div.setAttribute("data-room-id", roomId);
@@ -453,8 +906,10 @@
 
                 div.style.left = x + "px";
                 div.style.top = y + "px";
-                div.style.width = gridSize + "px";
-                div.style.height = gridSize + "px";
+                const boxWidth = typeof opts.width === "number" ? opts.width : gridSize;
+                const boxHeight = typeof opts.height === "number" ? opts.height : gridSize;
+                div.style.width = boxWidth + "px";
+                div.style.height = boxHeight + "px";
                 div.style.position = "absolute";
                 div.style.border = "1px solid #333";
                 div.style.backgroundColor = "#cce5ff";
@@ -472,26 +927,27 @@
                 const controls = document.createElement("div");
                 controls.classList.add("box-controls");
                 controls.style.position = "absolute";
-                controls.style.top = "0";
                 controls.style.right = "0";
+                controls.style.bottom = "100%";
                 controls.style.display = "flex";
-                controls.style.opacity = "0";
-                controls.style.transition = "opacity 0.2s";
+                controls.style.marginBottom = "4px";
+
+                const btnCustomize = document.createElement("button");
+                btnCustomize.classList.add("btn", "btn-sm", "btn-light", "btn-customize-shape");
+                btnCustomize.title = "Customize shape";
+                btnCustomize.innerText = "✎";
+                controls.appendChild(btnCustomize);
 
                 const btnMoveBack = document.createElement("button");
                 btnMoveBack.classList.add("btn", "btn-sm", "btn-light", "btn-move-back");
                 btnMoveBack.title = "Move back to palette";
                 btnMoveBack.innerText = "⮐";
-                btnMoveBack.style.padding = "2px 6px";
-                btnMoveBack.style.fontSize = "0.8em";
                 controls.appendChild(btnMoveBack);
 
                 const btnDel = document.createElement("button");
                 btnDel.classList.add("btn", "btn-sm", "btn-light", "btn-delete-shape");
                 btnDel.title = "Delete shape";
                 btnDel.innerText = "✖";
-                btnDel.style.padding = "2px 6px";
-                btnDel.style.fontSize = "0.8em";
                 controls.appendChild(btnDel);
 
                 div.appendChild(controls);
@@ -508,7 +964,15 @@
                 div.appendChild(rh);
 
                 container.appendChild(div);
+                applyShapeToElement(
+                    div,
+                    typeof opts.shapeType === "string" ? opts.shapeType : "rectangle",
+                    typeof opts.shapeData === "string" ? opts.shapeData : ""
+                );
                 setupBoxInteractions(div);
+                if (!opts.skipRecord) {
+                    recordState();
+                }
             }
 
             function moveBackToPalette(roomId, roomLabel) {
@@ -517,10 +981,17 @@
                     return;
                 }
 
+                const key = String(roomId);
+                paletteRoomLabels.set(key, roomLabel);
+
                 const existing = pal.querySelector(`.pal-shape[data-room-id="${roomId}"]`);
-                if (existing && roomId !== "0") {
+                if (existing) {
                     existing.setAttribute("data-room-label", roomLabel);
                     existing.textContent = roomLabel;
+                    return;
+                }
+
+                if (roomId === "0") {
                     return;
                 }
 
@@ -545,6 +1016,7 @@
             }
 
             container.querySelectorAll(".room-box").forEach(box => setupBoxInteractions(box));
+            recordState(true);
 
             // Drag / Resize logic (re-use your existing handlers)
             let dragBox = null, offsetX = 0, offsetY = 0;
@@ -585,6 +1057,10 @@
             function stopDrag(evt) {
                 document.removeEventListener("mousemove", onDrag);
                 document.removeEventListener("mouseup", stopDrag);
+                let hadDrag = false;
+                if (dragBox) {
+                    hadDrag = true;
+                }
                 if (dragBox && chkSnap.checked) {
                     let x = parseInt(dragBox.style.left) || 0;
                     let y = parseInt(dragBox.style.top) || 0;
@@ -594,6 +1070,9 @@
                     dragBox.style.top = y + "px";
                 }
                 dragBox = null;
+                if (hadDrag) {
+                    recordState();
+                }
             }
 
             function onResize(evt) {
@@ -611,6 +1090,10 @@
             function stopResize(evt) {
                 document.removeEventListener("mousemove", onResize);
                 document.removeEventListener("mouseup", stopResize);
+                let hadResize = false;
+                if (resizeBox) {
+                    hadResize = true;
+                }
                 if (resizeBox && chkSnap.checked) {
                     let w = parseInt(resizeBox.style.width) || resizeBox.offsetWidth;
                     let h = parseInt(resizeBox.style.height) || resizeBox.offsetHeight;
@@ -620,6 +1103,9 @@
                     resizeBox.style.height = h + "px";
                 }
                 resizeBox = null;
+                if (hadResize) {
+                    recordState();
+                }
             }
 
             document.getElementById("save-layout-btn").addEventListener("click", async () => {
@@ -634,6 +1120,8 @@
                     const w = parseInt(b.style.width) || b.offsetWidth;
                     const h = parseInt(b.style.height) || b.offsetHeight;
                     const label = b.getAttribute("data-room-label") ?? "";
+                    const shapeType = b.getAttribute("data-shape-type") ?? "rectangle";
+                    const shapeData = b.getAttribute("data-shape-data") ?? "";
                     layoutDtos.push({
                         propertyId: propertyId,
                         roomId: Number.isNaN(roomId) ? 0 : roomId,
@@ -642,7 +1130,9 @@
                         y,
                         width: w,
                         height: h,
-                        label: label
+                        label: label,
+                        shapeType: shapeType,
+                        shapeData: shapeData
                     });
                 });
 
