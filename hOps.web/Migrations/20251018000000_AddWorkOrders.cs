@@ -11,6 +11,16 @@ namespace hOps.web.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Ensure the lookup table exists before creating tables that reference it.
+            migrationBuilder.Sql(
+                """
+                CREATE TABLE IF NOT EXISTS "WorkOrderTypes" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_WorkOrderTypes" PRIMARY KEY AUTOINCREMENT,
+                    "Name" TEXT NOT NULL,
+                    "Color" TEXT NOT NULL
+                );
+                """);
+
             migrationBuilder.CreateTable(
                 name: "WorkOrders",
                 columns: table => new
