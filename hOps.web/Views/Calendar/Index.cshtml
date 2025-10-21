@@ -330,6 +330,10 @@
                 return;
             }
 
+            if (modalElement.parentElement !== document.body) {
+                document.body.appendChild(modalElement);
+            }
+
             const titleEl = modalElement.querySelector('[data-details="title"]');
             const categoryEl = modalElement.querySelector('[data-details="category"]');
             const datesEl = modalElement.querySelector('[data-details="dates"]');
