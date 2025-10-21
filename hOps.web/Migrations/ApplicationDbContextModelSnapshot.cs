@@ -1167,6 +1167,12 @@ namespace hOps.web.Migrations
                         .WithMany()
                         .HasForeignKey(e => e.WorkOrderTypeId);
 
+                    b.HasMany(e => e.Properties)
+                        .WithOne(e => e.WorkOrder)
+                        .HasForeignKey(e => e.WorkOrderId)
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation(e => e.CreatedBy);
 
                     b.Navigation(e => e.Department);
