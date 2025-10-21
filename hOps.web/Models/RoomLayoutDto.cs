@@ -2,6 +2,7 @@
 {
     public class RoomLayoutDto
     {
+        public int Id { get; set; }
         public int PropertyId { get; set; }
         public int RoomId { get; set; }
         public int Floor { get; set; }  // use room’s floor number
