@@ -100,6 +100,77 @@ namespace hOps.web.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(BookmarkEditViewModel form)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                TempData["BookmarkError"] = "Unable to update bookmark. Please check the form and try again.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+
+            var bookmark = await _context.Bookmarks.FirstOrDefaultAsync(b => b.Id == form.Id);
+            if (bookmark == null)
+            {
+                return NotFound();
+            }
+
+            if (!await CanModifyBookmarkAsync(bookmark, currentUser, roles, currentPropertyId))
+            {
+                return Forbid();
+            }
+
+            bookmark.Name = form.Name.Trim();
+            bookmark.Url = form.Url.Trim();
+            bookmark.Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim();
+
+            await _context.SaveChangesAsync();
+
+            TempData["BookmarkSuccess"] = "Bookmark updated successfully.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+
+            var bookmark = await _context.Bookmarks.FirstOrDefaultAsync(b => b.Id == id);
+            if (bookmark == null)
+            {
+                return NotFound();
+            }
+
+            if (!await CanModifyBookmarkAsync(bookmark, currentUser, roles, currentPropertyId))
+            {
+                return Forbid();
+            }
+
+            _context.Bookmarks.Remove(bookmark);
+            await _context.SaveChangesAsync();
+
+            TempData["BookmarkSuccess"] = "Bookmark deleted successfully.";
+            return RedirectToAction(nameof(Index));
+        }
+
         private async Task<BookmarksIndexViewModel> BuildIndexViewModel(
             ApplicationUser currentUser,
             IList<string> roles,
@@ -151,10 +222,51 @@ namespace hOps.web.Controllers
                 Form = form,
                 CanManagePropertyBookmarks = roles.Contains("Manager") || roles.Contains("Admin"),
                 HasCurrentProperty = currentPropertyId.HasValue,
-                CurrentPropertyName = propertyName
+                CurrentPropertyName = propertyName,
+                CurrentUserId = currentUser.Id
             };
 
             return vm;
+        }
+
+        private async Task<bool> CanModifyBookmarkAsync(
+            Bookmark bookmark,
+            ApplicationUser currentUser,
+            IList<string> roles,
+            int? currentPropertyId)
+        {
+            if (bookmark.Section == BookmarkSection.User)
+            {
+                return bookmark.CreatedById == currentUser.Id;
+            }
+
+            if (!bookmark.PropertyId.HasValue)
+            {
+                return false;
+            }
+
+            if (!currentPropertyId.HasValue || currentPropertyId.Value != bookmark.PropertyId.Value)
+            {
+                return false;
+            }
+
+            var isAdmin = roles.Contains("Admin");
+            var isManager = roles.Contains("Manager") || isAdmin;
+
+            var hasAccess = isAdmin || await _context.UserPropertyAccesses
+                .AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == bookmark.PropertyId.Value);
+
+            if (!hasAccess)
+            {
+                return false;
+            }
+
+            return bookmark.Section switch
+            {
+                BookmarkSection.Property => isManager,
+                BookmarkSection.Team => bookmark.CreatedById == currentUser.Id || isManager,
+                _ => false
+            };
         }
     }
 }
