@@ -15,6 +15,8 @@
     const clearLogButton = document.getElementById('clearLogBtn');
     const createLogForm = document.getElementById('createLogForm');
     const logNameInput = document.getElementById('logNameInput');
+    const importLogButton = document.getElementById('importLogBtn');
+    const importLogInput = document.getElementById('importLogInput');
 
     const boldButton = document.getElementById('boldBtn');
     const italicButton = document.getElementById('italicBtn');
@@ -220,6 +222,25 @@
         };
     }
 
+    function normalizeImportedValue(value) {
+        if (value == null) {
+            return '';
+        }
+        if (value instanceof Date) {
+            return value.toISOString();
+        }
+        if (typeof value === 'number') {
+            if (!Number.isFinite(value)) {
+                return '';
+            }
+            return String(value);
+        }
+        if (typeof value === 'boolean') {
+            return value ? 'TRUE' : 'FALSE';
+        }
+        return String(value);
+    }
+
     function normalizeFormat(format) {
         if (!format || typeof format !== 'object') {
             return {};
@@ -337,6 +358,44 @@
             name,
             data: createEmptyData()
         };
+    }
+
+    function createLogFromData(name, rows) {
+        const normalizedRows = Array.isArray(rows)
+            ? rows.map((row) => (Array.isArray(row) ? row : []))
+            : [];
+
+        const maxImportedColumns = normalizedRows.reduce((max, row) => Math.max(max, row.length), 0);
+        const totalRows = Math.max(normalizedRows.length, defaultRows);
+        const totalColumns = Math.max(maxImportedColumns, defaultColumns);
+        const data = createEmptyData(totalRows, totalColumns);
+
+        normalizedRows.forEach((row, rowIndex) => {
+            row.forEach((cellValue, columnIndex) => {
+                if (rowIndex < data.length && columnIndex < data[rowIndex].length) {
+                    data[rowIndex][columnIndex] = createCell(normalizeImportedValue(cellValue));
+                }
+            });
+        });
+
+        return {
+            id: generateId(),
+            name,
+            data
+        };
+    }
+
+    function generateUniqueLogName(baseName) {
+        const trimmed = typeof baseName === 'string' ? baseName.trim() : '';
+        const defaultName = trimmed.length ? trimmed : 'Imported Log';
+        let candidate = defaultName;
+        let counter = 2;
+        const existingNames = new Set(logs.map((log) => log.name));
+        while (existingNames.has(candidate)) {
+            candidate = `${defaultName} (${counter})`;
+            counter += 1;
+        }
+        return candidate;
     }
 
     function loadLogs() {
@@ -1566,6 +1625,69 @@
         renderLogList();
     }
 
+    function triggerImportLogPicker() {
+        if (!importLogInput) {
+            return;
+        }
+        importLogInput.click();
+    }
+
+    async function handleImportLogInputChange(event) {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement)) {
+            return;
+        }
+        const file = target.files?.[0];
+        if (!file) {
+            return;
+        }
+
+        try {
+            if (typeof XLSX === 'undefined') {
+                throw new Error('XLSX library is not available');
+            }
+
+            const extension = (file.name.split('.').pop() || '').toLowerCase();
+            let workbook;
+            if (extension === 'csv') {
+                const textContent = await file.text();
+                workbook = XLSX.read(textContent, { type: 'string' });
+            } else {
+                const buffer = await file.arrayBuffer();
+                workbook = XLSX.read(buffer, { type: 'array' });
+            }
+
+            if (!workbook.SheetNames?.length) {
+                throw new Error('Imported file does not contain any sheets');
+            }
+
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            if (!worksheet) {
+                throw new Error('Unable to read the first worksheet');
+            }
+
+            const rows = XLSX.utils.sheet_to_json(worksheet, {
+                header: 1,
+                defval: '',
+                blankrows: true
+            });
+
+            const baseName = file.name.replace(/\.[^/.]+$/, '');
+            const logName = generateUniqueLogName(baseName);
+            const newLog = createLogFromData(logName, rows);
+            logs.push(newLog);
+            logHistory.set(newLog.id, []);
+            persistLogs();
+            renderLogList();
+            selectLog(newLog.id);
+        } catch (error) {
+            console.error('Failed to import log', error);
+            window.alert('Unable to import the selected file. Please ensure it is a valid .xls, .xlsx, or .csv document.');
+        } finally {
+            target.value = '';
+        }
+    }
+
     function focusFirstCell() {
         const firstCell = spreadsheetTableEl.querySelector('tbody td');
         if (!(firstCell instanceof HTMLElement)) {
@@ -2244,6 +2366,9 @@
     logNameInput?.addEventListener('input', () => {
         logNameInput?.classList.remove('is-invalid');
     });
+
+    importLogButton?.addEventListener('click', triggerImportLogPicker);
+    importLogInput?.addEventListener('change', handleImportLogInputChange);
 
     applyZoomLevel();
     updateZoomButtonState();
