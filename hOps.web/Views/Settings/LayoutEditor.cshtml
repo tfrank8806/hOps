@@ -581,26 +581,36 @@
                 const boxes = container.querySelectorAll(".room-box");
                 const layoutDtos = [];
                 boxes.forEach(b => {
-                    const rid = b.getAttribute("data-room-id");
+                    const ridValue = b.getAttribute("data-room-id");
+                    const roomId = parseInt(ridValue ?? "", 10);
                     const fl = selectedFloor;
                     const x = parseInt(b.style.left) || 0;
                     const y = parseInt(b.style.top) || 0;
                     const w = parseInt(b.style.width) || b.offsetWidth;
                     const h = parseInt(b.style.height) || b.offsetHeight;
-                    const label = b.getAttribute("data-room-label");
+                    const label = b.getAttribute("data-room-label") ?? "";
                     layoutDtos.push({
                         propertyId: propertyId,
-                        roomId: parseInt(rid),
+                        roomId: Number.isNaN(roomId) ? 0 : roomId,
                         floor: fl,
-                        x, y, width: w, height: h,
-                        Label: label
+                        x,
+                        y,
+                        width: w,
+                        height: h,
+                        label: label
                     });
                 });
+
+                const payload = {
+                    propertyId: propertyId,
+                    floor: selectedFloor,
+                    layouts: layoutDtos
+                };
 
                 const resp = await fetch('@Url.Action("SaveLayout", "Settings")', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(layoutDtos)
+                    body: JSON.stringify(payload)
                 });
                 const result = await resp.json();
                 if (result.success) {

@@ -347,11 +347,39 @@ namespace hOps.web.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> SaveLayout([FromBody] List<RoomLayoutDto> layoutDtos)
+        public async Task<IActionResult> SaveLayout([FromBody] LayoutSaveRequest request)
         {
+            if (request == null || request.PropertyId <= 0)
+            {
+                return BadRequest();
+            }
+
+            var propertyId = request.PropertyId;
+            var floor = request.Floor;
+            var layoutDtos = request.Layouts ?? new List<RoomLayoutDto>();
+
+            var existingLayouts = await _db.RoomLayouts
+                .Where(l => l.PropertyId == propertyId && l.Floor == floor)
+                .ToListAsync();
+
+            var dtoLookup = layoutDtos
+                .GroupBy(dto => dto.RoomId)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            foreach (var existing in existingLayouts)
+            {
+                if (!dtoLookup.ContainsKey(existing.RoomId))
+                {
+                    _db.RoomLayouts.Remove(existing);
+                }
+            }
+
             foreach (var dto in layoutDtos)
             {
-                var existing = await _db.RoomLayouts.FirstOrDefaultAsync(l =>
+                dto.PropertyId = propertyId;
+                dto.Floor = floor;
+
+                var existing = existingLayouts.FirstOrDefault(l =>
                     l.PropertyId == dto.PropertyId && l.RoomId == dto.RoomId && l.Floor == dto.Floor);
 
                 if (existing != null)
@@ -360,10 +388,7 @@ namespace hOps.web.Controllers
                     existing.Y = dto.Y;
                     existing.Width = dto.Width;
                     existing.Height = dto.Height;
-                    if (!string.IsNullOrWhiteSpace(dto.Label))
-                    {
-                        existing.Label = dto.Label;
-                    }
+                    existing.Label = dto.Label;
                     _db.RoomLayouts.Update(existing);
                 }
                 else
@@ -381,6 +406,7 @@ namespace hOps.web.Controllers
                     });
                 }
             }
+
             await _db.SaveChangesAsync();
             return Json(new { success = true });
         }
