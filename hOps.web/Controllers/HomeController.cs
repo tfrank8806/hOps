@@ -488,7 +488,9 @@ namespace hOps.web.Controllers
                             Start = start,
                             End = displayEnd,
                             CategoryName = e.Category?.Name ?? string.Empty,
-                            CategoryColor = e.Category?.ColorHex,
+                            CategoryColor = string.IsNullOrWhiteSpace(e.Category?.Color)
+                                ? "#6c757d"
+                                : e.Category!.Color,
                             DetailUrl = Url.Action("Index", "Calendar") ?? string.Empty,
                         },
                         Start = start,
