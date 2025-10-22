@@ -358,16 +358,16 @@ static async Task ConsolidateLegacyWorkOrderTypeTableAsync(ApplicationDbContext 
 
 static async Task<bool> TableExistsAsync(DbConnection connection, string tableName)
 {
-    await using var checkCommand = connection.CreateCommand();
-    checkCommand.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name = @name LIMIT 1;";
-
-    var parameter = checkCommand.CreateParameter();
-    parameter.ParameterName = "@name";
-    parameter.Value = tableName;
-    checkCommand.Parameters.Add(parameter);
-
     try
     {
+        await using var checkCommand = connection.CreateCommand();
+        checkCommand.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name = @name LIMIT 1;";
+
+        var parameter = checkCommand.CreateParameter();
+        parameter.ParameterName = "@name";
+        parameter.Value = tableName;
+        checkCommand.Parameters.Add(parameter);
+
         var result = await checkCommand.ExecuteScalarAsync();
         return result != null;
     }
