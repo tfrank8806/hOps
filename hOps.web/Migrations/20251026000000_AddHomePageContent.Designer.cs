@@ -398,7 +398,7 @@ namespace hOps.web.Migrations
                     b.Navigation("UpdatedBy");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.PackageLogEntry", b =>
+            modelBuilder.Entity<PackageLogEntry>(b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "LoggedBy")
                         .WithMany()
@@ -688,7 +688,7 @@ namespace hOps.web.Migrations
                     b.ToTable("BulletinPosts");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.PackageLogEntry", b =>
+            modelBuilder.Entity<PackageLogEntry>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
