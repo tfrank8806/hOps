@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace hOps.web.Models
 {
@@ -31,6 +32,7 @@ namespace hOps.web.Models
 
         public ICollection<Bookmark> Bookmarks { get; set; } = new List<Bookmark>();
 
+        [InverseProperty(nameof(PassOnLogProperty.Property))]
         public ICollection<PassOnLogProperty> PassOnLogLinks { get; set; } = new List<PassOnLogProperty>();
 
         public ICollection<ManagerAnnouncement> ManagerAnnouncements { get; set; } = new List<ManagerAnnouncement>();
