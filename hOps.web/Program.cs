@@ -509,50 +509,63 @@ static async Task RemoveLegacyDuplicatePassOnLogSchemaEntriesAsync(DbConnection 
 
     var duplicateRowIds = new List<long>();
 
-    foreach (var table in tables)
-    {
-        await using var lookupCommand = connection.CreateCommand();
-        lookupCommand.CommandText =
-            """
-            SELECT rowid
-            FROM sqlite_master
-            WHERE type = 'table' AND name = @name
-            ORDER BY rowid;
-            """;
-
-        var parameter = lookupCommand.CreateParameter();
-        parameter.ParameterName = "@name";
-        parameter.Value = table;
-        lookupCommand.Parameters.Add(parameter);
-
-        await using var reader = await lookupCommand.ExecuteReaderAsync();
-        var rowIdsForTable = new List<long>();
-
-        while (await reader.ReadAsync())
-        {
-            if (!reader.IsDBNull(0))
-            {
-                rowIdsForTable.Add(reader.GetInt64(0));
-            }
-        }
-
-        if (rowIdsForTable.Count > 1)
-        {
-            duplicateRowIds.AddRange(rowIdsForTable.Skip(1));
-        }
-    }
-
-    if (duplicateRowIds.Count == 0)
-    {
-        return;
-    }
-
-    await using var enableWritableSchema = connection.CreateCommand();
-    enableWritableSchema.CommandText = "PRAGMA writable_schema = 1;";
-    await enableWritableSchema.ExecuteNonQueryAsync();
+    var writableSchemaEnabled = false;
 
     try
     {
+        await using (var enableWritableSchema = connection.CreateCommand())
+        {
+            enableWritableSchema.CommandText = "PRAGMA writable_schema = 1;";
+            await enableWritableSchema.ExecuteNonQueryAsync();
+            writableSchemaEnabled = true;
+        }
+
+        foreach (var table in tables)
+        {
+            try
+            {
+                await using var lookupCommand = connection.CreateCommand();
+                lookupCommand.CommandText =
+                    """
+                    SELECT rowid
+                    FROM sqlite_master
+                    WHERE type = 'table' AND name = @name
+                    ORDER BY rowid;
+                    """;
+
+                var parameter = lookupCommand.CreateParameter();
+                parameter.ParameterName = "@name";
+                parameter.Value = table;
+                lookupCommand.Parameters.Add(parameter);
+
+                await using var reader = await lookupCommand.ExecuteReaderAsync();
+                var rowIdsForTable = new List<long>();
+
+                while (await reader.ReadAsync())
+                {
+                    if (!reader.IsDBNull(0))
+                    {
+                        rowIdsForTable.Add(reader.GetInt64(0));
+                    }
+                }
+
+                if (rowIdsForTable.Count > 1)
+                {
+                    duplicateRowIds.AddRange(rowIdsForTable.Skip(1));
+                }
+            }
+            catch (SqliteException ex) when (IsLegacyPassOnLogSchemaError(ex))
+            {
+                // If the schema remains malformed even with writable_schema enabled,
+                // continue so the legacy migration can still progress.
+            }
+        }
+
+        if (duplicateRowIds.Count == 0)
+        {
+            return;
+        }
+
         foreach (var rowId in duplicateRowIds)
         {
             await using var deleteCommand = connection.CreateCommand();
@@ -568,9 +581,12 @@ static async Task RemoveLegacyDuplicatePassOnLogSchemaEntriesAsync(DbConnection 
     }
     finally
     {
-        await using var disableWritableSchema = connection.CreateCommand();
-        disableWritableSchema.CommandText = "PRAGMA writable_schema = 0;";
-        await disableWritableSchema.ExecuteNonQueryAsync();
+        if (writableSchemaEnabled)
+        {
+            await using var disableWritableSchema = connection.CreateCommand();
+            disableWritableSchema.CommandText = "PRAGMA writable_schema = 0;";
+            await disableWritableSchema.ExecuteNonQueryAsync();
+        }
     }
 }
 
