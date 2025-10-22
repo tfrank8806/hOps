@@ -433,14 +433,13 @@ static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbCon
         await EnsureMigrationsHistoryTableAsync(connection);
 
         const string migrationId = "20251018090000_AddPassOnLogs";
-        if (await MigrationHistoryContainsAsync(connection, migrationId))
-        {
-            return;
-        }
 
         await using var insertCommand = connection.CreateCommand();
         insertCommand.CommandText =
-            "INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES (@id, @version);";
+            """
+            INSERT OR IGNORE INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+            VALUES (@id, @version);
+            """;
 
         var migrationIdParameter = insertCommand.CreateParameter();
         migrationIdParameter.ParameterName = "@id";
@@ -452,7 +451,16 @@ static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbCon
         versionParameter.Value = "9.0.9";
         insertCommand.Parameters.Add(versionParameter);
 
-        await insertCommand.ExecuteNonQueryAsync();
+        try
+        {
+            await insertCommand.ExecuteNonQueryAsync();
+        }
+        catch (SqliteException ex) when (IsLegacyPassOnLogSchemaError(ex))
+        {
+            // The legacy schema defines duplicate Pass On Log tables which trigger malformed
+            // schema errors when preparing the INSERT. Treat this as a no-op because the
+            // existing tables already represent the applied migration.
+        }
     }
     finally
     {
@@ -486,17 +494,3 @@ static async Task EnsureMigrationsHistoryTableAsync(DbConnection connection)
     }
 }
 
-static async Task<bool> MigrationHistoryContainsAsync(DbConnection connection, string migrationId)
-{
-    await using var checkCommand = connection.CreateCommand();
-    checkCommand.CommandText =
-        "SELECT 1 FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = @id LIMIT 1;";
-
-    var parameter = checkCommand.CreateParameter();
-    parameter.ParameterName = "@id";
-    parameter.Value = migrationId;
-    checkCommand.Parameters.Add(parameter);
-
-    var result = await checkCommand.ExecuteScalarAsync();
-    return result != null;
-}
