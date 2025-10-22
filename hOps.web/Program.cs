@@ -474,7 +474,16 @@ static async Task EnsureMigrationsHistoryTableAsync(DbConnection connection)
         );
         """;
 
-    await createCommand.ExecuteNonQueryAsync();
+    try
+    {
+        await createCommand.ExecuteNonQueryAsync();
+    }
+    catch (SqliteException ex) when (IsDuplicateTableSchemaError(ex, "__EFMigrationsHistory")
+        || IsLegacyPassOnLogSchemaError(ex))
+    {
+        // Treat legacy malformed schema errors as a no-op because the migrations history
+        // table already exists in these databases.
+    }
 }
 
 static async Task<bool> MigrationHistoryContainsAsync(DbConnection connection, string migrationId)
