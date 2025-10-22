@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using hOps.web.Models;
 using hOps.web.Data;
-using hOps.web.Models;
 
 #nullable disable
 
@@ -518,7 +517,7 @@ namespace hOps.web.Migrations
                     b.ToTable("PassOnLogComments");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.PassOnLogProperty", b =>
+            modelBuilder.Entity(typeof(PassOnLogProperty), b =>
                 {
                     b.Property<int>("PassOnLogId")
                         .HasColumnType("INTEGER");
@@ -1257,7 +1256,7 @@ namespace hOps.web.Migrations
                     b.Navigation("Property");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.PassOnLogProperty", b =>
+            modelBuilder.Entity(typeof(PassOnLogProperty), b =>
                 {
                     b.HasOne("hOps.web.Models.PassOnLog", "PassOnLog")
                         .WithMany("Properties")

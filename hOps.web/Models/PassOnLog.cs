@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace hOps.web.Models
 {
@@ -22,6 +23,7 @@ namespace hOps.web.Models
 
         public ApplicationUser? CreatedBy { get; set; }
 
+        [InverseProperty(nameof(PassOnLogProperty.PassOnLog))]
         public ICollection<PassOnLogProperty> Properties { get; set; } = new List<PassOnLogProperty>();
 
         public ICollection<PassOnLogComment> Comments { get; set; } = new List<PassOnLogComment>();
