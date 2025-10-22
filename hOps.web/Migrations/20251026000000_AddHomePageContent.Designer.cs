@@ -734,7 +734,7 @@ namespace hOps.web.Migrations
                     b.ToTable("PackageLogEntries");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Room", b =>
+            modelBuilder.Entity<Room>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
