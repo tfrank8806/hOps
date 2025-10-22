@@ -366,9 +366,24 @@ static async Task<bool> TableExistsAsync(DbConnection connection, string tableNa
     parameter.Value = tableName;
     checkCommand.Parameters.Add(parameter);
 
-    var result = await checkCommand.ExecuteScalarAsync();
-    return result != null;
+    try
+    {
+        var result = await checkCommand.ExecuteScalarAsync();
+        return result != null;
+    }
+    catch (SqliteException ex) when (IsDuplicateTableSchemaError(ex, tableName))
+    {
+        // Legacy databases may contain duplicate schema entries which surface as
+        // "malformed database schema" errors even though the table already exists.
+        // Treat this as the table being present so the legacy migration logic can continue.
+        return true;
+    }
 }
+
+static bool IsDuplicateTableSchemaError(SqliteException ex, string tableName)
+    => ex.SqliteErrorCode == 11
+        && ex.Message.Contains("malformed database schema", StringComparison.OrdinalIgnoreCase)
+        && ex.Message.Contains(tableName, StringComparison.OrdinalIgnoreCase);
 
 static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbContext)
 {
