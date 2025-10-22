@@ -249,6 +249,8 @@ static async Task EnsureRoomLayoutShapeColumnsAsync(ApplicationDbContext dbConte
 
 static async Task ApplyMigrationsWithLegacySupportAsync(ApplicationDbContext dbContext)
 {
+    await EnsureLegacyPassOnLogMigrationAsync(dbContext);
+
     try
     {
         await dbContext.Database.MigrateAsync();
@@ -258,12 +260,20 @@ static async Task ApplyMigrationsWithLegacySupportAsync(ApplicationDbContext dbC
         await EnsureLegacyWorkOrderTypeTableAsync(dbContext);
         await dbContext.Database.MigrateAsync();
     }
+    catch (SqliteException ex) when (IsLegacyPassOnLogSchemaError(ex))
+    {
+        await EnsureLegacyPassOnLogMigrationAsync(dbContext);
+        await dbContext.Database.MigrateAsync();
+    }
 
     await ConsolidateLegacyWorkOrderTypeTableAsync(dbContext);
 }
 
 static bool IsMissingWorkOrderTypeTableError(SqliteException ex)
     => ex.SqliteErrorCode == 1 && ex.Message.Contains("no such table: WorkOrderType", StringComparison.OrdinalIgnoreCase);
+
+static bool IsLegacyPassOnLogSchemaError(SqliteException ex)
+    => ex.SqliteErrorCode == 11 && ex.Message.Contains("PassOnLog", StringComparison.OrdinalIgnoreCase);
 
 static async Task EnsureLegacyWorkOrderTypeTableAsync(ApplicationDbContext dbContext)
 {
@@ -354,6 +364,96 @@ static async Task<bool> TableExistsAsync(DbConnection connection, string tableNa
     var parameter = checkCommand.CreateParameter();
     parameter.ParameterName = "@name";
     parameter.Value = tableName;
+    checkCommand.Parameters.Add(parameter);
+
+    var result = await checkCommand.ExecuteScalarAsync();
+    return result != null;
+}
+
+static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        var requiredTables = new[]
+        {
+            "PassOnLogs",
+            "PassOnLogComments",
+            "PassOnLogProperties",
+            "PassOnLogViews"
+        };
+
+        foreach (var table in requiredTables)
+        {
+            if (!await TableExistsAsync(connection, table))
+            {
+                return;
+            }
+        }
+
+        await EnsureMigrationsHistoryTableAsync(connection);
+
+        const string migrationId = "20251018090000_AddPassOnLogs";
+        if (await MigrationHistoryContainsAsync(connection, migrationId))
+        {
+            return;
+        }
+
+        await using var insertCommand = connection.CreateCommand();
+        insertCommand.CommandText =
+            "INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES (@id, @version);";
+
+        var migrationIdParameter = insertCommand.CreateParameter();
+        migrationIdParameter.ParameterName = "@id";
+        migrationIdParameter.Value = migrationId;
+        insertCommand.Parameters.Add(migrationIdParameter);
+
+        var versionParameter = insertCommand.CreateParameter();
+        versionParameter.ParameterName = "@version";
+        versionParameter.Value = "9.0.9";
+        insertCommand.Parameters.Add(versionParameter);
+
+        await insertCommand.ExecuteNonQueryAsync();
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
+        }
+    }
+}
+
+static async Task EnsureMigrationsHistoryTableAsync(DbConnection connection)
+{
+    await using var createCommand = connection.CreateCommand();
+    createCommand.CommandText =
+        """
+        CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+            "MigrationId" TEXT NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
+            "ProductVersion" TEXT NOT NULL
+        );
+        """;
+
+    await createCommand.ExecuteNonQueryAsync();
+}
+
+static async Task<bool> MigrationHistoryContainsAsync(DbConnection connection, string migrationId)
+{
+    await using var checkCommand = connection.CreateCommand();
+    checkCommand.CommandText =
+        "SELECT 1 FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = @id LIMIT 1;";
+
+    var parameter = checkCommand.CreateParameter();
+    parameter.ParameterName = "@id";
+    parameter.Value = migrationId;
     checkCommand.Parameters.Add(parameter);
 
     var result = await checkCommand.ExecuteScalarAsync();
