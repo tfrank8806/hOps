@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using Microsoft.Data.Sqlite;
+using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -414,6 +415,8 @@ static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbCon
 
     try
     {
+        await RemoveLegacyDuplicatePassOnLogSchemaEntriesAsync(connection);
+
         var requiredTables = new[]
         {
             "PassOnLogs",
@@ -491,6 +494,83 @@ static async Task EnsureMigrationsHistoryTableAsync(DbConnection connection)
     {
         // Treat legacy malformed schema errors as a no-op because the migrations history
         // table already exists in these databases.
+    }
+}
+
+static async Task RemoveLegacyDuplicatePassOnLogSchemaEntriesAsync(DbConnection connection)
+{
+    var tables = new[]
+    {
+        "PassOnLogs",
+        "PassOnLogComments",
+        "PassOnLogProperties",
+        "PassOnLogViews"
+    };
+
+    var duplicateRowIds = new List<long>();
+
+    foreach (var table in tables)
+    {
+        await using var lookupCommand = connection.CreateCommand();
+        lookupCommand.CommandText =
+            """
+            SELECT rowid
+            FROM sqlite_master
+            WHERE type = 'table' AND name = @name
+            ORDER BY rowid;
+            """;
+
+        var parameter = lookupCommand.CreateParameter();
+        parameter.ParameterName = "@name";
+        parameter.Value = table;
+        lookupCommand.Parameters.Add(parameter);
+
+        await using var reader = await lookupCommand.ExecuteReaderAsync();
+        var rowIdsForTable = new List<long>();
+
+        while (await reader.ReadAsync())
+        {
+            if (!reader.IsDBNull(0))
+            {
+                rowIdsForTable.Add(reader.GetInt64(0));
+            }
+        }
+
+        if (rowIdsForTable.Count > 1)
+        {
+            duplicateRowIds.AddRange(rowIdsForTable.Skip(1));
+        }
+    }
+
+    if (duplicateRowIds.Count == 0)
+    {
+        return;
+    }
+
+    await using var enableWritableSchema = connection.CreateCommand();
+    enableWritableSchema.CommandText = "PRAGMA writable_schema = 1;";
+    await enableWritableSchema.ExecuteNonQueryAsync();
+
+    try
+    {
+        foreach (var rowId in duplicateRowIds)
+        {
+            await using var deleteCommand = connection.CreateCommand();
+            deleteCommand.CommandText = "DELETE FROM sqlite_master WHERE rowid = @rowid;";
+
+            var parameter = deleteCommand.CreateParameter();
+            parameter.ParameterName = "@rowid";
+            parameter.Value = rowId;
+            deleteCommand.Parameters.Add(parameter);
+
+            await deleteCommand.ExecuteNonQueryAsync();
+        }
+    }
+    finally
+    {
+        await using var disableWritableSchema = connection.CreateCommand();
+        disableWritableSchema.CommandText = "PRAGMA writable_schema = 0;";
+        await disableWritableSchema.ExecuteNonQueryAsync();
     }
 }
 
