@@ -285,7 +285,7 @@ namespace hOps.web.Migrations
                     b.ToTable("PhonebookTypes");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Property", b =>
+            modelBuilder.Entity<Property>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
