@@ -354,7 +354,7 @@ namespace hOps.web.Migrations
                     b.ToTable("Properties");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.ManagerAnnouncement", b =>
+            modelBuilder.Entity<ManagerAnnouncement>(b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "UpdatedBy")
                         .WithMany()
@@ -373,7 +373,7 @@ namespace hOps.web.Migrations
                     b.Navigation("UpdatedBy");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.BulletinPost", b =>
+            modelBuilder.Entity<BulletinPost>(b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "CreatedBy")
                         .WithMany()
@@ -620,7 +620,7 @@ namespace hOps.web.Migrations
                     b.ToTable("PhonebookContacts");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.ManagerAnnouncement", b =>
+            modelBuilder.Entity<ManagerAnnouncement>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -650,7 +650,7 @@ namespace hOps.web.Migrations
                     b.ToTable("ManagerAnnouncements");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.BulletinPost", b =>
+            modelBuilder.Entity<BulletinPost>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
