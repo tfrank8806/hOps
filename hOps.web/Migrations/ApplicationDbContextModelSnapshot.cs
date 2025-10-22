@@ -1264,7 +1264,7 @@ namespace hOps.web.Migrations
                         .IsRequired();
 
                     b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany()
+                        .WithMany("PassOnLogLinks")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1417,6 +1417,8 @@ namespace hOps.web.Migrations
                     b.Navigation("Bookmarks");
 
                     b.Navigation("BulletinPosts");
+
+                    b.Navigation("PassOnLogLinks");
 
                     b.Navigation("CalendarEvents");
 
