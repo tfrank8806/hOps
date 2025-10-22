@@ -125,7 +125,7 @@ namespace hOps.web.Data
 
             builder.Entity<PassOnLogProperty>()
                 .HasOne(lp => lp.Property)
-                .WithMany()
+                .WithMany(p => p.PassOnLogLinks)
                 .HasForeignKey(lp => lp.PropertyId);
 
             builder.Entity<PassOnLogView>()

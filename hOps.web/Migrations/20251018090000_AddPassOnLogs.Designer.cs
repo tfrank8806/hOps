@@ -681,7 +681,7 @@ namespace hOps.web.Migrations
                         .IsRequired();
 
                     b.HasOne("hOps.web.Models.Property", "Property")
-                        .WithMany()
+                        .WithMany("PassOnLogLinks")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -748,6 +748,8 @@ namespace hOps.web.Migrations
                     b.Navigation("Rooms");
 
                     b.Navigation("UserAccesses");
+
+                    b.Navigation("PassOnLogLinks");
                 });
 #pragma warning restore 612, 618
         }
