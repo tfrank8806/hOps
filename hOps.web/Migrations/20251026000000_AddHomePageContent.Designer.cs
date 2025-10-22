@@ -332,6 +332,28 @@ namespace hOps.web.Migrations
                     b.ToTable("Departments");
                 });
 
+            modelBuilder.Entity<Property>(b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Address")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Properties");
+                });
+
             modelBuilder.Entity("hOps.web.Models.ManagerAnnouncement", b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "UpdatedBy")
@@ -596,28 +618,6 @@ namespace hOps.web.Migrations
                     b.HasIndex("PhonebookTypeId");
 
                     b.ToTable("PhonebookContacts");
-                });
-
-            modelBuilder.Entity<Property>(b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Address")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Properties");
                 });
 
             modelBuilder.Entity("hOps.web.Models.ManagerAnnouncement", b =>
