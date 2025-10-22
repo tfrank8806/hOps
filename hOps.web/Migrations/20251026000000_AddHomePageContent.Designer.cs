@@ -417,7 +417,7 @@ namespace hOps.web.Migrations
                     b.Property<int?>("PropertyId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("Section")
+                    b.Property<BookmarkSection>("Section")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Url")
