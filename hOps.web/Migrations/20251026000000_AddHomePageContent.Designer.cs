@@ -517,7 +517,7 @@ namespace hOps.web.Migrations
                     b.ToTable("PassOnLogComments");
                 });
 
-            modelBuilder.Entity(typeof(PassOnLogProperty), b =>
+            modelBuilder.Entity<PassOnLogProperty>(b =>
                 {
                     b.Property<int>("PassOnLogId")
                         .HasColumnType("INTEGER");
@@ -1256,7 +1256,7 @@ namespace hOps.web.Migrations
                     b.Navigation("Property");
                 });
 
-            modelBuilder.Entity(typeof(PassOnLogProperty), b =>
+            modelBuilder.Entity<PassOnLogProperty>(b =>
                 {
                     b.HasOne("hOps.web.Models.PassOnLog", "PassOnLog")
                         .WithMany("Properties")
