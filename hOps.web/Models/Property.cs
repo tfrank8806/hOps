@@ -31,6 +31,8 @@ namespace hOps.web.Models
 
         public ICollection<Bookmark> Bookmarks { get; set; } = new List<Bookmark>();
 
+        public ICollection<PassOnLogProperty> PassOnLogLinks { get; set; } = new List<PassOnLogProperty>();
+
         public ICollection<ManagerAnnouncement> ManagerAnnouncements { get; set; } = new List<ManagerAnnouncement>();
 
         public ICollection<BulletinPost> BulletinPosts { get; set; } = new List<BulletinPost>();
