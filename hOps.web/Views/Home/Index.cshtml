@@ -170,12 +170,8 @@
     <div class="row g-4 mt-1">
         <div class="col-12">
             <div class="card shadow-sm">
-                <div class="card-header d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between">
+                <div class="card-header d-flex align-items-center justify-content-between">
                     <h2 class="h5 mb-0">Hotel Layout</h2>
-                    <div class="d-flex align-items-center gap-3 text-muted small">
-                        <span><span class="legend-swatch workorder"></span> Work Orders</span>
-                        <span><span class="legend-swatch lostfound"></span> Lost &amp; Found</span>
-                    </div>
                 </div>
                 <div class="card-body">
                     @if (!hasProperty)
@@ -189,48 +185,125 @@
                     else
                     {
                         var tilesByFloor = Model.RoomTiles.GroupBy(t => t.Floor).OrderBy(g => g.Key).ToList();
-                        foreach (var floorGroup in tilesByFloor)
-                        {
-                            var maxWidth = Math.Max(1, floorGroup.Max(t => t.X + t.Width));
-                            var maxHeight = Math.Max(1, floorGroup.Max(t => t.Y + t.Height));
-                            <section class="layout-floor mb-4">
-                                <header class="d-flex align-items-center justify-content-between mb-2">
-                                    <h3 class="h6 mb-0">Floor @floorGroup.Key</h3>
-                                    <span class="text-muted small">@floorGroup.Count() room@(floorGroup.Count() == 1 ? string.Empty : "s")</span>
-                                </header>
-                                <div class="layout-canvas" style="--layout-width:@maxWidth; --layout-height:@maxHeight;">
-                                    @foreach (var tile in floorGroup)
+                        var floorLegend = tilesByFloor
+                            .Select(g => new { Floor = g.Key, Color = g.First().FloorColor })
+                            .ToList();
+                        var maxWidthAll = Math.Max(1, tilesByFloor.SelectMany(g => g).Max(t => t.X + t.Width));
+                        var maxHeightAll = Math.Max(1, tilesByFloor.SelectMany(g => g).Max(t => t.Y + t.Height));
+                        var defaultFloor = tilesByFloor.First().Key;
+
+                        <div class="layout-controls d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-3">
+                            <div class="btn-group btn-group-sm layout-view-toggle" role="group" aria-label="Layout view mode">
+                                <input class="btn-check" type="radio" name="layoutViewMode" id="layoutViewOverlay" value="overlay" checked autocomplete="off">
+                                <label class="btn btn-outline-primary" for="layoutViewOverlay">All Floors</label>
+                                <input class="btn-check" type="radio" name="layoutViewMode" id="layoutViewSingle" value="single" autocomplete="off">
+                                <label class="btn btn-outline-primary" for="layoutViewSingle">Individual Floor</label>
+                            </div>
+                            <div class="layout-legends d-flex flex-column flex-lg-row gap-3 text-muted small">
+                                <div class="d-flex align-items-center gap-3">
+                                    <span><span class="legend-swatch workorder"></span> Work Orders</span>
+                                    <span><span class="legend-swatch lostfound"></span> Lost &amp; Found</span>
+                                </div>
+                                <div class="layout-floor-legend d-flex align-items-center gap-2 flex-wrap">
+                                    @foreach (var floorInfo in floorLegend)
                                     {
-                                        var left = Math.Round((double)tile.X / maxWidth * 100, 2);
-                                        var top = Math.Round((double)tile.Y / maxHeight * 100, 2);
-                                        var width = Math.Round((double)tile.Width / maxWidth * 100, 2);
-                                        var height = Math.Round((double)tile.Height / maxHeight * 100, 2);
-                                        <div class="@tile.CssClass" style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%">
-                                            <div class="tile-header">
-                                                <span class="tile-room">@tile.RoomNumber</span>
-                                                <span class="tile-type">@tile.RoomType</span>
-                                            </div>
-                                            @if (tile.Badges.Any())
-                                            {
-                                                <div class="tile-badges">
-                                                    @foreach (var badge in tile.Badges)
-                                                    {
-                                                        if (!string.IsNullOrEmpty(badge.Url))
-                                                        {
-                                                            <a class="badge rounded-pill text-bg-@badge.Variant" href="@badge.Url">@badge.Text</a>
-                                                        }
-                                                        else
-                                                        {
-                                                            <span class="badge rounded-pill text-bg-@badge.Variant">@badge.Text</span>
-                                                        }
-                                                    }
-                                                </div>
-                                            }
-                                        </div>
+                                        <span class="layout-floor-pill" style="--floor-color:@floorInfo.Color">Floor @floorInfo.Floor</span>
                                     }
                                 </div>
-                            </section>
-                        }
+                            </div>
+                        </div>
+
+                        <div id="layoutOverlayView" class="layout-view">
+                            <div class="layout-canvas multi-floor" style="--layout-width:@maxWidthAll; --layout-height:@maxHeightAll;">
+                                @foreach (var tile in Model.RoomTiles)
+                                {
+                                    var left = Math.Round((double)tile.X / maxWidthAll * 100, 2);
+                                    var top = Math.Round((double)tile.Y / maxHeightAll * 100, 2);
+                                    var width = Math.Round((double)tile.Width / maxWidthAll * 100, 2);
+                                    var height = Math.Round((double)tile.Height / maxHeightAll * 100, 2);
+                                    var overlayBg = $"{tile.FloorColor}33";
+                                    <div class="@($"{tile.CssClass} room-tile-overlay")"
+                                         data-floor="@tile.Floor"
+                                         style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%;border-color:@tile.FloorColor;background-color:@overlayBg;">
+                                        <div class="tile-header">
+                                            <span class="tile-room">Floor @tile.Floor &middot; @tile.RoomNumber</span>
+                                            <span class="tile-type">@tile.RoomType</span>
+                                        </div>
+                                        @if (tile.Badges.Any())
+                                        {
+                                            <div class="tile-badges">
+                                                @foreach (var badge in tile.Badges)
+                                                {
+                                                    if (!string.IsNullOrEmpty(badge.Url))
+                                                    {
+                                                        <a class="badge rounded-pill text-bg-@badge.Variant" href="@badge.Url">@badge.Text</a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge rounded-pill text-bg-@badge.Variant">@badge.Text</span>
+                                                    }
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <div id="layoutPerFloorView" class="layout-view d-none">
+                            <div class="btn-group btn-group-sm layout-floor-selector mb-3" role="group" aria-label="Select floor">
+                                @foreach (var floorGroup in tilesByFloor)
+                                {
+                                    var isActive = floorGroup.Key == defaultFloor;
+                                    <input class="btn-check" type="radio" name="singleFloorOption" id="singleFloor_@floorGroup.Key" value="@floorGroup.Key" autocomplete="off" @(isActive ? "checked" : null)>
+                                    <label class="btn btn-outline-secondary" for="singleFloor_@floorGroup.Key">Floor @floorGroup.Key</label>
+                                }
+                            </div>
+
+                            @foreach (var floorGroup in tilesByFloor)
+                            {
+                                var maxWidth = Math.Max(1, floorGroup.Max(t => t.X + t.Width));
+                                var maxHeight = Math.Max(1, floorGroup.Max(t => t.Y + t.Height));
+                                var isActive = floorGroup.Key == defaultFloor;
+                                <section class="layout-floor-section mb-4 @(isActive ? string.Empty : "d-none")" data-floor="@floorGroup.Key">
+                                    <header class="d-flex align-items-center justify-content-between mb-2">
+                                        <h3 class="h6 mb-0">Floor @floorGroup.Key</h3>
+                                        <span class="text-muted small">@floorGroup.Count() room@(floorGroup.Count() == 1 ? string.Empty : "s")</span>
+                                    </header>
+                                    <div class="layout-canvas" style="--layout-width:@maxWidth; --layout-height:@maxHeight;">
+                                        @foreach (var tile in floorGroup)
+                                        {
+                                            var left = Math.Round((double)tile.X / maxWidth * 100, 2);
+                                            var top = Math.Round((double)tile.Y / maxHeight * 100, 2);
+                                            var width = Math.Round((double)tile.Width / maxWidth * 100, 2);
+                                            var height = Math.Round((double)tile.Height / maxHeight * 100, 2);
+                                            <div class="@tile.CssClass" style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%">
+                                                <div class="tile-header">
+                                                    <span class="tile-room">@tile.RoomNumber</span>
+                                                    <span class="tile-type">@tile.RoomType</span>
+                                                </div>
+                                                @if (tile.Badges.Any())
+                                                {
+                                                    <div class="tile-badges">
+                                                        @foreach (var badge in tile.Badges)
+                                                        {
+                                                            if (!string.IsNullOrEmpty(badge.Url))
+                                                            {
+                                                                <a class="badge rounded-pill text-bg-@badge.Variant" href="@badge.Url">@badge.Text</a>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="badge rounded-pill text-bg-@badge.Variant">@badge.Text</span>
+                                                            }
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </section>
+                            }
+                        </div>
                     }
                 </div>
             </div>
@@ -302,6 +375,54 @@
             background: linear-gradient(135deg, rgba(255, 193, 7, 0.12), rgba(255, 255, 255, 0.92));
         }
 
+        .layout-canvas.multi-floor {
+            isolation: isolate;
+        }
+
+        .layout-controls .layout-view-toggle .btn {
+            min-width: 120px;
+        }
+
+        .layout-legends {
+            align-items: flex-start;
+        }
+
+        .layout-floor-legend {
+            font-size: 0.8rem;
+        }
+
+        .layout-floor-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background-color: rgba(148, 163, 184, 0.12);
+        }
+
+        .layout-floor-pill::before {
+            content: "";
+            width: 0.65rem;
+            height: 0.65rem;
+            border-radius: 999px;
+            background-color: var(--floor-color, rgba(148, 163, 184, 0.7));
+        }
+
+        .room-tile-overlay {
+            border-width: 2px;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .room-tile-overlay:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 14px rgba(15, 46, 97, 0.18);
+        }
+
+        .layout-floor-selector .btn {
+            min-width: 100px;
+        }
+
         .tile-header {
             display: flex;
             justify-content: space-between;
@@ -357,4 +478,71 @@
             padding-bottom: 0;
         }
     </style>
+}
+
+@section Scripts {
+    <script>
+        (() => {
+            const overlayView = document.getElementById('layoutOverlayView');
+            const singleView = document.getElementById('layoutPerFloorView');
+            const viewRadios = document.querySelectorAll('input[name="layoutViewMode"]');
+
+            if (!overlayView && !singleView) {
+                return;
+            }
+
+            const updateViewMode = () => {
+                const selected = document.querySelector('input[name="layoutViewMode"]:checked');
+                if (!selected) {
+                    return;
+                }
+
+                if (selected.value === 'overlay') {
+                    if (overlayView) {
+                        overlayView.classList.remove('d-none');
+                    }
+                    if (singleView) {
+                        singleView.classList.add('d-none');
+                    }
+                } else {
+                    if (overlayView) {
+                        overlayView.classList.add('d-none');
+                    }
+                    if (singleView) {
+                        singleView.classList.remove('d-none');
+                    }
+                }
+            };
+
+            viewRadios.forEach(radio => radio.addEventListener('change', updateViewMode));
+            updateViewMode();
+
+            const floorRadios = document.querySelectorAll('input[name="singleFloorOption"]');
+            const floorSections = document.querySelectorAll('.layout-floor-section');
+
+            const setActiveFloor = (floorValue) => {
+                floorSections.forEach(section => {
+                    if (!(section instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const shouldHide = section.dataset.floor !== floorValue;
+                    section.classList.toggle('d-none', shouldHide);
+                });
+            };
+
+            const initialFloor = document.querySelector('input[name="singleFloorOption"]:checked');
+            if (initialFloor) {
+                setActiveFloor(initialFloor.value);
+            }
+
+            floorRadios.forEach(radio => {
+                radio.addEventListener('change', () => {
+                    if (radio.checked) {
+                        setActiveFloor(radio.value);
+                    }
+                });
+            });
+        })();
+    </script>
 }

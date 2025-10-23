@@ -56,6 +56,7 @@ namespace hOps.web.ViewModels.Home
         public int Height { get; set; }
         public string ShapeType { get; set; } = string.Empty;
         public string? ShapeData { get; set; }
+        public string FloorColor { get; set; } = "#6c757d";
         public string CssClass { get; set; } = string.Empty;
         public List<RoomTileBadgeViewModel> Badges { get; set; } = new();
     }

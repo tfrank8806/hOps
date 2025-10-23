@@ -6,11 +6,14 @@
 @{
     ViewData["Title"] = "Layout Editor";
     int propertyId = Model.PropertyId;
+    string propertyName = string.IsNullOrWhiteSpace(Model.PropertyName)
+        ? $"Property {propertyId}"
+        : Model.PropertyName;
     int selFloor = Model.SelectedFloor;
     var floors = Model.AllFloors;
 }
 
-<h2>Layout Editor — Property @propertyId, Floor @selFloor</h2>
+<h2>Layout Editor - @propertyName, Floor @selFloor</h2>
 
 @section Styles {
     <style>
@@ -1220,3 +1223,4 @@
         })();
     </script>
 }
+

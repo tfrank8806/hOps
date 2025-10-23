@@ -250,6 +250,9 @@ namespace hOps.web.Controllers
             var rooms = await _db.Rooms.Where(r => r.PropertyId == propertyId).ToListAsync();
 
             ViewBag.PropertyId = propertyId;
+            ViewBag.PropertyName = accessibleProps.FirstOrDefault(p => p.Id == propertyId)?.Name
+                ?? (await _db.Properties.Where(p => p.Id == propertyId).Select(p => p.Name).FirstOrDefaultAsync())
+                ?? $"Property {propertyId}";
             ViewBag.AllProperties = accessibleProps;
             return View(rooms);
         }
@@ -315,8 +318,43 @@ namespace hOps.web.Controllers
         // — Layout Editor —
         public async Task<IActionResult> LayoutEditor(int propertyId, int? floor)
         {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+
+            List<Property> accessibleProps;
+            if (roles.Contains("Admin"))
+            {
+                accessibleProps = await _db.Properties.ToListAsync();
+            }
+            else
+            {
+                accessibleProps = await _db.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == currentUser.Id)
+                    .Select(upa => upa.Property)
+                    .ToListAsync();
+            }
+
+            if (!accessibleProps.Any())
+            {
+                return Forbid();
+            }
+
+            if (propertyId <= 0 || !accessibleProps.Any(p => p.Id == propertyId))
+            {
+                propertyId = accessibleProps.First().Id;
+            }
+
             var rooms = await _db.Rooms.Where(r => r.PropertyId == propertyId).ToListAsync();
-            if (!rooms.Any()) return NotFound("No rooms found for this property.");
+            if (!rooms.Any())
+            {
+                TempData["RoomsMissing"] = "Please add rooms for this property before editing the layout.";
+                return RedirectToAction(nameof(Rooms), new { propertyId });
+            }
 
             var floors = rooms.Select(r => r.Floor).Distinct().OrderBy(f => f).ToList();
             int selectedFloor = floor ?? floors.First();
@@ -325,22 +363,50 @@ namespace hOps.web.Controllers
                 .Where(l => l.PropertyId == propertyId)
                 .ToListAsync();
 
-            var layoutsByFloor = allLayouts
+            var layoutDtos = allLayouts
+                .Select(l => new LayoutEditorRoomLayoutViewModel
+                {
+                    Id = l.Id,
+                    PropertyId = l.PropertyId,
+                    RoomId = l.RoomId,
+                    Floor = l.Floor,
+                    X = l.X,
+                    Y = l.Y,
+                    Width = l.Width,
+                    Height = l.Height,
+                    Label = l.Label,
+                    ShapeType = l.ShapeType,
+                    ShapeData = l.ShapeData
+                })
+                .ToList();
+
+            var layoutsByFloor = layoutDtos
                 .GroupBy(l => l.Floor)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            if (!layoutsByFloor.TryGetValue(selectedFloor, out var layouts))
+            if (!layoutsByFloor.TryGetValue(selectedFloor, out var layoutsForFloor))
             {
-                layouts = new List<RoomLayout>();
+                layoutsForFloor = new List<LayoutEditorRoomLayoutViewModel>();
             }
+
+            var roomDtos = rooms
+                .Select(r => new LayoutEditorRoomViewModel
+                {
+                    Id = r.Id,
+                    RoomNumber = string.IsNullOrWhiteSpace(r.RoomNumber) ? $"Room {r.Id}" : r.RoomNumber,
+                    Floor = r.Floor
+                })
+                .ToList();
 
             var vm = new LayoutEditorViewModel
             {
                 PropertyId = propertyId,
+                PropertyName = accessibleProps.FirstOrDefault(p => p.Id == propertyId)?.Name
+                    ?? $"Property {propertyId}",
                 SelectedFloor = selectedFloor,
                 AllFloors = floors,
-                Rooms = rooms,
-                Layouts = layouts,
+                Rooms = roomDtos,
+                Layouts = layoutsForFloor,
                 LayoutsByFloor = layoutsByFloor
             };
             return View(vm);

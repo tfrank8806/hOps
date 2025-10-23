@@ -38,7 +38,13 @@ namespace hOps.web.Controllers
                 .Where(r => r.PropertyId == propertyId)
                 .ToListAsync();
 
+            var property = await _context.Properties
+                .Where(p => p.Id == propertyId)
+                .Select(p => new { p.Id, p.Name })
+                .FirstOrDefaultAsync();
+
             ViewBag.PropertyId = propertyId;
+            ViewBag.PropertyName = property?.Name ?? $"Property {propertyId}";
             return View(rooms);
         }
 

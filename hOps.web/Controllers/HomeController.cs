@@ -298,6 +298,32 @@ namespace hOps.web.Controllers
                 .AsNoTracking()
                 .ToListAsync();
 
+            var floorSequence = layoutData
+                .Select(ld => ld.Layout.Floor)
+                .Distinct()
+                .OrderBy(f => f)
+                .ToList();
+
+            var palette = new[]
+            {
+                "#0d6efd",
+                "#6610f2",
+                "#198754",
+                "#fd7e14",
+                "#20c997",
+                "#d63384",
+                "#6f42c1",
+                "#17a2b8",
+                "#e83e8c",
+                "#7952b3"
+            };
+
+            var floorColorMap = new Dictionary<int, string>();
+            for (var i = 0; i < floorSequence.Count; i++)
+            {
+                floorColorMap[floorSequence[i]] = palette[i % palette.Length];
+            }
+
             var activeWorkOrders = await _context.WorkOrderProperties
                 .Where(wp => wp.PropertyId == propertyId)
                 .Select(wp => wp.WorkOrder)
@@ -336,6 +362,9 @@ namespace hOps.web.Controllers
                     Height = entry.Layout.Height,
                     ShapeType = entry.Layout.ShapeType ?? "rectangle",
                     ShapeData = entry.Layout.ShapeData,
+                    FloorColor = floorColorMap.TryGetValue(entry.Layout.Floor, out var color)
+                        ? color
+                        : "#6c757d",
                     CssClass = "room-tile",
                 };
 

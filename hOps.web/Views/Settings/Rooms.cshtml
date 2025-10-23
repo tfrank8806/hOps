@@ -3,9 +3,15 @@
     ViewData["Title"] = "Rooms";
     int propertyId = ViewBag.PropertyId;
     var allProps = ViewBag.AllProperties as List<hOps.web.Models.Property> ?? new List<hOps.web.Models.Property>();
+    string propertyName = ViewBag.PropertyName as string ?? $"Property {propertyId}";
 }
 
-<h2>Rooms for Property @propertyId</h2>
+<h2>Rooms for @propertyName</h2>
+
+@if (TempData["RoomsMissing"] is string missingMessage)
+{
+    <div class="alert alert-warning">@missingMessage</div>
+}
 
 @if (allProps.Count > 1)
 {

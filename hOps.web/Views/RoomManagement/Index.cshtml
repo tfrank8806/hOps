@@ -2,9 +2,10 @@
 @{
     ViewData["Title"] = "Rooms";
     int propertyId = ViewBag.PropertyId;
+    string propertyName = ViewBag.PropertyName as string ?? $"Property {propertyId}";
 }
 
-<h2>Rooms for Property @propertyId</h2>
+<h2>Rooms for @propertyName</h2>
 
 <form asp-action="Save" method="post">
     <input type="hidden" name="propertyId" value="@propertyId" />
