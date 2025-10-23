@@ -1,4 +1,4 @@
-﻿using hOps.web.Data;
+using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
@@ -173,7 +173,7 @@ namespace hOps.web.Controllers
             foreach (var role in desiredRoles.Except(currentUserRoles))
             {
                 if (currentRoles.Contains("Manager") && !currentRoles.Contains("Admin") && role == "Admin")
-                    continue; // Managers can’t assign Admin role
+                    continue; // Managers can�t assign Admin role
                 await _userManager.AddToRoleAsync(user, role);
             }
 
@@ -275,3 +275,5 @@ HotelOps Admin Team
         }
     }
 }
+
+

@@ -3623,7 +3623,7 @@
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "dependencies": {
-          "ClosedXML": "0.102.4",
+          "ClosedXML": "0.104.0",
           "MailKit": "4.14.0",
           "Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore": "8.0.20",
           "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "8.0.20",
@@ -9787,17 +9787,5 @@
         "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.306/PortableRuntimeIdentifierGraph.json"
       }
     }
-  },
-  "logs": [
-    {
-      "code": "NU1603",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "hOps.web depends on ClosedXML (>= 0.102.4) but ClosedXML 0.102.4 was not found. ClosedXML 0.104.0 was resolved instead.",
-      "libraryId": "ClosedXML",
-      "targetGraphs": [
-        "net8.0"
-      ]
-    }
-  ]
+  }
 }

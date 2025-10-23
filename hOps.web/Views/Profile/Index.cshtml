@@ -72,6 +72,20 @@
                         <input asp-for="Profile.Email" class="form-control" />
                         <span asp-validation-for="Profile.Email" class="text-danger"></span>
                     </div>
+                    <div class="mb-3">
+                        <label asp-for="Profile.DefaultPropertyId" class="form-label"></label>
+                        @if (Model.PropertyOptions?.Any() == true)
+                        {
+                            <select asp-for="Profile.DefaultPropertyId" asp-items="Model.PropertyOptions" class="form-select">
+                                <option value="">Select a default property</option>
+                            </select>
+                        }
+                        else
+                        {
+                            <input class="form-control" value="No properties available" disabled />
+                        }
+                        <span asp-validation-for="Profile.DefaultPropertyId" class="text-danger"></span>
+                    </div>
                     <div class="text-end">
                         <button type="submit" class="btn btn-primary">Save Changes</button>
                     </div>

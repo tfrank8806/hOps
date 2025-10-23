@@ -1,0 +1,8 @@
+@model string
+@if (!string.IsNullOrEmpty(Model))
+{
+    var statusClass = Model.StartsWith("Error") ? "alert-danger" : "alert-success";
+    <div class="alert @statusClass" role="alert">
+        @Model
+    </div>
+}

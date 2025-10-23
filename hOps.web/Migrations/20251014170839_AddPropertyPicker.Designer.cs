@@ -21,7 +21,7 @@ namespace hOps.web.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.9");
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
+            modelBuilder.Entity<Microsoft.AspNetCore.Identity.IdentityRole>(b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("TEXT");
@@ -47,7 +47,7 @@ namespace hOps.web.Migrations
                     b.ToTable("AspNetRoles", (string)null);
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
+            modelBuilder.Entity<Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -70,7 +70,7 @@ namespace hOps.web.Migrations
                     b.ToTable("AspNetRoleClaims", (string)null);
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
+            modelBuilder.Entity<Microsoft.AspNetCore.Identity.IdentityUserClaim<string>>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -93,7 +93,7 @@ namespace hOps.web.Migrations
                     b.ToTable("AspNetUserClaims", (string)null);
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
+            modelBuilder.Entity<Microsoft.AspNetCore.Identity.IdentityUserLogin<string>>(b =>
                 {
                     b.Property<string>("LoginProvider")
                         .HasMaxLength(128)
@@ -117,7 +117,7 @@ namespace hOps.web.Migrations
                     b.ToTable("AspNetUserLogins", (string)null);
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", b =>
+            modelBuilder.Entity<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>(b =>
                 {
                     b.Property<string>("UserId")
                         .HasColumnType("TEXT");
@@ -132,7 +132,7 @@ namespace hOps.web.Migrations
                     b.ToTable("AspNetUserRoles", (string)null);
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
+            modelBuilder.Entity<Microsoft.AspNetCore.Identity.IdentityUserToken<string>>(b =>
                 {
                     b.Property<string>("UserId")
                         .HasColumnType("TEXT");
@@ -153,7 +153,7 @@ namespace hOps.web.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("RoomLayout", b =>
+            modelBuilder.Entity("hOps.web.Models.RoomLayout", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -186,7 +186,7 @@ namespace hOps.web.Migrations
                     b.ToTable("RoomLayouts");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
+            modelBuilder.Entity<ApplicationUser>(b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("TEXT");
@@ -261,7 +261,7 @@ namespace hOps.web.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("hOps.web.Models.CalendarCategory", b =>
+            modelBuilder.Entity<hOps.web.Models.CalendarCategory>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -280,7 +280,7 @@ namespace hOps.web.Migrations
                     b.ToTable("CalendarCategories");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Department", b =>
+            modelBuilder.Entity<hOps.web.Models.Department>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -299,7 +299,7 @@ namespace hOps.web.Migrations
                     b.ToTable("Departments");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.PhonebookType", b =>
+            modelBuilder.Entity<hOps.web.Models.PhonebookType>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -340,7 +340,7 @@ namespace hOps.web.Migrations
                     b.ToTable("Properties");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Room", b =>
+            modelBuilder.Entity<hOps.web.Models.Room>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -376,7 +376,7 @@ namespace hOps.web.Migrations
                     b.ToTable("Rooms");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.RoomType", b =>
+            modelBuilder.Entity<hOps.web.Models.RoomType>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -394,7 +394,7 @@ namespace hOps.web.Migrations
                     b.ToTable("RoomTypes");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.UserAccessRequest", b =>
+            modelBuilder.Entity<hOps.web.Models.UserAccessRequest>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -457,7 +457,7 @@ namespace hOps.web.Migrations
                     b.ToTable("UserPropertyAccesses");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.WorkOrderType", b =>
+            modelBuilder.Entity<hOps.web.Models.WorkOrderType>(b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -476,58 +476,58 @@ namespace hOps.web.Migrations
                     b.ToTable("WorkOrderTypes");
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
+            modelBuilder.Entity<Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>>(b =>
                 {
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
+                    b.HasOne<Microsoft.AspNetCore.Identity.IdentityRole>()
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
+            modelBuilder.Entity<Microsoft.AspNetCore.Identity.IdentityUserClaim<string>>(b =>
                 {
-                    b.HasOne("hOps.web.Models.ApplicationUser", null)
+                    b.HasOne<ApplicationUser>()
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
+            modelBuilder.Entity<Microsoft.AspNetCore.Identity.IdentityUserLogin<string>>(b =>
                 {
-                    b.HasOne("hOps.web.Models.ApplicationUser", null)
+                    b.HasOne<ApplicationUser>()
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", b =>
+            modelBuilder.Entity<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>(b =>
                 {
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
+                    b.HasOne<Microsoft.AspNetCore.Identity.IdentityRole>()
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("hOps.web.Models.ApplicationUser", null)
+                    b.HasOne<ApplicationUser>()
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
+            modelBuilder.Entity<Microsoft.AspNetCore.Identity.IdentityUserToken<string>>(b =>
                 {
-                    b.HasOne("hOps.web.Models.ApplicationUser", null)
+                    b.HasOne<ApplicationUser>()
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("RoomLayout", b =>
+            modelBuilder.Entity("hOps.web.Models.RoomLayout", b =>
                 {
                     b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany()
@@ -546,7 +546,7 @@ namespace hOps.web.Migrations
                     b.Navigation("Room");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.Room", b =>
+            modelBuilder.Entity<hOps.web.Models.Room>(b =>
                 {
                     b.HasOne("hOps.web.Models.Property", "Property")
                         .WithMany("Rooms")
@@ -559,7 +559,7 @@ namespace hOps.web.Migrations
 
             modelBuilder.Entity<UserPropertyAccess>(b =>
                 {
-                    b.HasOne("hOps.web.Models.ApplicationUser", "ApplicationUser")
+                    b.HasOne<ApplicationUser>("ApplicationUser")
                         .WithMany("UserPropertyAccesses")
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -580,7 +580,7 @@ namespace hOps.web.Migrations
                     b.Navigation("Property");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
+            modelBuilder.Entity<ApplicationUser>(b =>
                 {
                     b.Navigation("UserPropertyAccesses");
                 });
@@ -595,3 +595,9 @@ namespace hOps.web.Migrations
         }
     }
 }
+
+
+
+
+
+

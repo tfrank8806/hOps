@@ -2,6 +2,7 @@ using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
 using Microsoft.AspNetCore.Identity;
+using System;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
@@ -90,6 +91,35 @@ app.UseRouting();
 app.UseSession();
 
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    if (context.User?.Identity?.IsAuthenticated == true)
+    {
+        var path = context.Request.Path;
+        bool isAllowedPath =
+            path.StartsWithSegments("/Identity/Account/ForceChangePassword", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWithSegments("/Identity/Account/Logout", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWithSegments("/Identity/Account/Manage", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWithSegments("/css", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWithSegments("/js", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWithSegments("/lib", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWithSegments("/images", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWithSegments("/favicon", StringComparison.OrdinalIgnoreCase);
+
+        if (!isAllowedPath)
+        {
+            var userManager = context.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = await userManager.GetUserAsync(context.User);
+            if (user?.MustChangePassword == true)
+            {
+                context.Response.Redirect("/Identity/Account/ForceChangePassword");
+                return;
+            }
+        }
+    }
+
+    await next();
+});
 app.UseAuthorization();
 
 app.MapControllerRoute(
@@ -130,7 +160,8 @@ static async Task SeedAdminUserAsync(UserManager<ApplicationUser> userManager, R
             Email = adminEmail,
             FirstName = "Super",
             LastName = "Admin",
-            MobilePhone = "1234567890"
+            MobilePhone = "1234567890",
+            MustChangePassword = false
         };
 
         var result = await userManager.CreateAsync(user, adminPassword);
@@ -146,6 +177,11 @@ static async Task SeedAdminUserAsync(UserManager<ApplicationUser> userManager, R
                 Console.WriteLine($" - {error.Description}");
             }
         }
+    }
+    else if (adminUser.MustChangePassword)
+    {
+        adminUser.MustChangePassword = false;
+        await userManager.UpdateAsync(adminUser);
     }
 }
 
@@ -256,6 +292,11 @@ static async Task ApplyMigrationsWithLegacySupportAsync(ApplicationDbContext dbC
     {
         await dbContext.Database.MigrateAsync();
     }
+    catch (SqliteException ex) when (IsDuplicateMustChangePasswordColumnError(ex))
+    {
+        await EnsureMustChangePasswordColumnAsync(dbContext);
+        await dbContext.Database.MigrateAsync();
+    }
     catch (SqliteException ex) when (IsMissingWorkOrderTypeTableError(ex))
     {
         await EnsureLegacyWorkOrderTypeTableAsync(dbContext);
@@ -275,6 +316,57 @@ static bool IsMissingWorkOrderTypeTableError(SqliteException ex)
 
 static bool IsLegacyPassOnLogSchemaError(SqliteException ex)
     => ex.SqliteErrorCode == 11 && ex.Message.Contains("PassOnLog", StringComparison.OrdinalIgnoreCase);
+
+static bool IsDuplicateMustChangePasswordColumnError(SqliteException ex)
+    => ex.SqliteErrorCode == 1
+       && ex.Message.Contains("duplicate column name: MustChangePassword", StringComparison.OrdinalIgnoreCase);
+
+static async Task EnsureMustChangePasswordColumnAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        var hasColumn = false;
+
+        await using (var pragmaCommand = connection.CreateCommand())
+        {
+            pragmaCommand.CommandText = "PRAGMA table_info('AspNetUsers');";
+            await using var reader = await pragmaCommand.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                if (string.Equals(reader.GetString(1), "MustChangePassword", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasColumn = true;
+                    break;
+                }
+            }
+        }
+
+        if (!hasColumn)
+        {
+            await using var addColumnCommand = connection.CreateCommand();
+            addColumnCommand.CommandText =
+                "ALTER TABLE \"AspNetUsers\" ADD COLUMN \"MustChangePassword\" INTEGER NOT NULL DEFAULT 0;";
+            await addColumnCommand.ExecuteNonQueryAsync();
+        }
+
+        await EnsureMigrationRecordedAsync(connection, "20251023144228_AddMustChangePasswordFlag", "8.0.20");
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
+        }
+    }
+}
 
 static async Task EnsureLegacyWorkOrderTypeTableAsync(ApplicationDbContext dbContext)
 {
@@ -474,6 +566,30 @@ static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbCon
     }
 }
 
+static async Task EnsureMigrationRecordedAsync(DbConnection connection, string migrationId, string productVersion)
+{
+    await EnsureMigrationsHistoryTableAsync(connection);
+
+    await using var insertCommand = connection.CreateCommand();
+    insertCommand.CommandText =
+        """
+        INSERT OR IGNORE INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+        VALUES (@id, @version);
+        """;
+
+    var migrationIdParameter = insertCommand.CreateParameter();
+    migrationIdParameter.ParameterName = "@id";
+    migrationIdParameter.Value = migrationId;
+    insertCommand.Parameters.Add(migrationIdParameter);
+
+    var versionParameter = insertCommand.CreateParameter();
+    versionParameter.ParameterName = "@version";
+    versionParameter.Value = productVersion;
+    insertCommand.Parameters.Add(versionParameter);
+
+    await insertCommand.ExecuteNonQueryAsync();
+}
+
 static async Task EnsureMigrationsHistoryTableAsync(DbConnection connection)
 {
     await using var createCommand = connection.CreateCommand();
@@ -589,4 +705,7 @@ static async Task RemoveLegacyDuplicatePassOnLogSchemaEntriesAsync(DbConnection 
         }
     }
 }
+
+
+
 

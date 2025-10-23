@@ -90,7 +90,10 @@ public class RegisterModelTests
             .Returns("/");
 
         urlHelperMock
-            .Setup(u => u.Action(nameof(AdminController.AccessRequests), "Admin", null, httpContext.Request.Scheme))
+            .Setup(u => u.Action(It.Is<UrlActionContext>(ctx =>
+                ctx.Action == nameof(AdminController.AccessRequests) &&
+                ctx.Controller == "Admin" &&
+                ctx.Protocol == httpContext.Request.Scheme)))
             .Returns(encodedUrlTarget);
 
         var actionContext = new ActionContext(httpContext, new RouteData(), new PageActionDescriptor());
@@ -111,8 +114,6 @@ public class RegisterModelTests
                 FirstName = "Test",
                 LastName = "User",
                 Email = "test@example.com",
-                Password = "Password1!",
-                ConfirmPassword = "Password1!",
                 PropertyCode = "PROP",
                 MobilePhone = "1234567890"
             }
@@ -125,6 +126,9 @@ public class RegisterModelTests
         var redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("./RegisterConfirmation", redirect.PageName);
         Assert.Equal("test@example.com", redirect.RouteValues?["email"]);
+        var savedRequest = Assert.Single(dbContext.UserAccessRequests);
+        Assert.Equal("test@example.com", savedRequest.Email);
+        Assert.False(string.IsNullOrWhiteSpace(savedRequest.PasswordHash));
         Assert.NotNull(capturedBody);
         Assert.Contains("https://example.com/Admin/AccessRequests?token=abc&amp;value=1", capturedBody, StringComparison.Ordinal);
 
@@ -198,7 +202,10 @@ public class RegisterModelTests
             .Returns("/");
 
         urlHelperMock
-            .Setup(u => u.Action(nameof(AdminController.AccessRequests), "Admin", null, httpContext.Request.Scheme))
+            .Setup(u => u.Action(It.Is<UrlActionContext>(ctx =>
+                ctx.Action == nameof(AdminController.AccessRequests) &&
+                ctx.Controller == "Admin" &&
+                ctx.Protocol == httpContext.Request.Scheme)))
             .Returns(encodedUrlTarget);
 
         var actionContext = new ActionContext(httpContext, new RouteData(), new PageActionDescriptor());
@@ -219,8 +226,6 @@ public class RegisterModelTests
                 FirstName = "<Alice>",
                 LastName = "User & Co",
                 Email = "test@example.com",
-                Password = "Password1!",
-                ConfirmPassword = "Password1!",
                 PropertyCode = "PROP&1",
                 MobilePhone = "1234567890"
             }

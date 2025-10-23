@@ -462,10 +462,14 @@ namespace hOps.web.Controllers
         {
             var now = DateTime.Now;
 
-            var upcomingEvents = await _context.CalendarEventProperties
+            var upcomingEventsQuery = _context.CalendarEventProperties
                 .Where(cep => cep.PropertyId == propertyId)
                 .Select(cep => cep.CalendarEvent)
                 .Where(e => e.EndDate >= now.Date)
+                .AsNoTracking();
+
+            var upcomingEvents = await _context.CalendarEvents
+                .Where(e => upcomingEventsQuery.Contains(e))
                 .Include(e => e.Category)
                 .AsNoTracking()
                 .ToListAsync();

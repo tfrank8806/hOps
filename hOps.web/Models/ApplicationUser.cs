@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 
 #nullable enable
 namespace hOps.web.Models
@@ -10,6 +10,11 @@ namespace hOps.web.Models
         public string? MobilePhone { get; set; }
         public string? ProfilePhotoPath { get; set; }
 
+        public bool MustChangePassword { get; set; } = false;
+
+        public int? DefaultPropertyId { get; set; }
+        public Property? DefaultProperty { get; set; }
+
         public ICollection<UserPropertyAccess>? UserPropertyAccesses { get; set; }
 
         public ICollection<CalendarEvent> CreatedCalendarEvents { get; set; } = new List<CalendarEvent>();
@@ -17,3 +22,4 @@ namespace hOps.web.Models
         public ICollection<Bookmark> CreatedBookmarks { get; set; } = new List<Bookmark>();
     }
 }
+

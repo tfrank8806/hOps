@@ -10,6 +10,29 @@ namespace hOps.web.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(
+                """
+                CREATE TABLE IF NOT EXISTS "WorkOrders" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_WorkOrders" PRIMARY KEY AUTOINCREMENT,
+                    "Status" TEXT NOT NULL,
+                    "Location" TEXT,
+                    "WorkOrderTypeId" INTEGER,
+                    "Issue" TEXT NOT NULL,
+                    "Details" TEXT,
+                    "DueDate" TEXT NOT NULL,
+                    "CreatedAt" TEXT NOT NULL,
+                    "CreatedById" TEXT,
+                    "DepartmentId" INTEGER,
+                    CONSTRAINT "FK_WorkOrders_AspNetUsers_CreatedById" FOREIGN KEY ("CreatedById") REFERENCES "AspNetUsers" ("Id"),
+                    CONSTRAINT "FK_WorkOrders_Departments_DepartmentId" FOREIGN KEY ("DepartmentId") REFERENCES "Departments" ("Id"),
+                    CONSTRAINT "FK_WorkOrders_WorkOrderTypes_WorkOrderTypeId" FOREIGN KEY ("WorkOrderTypeId") REFERENCES "WorkOrderTypes" ("Id")
+                );
+
+                CREATE INDEX IF NOT EXISTS "IX_WorkOrders_CreatedById" ON "WorkOrders" ("CreatedById");
+                CREATE INDEX IF NOT EXISTS "IX_WorkOrders_DepartmentId" ON "WorkOrders" ("DepartmentId");
+                CREATE INDEX IF NOT EXISTS "IX_WorkOrders_WorkOrderTypeId" ON "WorkOrders" ("WorkOrderTypeId");
+                """);
+
             migrationBuilder.CreateTable(
                 name: "ManagerAnnouncements",
                 columns: table => new

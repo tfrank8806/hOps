@@ -19,6 +19,7 @@ namespace hOps.web.Models
         /// The room this layout box is associated with.
         /// </summary>
         public int RoomId { get; set; }
+        public Room? Room { get; set; }
 
         /// <summary>
         /// The floor number the layout applies to (matches Room.Floor).

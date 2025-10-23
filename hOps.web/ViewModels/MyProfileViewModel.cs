@@ -1,5 +1,8 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace hOps.web.ViewModels
 {
@@ -26,6 +29,9 @@ namespace hOps.web.ViewModels
         [Phone]
         [Display(Name = "Phone Number")]
         public string? PhoneNumber { get; set; }
+
+        [Display(Name = "Default Property")]
+        public int? DefaultPropertyId { get; set; }
     }
 
     public class ChangePasswordFormViewModel
@@ -51,5 +57,6 @@ namespace hOps.web.ViewModels
     {
         public ProfileFormViewModel Profile { get; set; } = new();
         public ChangePasswordFormViewModel ChangePassword { get; set; } = new();
+        public IEnumerable<SelectListItem> PropertyOptions { get; set; } = Enumerable.Empty<SelectListItem>();
     }
 }

@@ -30,13 +30,28 @@ public class BaseController : Controller
             ViewBag.UserProperties = props;
 
             int? currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
-            Property? currentProperty = props.FirstOrDefault(p => p.Id == currentPropertyId);
+            Property? currentProperty = currentPropertyId.HasValue
+                ? props.FirstOrDefault(p => p.Id == currentPropertyId.Value)
+                : null;
+
+            if (currentProperty == null && user.DefaultPropertyId.HasValue)
+            {
+                currentProperty = props.FirstOrDefault(p => p.Id == user.DefaultPropertyId.Value);
+                if (currentProperty != null)
+                {
+                    HttpContext.Session.SetInt32("CurrentPropertyId", currentProperty.Id);
+                }
+            }
 
             // Fallback to first property if session value is missing or invalid
             if (currentProperty == null && props.Any())
             {
                 currentProperty = props.First();
                 HttpContext.Session.SetInt32("CurrentPropertyId", currentProperty.Id);
+            }
+            else if (currentProperty == null)
+            {
+                HttpContext.Session.Remove("CurrentPropertyId");
             }
 
             ViewBag.CurrentProperty = currentProperty;

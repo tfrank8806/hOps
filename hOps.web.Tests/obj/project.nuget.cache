@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "tejnWXk66nE=",
+  "dgSpecHash": "Pxi4/Nb8yPE=",
   "success": true,
   "projectFilePath": "C:\\hOps\\hOps.web.Tests\\hOps.web.Tests.csproj",
   "expectedPackageFiles": [
@@ -204,18 +204,5 @@
     "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\xunit.extensibility.execution\\2.9.0\\xunit.extensibility.execution.2.9.0.nupkg.sha512",
     "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\xunit.runner.visualstudio\\2.8.2\\xunit.runner.visualstudio.2.8.2.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1603",
-      "level": "Warning",
-      "message": "hOps.web depends on ClosedXML (>= 0.102.4) but ClosedXML 0.102.4 was not found. ClosedXML 0.104.0 was resolved instead.",
-      "projectPath": "C:\\hOps\\hOps.web.Tests\\hOps.web.Tests.csproj",
-      "warningLevel": 1,
-      "filePath": "C:\\hOps\\hOps.web.Tests\\hOps.web.Tests.csproj",
-      "libraryId": "ClosedXML",
-      "targetGraphs": [
-        "net8.0"
-      ]
-    }
-  ]
+  "logs": []
 }

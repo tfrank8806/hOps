@@ -1,0 +1,25 @@
+@page
+@model hOps.web.Areas.Identity.Pages.Account.RegisterConfirmationModel
+@{
+    ViewData["Title"] = "Access Request Submitted";
+}
+
+<h1 class="mb-3">@ViewData["Title"]</h1>
+
+<p>
+    Thanks for submitting your access request. Our admin team will review the details
+    and notify you once your account is approved.
+</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.Email))
+{
+    <p>
+        We captured your email as <strong>@Model.Email</strong>. If this is incorrect,
+        please submit the form again with the correct address.
+    </p>
+}
+
+<p>
+    You can close this tab or return to the <a asp-page="./Login">sign-in page</a>.
+</p>
+

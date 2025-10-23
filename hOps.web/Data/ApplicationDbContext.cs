@@ -47,6 +47,12 @@ namespace hOps.web.Data
         {
             base.OnModelCreating(builder);
 
+            builder.Entity<ApplicationUser>()
+                .HasOne(u => u.DefaultProperty)
+                .WithMany()
+                .HasForeignKey(u => u.DefaultPropertyId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // Composite key for UserPropertyAccess
             builder.Entity<UserPropertyAccess>()
                 .HasKey(upa => new { upa.ApplicationUserId, upa.PropertyId });

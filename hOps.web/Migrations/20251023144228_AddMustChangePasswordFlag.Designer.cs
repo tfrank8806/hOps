@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using hOps.web.Data;
 
@@ -10,9 +11,11 @@ using hOps.web.Data;
 namespace hOps.web.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251023144228_AddMustChangePasswordFlag")]
+    partial class AddMustChangePasswordFlag
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.20");
@@ -161,9 +164,6 @@ namespace hOps.web.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("DefaultPropertyId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
@@ -222,8 +222,6 @@ namespace hOps.web.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("DefaultPropertyId");
 
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
@@ -1079,16 +1077,6 @@ namespace hOps.web.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
-                {
-                    b.HasOne("hOps.web.Models.Property", "DefaultProperty")
-                        .WithMany()
-                        .HasForeignKey("DefaultPropertyId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("DefaultProperty");
                 });
 
             modelBuilder.Entity("hOps.web.Models.Bookmark", b =>

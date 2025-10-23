@@ -1,12 +1,16 @@
 using System;
 using System.IO;
+using System.Linq;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
 
 namespace hOps.web.Controllers
 {
@@ -36,7 +40,7 @@ namespace hOps.web.Controllers
                 return RedirectToAction("Login", "Account", new { area = "Identity" });
             }
 
-            return View(BuildViewModel(user));
+            return View(await BuildViewModel(user));
         }
 
         [HttpPost]
@@ -49,13 +53,29 @@ namespace hOps.web.Controllers
                 return RedirectToAction("Login", "Account", new { area = "Identity" });
             }
 
+            var accessiblePropertyIds = await _context.UserPropertyAccesses
+                .Where(upa => upa.ApplicationUserId == user.Id)
+                .Select(upa => upa.PropertyId)
+                .ToListAsync();
+
+            if (model.DefaultPropertyId.HasValue && !accessiblePropertyIds.Contains(model.DefaultPropertyId.Value))
+            {
+                ModelState.AddModelError("Profile.DefaultPropertyId", "You do not have access to the selected property.");
+            }
+
             if (!ModelState.IsValid)
             {
                 model.ProfilePhotoPath = user.ProfilePhotoPath;
-                return View("Index", BuildViewModel(user, model));
+                if (model.DefaultPropertyId == null)
+                {
+                    model.DefaultPropertyId = user.DefaultPropertyId;
+                }
+
+                return View("Index", await BuildViewModel(user, model));
             }
 
             var previousPhotoPath = user.ProfilePhotoPath;
+            var previousDefaultPropertyId = user.DefaultPropertyId;
             string? newPhotoPhysicalPath = null;
 
             user.FirstName = model.FirstName ?? string.Empty;
@@ -93,6 +113,12 @@ namespace hOps.web.Controllers
                 model.ProfilePhotoPath = user.ProfilePhotoPath;
             }
 
+            var selectedDefaultPropertyId = model.DefaultPropertyId.HasValue && accessiblePropertyIds.Contains(model.DefaultPropertyId.Value)
+                ? model.DefaultPropertyId.Value
+                : (int?)null;
+
+            user.DefaultPropertyId = selectedDefaultPropertyId;
+
             var updateResult = await _userManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
             {
@@ -116,7 +142,9 @@ namespace hOps.web.Controllers
                     model.ProfilePhotoPath = previousPhotoPath;
                 }
 
-                return View("Index", BuildViewModel(user, model));
+                user.DefaultPropertyId = previousDefaultPropertyId;
+
+                return View("Index", await BuildViewModel(user, model));
             }
 
             if (!string.IsNullOrWhiteSpace(previousPhotoPath) &&
@@ -130,6 +158,15 @@ namespace hOps.web.Controllers
                 }
             }
 
+            if (user.DefaultPropertyId.HasValue)
+            {
+                HttpContext.Session.SetInt32("CurrentPropertyId", user.DefaultPropertyId.Value);
+            }
+            else if (HttpContext.Session.GetInt32("CurrentPropertyId") is int currentId && !accessiblePropertyIds.Contains(currentId))
+            {
+                HttpContext.Session.Remove("CurrentPropertyId");
+            }
+
             await _signInManager.RefreshSignInAsync(user);
             TempData["ProfileUpdated"] = true;
 
@@ -138,7 +175,7 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ChangePassword(ChangePasswordFormViewModel model)
+        public async Task<IActionResult> ChangePassword([Bind(Prefix = "ChangePassword")] ChangePasswordFormViewModel model)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -148,7 +185,7 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                return View("Index", BuildViewModel(user, changePassword: model));
+                return View("Index", await BuildViewModel(user, changePassword: model));
             }
 
             var result = await _userManager.ChangePasswordAsync(user, model.CurrentPassword!, model.NewPassword!);
@@ -165,7 +202,22 @@ namespace hOps.web.Controllers
                     ModelState.AddModelError(targetKey, error.Description);
                 }
 
-                return View("Index", BuildViewModel(user, changePassword: model));
+                return View("Index", await BuildViewModel(user, changePassword: model));
+            }
+
+            if (user.MustChangePassword)
+            {
+                user.MustChangePassword = false;
+                var updateResult = await _userManager.UpdateAsync(user);
+                if (!updateResult.Succeeded)
+                {
+                    foreach (var error in updateResult.Errors)
+                    {
+                        ModelState.AddModelError(string.Empty, error.Description);
+                    }
+
+                    return View("Index", await BuildViewModel(user, changePassword: model));
+                }
             }
 
             await _signInManager.RefreshSignInAsync(user);
@@ -173,7 +225,7 @@ namespace hOps.web.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        private MyProfileViewModel BuildViewModel(
+        private async Task<MyProfileViewModel> BuildViewModel(
             ApplicationUser user,
             ProfileFormViewModel? profile = null,
             ChangePasswordFormViewModel? changePassword = null)
@@ -188,12 +240,35 @@ namespace hOps.web.Controllers
             };
 
             profileVm.ProfilePhotoPath ??= user.ProfilePhotoPath;
+            profileVm.DefaultPropertyId ??= user.DefaultPropertyId;
+
+            var accessibleProperties = await _context.UserPropertyAccesses
+                .Where(upa => upa.ApplicationUserId == user.Id)
+                .Select(upa => upa.Property)
+                .OrderBy(p => p.Name)
+                .ToListAsync();
+
+            if (profileVm.DefaultPropertyId.HasValue && accessibleProperties.All(p => p.Id != profileVm.DefaultPropertyId.Value))
+            {
+                profileVm.DefaultPropertyId = null;
+            }
+
+            var propertyOptions = accessibleProperties
+                .Select(p => new SelectListItem
+                {
+                    Value = p.Id.ToString(),
+                    Text = $"{p.Name} ({p.Code})",
+                    Selected = profileVm.DefaultPropertyId == p.Id
+                })
+                .ToList();
+
             var changePasswordVm = changePassword ?? new ChangePasswordFormViewModel();
 
             return new MyProfileViewModel
             {
                 Profile = profileVm,
-                ChangePassword = changePasswordVm
+                ChangePassword = changePasswordVm,
+                PropertyOptions = propertyOptions
             };
         }
     }
