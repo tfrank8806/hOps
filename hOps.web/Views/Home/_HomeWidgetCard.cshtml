@@ -7,8 +7,6 @@
 
 @{
     var items = Model.Items ?? Array.Empty<object>();
-    var isPackageWidget = string.Equals(Model.ControllerName, "MailLog", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(Model.Title, "Package Log", StringComparison.OrdinalIgnoreCase);
 }
 
 <div class="card shadow-sm h-100">
@@ -17,46 +15,7 @@
         <a class="btn btn-sm btn-outline-primary" asp-controller="@Model.ControllerName" asp-action="@Model.ActionName">View All</a>
     </div>
     <div class="card-body">
-        @if (isPackageWidget)
-        {
-            var packages = items.OfType<PackageLogSummaryViewModel>().ToList();
-            <div class="home-package-log-widget" data-package-log-widget data-fallback-count="@packages.Count">
-                <ul class="list-unstyled mb-0 widget-list" data-package-log-list>
-                    @foreach (var package in packages)
-                    {
-                        var hasLink = !string.IsNullOrWhiteSpace(package.DetailUrl);
-                        var metaParts = new List<string>();
-                        if (!string.IsNullOrWhiteSpace(package.RoomNumber))
-                        {
-                            metaParts.Add($"Room {package.RoomNumber}");
-                        }
-                        if (!string.IsNullOrWhiteSpace(package.Carrier))
-                        {
-                            metaParts.Add(package.Carrier);
-                        }
-                        <li class="widget-item">
-                            @if (hasLink)
-                            {
-                                <a class="fw-semibold" href="@package.DetailUrl">@package.RecipientName</a>
-                            }
-                            else
-                            {
-                                <span class="fw-semibold">@package.RecipientName</span>
-                            }
-                            @if (metaParts.Any())
-                            {
-                                <div class="text-muted small">@string.Join(" &middot; ", metaParts)</div>
-                            }
-                            <div class="text-muted small">Logged @package.LoggedAt.ToLocalTime().ToString("g")</div>
-                        </li>
-                    }
-                </ul>
-                <div class="text-muted small" data-package-log-empty @(packages.Any() ? "hidden" : null)>
-                    No packages logged yet. Use the Package &amp; Mail Log to add entries.
-                </div>
-            </div>
-        }
-        else if (!items.Any())
+        @if (!items.Any())
         {
             <p class="text-muted mb-0">No records to show.</p>
         }
@@ -137,6 +96,14 @@
                             if (!string.IsNullOrWhiteSpace(package.Carrier))
                             {
                                 metaParts.Add(package.Carrier);
+                            }
+                            if (!string.IsNullOrWhiteSpace(package.TrackingNumber))
+                            {
+                                metaParts.Add(package.TrackingNumber);
+                            }
+                            if (!string.IsNullOrWhiteSpace(package.StorageLocation))
+                            {
+                                metaParts.Add(package.StorageLocation);
                             }
                         }
                         @if (metaParts.Any())

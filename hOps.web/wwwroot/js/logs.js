@@ -1896,22 +1896,13 @@
         recordAudit(newLog, 'Log created', 'Log created manually.');
         persistLogs();
         createLogForm.reset();
-        const modalElement = document.getElementById('createLogModal');
-        if (modalElement) {
-            if (typeof bootstrap !== 'undefined' && bootstrap?.Modal) {
-                const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
-                modal.hide();
+        const createLogCollapse = document.getElementById('createLogFormSection');
+        if (createLogCollapse) {
+            if (typeof bootstrap !== 'undefined' && bootstrap?.Collapse) {
+                const collapse = bootstrap.Collapse.getOrCreateInstance(createLogCollapse);
+                collapse.hide();
             } else {
-                modalElement.classList.remove('show');
-                modalElement.setAttribute('aria-hidden', 'true');
-                modalElement.style.display = 'none';
-                document.body.classList.remove('modal-open');
-                document.body.style.removeProperty('padding-right');
-                document.querySelectorAll('.modal-backdrop').forEach((backdrop) => {
-                    if (backdrop instanceof HTMLElement && backdrop.parentElement) {
-                        backdrop.parentElement.removeChild(backdrop);
-                    }
-                });
+                createLogCollapse.classList.remove('show');
             }
         }
         selectLog(newLog.id);

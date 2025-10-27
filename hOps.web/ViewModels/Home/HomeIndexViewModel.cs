@@ -94,6 +94,10 @@ namespace hOps.web.ViewModels.Home
         public string RecipientName { get; set; } = string.Empty;
         public string? RoomNumber { get; set; }
         public string? Carrier { get; set; }
+        public string? TrackingNumber { get; set; }
+        public string? StorageLocation { get; set; }
+        public bool Delivered { get; set; }
+        public DateTime? DeliveredAt { get; set; }
         public DateTime LoggedAt { get; set; }
         public string DetailUrl { get; set; } = string.Empty;
     }

@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace hOps.web.Models
@@ -27,6 +28,17 @@ namespace hOps.web.Models
         public string? Notes { get; set; }
 
         public DateTime LoggedAt { get; set; } = DateTime.UtcNow;
+
+        [MaxLength(150)]
+        public string? StorageLocation { get; set; }
+
+        public DateTime? ArrivalDate { get; set; }
+
+        public DateTime? DepartureDate { get; set; }
+
+        public bool Delivered { get; set; }
+
+        public DateTime? DeliveredAt { get; set; }
 
         [Required]
         public string LoggedById { get; set; } = string.Empty;

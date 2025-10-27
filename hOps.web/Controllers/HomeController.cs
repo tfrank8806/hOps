@@ -473,6 +473,10 @@ namespace hOps.web.Controllers
                     RecipientName = p.RecipientName,
                     RoomNumber = p.RoomNumber,
                     Carrier = p.Carrier,
+                    TrackingNumber = p.TrackingNumber,
+                    StorageLocation = p.StorageLocation,
+                    Delivered = p.Delivered,
+                    DeliveredAt = p.DeliveredAt,
                     LoggedAt = p.LoggedAt,
                     DetailUrl = string.Empty,
                 })
