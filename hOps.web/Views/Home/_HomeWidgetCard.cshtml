@@ -1,7 +1,15 @@
+@using System
+@using System.Collections.Generic
 @using System.Linq
 @using hOps.web.ViewModels
 @using hOps.web.ViewModels.Home
 @model HomeWidgetViewModel
+
+@{
+    var items = Model.Items ?? Array.Empty<object>();
+    var isPackageWidget = string.Equals(Model.ControllerName, "MailLog", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Model.Title, "Package Log", StringComparison.OrdinalIgnoreCase);
+}
 
 <div class="card shadow-sm h-100">
     <div class="card-header d-flex align-items-center justify-content-between">
@@ -9,13 +17,52 @@
         <a class="btn btn-sm btn-outline-primary" asp-controller="@Model.ControllerName" asp-action="@Model.ActionName">View All</a>
     </div>
     <div class="card-body">
-        @if (Model.Items == null || !Model.Items.Any())
+        @if (isPackageWidget)
+        {
+            var packages = items.OfType<PackageLogSummaryViewModel>().ToList();
+            <div class="home-package-log-widget" data-package-log-widget data-fallback-count="@packages.Count">
+                <ul class="list-unstyled mb-0 widget-list" data-package-log-list>
+                    @foreach (var package in packages)
+                    {
+                        var hasLink = !string.IsNullOrWhiteSpace(package.DetailUrl);
+                        var metaParts = new List<string>();
+                        if (!string.IsNullOrWhiteSpace(package.RoomNumber))
+                        {
+                            metaParts.Add($"Room {package.RoomNumber}");
+                        }
+                        if (!string.IsNullOrWhiteSpace(package.Carrier))
+                        {
+                            metaParts.Add(package.Carrier);
+                        }
+                        <li class="widget-item">
+                            @if (hasLink)
+                            {
+                                <a class="fw-semibold" href="@package.DetailUrl">@package.RecipientName</a>
+                            }
+                            else
+                            {
+                                <span class="fw-semibold">@package.RecipientName</span>
+                            }
+                            @if (metaParts.Any())
+                            {
+                                <div class="text-muted small">@string.Join(" &middot; ", metaParts)</div>
+                            }
+                            <div class="text-muted small">Logged @package.LoggedAt.ToLocalTime().ToString("g")</div>
+                        </li>
+                    }
+                </ul>
+                <div class="text-muted small" data-package-log-empty @(packages.Any() ? "hidden" : null)>
+                    No packages logged yet. Use the Package &amp; Mail Log to add entries.
+                </div>
+            </div>
+        }
+        else if (!items.Any())
         {
             <p class="text-muted mb-0">No records to show.</p>
         }
-        else if (Model.Items.First() is WorkOrderSummaryViewModel)
+        else if (items.First() is WorkOrderSummaryViewModel)
         {
-            var workOrders = Model.Items.Cast<WorkOrderSummaryViewModel>();
+            var workOrders = items.OfType<WorkOrderSummaryViewModel>();
             <ul class="list-unstyled mb-0 widget-list">
                 @foreach (var order in workOrders)
                 {
@@ -43,9 +90,9 @@
                 }
             </ul>
         }
-        else if (Model.Items.First() is LostFoundSummaryViewModel)
+        else if (items.First() is LostFoundSummaryViewModel)
         {
-            var entries = Model.Items.Cast<LostFoundSummaryViewModel>();
+            var entries = items.OfType<LostFoundSummaryViewModel>();
             <ul class="list-unstyled mb-0 widget-list">
                 @foreach (var entry in entries)
                 {
@@ -59,15 +106,15 @@
                         {
                             <span class="fw-semibold">@entry.Title</span>
                         }
-                        <div class="text-muted small">@entry.Type.ToString() · @entry.Status.ToString()</div>
+                        <div class="text-muted small">@entry.Type.ToString() &middot; @entry.Status.ToString()</div>
                         <div class="text-muted small">Logged @entry.CreatedAt.ToLocalTime().ToString("g")</div>
                     </li>
                 }
             </ul>
         }
-        else if (Model.Items.First() is PackageLogSummaryViewModel)
+        else if (items.First() is PackageLogSummaryViewModel)
         {
-            var packages = Model.Items.Cast<PackageLogSummaryViewModel>();
+            var packages = items.OfType<PackageLogSummaryViewModel>();
             <ul class="list-unstyled mb-0 widget-list">
                 @foreach (var package in packages)
                 {
@@ -81,15 +128,29 @@
                         {
                             <span class="fw-semibold">@package.RecipientName</span>
                         }
-                        <div class="text-muted small">@if (!string.IsNullOrWhiteSpace(package.RoomNumber)){<text>Room @package.RoomNumber</text>} @if (!string.IsNullOrWhiteSpace(package.Carrier)){<text>· @package.Carrier</text>}</div>
+                        @{
+                            var metaParts = new List<string>();
+                            if (!string.IsNullOrWhiteSpace(package.RoomNumber))
+                            {
+                                metaParts.Add($"Room {package.RoomNumber}");
+                            }
+                            if (!string.IsNullOrWhiteSpace(package.Carrier))
+                            {
+                                metaParts.Add(package.Carrier);
+                            }
+                        }
+                        @if (metaParts.Any())
+                        {
+                            <div class="text-muted small">@string.Join(" &middot; ", metaParts)</div>
+                        }
                         <div class="text-muted small">Logged @package.LoggedAt.ToLocalTime().ToString("g")</div>
                     </li>
                 }
             </ul>
         }
-        else if (Model.Items.First() is CalendarEventSummaryViewModel)
+        else if (items.First() is CalendarEventSummaryViewModel)
         {
-            var events = Model.Items.Cast<CalendarEventSummaryViewModel>();
+            var events = items.OfType<CalendarEventSummaryViewModel>();
             <ul class="list-unstyled mb-0 widget-list">
                 @foreach (var calendarEvent in events)
                 {

@@ -258,10 +258,10 @@
                                                 <span class="fw-semibold">@(!string.IsNullOrWhiteSpace(entry.ItemFound) ? entry.ItemFound : "Found Item")</span>
                                             </button>
                                             <div class="small text-muted">
-                                                @entry.DateFound?.ToString("MMM d, yyyy") ?? entry.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")
+                                                @(entry.DateFound?.ToString("MMM d, yyyy") ?? entry.CreatedAt.ToLocalTime().ToString("MMM d, yyyy"))
                                                 @if (!string.IsNullOrWhiteSpace(entry.Location))
                                                 {
-                                                    <span> • @entry.Location</span>
+                                                    <span>&nbsp;&middot; @entry.Location</span>
                                                 }
                                             </div>
                                         </div>
@@ -296,10 +296,10 @@
                                                 <span class="fw-semibold">@(!string.IsNullOrWhiteSpace(entry.ItemLost) ? entry.ItemLost : "Lost Item")</span>
                                             </button>
                                             <div class="small text-muted">
-                                                @entry.DateReportedLost?.ToString("MMM d, yyyy") ?? entry.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")
+                                                @(entry.DateReportedLost?.ToString("MMM d, yyyy") ?? entry.CreatedAt.ToLocalTime().ToString("MMM d, yyyy"))
                                                 @if (!string.IsNullOrWhiteSpace(entry.GuestName))
                                                 {
-                                                    <span> • @entry.GuestName</span>
+                                                    <span>&nbsp;&middot; @entry.GuestName</span>
                                                 }
                                             </div>
                                         </div>

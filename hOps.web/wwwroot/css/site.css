@@ -335,50 +335,23 @@ body.sidebar-collapsed .sidebar .sidebar-inner {
 }
 
 .lost-found-results {
-    flex: 1 1 auto;
-    min-height: 0;
+    flex: 0 0 auto;
 }
 
 .lost-found-results > [class*="col-"] {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
+    display: block;
 }
 
 .lost-found-results .card {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
-    min-height: 0;
+    display: block;
 }
 
 .lost-found-results .card-body {
-    flex: 1 1 auto;
-    overflow-y: auto;
-    min-height: 0;
+    overflow: visible;
 }
 
 .lost-found-entry-card .card-body {
-    max-height: 22rem;
-    overflow-y: auto;
-}
-
-@media (max-width: 991.98px) {
-    .lost-found-results > [class*="col-"] {
-        display: block;
-    }
-
-    .lost-found-results .card {
-        display: block;
-    }
-
-    .lost-found-results .card-body {
-        overflow: visible;
-    }
-
-    .lost-found-entry-card .card-body {
-        max-height: none;
-    }
+    overflow: visible;
 }
 
 @media (max-width: 991.98px) {

@@ -222,19 +222,25 @@
                                     var width = Math.Round((double)tile.Width / maxWidthAll * 100, 2);
                                     var height = Math.Round((double)tile.Height / maxHeightAll * 100, 2);
                                     var overlayBg = $"{tile.FloorColor}33";
+                                    var navigateUrl = tile.Badges.FirstOrDefault(b => !string.IsNullOrWhiteSpace(b.Url))?.Url ?? string.Empty;
+                                    var ariaLabel = $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} room {tile.RoomNumber}";
+                                    if (tile.Badges.Any())
+                                    {
+                                        ariaLabel = $"{ariaLabel} with {string.Join(", ", tile.Badges.Select(b => b.Text))}";
+                                    }
                                     <div class="@($"{tile.CssClass} room-tile-overlay")"
                                          data-floor="@tile.Floor"
-                                         style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%;border-color:@tile.FloorColor;background-color:@overlayBg;">
-                                        <div class="tile-header">
-                                            <span class="tile-room">Floor @tile.Floor &middot; @tile.RoomNumber</span>
-                                            <span class="tile-type">@tile.RoomType</span>
-                                        </div>
+                                         data-navigate-url="@navigateUrl"
+                                         style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%;border-color:@tile.FloorColor;background-color:@overlayBg;"
+                                         aria-label="@ariaLabel"
+                                         tabindex="@(string.IsNullOrWhiteSpace(navigateUrl) ? "-1" : "0")"
+                                         @(string.IsNullOrWhiteSpace(navigateUrl) ? null : "role=\"link\"")>
                                         @if (tile.Badges.Any())
                                         {
-                                            <div class="tile-badges">
+                                            <div class="tile-badges tile-badges--overlay">
                                                 @foreach (var badge in tile.Badges)
                                                 {
-                                                    if (!string.IsNullOrEmpty(badge.Url))
+                                                    if (!string.IsNullOrWhiteSpace(badge.Url))
                                                     {
                                                         <a class="badge rounded-pill text-bg-@badge.Variant" href="@badge.Url">@badge.Text</a>
                                                     }
@@ -315,7 +321,7 @@
             <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Work Orders", Model.WorkOrders.Cast<object>().ToList(), "WorkOrders", "Index")' />
         </div>
         <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Lost &amp; Found", Model.LostFoundEntries.Cast<object>().ToList(), "LostAndFound", "Index")' />
+            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Lost & Found", Model.LostFoundEntries.Cast<object>().ToList(), "LostAndFound", "Index")' />
         </div>
         <div class="col-12 col-xl-3">
             <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Package Log", Model.PackageLogs.Cast<object>().ToList(), "MailLog", "Index")' />
@@ -412,11 +418,29 @@
         .room-tile-overlay {
             border-width: 2px;
             transition: transform 0.15s ease, box-shadow 0.15s ease;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 0.4rem;
         }
 
         .room-tile-overlay:hover {
             transform: translateY(-1px);
             box-shadow: 0 6px 14px rgba(15, 46, 97, 0.18);
+        }
+
+        .room-tile-overlay[data-navigate-url]:not([data-navigate-url=""]) {
+            cursor: pointer;
+        }
+
+        .tile-badges--overlay {
+            justify-content: center;
+            gap: 0.25rem;
+        }
+
+        .tile-badges--overlay .badge {
+            font-size: 0.7rem;
+            padding: 0.3rem 0.55rem;
         }
 
         .layout-floor-selector .btn {
@@ -481,6 +505,7 @@
 }
 
 @section Scripts {
+    <script src="~/js/homePackageLog.js"></script>
     <script>
         (() => {
             const overlayView = document.getElementById('layoutOverlayView');
@@ -540,6 +565,34 @@
                 radio.addEventListener('change', () => {
                     if (radio.checked) {
                         setActiveFloor(radio.value);
+                    }
+                });
+            });
+
+            const clickableTiles = document.querySelectorAll('.room-tile-overlay');
+            clickableTiles.forEach(tile => {
+                if (!(tile instanceof HTMLElement)) {
+                    return;
+                }
+
+                const url = tile.dataset.navigateUrl;
+                if (!url) {
+                    return;
+                }
+
+                tile.addEventListener('click', (event) => {
+                    const target = event.target;
+                    if (target instanceof HTMLElement && target.closest('a')) {
+                        return;
+                    }
+
+                    window.location.href = url;
+                });
+
+                tile.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        window.location.href = url;
                     }
                 });
             });
