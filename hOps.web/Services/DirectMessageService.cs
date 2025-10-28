@@ -1,0 +1,299 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using hOps.web.Data;
+using hOps.web.Models;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+
+namespace hOps.web.Services
+{
+    public class DirectMessageService
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly UserManager<ApplicationUser> _userManager;
+
+        public DirectMessageService(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        {
+            _context = context;
+            _userManager = userManager;
+        }
+
+        public async Task<DirectMessageConversation> GetOrCreateConversationAsync(string userId, string otherUserId)
+        {
+            var (participantA, participantB) = NormalizeParticipants(userId, otherUserId);
+
+            var conversation = await _context.DirectMessageConversations
+                .FirstOrDefaultAsync(c => c.ParticipantAId == participantA && c.ParticipantBId == participantB);
+
+            if (conversation != null)
+            {
+                return conversation;
+            }
+
+            conversation = new DirectMessageConversation
+            {
+                ParticipantAId = participantA,
+                ParticipantBId = participantB,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _context.DirectMessageConversations.Add(conversation);
+            await _context.SaveChangesAsync();
+            return conversation;
+        }
+
+        public async Task<DirectMessage> SendMessageAsync(int conversationId, string senderId, string recipientId, string body)
+        {
+            var conversation = await _context.DirectMessageConversations
+                .FirstOrDefaultAsync(c => c.Id == conversationId && (c.ParticipantAId == senderId || c.ParticipantBId == senderId));
+
+            if (conversation == null)
+            {
+                throw new InvalidOperationException("Conversation not found.");
+            }
+
+            if (conversation.ParticipantAId != recipientId && conversation.ParticipantBId != recipientId)
+            {
+                throw new InvalidOperationException("Recipient does not belong to this conversation.");
+            }
+
+            var message = new DirectMessage
+            {
+                ConversationId = conversationId,
+                SenderId = senderId,
+                RecipientId = recipientId,
+                Body = body.Trim(),
+                SentAt = DateTime.UtcNow,
+                IsRead = false
+            };
+
+            _context.DirectMessages.Add(message);
+            conversation.UpdatedAt = message.SentAt;
+
+            _context.UserNotifications.Add(new UserNotification
+            {
+                UserId = recipientId,
+                Type = "message",
+                Title = "New message",
+                Content = body.Length > 140 ? $"{body.Substring(0, 140)}…" : body,
+                LinkUrl = $"/DirectMessages?conversationId={conversationId}",
+                CreatedAt = message.SentAt,
+                DirectMessage = message,
+                IsRead = false
+            });
+
+            await _context.SaveChangesAsync();
+            return message;
+        }
+
+        public async Task<DirectMessage> StartConversationAsync(string senderId, string recipientId, string body)
+        {
+            if (senderId == recipientId)
+            {
+                throw new InvalidOperationException("Cannot start a conversation with yourself.");
+            }
+
+            var conversation = await GetOrCreateConversationAsync(senderId, recipientId);
+            return await SendMessageAsync(conversation.Id, senderId, recipientId, body);
+        }
+
+        public async Task<List<ConversationSummary>> GetConversationSummariesAsync(string userId)
+        {
+            return await _context.DirectMessageConversations
+                .Where(c => c.ParticipantAId == userId || c.ParticipantBId == userId)
+                .Select(c => new ConversationSummary
+                {
+                    ConversationId = c.Id,
+                    OtherUserId = c.ParticipantAId == userId ? c.ParticipantBId : c.ParticipantAId,
+                    LastMessageAt = c.Messages
+                        .OrderByDescending(m => m.SentAt)
+                        .Select(m => (DateTime?)m.SentAt)
+                        .FirstOrDefault(),
+                    LastMessagePreview = c.Messages
+                        .OrderByDescending(m => m.SentAt)
+                        .Select(m => m.Body)
+                        .FirstOrDefault(),
+                    UnreadCount = c.Messages.Count(m => m.RecipientId == userId && !m.IsRead)
+                })
+                .OrderByDescending(c => c.LastMessageAt ?? DateTime.MinValue)
+                .ToListAsync();
+        }
+
+        public async Task<ConversationDetail?> GetConversationDetailAsync(int conversationId, string userId)
+        {
+            var conversation = await _context.DirectMessageConversations
+                .Include(c => c.Messages.OrderBy(m => m.SentAt))
+                .FirstOrDefaultAsync(c => c.Id == conversationId && (c.ParticipantAId == userId || c.ParticipantBId == userId));
+
+            if (conversation == null)
+            {
+                return null;
+            }
+
+            var otherUserId = conversation.ParticipantAId == userId ? conversation.ParticipantBId : conversation.ParticipantAId;
+            var otherUser = await _userManager.Users.FirstOrDefaultAsync(u => u.Id == otherUserId);
+
+            var detail = new ConversationDetail
+            {
+                ConversationId = conversation.Id,
+                OtherUserId = otherUserId ?? string.Empty,
+                OtherUserName = otherUser != null ? BuildDisplayName(otherUser) : "Unknown user",
+                Messages = conversation.Messages
+                    .Select(m => new MessageDetail
+                    {
+                        MessageId = m.Id,
+                        SenderId = m.SenderId,
+                        Body = m.Body,
+                        SentAt = m.SentAt,
+                        IsOwnMessage = m.SenderId == userId,
+                        IsRead = m.IsRead,
+                        ReadAt = m.ReadAt
+                    })
+                    .ToList()
+            };
+
+            var unreadMessages = conversation.Messages
+                .Where(m => m.RecipientId == userId && !m.IsRead)
+                .ToList();
+
+            if (unreadMessages.Count > 0)
+            {
+                var now = DateTime.UtcNow;
+                foreach (var message in unreadMessages)
+                {
+                    message.IsRead = true;
+                    message.ReadAt = now;
+                }
+
+                var notifications = await _context.UserNotifications
+                    .Where(n => n.DirectMessageId != null
+                                && unreadMessages.Select(m => m.Id).Contains(n.DirectMessageId.Value)
+                                && n.UserId == userId
+                                && !n.IsRead)
+                    .ToListAsync();
+
+                foreach (var notification in notifications)
+                {
+                    notification.IsRead = true;
+                    notification.ReadAt = now;
+                }
+
+                await _context.SaveChangesAsync();
+            }
+
+            return detail;
+        }
+
+        public async Task<List<UserNotification>> GetRecentNotificationsAsync(string userId, int take = 10)
+        {
+            return await _context.UserNotifications
+                .Where(n => n.UserId == userId)
+                .OrderByDescending(n => n.CreatedAt)
+                .Take(take)
+                .ToListAsync();
+        }
+
+        public async Task<int> GetUnreadNotificationCountAsync(string userId)
+        {
+            return await _context.UserNotifications
+                .CountAsync(n => n.UserId == userId && !n.IsRead);
+        }
+
+        public async Task MarkNotificationAsReadAsync(int notificationId, string userId)
+        {
+            var notification = await _context.UserNotifications
+                .FirstOrDefaultAsync(n => n.Id == notificationId && n.UserId == userId);
+
+            if (notification == null)
+            {
+                return;
+            }
+
+            if (!notification.IsRead)
+            {
+                notification.IsRead = true;
+                notification.ReadAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task MarkAllNotificationsReadAsync(string userId)
+        {
+            var notifications = await _context.UserNotifications
+                .Where(n => n.UserId == userId && !n.IsRead)
+                .ToListAsync();
+
+            if (notifications.Count == 0)
+            {
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            foreach (var notification in notifications)
+            {
+                notification.IsRead = true;
+                notification.ReadAt = now;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        private static (string First, string Second) NormalizeParticipants(string first, string second)
+        {
+            return string.CompareOrdinal(first, second) <= 0
+                ? (first, second)
+                : (second, first);
+        }
+
+        private static string BuildDisplayName(ApplicationUser user)
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(user.FirstName))
+            {
+                parts.Add(user.FirstName);
+            }
+            if (!string.IsNullOrWhiteSpace(user.LastName))
+            {
+                parts.Add(user.LastName);
+            }
+
+            if (parts.Count > 0)
+            {
+                return string.Join(" ", parts);
+            }
+
+            return string.IsNullOrWhiteSpace(user.Email) ? user.UserName ?? "Unknown user" : user.Email!;
+        }
+    }
+
+    public class ConversationSummary
+    {
+        public int ConversationId { get; set; }
+        public string OtherUserId { get; set; } = string.Empty;
+        public string? LastMessagePreview { get; set; }
+        public DateTime? LastMessageAt { get; set; }
+        public int UnreadCount { get; set; }
+    }
+
+    public class ConversationDetail
+    {
+        public int ConversationId { get; set; }
+        public string OtherUserId { get; set; } = string.Empty;
+        public string OtherUserName { get; set; } = string.Empty;
+        public List<MessageDetail> Messages { get; set; } = new();
+    }
+
+    public class MessageDetail
+    {
+        public int MessageId { get; set; }
+        public string SenderId { get; set; } = string.Empty;
+        public string Body { get; set; } = string.Empty;
+        public DateTime SentAt { get; set; }
+        public bool IsOwnMessage { get; set; }
+        public bool IsRead { get; set; }
+        public DateTime? ReadAt { get; set; }
+    }
+}

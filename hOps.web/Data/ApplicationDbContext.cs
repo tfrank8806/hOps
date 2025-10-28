@@ -42,6 +42,9 @@ namespace hOps.web.Data
         public DbSet<PassOnLogProperty> PassOnLogProperties { get; set; }
         public DbSet<PassOnLogComment> PassOnLogComments { get; set; }
         public DbSet<PassOnLogView> PassOnLogViews { get; set; }
+        public DbSet<DirectMessageConversation> DirectMessageConversations { get; set; }
+        public DbSet<DirectMessage> DirectMessages { get; set; }
+        public DbSet<UserNotification> UserNotifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -180,6 +183,52 @@ namespace hOps.web.Data
             builder.Entity<Bookmark>()
                 .Property(b => b.Description)
                 .HasMaxLength(500);
+
+            builder.Entity<DirectMessageConversation>()
+                .HasIndex(c => new { c.ParticipantAId, c.ParticipantBId })
+                .IsUnique();
+
+            builder.Entity<DirectMessageConversation>()
+                .HasOne(c => c.ParticipantA)
+                .WithMany()
+                .HasForeignKey(c => c.ParticipantAId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<DirectMessageConversation>()
+                .HasOne(c => c.ParticipantB)
+                .WithMany()
+                .HasForeignKey(c => c.ParticipantBId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<DirectMessage>()
+                .HasOne(m => m.Conversation)
+                .WithMany(c => c.Messages)
+                .HasForeignKey(m => m.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<DirectMessage>()
+                .HasOne(m => m.Sender)
+                .WithMany(u => u.SentDirectMessages!)
+                .HasForeignKey(m => m.SenderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<DirectMessage>()
+                .HasOne(m => m.Recipient)
+                .WithMany(u => u.ReceivedDirectMessages!)
+                .HasForeignKey(m => m.RecipientId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<UserNotification>()
+                .HasOne(n => n.User)
+                .WithMany(u => u.Notifications!)
+                .HasForeignKey(n => n.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<UserNotification>()
+                .HasOne(n => n.DirectMessage)
+                .WithMany()
+                .HasForeignKey(n => n.DirectMessageId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

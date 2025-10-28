@@ -1,0 +1,220 @@
+@model hOps.web.ViewModels.Messages.DirectMessagePageViewModel
+
+@{
+    ViewData["Title"] = "Messages";
+    ViewData["MainContainerClass"] = "main-inner--wide";
+}
+
+<div class="row g-4 direct-messages-page align-items-stretch flex-grow-1">
+    <div class="col-lg-3 col-xl-3 col-xxl-2 d-flex">
+        <div class="card shadow-sm flex-fill">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h2 class="h5 mb-0">Conversations</h2>
+                <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#newConversationForm" aria-expanded="false" aria-controls="newConversationForm">
+                    New Message
+                </button>
+            </div>
+            <div class="card-body p-0 d-flex flex-column">
+                <div class="collapse border-bottom" id="newConversationForm">
+                    <form asp-action="Start" method="post" class="p-3">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label for="newConversationRecipient" class="form-label">Recipient</label>
+                            <select class="form-select" id="newConversationRecipient" name="RecipientUserId" required>
+                                <option value="" selected disabled>Select a teammate</option>
+                                @foreach (var option in Model.AvailableRecipients)
+                                {
+                                    <option value="@option.UserId">@option.DisplayName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="newConversationBody" class="form-label">Message</label>
+                            <textarea class="form-control" id="newConversationBody" name="Body" rows="3" maxlength="2000" required></textarea>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#newConversationForm">Cancel</button>
+                            <button class="btn btn-primary btn-sm" type="submit">Send</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="list-group list-group-flush flex-grow-1 overflow-auto">
+                    @if (!Model.Conversations.Any())
+                    {
+                        <div class="list-group-item text-muted">
+                            No conversations yet.
+                        </div>
+                    }
+                    else
+                    {
+                        foreach (var conversation in Model.Conversations)
+                        {
+                            var url = Url.Action("Index", new { conversationId = conversation.ConversationId });
+                            <a href="@url" class="list-group-item list-group-item-action @(Model.ActiveConversation?.ConversationId == conversation.ConversationId ? "active" : "")">
+                                <div class="d-flex justify-content-between">
+                                    <span class="fw-semibold">@conversation.ParticipantName</span>
+                                    @if (conversation.LastMessageAt.HasValue)
+                                    {
+                                        <small class="text-muted">@conversation.LastMessageAt.Value.ToLocalTime().ToString("g")</small>
+                                    }
+                                </div>
+                                <div class="small text-muted @(conversation.HasUnread ? "fw-semibold text-primary" : "")">
+                                    @(string.IsNullOrWhiteSpace(conversation.LastMessagePreview) ? "…" : conversation.LastMessagePreview)
+                                    @if (conversation.HasUnread)
+                                    {
+                                        <span class="badge bg-primary ms-2">@conversation.UnreadCount</span>
+                                    }
+                                </div>
+                            </a>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-9 col-xl-9 col-xxl-10 d-flex">
+        <div class="card shadow-sm flex-fill">
+            <div class="card-header">
+                @if (Model.ActiveConversation != null)
+                {
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="h5 mb-0">@Model.ActiveConversation.ParticipantName</h2>
+                            <small class="text-muted">Direct messages</small>
+                        </div>
+                        <a class="btn btn-outline-secondary btn-sm" href="mailto:@Model.ActiveConversation.ParticipantName">Email</a>
+                    </div>
+                }
+                else
+                {
+                    <h2 class="h5 mb-0">Select a conversation</h2>
+                }
+            </div>
+            <div class="card-body d-flex flex-column gap-3">
+                @if (TempData["DirectMessageMessage"] is string successMessage)
+                {
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        @successMessage
+                        <button class="btn-close" type="button" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+                @if (TempData["DirectMessageError"] is string errorMessage)
+                {
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        @errorMessage
+                        <button class="btn-close" type="button" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+
+                @if (Model.ActiveConversation == null)
+                {
+                    <div class="direct-message-placeholder text-center text-muted py-5">
+                        <p class="fw-semibold mb-1">No conversation selected</p>
+                        <p class="mb-0">Choose a conversation from the left or start a new one.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="direct-message-thread flex-grow-1">
+                        <div class="direct-message-scroll" id="directMessageScroll">
+                            @foreach (var message in Model.ActiveConversation.Messages)
+                            {
+                                <div class="message-bubble @(message.IsOwnMessage ? "message-outgoing" : "message-incoming")">
+                                    <div class="message-meta">
+                                        <span class="message-sender">@message.SenderName</span>
+                                        <span class="message-time text-muted">@message.SentAt.ToString("g")</span>
+                                    </div>
+                                    <div class="message-body">@message.Body</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <form asp-action="Send" method="post" class="direct-message-composer mt-3">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="Form.ConversationId" value="@Model.ActiveConversation.ConversationId" />
+                        <div class="input-group">
+                            <textarea class="form-control" asp-for="Form.Body" rows="2" maxlength="2000" placeholder="Type a message…" required></textarea>
+                            <button class="btn btn-primary" type="submit">Send</button>
+                        </div>
+                        <span asp-validation-for="Form.Body" class="text-danger small"></span>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        .direct-messages-page .list-group-item.active {
+            background: linear-gradient(135deg, #0d6efd 0%, #2575fc 100%);
+            border-color: #0d6efd;
+        }
+
+        .direct-message-thread {
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 auto;
+        }
+
+        .direct-message-scroll {
+            flex: 1 1 auto;
+            max-height: 500px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            padding-right: 0.25rem;
+        }
+
+        .message-bubble {
+            max-width: 75%;
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 12px rgba(15, 46, 97, 0.12);
+        }
+
+        .message-bubble.message-incoming {
+            align-self: flex-start;
+            background-color: #ffffff;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+
+        .message-bubble.message-outgoing {
+            align-self: flex-end;
+            background: linear-gradient(135deg, #0d6efd 0%, #4f8aff 100%);
+            color: #fff;
+        }
+
+        .message-bubble .message-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .message-bubble.message-outgoing .message-meta {
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .message-bubble.message-outgoing .message-body {
+            color: #fff;
+        }
+
+        .direct-message-composer .form-control {
+            resize: vertical;
+        }
+
+        @@media (max-width: 991.98px) {
+            .message-bubble {
+                max-width: 100%;
+            }
+        }
+    </style>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/directMessages.js"></script>
+}

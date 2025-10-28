@@ -20,6 +20,9 @@ namespace hOps.web.Models
         public ICollection<CalendarEvent> CreatedCalendarEvents { get; set; } = new List<CalendarEvent>();
 
         public ICollection<Bookmark> CreatedBookmarks { get; set; } = new List<Bookmark>();
+
+        public ICollection<DirectMessage> SentDirectMessages { get; set; } = new List<DirectMessage>();
+        public ICollection<DirectMessage> ReceivedDirectMessages { get; set; } = new List<DirectMessage>();
+        public ICollection<UserNotification> Notifications { get; set; } = new List<UserNotification>();
     }
 }
-

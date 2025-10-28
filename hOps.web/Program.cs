@@ -34,6 +34,7 @@ builder.Services.AddRazorPages();
 
 // Register email sender
 builder.Services.AddTransient<IEmailSender, EmailSender>();
+builder.Services.AddScoped<DirectMessageService>();
 
 // Add session support
 builder.Services.AddDistributedMemoryCache();
