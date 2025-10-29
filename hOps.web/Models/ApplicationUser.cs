@@ -33,5 +33,6 @@ namespace hOps.web.Models
         public ICollection<DirectMessage> SentDirectMessages { get; set; } = new List<DirectMessage>();
         public ICollection<DirectMessage> ReceivedDirectMessages { get; set; } = new List<DirectMessage>();
         public ICollection<UserNotification> Notifications { get; set; } = new List<UserNotification>();
+        public ICollection<Document> UploadedDocuments { get; set; } = new List<Document>();
     }
 }

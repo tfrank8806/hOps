@@ -1,0 +1,203 @@
+@using hOps.web.Models
+@using Microsoft.AspNetCore.Mvc.Rendering
+@model hOps.web.ViewModels.Documents.DocumentsIndexViewModel
+@{
+    ViewData["Title"] = "Documents";
+    ViewData["MainContainerClass"] = "main-inner--wide";
+    var hasPropertyAccess = Model.HasPropertyAccess;
+    var propertySelectList = Model.PropertyOptions
+        .Select(option => new SelectListItem($"{option.Name} ({option.Code})", option.Id.ToString(), Model.Form.PropertyId == option.Id))
+        .ToList();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Documents</h1>
+</div>
+
+@if (TempData["DocumentSuccess"] is string successMessage)
+{
+    <div class="alert alert-success" role="alert">
+        @successMessage
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-xxl-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Upload Document</h2>
+            </div>
+            <div class="card-body">
+                <form asp-action="Upload" method="post" enctype="multipart/form-data" novalidate>
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Form.Title" class="form-label"></label>
+                        <input asp-for="Form.Title" class="form-control" maxlength="150" />
+                        <span asp-validation-for="Form.Title" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Form.File" class="form-label">File</label>
+                        <input asp-for="Form.File" class="form-control" type="file" />
+                        <span asp-validation-for="Form.File" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label d-block">Who can download?</label>
+                        <div class="vstack gap-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="Form.AccessScope" id="accessScopePropertyOnly" value="@((int)DocumentAccessScope.PropertyOnly)" @(Model.Form.AccessScope == DocumentAccessScope.PropertyOnly ? "checked" : string.Empty) @(hasPropertyAccess ? string.Empty : "disabled") />
+                                <label class="form-check-label" for="accessScopePropertyOnly">
+                                    Users of a single property
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="Form.AccessScope" id="accessScopeSelected" value="@((int)DocumentAccessScope.SelectedProperties)" @(Model.Form.AccessScope == DocumentAccessScope.SelectedProperties ? "checked" : string.Empty) @(hasPropertyAccess ? string.Empty : "disabled") />
+                                <label class="form-check-label" for="accessScopeSelected">
+                                    Users of selected properties
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="Form.AccessScope" id="accessScopeAll" value="@((int)DocumentAccessScope.AllUsers)" @(Model.Form.AccessScope == DocumentAccessScope.AllUsers ? "checked" : string.Empty) />
+                                <label class="form-check-label" for="accessScopeAll">
+                                    All users
+                                </label>
+                            </div>
+                        </div>
+                        <span asp-validation-for="Form.AccessScope" class="text-danger"></span>
+                        @if (!hasPropertyAccess)
+                        {
+                            <div class="form-text">You do not have property access, so property-restricted options are unavailable.</div>
+                        }
+                    </div>
+
+                    <div class="mb-3" id="propertyOnlyFields" style="display: none;">
+                        <label asp-for="Form.PropertyId" class="form-label">Property</label>
+                        <select asp-for="Form.PropertyId" class="form-select" asp-items="propertySelectList">
+                            <option value="">-- Select property --</option>
+                        </select>
+                        <span asp-validation-for="Form.PropertyId" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3" id="selectedPropertiesFields" style="display: none;">
+                        <span asp-validation-for="Form.SelectedPropertyIds" class="text-danger"></span>
+                        @if (Model.PropertyOptions.Count == 0)
+                        {
+                            <p class="text-muted mb-0">No properties available.</p>
+                        }
+                        else
+                        {
+                            <div class="small text-muted mb-2">Select one or more properties.</div>
+                            <div class="vstack gap-2">
+                                @foreach (var option in Model.PropertyOptions)
+                                {
+                                    var checkboxId = $"propertyOption_{option.Id}";
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="Form.SelectedPropertyIds" id="@checkboxId" value="@option.Id" @(option.IsSelected ? "checked" : string.Empty) />
+                                        <label class="form-check-label" for="@checkboxId">@option.Name (@option.Code)</label>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Upload</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-xxl-8">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Available Documents</h2>
+                <span class="badge bg-light text-dark">@Model.Documents.Count document@(Model.Documents.Count == 1 ? string.Empty : "s")</span>
+            </div>
+            <div class="card-body">
+                @if (Model.Documents.Count == 0)
+                {
+                    <p class="text-muted mb-0">No documents have been uploaded yet.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Document</th>
+                                    <th scope="col">Shared With</th>
+                                    <th scope="col" class="text-end">Uploaded</th>
+                                    <th scope="col" class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var doc in Model.Documents)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@doc.DisplayName</div>
+                                            <div class="text-muted small">@doc.OriginalFileName</div>
+                                            <div class="text-muted small">@doc.FileSizeDisplay</div>
+                                        </td>
+                                        <td>
+                                            <div>@doc.AccessSummary</div>
+                                            @if (doc.TargetProperties.Count > 0)
+                                            {
+                                                <ul class="list-unstyled mb-0 small text-muted">
+                                                    @foreach (var propertyLabel in doc.TargetProperties)
+                                                    {
+                                                        <li>@propertyLabel</li>
+                                                    }
+                                                </ul>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            <div>@doc.UploadedAtUtc.ToLocalTime().ToString("g")</div>
+                                            <div class="text-muted small">@doc.UploadedByDisplayName</div>
+                                        </td>
+                                        <td class="text-end">
+                                            <a class="btn btn-outline-primary btn-sm" asp-action="Download" asp-route-id="@doc.Id">Download</a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            const propertyOnlyFields = document.getElementById('propertyOnlyFields');
+            const selectedPropertiesFields = document.getElementById('selectedPropertiesFields');
+
+            function updateVisibility() {
+                const selectedValue = document.querySelector('input[name="Form.AccessScope"]:checked')?.value;
+                const scope = parseInt(selectedValue ?? '-1');
+
+                if (scope === @((int)DocumentAccessScope.PropertyOnly)) {
+                    propertyOnlyFields.style.display = 'block';
+                } else {
+                    propertyOnlyFields.style.display = 'none';
+                }
+
+                if (scope === @((int)DocumentAccessScope.SelectedProperties)) {
+                    selectedPropertiesFields.style.display = 'block';
+                } else {
+                    selectedPropertiesFields.style.display = 'none';
+                }
+            }
+
+            document.querySelectorAll('input[name="Form.AccessScope"]').forEach(radio => {
+                radio.addEventListener('change', updateVisibility);
+            });
+
+            updateVisibility();
+        })();
+    </script>
+}

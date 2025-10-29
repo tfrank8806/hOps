@@ -71,6 +71,11 @@
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link @(currentController == "Documents" ? "active" : string.Empty)" asp-controller="Documents" asp-action="Index">
+                                    <span class="sidebar-text">Documents</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link @(currentController == "LostAndFound" ? "active" : string.Empty)" asp-controller="LostAndFound" asp-action="Index">
                                     <span class="sidebar-text">Lost &amp; Found</span>
                                 </a>

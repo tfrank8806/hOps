@@ -46,6 +46,8 @@ namespace hOps.web.Data
         public DbSet<DirectMessage> DirectMessages { get; set; }
         public DbSet<UserNotification> UserNotifications { get; set; }
         public DbSet<UserDepartmentSubscription> UserDepartmentSubscriptions { get; set; }
+        public DbSet<Document> Documents { get; set; }
+        public DbSet<DocumentProperty> DocumentProperties { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -244,6 +246,33 @@ namespace hOps.web.Data
                 .HasOne(s => s.Department)
                 .WithMany()
                 .HasForeignKey(s => s.DepartmentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<Document>()
+                .HasOne(d => d.UploadedBy)
+                .WithMany(u => u.UploadedDocuments)
+                .HasForeignKey(d => d.UploadedById)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<Document>()
+                .HasOne(d => d.Property)
+                .WithMany(p => p.Documents)
+                .HasForeignKey(d => d.PropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<DocumentProperty>()
+                .HasKey(dp => new { dp.DocumentId, dp.PropertyId });
+
+            builder.Entity<DocumentProperty>()
+                .HasOne(dp => dp.Document)
+                .WithMany(d => d.DocumentProperties)
+                .HasForeignKey(dp => dp.DocumentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<DocumentProperty>()
+                .HasOne(dp => dp.Property)
+                .WithMany(p => p.DocumentLinks)
+                .HasForeignKey(dp => dp.PropertyId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
     }

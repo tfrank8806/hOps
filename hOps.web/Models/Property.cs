@@ -35,6 +35,9 @@ namespace hOps.web.Models
         [InverseProperty(nameof(PassOnLogProperty.Property))]
         public ICollection<PassOnLogProperty> PassOnLogLinks { get; set; } = new List<PassOnLogProperty>();
 
+        public ICollection<Document> Documents { get; set; } = new List<Document>();
+        public ICollection<DocumentProperty> DocumentLinks { get; set; } = new List<DocumentProperty>();
+
         public ICollection<ManagerAnnouncement> ManagerAnnouncements { get; set; } = new List<ManagerAnnouncement>();
 
         public ICollection<BulletinPost> BulletinPosts { get; set; } = new List<BulletinPost>();
