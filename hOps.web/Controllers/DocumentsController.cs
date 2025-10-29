@@ -32,7 +32,7 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int? folderId = null)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -40,13 +40,13 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
-            var viewModel = await BuildIndexViewModelAsync(user, null);
+            var viewModel = await BuildIndexViewModelAsync(user, null, null, folderId);
             return View(viewModel);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Upload(DocumentUploadFormViewModel form)
+        public async Task<IActionResult> Upload([Bind(Prefix = "Form")] DocumentUploadFormViewModel form, int? currentFolderId)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -100,9 +100,23 @@ namespace hOps.web.Controllers
                     break;
             }
 
+            if (form.FolderId.HasValue)
+            {
+                var folderExists = await _context.DocumentFolders.AnyAsync(f => f.Id == form.FolderId.Value);
+                if (!folderExists)
+                {
+                    ModelState.AddModelError(nameof(form.FolderId), "Selected folder was not found.");
+                    form.FolderId = null;
+                }
+            }
+
             if (!ModelState.IsValid)
             {
-                var invalidModel = await BuildIndexViewModelAsync(user, form);
+                var invalidModel = await BuildIndexViewModelAsync(
+                    user,
+                    form,
+                    null,
+                    currentFolderId ?? form.FolderId);
                 return View("Index", invalidModel);
             }
 
@@ -127,6 +141,7 @@ namespace hOps.web.Controllers
                 OriginalFileName = form.File.FileName,
                 ContentType = string.IsNullOrWhiteSpace(form.File.ContentType) ? null : form.File.ContentType,
                 FileSizeBytes = form.File.Length,
+                FolderId = form.FolderId,
                 AccessScope = form.AccessScope,
                 PropertyId = form.AccessScope == DocumentAccessScope.PropertyOnly ? form.PropertyId : null,
                 UploadedById = user.Id,
@@ -148,7 +163,65 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
 
             TempData["DocumentSuccess"] = "Document uploaded successfully.";
+            if (form.FolderId.HasValue)
+            {
+                return RedirectToAction(nameof(Index), new { folderId = form.FolderId.Value });
+            }
+
+            if (currentFolderId.HasValue && currentFolderId.Value == -1)
+            {
+                return RedirectToAction(nameof(Index), new { folderId = -1 });
+            }
+
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateFolder([Bind(Prefix = "FolderForm")] DocumentFolderFormViewModel form, int? currentFolderId)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            form.Name = form.Name?.Trim() ?? string.Empty;
+
+            DocumentFolder? parentFolder = null;
+            if (form.ParentFolderId.HasValue)
+            {
+                parentFolder = await _context.DocumentFolders.FirstOrDefaultAsync(f => f.Id == form.ParentFolderId.Value);
+                if (parentFolder == null)
+                {
+                    ModelState.AddModelError(nameof(form.ParentFolderId), "Selected parent folder was not found.");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(form.Name))
+            {
+                ModelState.AddModelError(nameof(form.Name), "Folder name is required.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                var invalidViewModel = await BuildIndexViewModelAsync(user, null, form, currentFolderId);
+                return View("Index", invalidViewModel);
+            }
+
+            var folder = new DocumentFolder
+            {
+                Name = form.Name,
+                ParentFolderId = form.ParentFolderId,
+                CreatedById = user.Id,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            _context.DocumentFolders.Add(folder);
+            await _context.SaveChangesAsync();
+
+            TempData["DocumentSuccess"] = "Folder created successfully.";
+            return RedirectToAction(nameof(Index), new { folderId = folder.Id });
         }
 
         [HttpGet]
@@ -195,7 +268,11 @@ namespace hOps.web.Controllers
             return PhysicalFile(physicalPath, contentType, downloadName);
         }
 
-        private async Task<DocumentsIndexViewModel> BuildIndexViewModelAsync(ApplicationUser user, DocumentUploadFormViewModel? form)
+        private async Task<DocumentsIndexViewModel> BuildIndexViewModelAsync(
+            ApplicationUser user,
+            DocumentUploadFormViewModel? uploadForm,
+            DocumentFolderFormViewModel? folderForm,
+            int? selectedFolderId)
         {
             var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
             var accessiblePropertySet = accessiblePropertyIds.ToHashSet();
@@ -206,38 +283,68 @@ namespace hOps.web.Controllers
                 currentProperty = null;
             }
 
-            DocumentUploadFormViewModel effectiveForm;
-            if (form == null)
+            var folderEntities = await _context.DocumentFolders
+                .Include(f => f.ParentFolder)
+                .OrderBy(f => f.Name)
+                .ToListAsync();
+
+            var folderLookup = folderEntities.ToDictionary(f => f.Id);
+            var showUnassignedOnly = selectedFolderId.HasValue && selectedFolderId.Value == -1;
+            var actualSelectedFolderId = showUnassignedOnly ? (int?)null : selectedFolderId;
+
+            if (actualSelectedFolderId.HasValue && !folderLookup.ContainsKey(actualSelectedFolderId.Value))
             {
-                effectiveForm = new DocumentUploadFormViewModel
+                actualSelectedFolderId = null;
+            }
+
+            DocumentUploadFormViewModel effectiveUploadForm;
+            if (uploadForm == null)
+            {
+                effectiveUploadForm = new DocumentUploadFormViewModel
                 {
                     AccessScope = accessiblePropertySet.Count > 0 ? DocumentAccessScope.PropertyOnly : DocumentAccessScope.AllUsers,
-                    PropertyId = currentProperty?.Id
+                    PropertyId = currentProperty?.Id,
+                    FolderId = actualSelectedFolderId
                 };
                 if (currentProperty != null)
                 {
-                    effectiveForm.SelectedPropertyIds.Add(currentProperty.Id);
+                    effectiveUploadForm.SelectedPropertyIds.Add(currentProperty.Id);
                 }
             }
             else
             {
-                effectiveForm = new DocumentUploadFormViewModel
+                effectiveUploadForm = new DocumentUploadFormViewModel
                 {
-                    Title = form.Title,
-                    AccessScope = form.AccessScope,
-                    PropertyId = form.PropertyId,
-                    SelectedPropertyIds = form.SelectedPropertyIds?.Distinct().ToList() ?? new List<int>()
+                    Title = uploadForm.Title,
+                    AccessScope = uploadForm.AccessScope,
+                    PropertyId = uploadForm.PropertyId,
+                    SelectedPropertyIds = uploadForm.SelectedPropertyIds?.Distinct().ToList() ?? new List<int>(),
+                    FolderId = uploadForm.FolderId
                 };
             }
 
-            if (effectiveForm.AccessScope == DocumentAccessScope.PropertyOnly && !effectiveForm.PropertyId.HasValue && currentProperty != null)
+            if (effectiveUploadForm.FolderId.HasValue && !folderLookup.ContainsKey(effectiveUploadForm.FolderId.Value))
             {
-                effectiveForm.PropertyId = currentProperty.Id;
+                effectiveUploadForm.FolderId = actualSelectedFolderId;
+            }
+            else if (!effectiveUploadForm.FolderId.HasValue && actualSelectedFolderId.HasValue)
+            {
+                effectiveUploadForm.FolderId = actualSelectedFolderId;
             }
 
-            if (effectiveForm.AccessScope == DocumentAccessScope.SelectedProperties && effectiveForm.SelectedPropertyIds.Count == 0 && currentProperty != null)
+            if (showUnassignedOnly)
             {
-                effectiveForm.SelectedPropertyIds.Add(currentProperty.Id);
+                effectiveUploadForm.FolderId = null;
+            }
+
+            if (effectiveUploadForm.AccessScope == DocumentAccessScope.PropertyOnly && !effectiveUploadForm.PropertyId.HasValue && currentProperty != null)
+            {
+                effectiveUploadForm.PropertyId = currentProperty.Id;
+            }
+
+            if (effectiveUploadForm.AccessScope == DocumentAccessScope.SelectedProperties && effectiveUploadForm.SelectedPropertyIds.Count == 0 && currentProperty != null)
+            {
+                effectiveUploadForm.SelectedPropertyIds.Add(currentProperty.Id);
             }
 
             var propertyOptions = await _context.Properties
@@ -248,13 +355,14 @@ namespace hOps.web.Controllers
                     Id = p.Id,
                     Name = p.Name,
                     Code = p.Code,
-                    IsSelected = effectiveForm.SelectedPropertyIds.Contains(p.Id)
+                    IsSelected = effectiveUploadForm.SelectedPropertyIds.Contains(p.Id)
                 })
                 .ToListAsync();
 
             var documents = await _context.Documents
                 .Include(d => d.UploadedBy)
                 .Include(d => d.Property)
+                .Include(d => d.Folder)
                 .Include(d => d.DocumentProperties)
                     .ThenInclude(dp => dp.Property)
                 .OrderByDescending(d => d.UploadedAtUtc)
@@ -262,20 +370,57 @@ namespace hOps.web.Controllers
 
             var accessibleDocuments = documents
                 .Where(d => UserCanAccessDocument(d, accessiblePropertySet))
-                .Select(ToListItemViewModel)
                 .ToList();
+
+            var folderPathMap = BuildFolderPathMap(folderEntities);
+
+            var filteredDocuments = accessibleDocuments
+                .Where(d => showUnassignedOnly
+                    ? !d.FolderId.HasValue
+                    : !actualSelectedFolderId.HasValue || d.FolderId == actualSelectedFolderId.Value)
+                .Select(d => ToListItemViewModel(d, folderPathMap))
+                .ToList();
+
+            var folderTree = BuildFolderTree(folderEntities, accessibleDocuments, actualSelectedFolderId);
+            var folderOptions = folderTree
+                .Select(node => new DocumentFolderOptionViewModel
+                {
+                    Id = node.Id,
+                    Name = node.Name,
+                    Level = node.Level,
+                    IsSelected = effectiveUploadForm.FolderId == node.Id
+                })
+                .ToList();
+
+            var effectiveFolderForm = folderForm == null
+                ? new DocumentFolderFormViewModel
+                {
+                    ParentFolderId = actualSelectedFolderId
+                }
+                : new DocumentFolderFormViewModel
+                {
+                    Name = folderForm.Name,
+                    ParentFolderId = folderForm.ParentFolderId
+                };
 
             return new DocumentsIndexViewModel
             {
-                Documents = accessibleDocuments,
-                Form = effectiveForm,
+                Documents = filteredDocuments,
+                Form = effectiveUploadForm,
+                FolderOptions = folderOptions,
+                FolderTree = folderTree,
+                FolderForm = effectiveFolderForm,
+                SelectedFolderId = actualSelectedFolderId,
+                ShowingUnassignedOnly = showUnassignedOnly,
+                UnassignedDocumentCount = accessibleDocuments.Count(d => !d.FolderId.HasValue),
+                TotalDocumentCount = accessibleDocuments.Count,
                 PropertyOptions = propertyOptions,
                 CurrentPropertyId = currentProperty?.Id,
                 CurrentPropertyName = currentProperty?.Name
             };
         }
 
-        private static DocumentListItemViewModel ToListItemViewModel(Document document)
+        private static DocumentListItemViewModel ToListItemViewModel(Document document, IReadOnlyDictionary<int, string> folderPathMap)
         {
             var displayName = !string.IsNullOrWhiteSpace(document.Title)
                 ? document.Title!
@@ -310,6 +455,12 @@ namespace hOps.web.Controllers
                 _ => "Restricted"
             };
 
+            string? folderPath = null;
+            if (document.FolderId.HasValue && folderPathMap.TryGetValue(document.FolderId.Value, out var resolvedPath))
+            {
+                folderPath = resolvedPath;
+            }
+
             return new DocumentListItemViewModel
             {
                 Id = document.Id,
@@ -321,8 +472,83 @@ namespace hOps.web.Controllers
                 UploadedByDisplayName = uploaderName,
                 AccessScope = document.AccessScope,
                 AccessSummary = accessSummary,
-                TargetProperties = propertyLabels
+                TargetProperties = propertyLabels,
+                FolderId = document.FolderId,
+                FolderPath = folderPath
             };
+        }
+
+        private static Dictionary<int, string> BuildFolderPathMap(IEnumerable<DocumentFolder> folders)
+        {
+            var lookup = folders.ToDictionary(f => f.Id);
+            var cache = new Dictionary<int, string>();
+
+            foreach (var folder in folders)
+            {
+                BuildFolderPath(folder, lookup, cache);
+            }
+
+            return cache;
+        }
+
+        private static string BuildFolderPath(DocumentFolder folder, IReadOnlyDictionary<int, DocumentFolder> lookup, Dictionary<int, string> cache)
+        {
+            if (cache.TryGetValue(folder.Id, out var existing))
+            {
+                return existing;
+            }
+
+            var path = folder.Name;
+            if (folder.ParentFolderId.HasValue && lookup.TryGetValue(folder.ParentFolderId.Value, out var parent))
+            {
+                path = $"{BuildFolderPath(parent, lookup, cache)} / {folder.Name}";
+            }
+
+            cache[folder.Id] = path;
+            return path;
+        }
+
+        private static List<DocumentFolderTreeItemViewModel> BuildFolderTree(
+            IReadOnlyCollection<DocumentFolder> folders,
+            IReadOnlyCollection<Document> accessibleDocuments,
+            int? selectedFolderId)
+        {
+            var childrenLookup = folders
+                .GroupBy(f => f.ParentFolderId ?? 0)
+                .ToDictionary(g => g.Key, g => g.OrderBy(f => f.Name).ToList());
+
+            var documentCounts = accessibleDocuments
+                .GroupBy(d => d.FolderId ?? 0)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            var tree = new List<DocumentFolderTreeItemViewModel>();
+
+            void AddChildren(int parentKey, int level)
+            {
+                if (!childrenLookup.TryGetValue(parentKey, out var children))
+                {
+                    return;
+                }
+
+                foreach (var child in children)
+                {
+                    var count = documentCounts.TryGetValue(child.Id, out var value) ? value : 0;
+                    tree.Add(new DocumentFolderTreeItemViewModel
+                    {
+                        Id = child.Id,
+                        Name = child.Name,
+                        Level = level,
+                        DocumentCount = count,
+                        IsSelected = selectedFolderId.HasValue && selectedFolderId.Value == child.Id,
+                        ParentFolderId = child.ParentFolderId
+                    });
+
+                    AddChildren(child.Id, level + 1);
+                }
+            }
+
+            AddChildren(0, 0);
+            return tree;
         }
 
         private static string FormatUserName(ApplicationUser? user)

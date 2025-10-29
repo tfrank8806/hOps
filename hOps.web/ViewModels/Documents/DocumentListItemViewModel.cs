@@ -16,5 +16,7 @@ namespace hOps.web.ViewModels.Documents
         public DocumentAccessScope AccessScope { get; set; }
         public string AccessSummary { get; set; } = string.Empty;
         public IReadOnlyList<string> TargetProperties { get; set; } = Array.Empty<string>();
+        public int? FolderId { get; set; }
+        public string? FolderPath { get; set; }
     }
 }

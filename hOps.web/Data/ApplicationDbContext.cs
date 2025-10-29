@@ -47,6 +47,7 @@ namespace hOps.web.Data
         public DbSet<UserNotification> UserNotifications { get; set; }
         public DbSet<UserDepartmentSubscription> UserDepartmentSubscriptions { get; set; }
         public DbSet<Document> Documents { get; set; }
+        public DbSet<DocumentFolder> DocumentFolders { get; set; }
         public DbSet<DocumentProperty> DocumentProperties { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
@@ -255,6 +256,12 @@ namespace hOps.web.Data
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<Document>()
+                .HasOne(d => d.Folder)
+                .WithMany(f => f.Documents)
+                .HasForeignKey(d => d.FolderId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<Document>()
                 .HasOne(d => d.Property)
                 .WithMany(p => p.Documents)
                 .HasForeignKey(d => d.PropertyId)
@@ -274,6 +281,18 @@ namespace hOps.web.Data
                 .WithMany(p => p.DocumentLinks)
                 .HasForeignKey(dp => dp.PropertyId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<DocumentFolder>()
+                .HasOne(f => f.CreatedBy)
+                .WithMany(u => u.CreatedDocumentFolders)
+                .HasForeignKey(f => f.CreatedById)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<DocumentFolder>()
+                .HasOne(f => f.ParentFolder)
+                .WithMany(f => f.SubFolders)
+                .HasForeignKey(f => f.ParentFolderId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

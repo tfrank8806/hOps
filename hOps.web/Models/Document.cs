@@ -24,6 +24,9 @@ namespace hOps.web.Models
 
         public long FileSizeBytes { get; set; }
 
+        public int? FolderId { get; set; }
+        public DocumentFolder? Folder { get; set; }
+
         [Required]
         public DocumentAccessScope AccessScope { get; set; }
 

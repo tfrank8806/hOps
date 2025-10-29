@@ -14,6 +14,9 @@ namespace hOps.web.ViewModels.Documents
         [Required(ErrorMessage = "Please select a file to upload.")]
         public IFormFile? File { get; set; }
 
+        [Display(Name = "Folder")]
+        public int? FolderId { get; set; }
+
         [Display(Name = "Allow Download By")]
         public DocumentAccessScope AccessScope { get; set; } = DocumentAccessScope.PropertyOnly;
 
