@@ -169,6 +169,21 @@
     </div>
 
     <div class="row g-4 mt-1">
+        <div class="col-12 col-xl-3">
+            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Work Orders", Model.WorkOrders.Cast<object>().ToList(), "WorkOrders", "Index")' />
+        </div>
+        <div class="col-12 col-xl-3">
+            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Lost & Found", Model.LostFoundEntries.Cast<object>().ToList(), "LostAndFound", "Index")' />
+        </div>
+        <div class="col-12 col-xl-3">
+            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Package Log", Model.PackageLogs.Cast<object>().ToList(), "MailLog", "Index")' />
+        </div>
+        <div class="col-12 col-xl-3">
+            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Upcoming Events", Model.UpcomingEvents.Cast<object>().ToList(), "Calendar", "Index")' />
+        </div>
+    </div>
+
+    <div class="row g-4 mt-1">
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header d-flex align-items-center justify-content-between">
@@ -314,21 +329,6 @@
                     }
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div class="row g-4 mt-1">
-        <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Work Orders", Model.WorkOrders.Cast<object>().ToList(), "WorkOrders", "Index")' />
-        </div>
-        <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Lost & Found", Model.LostFoundEntries.Cast<object>().ToList(), "LostAndFound", "Index")' />
-        </div>
-        <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Package Log", Model.PackageLogs.Cast<object>().ToList(), "MailLog", "Index")' />
-        </div>
-        <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Upcoming Events", Model.UpcomingEvents.Cast<object>().ToList(), "Calendar", "Index")' />
         </div>
     </div>
 </div>

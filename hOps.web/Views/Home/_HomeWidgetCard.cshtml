@@ -108,7 +108,16 @@
                         }
                         @if (metaParts.Any())
                         {
-                            <div class="text-muted small">@string.Join(" &middot; ", metaParts)</div>
+                            <div class="text-muted small">
+                                @for (var i = 0; i < metaParts.Count; i++)
+                                {
+                                    if (i > 0)
+                                    {
+                                        <span class="mx-1" aria-hidden="true">&middot;</span>
+                                    }
+                                    @metaParts[i]
+                                }
+                            </div>
                         }
                         <div class="text-muted small">Logged @package.LoggedAt.ToLocalTime().ToString("g")</div>
                     </li>
