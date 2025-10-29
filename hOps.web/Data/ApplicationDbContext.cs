@@ -45,6 +45,7 @@ namespace hOps.web.Data
         public DbSet<DirectMessageConversation> DirectMessageConversations { get; set; }
         public DbSet<DirectMessage> DirectMessages { get; set; }
         public DbSet<UserNotification> UserNotifications { get; set; }
+        public DbSet<UserDepartmentSubscription> UserDepartmentSubscriptions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -228,6 +229,21 @@ namespace hOps.web.Data
                 .HasOne(n => n.DirectMessage)
                 .WithMany()
                 .HasForeignKey(n => n.DirectMessageId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<UserDepartmentSubscription>()
+                .HasKey(s => new { s.UserId, s.DepartmentId });
+
+            builder.Entity<UserDepartmentSubscription>()
+                .HasOne(s => s.User)
+                .WithMany(u => u.DepartmentEmailSubscriptions)
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<UserDepartmentSubscription>()
+                .HasOne(s => s.Department)
+                .WithMany()
+                .HasForeignKey(s => s.DepartmentId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
     }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using hOps.web.Data;
@@ -175,6 +176,81 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateEmailPreferences([Bind(Prefix = "EmailPreferences")] EmailPreferencesViewModel model)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return RedirectToAction("Login", "Account", new { area = "Identity" });
+            }
+
+            var allDepartmentIds = await _context.Departments
+                .OrderBy(d => d.Name)
+                .Select(d => d.Id)
+                .ToListAsync();
+
+            var validDepartmentIds = new HashSet<int>(allDepartmentIds);
+
+            var selectedDepartmentIds = model.SelectedDepartmentIds?
+                .Where(id => validDepartmentIds.Contains(id))
+                .Distinct()
+                .ToList() ?? new List<int>();
+
+            user.EmailOnMessage = model.EmailOnMessage;
+            user.EmailOnMention = model.EmailOnMention;
+            user.EmailOnWorkOrderDepartment = model.EmailOnWorkOrderDepartment;
+            user.EmailOnLogEntry = model.EmailOnLogEntry;
+            user.EmailDailySummary = model.EmailDailySummary;
+
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                foreach (var error in updateResult.Errors)
+                {
+                    ModelState.AddModelError(string.Empty, error.Description);
+                }
+
+                model.SelectedDepartmentIds = selectedDepartmentIds;
+                return View("Index", await BuildViewModel(user, emailPreferences: model));
+            }
+
+            var existingSubscriptions = await _context.UserDepartmentSubscriptions
+                .Where(s => s.UserId == user.Id)
+                .ToListAsync();
+
+            var toRemove = existingSubscriptions
+                .Where(s => !selectedDepartmentIds.Contains(s.DepartmentId))
+                .ToList();
+
+            if (toRemove.Any())
+            {
+                _context.UserDepartmentSubscriptions.RemoveRange(toRemove);
+            }
+
+            var existingDepartmentIds = existingSubscriptions
+                .Select(s => s.DepartmentId)
+                .ToHashSet();
+
+            foreach (var departmentId in selectedDepartmentIds)
+            {
+                if (!existingDepartmentIds.Contains(departmentId))
+                {
+                    _context.UserDepartmentSubscriptions.Add(new UserDepartmentSubscription
+                    {
+                        UserId = user.Id,
+                        DepartmentId = departmentId
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["EmailPreferencesUpdated"] = true;
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ChangePassword([Bind(Prefix = "ChangePassword")] ChangePasswordFormViewModel model)
         {
             var user = await _userManager.GetUserAsync(User);
@@ -228,7 +304,8 @@ namespace hOps.web.Controllers
         private async Task<MyProfileViewModel> BuildViewModel(
             ApplicationUser user,
             ProfileFormViewModel? profile = null,
-            ChangePasswordFormViewModel? changePassword = null)
+            ChangePasswordFormViewModel? changePassword = null,
+            EmailPreferencesViewModel? emailPreferences = null)
         {
             var profileVm = profile ?? new ProfileFormViewModel
             {
@@ -264,11 +341,57 @@ namespace hOps.web.Controllers
 
             var changePasswordVm = changePassword ?? new ChangePasswordFormViewModel();
 
+            var departments = await _context.Departments
+                .OrderBy(d => d.Name)
+                .Select(d => new { d.Id, d.Name })
+                .ToListAsync();
+
+            List<int> subscriptionIds;
+            if (emailPreferences != null)
+            {
+                subscriptionIds = emailPreferences.SelectedDepartmentIds?
+                    .Distinct()
+                    .ToList() ?? new List<int>();
+            }
+            else
+            {
+                subscriptionIds = await _context.UserDepartmentSubscriptions
+                    .Where(s => s.UserId == user.Id)
+                    .Select(s => s.DepartmentId)
+                    .ToListAsync();
+            }
+
+            var validDepartmentIds = new HashSet<int>(departments.Select(d => d.Id));
+            subscriptionIds = subscriptionIds
+                .Where(validDepartmentIds.Contains)
+                .ToList();
+
+            var emailPreferencesVm = emailPreferences ?? new EmailPreferencesViewModel
+            {
+                EmailOnMessage = user.EmailOnMessage,
+                EmailOnMention = user.EmailOnMention,
+                EmailOnWorkOrderDepartment = user.EmailOnWorkOrderDepartment,
+                EmailOnLogEntry = user.EmailOnLogEntry,
+                EmailDailySummary = user.EmailDailySummary,
+                SelectedDepartmentIds = subscriptionIds.ToList()
+            };
+
+            emailPreferencesVm.SelectedDepartmentIds = subscriptionIds.ToList();
+            emailPreferencesVm.DepartmentOptions = departments
+                .Select(d => new EmailPreferenceDepartmentOption
+                {
+                    Id = d.Id,
+                    Name = d.Name,
+                    Selected = subscriptionIds.Contains(d.Id)
+                })
+                .ToList();
+
             return new MyProfileViewModel
             {
                 Profile = profileVm,
                 ChangePassword = changePasswordVm,
-                PropertyOptions = propertyOptions
+                PropertyOptions = propertyOptions,
+                EmailPreferences = emailPreferencesVm
             };
         }
     }

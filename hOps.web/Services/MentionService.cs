@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Utilities;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -15,15 +17,18 @@ namespace hOps.web.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IEmailSender _emailSender;
         private readonly ILogger<MentionService> _logger;
 
         public MentionService(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
+            IEmailSender emailSender,
             ILogger<MentionService> logger)
         {
             _context = context;
             _userManager = userManager;
+            _emailSender = emailSender;
             _logger = logger;
         }
 
@@ -81,12 +86,11 @@ namespace hOps.web.Services
                 return;
             }
 
-            var users = await _userManager.Users
+            var mentionedUsers = await _userManager.Users
                 .Where(u => userIds.Contains(u.Id))
-                .Select(u => new { u.Id, Name = BuildDisplayName(u) })
                 .ToListAsync();
 
-            if (!users.Any())
+            if (!mentionedUsers.Any())
             {
                 return;
             }
@@ -95,8 +99,14 @@ namespace hOps.web.Services
             var preview = string.IsNullOrWhiteSpace(excerpt)
                 ? MentionMarkupFormatter.ToDisplayText(content)
                 : excerpt!;
+            if (!string.IsNullOrWhiteSpace(preview) && preview.Length > 240)
+            {
+                preview = $"{preview[..240]}…";
+            }
 
-            foreach (var user in users)
+            var actorName = BuildDisplayName(actor);
+
+            foreach (var user in mentionedUsers)
             {
                 try
                 {
@@ -104,7 +114,7 @@ namespace hOps.web.Services
                     {
                         UserId = user.Id,
                         Type = "mention",
-                        Title = $"{BuildDisplayName(actor)} mentioned you",
+                        Title = $"{actorName} mentioned you",
                         Content = string.IsNullOrWhiteSpace(preview) ? contextTitle : $"{contextTitle}: {preview}",
                         LinkUrl = linkUrl,
                         CreatedAt = now,
@@ -118,6 +128,53 @@ namespace hOps.web.Services
             }
 
             await _context.SaveChangesAsync();
+
+            foreach (var user in mentionedUsers)
+            {
+                await SendMentionEmailAsync(user, actor, contextTitle, linkUrl, preview);
+            }
+        }
+
+        private async Task SendMentionEmailAsync(ApplicationUser recipient, ApplicationUser actor, string contextTitle, string linkUrl, string? preview)
+        {
+            if (!recipient.EmailOnMention || string.IsNullOrWhiteSpace(recipient.Email))
+            {
+                return;
+            }
+
+            var actorName = BuildDisplayName(actor);
+            var safeActor = WebUtility.HtmlEncode(actorName);
+            var safeContext = WebUtility.HtmlEncode(contextTitle);
+
+            var trimmedPreview = preview;
+            if (!string.IsNullOrWhiteSpace(trimmedPreview) && trimmedPreview.Length > 240)
+            {
+                trimmedPreview = $"{trimmedPreview[..240]}…";
+            }
+
+            var safePreview = string.IsNullOrWhiteSpace(trimmedPreview)
+                ? null
+                : WebUtility.HtmlEncode(trimmedPreview);
+
+            var htmlBody = safePreview == null
+                ? $"""
+                    <p>{safeActor} mentioned you in <strong>{safeContext}</strong>.</p>
+                    <p><a href="{linkUrl}">Open HotelOps to see the conversation.</a></p>
+                    """
+                : $"""
+                    <p>{safeActor} mentioned you in <strong>{safeContext}</strong>.</p>
+                    <p style="margin:0 0 1rem 0;">{safePreview}</p>
+                    <p><a href="{linkUrl}">Open HotelOps to see the conversation.</a></p>
+                    """;
+
+            try
+            {
+                await _emailSender.SendEmailAsync(recipient.Email!, $"{actorName} mentioned you", htmlBody);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unable to send mention email notification to user {UserId}", recipient.Id);
+            }
         }
 
         private static string BuildDisplayName(ApplicationUser user)

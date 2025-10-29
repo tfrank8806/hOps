@@ -1,3 +1,4 @@
+using System;
 using Microsoft.AspNetCore.Identity;
 
 #nullable enable
@@ -12,10 +13,18 @@ namespace hOps.web.Models
 
         public bool MustChangePassword { get; set; } = false;
 
+        public bool EmailOnMessage { get; set; } = true;
+        public bool EmailOnMention { get; set; } = true;
+        public bool EmailOnWorkOrderDepartment { get; set; } = true;
+        public bool EmailOnLogEntry { get; set; } = true;
+        public bool EmailDailySummary { get; set; } = false;
+        public DateTime? DailySummaryLastSentUtc { get; set; }
+
         public int? DefaultPropertyId { get; set; }
         public Property? DefaultProperty { get; set; }
 
         public ICollection<UserPropertyAccess>? UserPropertyAccesses { get; set; }
+        public ICollection<UserDepartmentSubscription> DepartmentEmailSubscriptions { get; set; } = new List<UserDepartmentSubscription>();
 
         public ICollection<CalendarEvent> CreatedCalendarEvents { get; set; } = new List<CalendarEvent>();
 

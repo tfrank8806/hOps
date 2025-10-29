@@ -5,7 +5,10 @@ using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System.Net;
 
 namespace hOps.web.Services
 {
@@ -13,11 +16,19 @@ namespace hOps.web.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IEmailSender _emailSender;
+        private readonly ILogger<DirectMessageService> _logger;
 
-        public DirectMessageService(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public DirectMessageService(
+            ApplicationDbContext context,
+            UserManager<ApplicationUser> userManager,
+            IEmailSender emailSender,
+            ILogger<DirectMessageService> logger)
         {
             _context = context;
             _userManager = userManager;
+            _emailSender = emailSender;
+            _logger = logger;
         }
 
         public async Task<DirectMessageConversation> GetOrCreateConversationAsync(string userId, string otherUserId)
@@ -86,6 +97,7 @@ namespace hOps.web.Services
             });
 
             await _context.SaveChangesAsync();
+            await SendMessageEmailAsync(message, senderId, recipientId);
             return message;
         }
 
@@ -239,6 +251,36 @@ namespace hOps.web.Services
             }
 
             await _context.SaveChangesAsync();
+        }
+
+        private async Task SendMessageEmailAsync(DirectMessage message, string senderId, string recipientId)
+        {
+            var recipient = await _userManager.FindByIdAsync(recipientId);
+            if (recipient == null || !recipient.EmailOnMessage || string.IsNullOrWhiteSpace(recipient.Email))
+            {
+                return;
+            }
+
+            var sender = await _userManager.FindByIdAsync(senderId);
+            var senderName = sender != null ? BuildDisplayName(sender) : "A colleague";
+            var preview = message.Body.Length > 200 ? $"{message.Body[..200]}…" : message.Body;
+            var safePreview = WebUtility.HtmlEncode(preview);
+            var safeSender = WebUtility.HtmlEncode(senderName);
+            var link = $"/DirectMessages?conversationId={message.ConversationId}";
+            var htmlBody = $"""
+                <p>{safeSender} sent you a new message.</p>
+                <p style="margin:0 0 1rem 0;"><em>{safePreview}</em></p>
+                <p><a href="{link}">Open the conversation</a></p>
+                """;
+
+            try
+            {
+                await _emailSender.SendEmailAsync(recipient.Email!, "New message in HotelOps", htmlBody);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unable to send direct message email notification to user {UserId}", recipientId);
+            }
         }
 
         private static (string First, string Second) NormalizeParticipants(string first, string second)

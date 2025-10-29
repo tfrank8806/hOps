@@ -5,9 +5,13 @@ using hOps.web.Utilities;
 using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System.Net;
+using System.Text;
 
 namespace hOps.web.Controllers
 {
@@ -18,11 +22,20 @@ namespace hOps.web.Controllers
         private const string SortOldest = "oldest";
 
         private readonly MentionService _mentionService;
+        private readonly IEmailSender _emailSender;
+        private readonly ILogger<PassOnLogsController> _logger;
 
-        public PassOnLogsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, MentionService mentionService)
+        public PassOnLogsController(
+            ApplicationDbContext context,
+            UserManager<ApplicationUser> userManager,
+            MentionService mentionService,
+            IEmailSender emailSender,
+            ILogger<PassOnLogsController> logger)
             : base(context, userManager)
         {
             _mentionService = mentionService;
+            _emailSender = emailSender;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index(string? sortOrder, DateTime? startDate, DateTime? endDate, string? creatorId, string? searchTerm)
@@ -239,7 +252,86 @@ namespace hOps.web.Controllers
                 link,
                 log.Body);
 
+            await SendLogEntryEmailsAsync(log, currentUser, link);
+
             return RedirectToAction(nameof(Details), new { id = log.Id });
+        }
+
+        private async Task SendLogEntryEmailsAsync(PassOnLog log, ApplicationUser actor, string linkUrl)
+        {
+            await _context.Entry(log)
+                .Collection(l => l.Properties)
+                .Query()
+                .Include(lp => lp.Property)
+                .LoadAsync();
+
+            var propertyIds = log.Properties.Select(lp => lp.PropertyId).Distinct().ToList();
+
+            var recipientsQuery = _context.Users
+                .Where(u => u.EmailOnLogEntry
+                            && !string.IsNullOrWhiteSpace(u.Email)
+                            && !string.Equals(u.Id, actor.Id));
+
+            if (propertyIds.Any())
+            {
+                recipientsQuery = recipientsQuery.Where(u =>
+                    u.UserPropertyAccesses != null &&
+                    u.UserPropertyAccesses.Any(upa => propertyIds.Contains(upa.PropertyId)));
+            }
+
+            var recipients = await recipientsQuery.ToListAsync();
+            if (!recipients.Any())
+            {
+                return;
+            }
+
+            var propertyNames = log.Properties
+                .Select(lp => lp.Property?.Name ?? $"Property #{lp.PropertyId}")
+                .Distinct()
+                .ToList();
+
+            var actorName = FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
+            var subject = $"New log: {log.Title}";
+            var preview = MentionMarkupFormatter.ToDisplayText(log.Body ?? string.Empty);
+            if (!string.IsNullOrWhiteSpace(preview) && preview.Length > 500)
+            {
+                preview = $"{preview[..500]}…";
+            }
+
+            var safeActor = WebUtility.HtmlEncode(actorName);
+            var safeTitle = WebUtility.HtmlEncode(log.Title);
+            var safePreview = string.IsNullOrWhiteSpace(preview)
+                ? null
+                : WebUtility.HtmlEncode(preview).Replace("\r\n", "\n").Replace("\n", "<br/>");
+            var safeProperties = propertyNames.Any()
+                ? string.Join(", ", propertyNames.Select(WebUtility.HtmlEncode))
+                : null;
+
+            var bodyBuilder = new StringBuilder();
+            bodyBuilder.AppendLine($@"<p>{safeActor} posted a new log titled <strong>{safeTitle}</strong>.</p>");
+            if (safeProperties != null)
+            {
+                bodyBuilder.AppendLine($@"<p><strong>Properties:</strong> {safeProperties}</p>");
+            }
+            if (safePreview != null)
+            {
+                bodyBuilder.AppendLine($@"<p><strong>Summary:</strong><br/>{safePreview}</p>");
+            }
+            bodyBuilder.AppendLine($@"<p><a href=""{linkUrl}"">Review the log</a></p>");
+
+            var htmlBody = bodyBuilder.ToString();
+
+            foreach (var recipient in recipients)
+            {
+                try
+                {
+                    await _emailSender.SendEmailAsync(recipient.Email!, subject, htmlBody);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unable to send log email notification to user {UserId}", recipient.Id);
+                }
+            }
         }
 
         [HttpGet]

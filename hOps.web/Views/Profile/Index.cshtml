@@ -14,6 +14,10 @@
 {
     <div class="alert alert-success">Your password has been changed.</div>
 }
+@if (TempData["EmailPreferencesUpdated"] != null)
+{
+    <div class="alert alert-success">Your email alert preferences have been updated.</div>
+}
 
 <div class="row">
     <div class="col-lg-7">
@@ -88,6 +92,62 @@
                     </div>
                     <div class="text-end">
                         <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="card mb-4">
+            <div class="card-header fw-bold">Email Alerts</div>
+            <div class="card-body">
+                <form asp-action="UpdateEmailPreferences" method="post">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" asp-for="EmailPreferences.EmailOnMessage" />
+                        <label class="form-check-label" asp-for="EmailPreferences.EmailOnMessage"></label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" asp-for="EmailPreferences.EmailOnMention" />
+                        <label class="form-check-label" asp-for="EmailPreferences.EmailOnMention"></label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" asp-for="EmailPreferences.EmailOnLogEntry" />
+                        <label class="form-check-label" asp-for="EmailPreferences.EmailOnLogEntry"></label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" asp-for="EmailPreferences.EmailOnWorkOrderDepartment" />
+                        <label class="form-check-label" asp-for="EmailPreferences.EmailOnWorkOrderDepartment"></label>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Departments for work order alerts</label>
+                        @if (Model.EmailPreferences.DepartmentOptions?.Any() == true)
+                        {
+                            <div class="d-flex flex-column gap-1">
+                                @foreach (var option in Model.EmailPreferences.DepartmentOptions)
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               name="EmailPreferences.SelectedDepartmentIds"
+                                               value="@option.Id"
+                                               id="departmentOption_@option.Id"
+                                               @(option.Selected ? "checked" : null) />
+                                        <label class="form-check-label" for="departmentOption_@option.Id">@option.Name</label>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted small mb-0">No departments are available.</p>
+                        }
+                        <div class="form-text">Select departments to receive alerts when new work orders are assigned.</div>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" asp-for="EmailPreferences.EmailDailySummary" />
+                        <label class="form-check-label" asp-for="EmailPreferences.EmailDailySummary"></label>
+                        <div class="form-text">Daily summary emails include new or ongoing logs and bulletin posts.</div>
+                    </div>
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-outline-primary">Save Email Preferences</button>
                     </div>
                 </form>
             </div>

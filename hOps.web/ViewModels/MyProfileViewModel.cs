@@ -53,10 +53,39 @@ namespace hOps.web.ViewModels
         public string? ConfirmPassword { get; set; }
     }
 
+    public class EmailPreferencesViewModel
+    {
+        [Display(Name = "Email me when I receive a direct message")]
+        public bool EmailOnMessage { get; set; }
+
+        [Display(Name = "Email me when I am mentioned")]
+        public bool EmailOnMention { get; set; }
+
+        [Display(Name = "Email me when new work orders are assigned to my selected departments")]
+        public bool EmailOnWorkOrderDepartment { get; set; }
+
+        [Display(Name = "Email me when new log entries are created")]
+        public bool EmailOnLogEntry { get; set; }
+
+        [Display(Name = "Send me a daily summary email")]
+        public bool EmailDailySummary { get; set; }
+
+        public List<int> SelectedDepartmentIds { get; set; } = new();
+        public List<EmailPreferenceDepartmentOption> DepartmentOptions { get; set; } = new();
+    }
+
+    public class EmailPreferenceDepartmentOption
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public bool Selected { get; set; }
+    }
+
     public class MyProfileViewModel
     {
         public ProfileFormViewModel Profile { get; set; } = new();
         public ChangePasswordFormViewModel ChangePassword { get; set; } = new();
         public IEnumerable<SelectListItem> PropertyOptions { get; set; } = Enumerable.Empty<SelectListItem>();
+        public EmailPreferencesViewModel EmailPreferences { get; set; } = new();
     }
 }

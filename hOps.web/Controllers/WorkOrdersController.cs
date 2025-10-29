@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Text;
 using ClosedXML.Excel;
 using hOps.web.Data;
 using hOps.web.Models;
@@ -10,6 +12,7 @@ using hOps.web.ViewModels.WorkOrders;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +28,7 @@ namespace hOps.web.Controllers
         private readonly IConfiguration _configuration;
         private readonly ILogger<WorkOrdersController> _logger;
         private readonly MentionService _mentionService;
+        private readonly IEmailSender _emailSender;
 
         public WorkOrdersController(
             ApplicationDbContext context,
@@ -32,12 +36,14 @@ namespace hOps.web.Controllers
             IWebHostEnvironment environment,
             IConfiguration configuration,
             ILogger<WorkOrdersController> logger,
-            MentionService mentionService) : base(context, userManager)
+            MentionService mentionService,
+            IEmailSender emailSender) : base(context, userManager)
         {
             _environment = environment;
             _configuration = configuration;
             _logger = logger;
             _mentionService = mentionService;
+            _emailSender = emailSender;
         }
 
         [HttpGet]
@@ -208,12 +214,135 @@ namespace hOps.web.Controllers
                 workOrderLink,
                 workOrder.Issue);
 
+            await SendDepartmentAlertEmailsAsync(workOrder, workOrderLink, user);
+
             if (form.DepartmentId.HasValue)
             {
                 _logger.LogInformation("Work order {WorkOrderId} assigned to department {DepartmentId}", workOrder.Id, form.DepartmentId);
             }
 
             return RedirectToAction(nameof(Index));
+        }
+
+        private async Task SendDepartmentAlertEmailsAsync(WorkOrder workOrder, string workOrderLink, ApplicationUser? createdBy)
+        {
+            if (!workOrder.DepartmentId.HasValue)
+            {
+                return;
+            }
+
+            await _context.Entry(workOrder).Reference(w => w.Department).LoadAsync();
+            await _context.Entry(workOrder)
+                .Collection(w => w.Properties)
+                .Query()
+                .Include(p => p.Property)
+                .LoadAsync();
+
+            var departmentId = workOrder.DepartmentId.Value;
+
+            var recipients = await _context.Users
+                .Where(u => u.EmailOnWorkOrderDepartment
+                            && u.DepartmentEmailSubscriptions.Any(s => s.DepartmentId == departmentId)
+                            && !string.IsNullOrWhiteSpace(u.Email)
+                            && (createdBy == null || u.Id != createdBy.Id))
+                .ToListAsync();
+
+            if (!recipients.Any())
+            {
+                return;
+            }
+
+            var departmentName = workOrder.Department?.Name ?? "department";
+            var subject = $"New work order #{workOrder.Id} assigned to {departmentName}";
+            var actorName = BuildUserDisplayName(createdBy);
+            var safeActor = WebUtility.HtmlEncode(actorName);
+            var safeDepartment = WebUtility.HtmlEncode(departmentName);
+            var safeIssue = WebUtility.HtmlEncode(workOrder.Issue ?? string.Empty);
+            var safeLocation = string.IsNullOrWhiteSpace(workOrder.Location) ? null : WebUtility.HtmlEncode(workOrder.Location);
+            var dueDateValue = workOrder.DueDate;
+            var dueDateText = dueDateValue == default
+                ? "Not set"
+                : dueDateValue.ToLocalTime().ToString("MMM d, yyyy h:mm tt");
+            dueDateText = WebUtility.HtmlEncode(dueDateText);
+
+            var detailPreview = string.IsNullOrWhiteSpace(workOrder.Details) ? null : workOrder.Details.Trim();
+            if (!string.IsNullOrWhiteSpace(detailPreview) && detailPreview.Length > 500)
+            {
+                detailPreview = $"{detailPreview[..500]}…";
+            }
+            var safeDetails = string.IsNullOrWhiteSpace(detailPreview)
+                ? null
+                : WebUtility.HtmlEncode(detailPreview).Replace("\r\n", "\n").Replace("\n", "<br/>");
+
+            var propertyNames = workOrder.Properties
+                .Select(p => p.Property?.Name ?? $"Property #{p.PropertyId}")
+                .Distinct()
+                .ToList();
+            var safeProperties = propertyNames.Any()
+                ? string.Join(", ", propertyNames.Select(WebUtility.HtmlEncode))
+                : null;
+
+            var bodyBuilder = new StringBuilder();
+            bodyBuilder.AppendLine($@"<p>{safeActor} created a new work order assigned to <strong>{safeDepartment}</strong>.</p>");
+            bodyBuilder.AppendLine($@"<p><strong>Issue:</strong> {safeIssue}</p>");
+            if (safeLocation != null)
+            {
+                bodyBuilder.AppendLine($@"<p><strong>Location:</strong> {safeLocation}</p>");
+            }
+            bodyBuilder.AppendLine($@"<p><strong>Due Date:</strong> {dueDateText}</p>");
+            if (safeProperties != null)
+            {
+                bodyBuilder.AppendLine($@"<p><strong>Properties:</strong> {safeProperties}</p>");
+            }
+            if (safeDetails != null)
+            {
+                bodyBuilder.AppendLine($@"<p><strong>Details:</strong><br/>{safeDetails}</p>");
+            }
+            bodyBuilder.AppendLine($@"<p><a href=""{workOrderLink}"">Open work order</a></p>");
+
+            var htmlBody = bodyBuilder.ToString();
+
+            foreach (var recipient in recipients)
+            {
+                try
+                {
+                    await _emailSender.SendEmailAsync(recipient.Email!, subject, htmlBody);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unable to send work order email notification to user {UserId}", recipient.Id);
+                }
+            }
+        }
+
+        private static string BuildUserDisplayName(ApplicationUser? user)
+        {
+            if (user == null)
+            {
+                return "A teammate";
+            }
+
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(user.FirstName))
+            {
+                parts.Add(user.FirstName);
+            }
+            if (!string.IsNullOrWhiteSpace(user.LastName))
+            {
+                parts.Add(user.LastName);
+            }
+
+            if (parts.Count > 0)
+            {
+                return string.Join(" ", parts);
+            }
+
+            if (!string.IsNullOrWhiteSpace(user.Email))
+            {
+                return user.Email!;
+            }
+
+            return "A teammate";
         }
 
         private async Task<List<int>> GetAccessiblePropertyIdsAsync(ApplicationUser? user)
