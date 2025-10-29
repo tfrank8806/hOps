@@ -1,3 +1,4 @@
+﻿using hOps.web.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,12 +29,18 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(int? conversationId)
+        public async Task<IActionResult> Index(int? conversationId, string? userId)
         {
             var currentUser = await _userManager.GetUserAsync(User);
             if (currentUser == null)
             {
                 return Challenge();
+            }
+
+            if (!conversationId.HasValue && !string.IsNullOrWhiteSpace(userId) && !string.Equals(userId, currentUser.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                var conversation = await _messageService.GetOrCreateConversationAsync(currentUser.Id, userId);
+                conversationId = conversation.Id;
             }
 
             var summaries = await _messageService.GetConversationSummariesAsync(currentUser.Id);
@@ -57,7 +64,9 @@ namespace hOps.web.Controllers
                         ConversationId = summary.ConversationId,
                         ParticipantId = summary.OtherUserId,
                         ParticipantName = other?.Name ?? "Unknown user",
-                        LastMessagePreview = summary.LastMessagePreview,
+                        LastMessagePreview = string.IsNullOrWhiteSpace(summary.LastMessagePreview)
+                            ? null
+                            : MentionMarkupFormatter.ToDisplayText(summary.LastMessagePreview),
                         LastMessageAt = summary.LastMessageAt,
                         HasUnread = summary.UnreadCount > 0,
                         UnreadCount = summary.UnreadCount
@@ -212,3 +221,4 @@ namespace hOps.web.Controllers
         }
     }
 }
+

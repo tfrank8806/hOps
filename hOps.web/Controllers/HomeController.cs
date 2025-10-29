@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using hOps.web.Data;
 using hOps.web.Models;
+using hOps.web.Services;
 using hOps.web.ViewModels.Home;
 using hOps.web.ViewModels.WorkOrders;
 using Microsoft.AspNetCore.Authorization;
@@ -15,9 +16,12 @@ namespace hOps.web.Controllers
 {
     public class HomeController : BaseController
     {
-        public HomeController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        private readonly MentionService _mentionService;
+
+        public HomeController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, MentionService mentionService)
             : base(context, userManager)
         {
+            _mentionService = mentionService;
         }
 
         public async Task<IActionResult> Index()
@@ -86,6 +90,10 @@ namespace hOps.web.Controllers
                 return Forbid();
             }
 
+            var property = await _context.Properties
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == form.PropertyId);
+
             var announcement = await _context.ManagerAnnouncements
                 .FirstOrDefaultAsync(a => a.PropertyId == form.PropertyId);
 
@@ -109,6 +117,12 @@ namespace hOps.web.Controllers
             }
 
             await _context.SaveChangesAsync();
+            await _mentionService.CreateMentionNotificationsAsync(
+                announcement.Content,
+                user,
+                $"Announcement at {property?.Name ?? "your property"}",
+                Url.Action(nameof(Index), "Home", null, Request.Scheme) ?? "/",
+                announcement.Content);
             TempData["HomeMessage"] = "Manager announcement updated.";
             return RedirectToAction(nameof(Index));
         }
@@ -135,6 +149,10 @@ namespace hOps.web.Controllers
                 return Forbid();
             }
 
+            var property = await _context.Properties
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == form.PropertyId);
+
             var post = new BulletinPost
             {
                 PropertyId = form.PropertyId,
@@ -145,6 +163,13 @@ namespace hOps.web.Controllers
 
             _context.BulletinPosts.Add(post);
             await _context.SaveChangesAsync();
+
+            await _mentionService.CreateMentionNotificationsAsync(
+                post.Content,
+                user,
+                $"Bulletin at {property?.Name ?? "your property"}",
+                Url.Action(nameof(Index), "Home", null, Request.Scheme) ?? "/",
+                post.Content);
 
             TempData["HomeMessage"] = "Bulletin item added.";
             return RedirectToAction(nameof(Index));
@@ -172,6 +197,10 @@ namespace hOps.web.Controllers
                 return Forbid();
             }
 
+            var property = await _context.Properties
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == form.PropertyId);
+
             var post = await _context.BulletinPosts
                 .FirstOrDefaultAsync(p => p.Id == form.Id.Value && p.PropertyId == form.PropertyId);
 
@@ -194,6 +223,12 @@ namespace hOps.web.Controllers
             post.UpdatedById = user.Id;
 
             await _context.SaveChangesAsync();
+            await _mentionService.CreateMentionNotificationsAsync(
+                post.Content,
+                user,
+                $"Bulletin at {property?.Name ?? "your property"}",
+                Url.Action(nameof(Index), "Home", null, Request.Scheme) ?? "/",
+                post.Content);
             TempData["HomeMessage"] = "Bulletin entry updated.";
             return RedirectToAction(nameof(Index));
         }

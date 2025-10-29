@@ -1,5 +1,7 @@
-using hOps.web.Data;
+﻿using hOps.web.Data;
 using hOps.web.Models;
+using hOps.web.Services;
+using hOps.web.Utilities;
 using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -15,9 +17,12 @@ namespace hOps.web.Controllers
         private const string SortNewest = "newest";
         private const string SortOldest = "oldest";
 
-        public PassOnLogsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        private readonly MentionService _mentionService;
+
+        public PassOnLogsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, MentionService mentionService)
             : base(context, userManager)
         {
+            _mentionService = mentionService;
         }
 
         public async Task<IActionResult> Index(string? sortOrder, DateTime? startDate, DateTime? endDate, string? creatorId, string? searchTerm)
@@ -224,6 +229,16 @@ namespace hOps.web.Controllers
             _context.PassOnLogs.Add(log);
             await _context.SaveChangesAsync();
 
+            var link = Url.Action(nameof(Details), "PassOnLogs", new { id = log.Id }, Request.Scheme)
+                ?? Url.Action(nameof(Index), "PassOnLogs") ?? "/PassOnLogs";
+
+            await _mentionService.CreateMentionNotificationsAsync(
+                log.Body,
+                currentUser,
+                $"Pass On Log: {log.Title}",
+                link,
+                log.Body);
+
             return RedirectToAction(nameof(Details), new { id = log.Id });
         }
 
@@ -340,6 +355,16 @@ namespace hOps.web.Controllers
 
             await _context.SaveChangesAsync();
 
+            var link = Url.Action(nameof(Details), "PassOnLogs", new { id = log.Id }, Request.Scheme)
+                ?? Url.Action(nameof(Index), "PassOnLogs") ?? "/PassOnLogs";
+
+            await _mentionService.CreateMentionNotificationsAsync(
+                log.Body,
+                currentUser,
+                $"Pass On Log: {log.Title}",
+                link,
+                log.Body);
+
             return RedirectToAction(nameof(Details), new { id = log.Id });
         }
 
@@ -440,23 +465,33 @@ namespace hOps.web.Controllers
             _context.PassOnLogComments.Add(comment);
             await _context.SaveChangesAsync();
 
+            var link = Url.Action(nameof(Details), "PassOnLogs", new { id = log.Id }, Request.Scheme)
+                ?? Url.Action(nameof(Index), "PassOnLogs") ?? "/PassOnLogs";
+
+            await _mentionService.CreateMentionNotificationsAsync(
+                comment.Body,
+                currentUser,
+                $"Pass On Log Comment: {log.Title}",
+                link,
+                comment.Body);
+
             return RedirectToAction(nameof(Details), new { id = log.Id });
         }
 
         private static string BuildPreview(string body)
         {
-            if (string.IsNullOrWhiteSpace(body))
+            var preview = MentionMarkupFormatter.ToDisplayText(body ?? string.Empty)
+                .ReplaceLineEndings(" ")
+                .Trim();
+
+            if (string.IsNullOrWhiteSpace(preview))
             {
                 return string.Empty;
             }
 
-            var preview = body.ReplaceLineEndings(" ").Trim();
-            if (preview.Length <= 180)
-            {
-                return preview;
-            }
-
-            return preview[..180] + "…";
+            return preview.Length <= 180
+                ? preview
+                : $"{preview[..180]}…";
         }
 
         private async Task<List<Property>> GetAccessiblePropertiesAsync(string userId)
@@ -565,3 +600,9 @@ namespace hOps.web.Controllers
         }
     }
 }
+
+
+
+
+
+

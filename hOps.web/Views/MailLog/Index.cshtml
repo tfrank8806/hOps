@@ -1,3 +1,4 @@
+@using hOps.web.Utilities
 @model hOps.web.ViewModels.MailLog.MailLogIndexViewModel
 
 @{
@@ -82,7 +83,7 @@
                         </div>
                         <div class="col-12">
                             <label asp-for="Form.Notes" class="form-label"></label>
-                            <textarea asp-for="Form.Notes" class="form-control" rows="2"></textarea>
+                            <textarea asp-for="Form.Notes" class="form-control" rows="2" data-enable-mentions="true"></textarea>
                             <span asp-validation-for="Form.Notes" class="text-danger"></span>
                         </div>
                         <div class="col-12 d-flex justify-content-end gap-2">
@@ -128,7 +129,16 @@
                                             <td>@(string.IsNullOrWhiteSpace(entry.StorageLocation) ? "-" : entry.StorageLocation)</td>
                                             <td>@(entry.ArrivalDate.HasValue ? entry.ArrivalDate.Value.ToString("MMM d, yyyy") : "-")</td>
                                             <td>@(entry.DepartureDate.HasValue ? entry.DepartureDate.Value.ToString("MMM d, yyyy") : "-")</td>
-                                            <td class="notes-cell">@(!string.IsNullOrWhiteSpace(entry.Notes) ? entry.Notes : "-")</td>
+                                            <td class="notes-cell">
+                                                @if (!string.IsNullOrWhiteSpace(entry.Notes))
+                                                {
+                                                    @Html.Raw(MentionMarkupFormatter.ToHtml(entry.Notes))
+                                                }
+                                                else
+                                                {
+                                                    @("-")
+                                                }
+                                            </td>
                                             <td>@(string.IsNullOrWhiteSpace(entry.LoggedByName) ? "-" : entry.LoggedByName)</td>
                                             <td class="delivered-cell">
                                                 <span class="badge @(entry.Delivered ? "text-bg-success" : "text-bg-secondary")">

@@ -18,7 +18,9 @@ var builder = WebApplication.CreateBuilder(args);
 // ----------------------
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlite(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqliteOptions => sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
@@ -35,6 +37,7 @@ builder.Services.AddRazorPages();
 // Register email sender
 builder.Services.AddTransient<IEmailSender, EmailSender>();
 builder.Services.AddScoped<DirectMessageService>();
+builder.Services.AddScoped<MentionService>();
 
 // Add session support
 builder.Services.AddDistributedMemoryCache();
@@ -43,6 +46,12 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromMinutes(30);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
+});
+var httpsPort = builder.Configuration.GetValue<int?>("HttpsPort")
+    ?? builder.Configuration.GetValue<int?>("ASPNETCORE_HTTPS_PORT");
+builder.Services.AddHttpsRedirection(options =>
+{
+    options.HttpsPort = httpsPort;
 });
 
 var app = builder.Build();

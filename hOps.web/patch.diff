@@ -1,0 +1,20 @@
+*** Begin Patch
+*** Update File: Controllers\PassOnLogsController.cs
+@@
+-            await _context.SaveChangesAsync();
+-
+-            return RedirectToAction(nameof(Details), new { id = log.Id });
++            await _context.SaveChangesAsync();
++
++            var link = Url.Action(nameof(Details), "PassOnLogs", new { id = log.Id }, Request.Scheme)
++                ?? Url.Action(nameof(Index), "PassOnLogs") ?? "/PassOnLogs";
++
++            await _mentionService.CreateMentionNotificationsAsync(
++                log.Body,
++                currentUser,
++                $"Pass On Log: {log.Title}",
++                link,
++                log.Body);
++
++            return RedirectToAction(nameof(Details), new { id = log.Id });
+*** End Patch

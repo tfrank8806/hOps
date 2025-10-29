@@ -428,3 +428,21 @@ body.sidebar-collapsed .sidebar .sidebar-inner {
     }
 }
 
+
+.mention {
+    color: #0d6efd !important;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.mention:hover,
+.mention:focus {
+    text-decoration: underline;
+}
+
+.mention-suggestions .dropdown-item.active,
+.mention-suggestions .dropdown-item:focus {
+    background-color: #0d6efd;
+    color: #fff;
+}
+

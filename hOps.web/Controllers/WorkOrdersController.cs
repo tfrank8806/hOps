@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using ClosedXML.Excel;
 using hOps.web.Data;
 using hOps.web.Models;
+using hOps.web.Services;
 using hOps.web.ViewModels.WorkOrders;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -23,17 +24,20 @@ namespace hOps.web.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly IConfiguration _configuration;
         private readonly ILogger<WorkOrdersController> _logger;
+        private readonly MentionService _mentionService;
 
         public WorkOrdersController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             IWebHostEnvironment environment,
             IConfiguration configuration,
-            ILogger<WorkOrdersController> logger) : base(context, userManager)
+            ILogger<WorkOrdersController> logger,
+            MentionService mentionService) : base(context, userManager)
         {
             _environment = environment;
             _configuration = configuration;
             _logger = logger;
+            _mentionService = mentionService;
         }
 
         [HttpGet]
@@ -112,6 +116,11 @@ namespace hOps.web.Controllers
         {
             var filters = new WorkOrderFilterInput();
             var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
             var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
 
             if (!accessiblePropertyIds.Any())
@@ -188,6 +197,16 @@ namespace hOps.web.Controllers
 
             _context.WorkOrders.Add(workOrder);
             await _context.SaveChangesAsync();
+
+            var workOrderLink = Url.Action(nameof(Index), "WorkOrders", new { highlight = workOrder.Id }, Request.Scheme)
+                ?? Url.Action(nameof(Index), "WorkOrders") ?? "/WorkOrders";
+
+            await _mentionService.CreateMentionNotificationsAsync(
+                $"{workOrder.Issue}\n{workOrder.Details}",
+                user!,
+                $"Work Order #{workOrder.Id}",
+                workOrderLink,
+                workOrder.Issue);
 
             if (form.DepartmentId.HasValue)
             {
@@ -432,3 +451,4 @@ namespace hOps.web.Controllers
         }
     }
 }
+

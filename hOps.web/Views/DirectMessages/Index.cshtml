@@ -1,3 +1,4 @@
+@using hOps.web.Utilities
 @model hOps.web.ViewModels.Messages.DirectMessagePageViewModel
 
 @{
@@ -30,7 +31,7 @@
                         </div>
                         <div class="mb-3">
                             <label for="newConversationBody" class="form-label">Message</label>
-                            <textarea class="form-control" id="newConversationBody" name="Body" rows="3" maxlength="2000" required></textarea>
+                            <textarea class="form-control" id="newConversationBody" name="Body" rows="3" maxlength="2000" required data-enable-mentions="true"></textarea>
                         </div>
                         <div class="d-flex justify-content-end gap-2">
                             <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#newConversationForm">Cancel</button>
@@ -124,7 +125,7 @@
                                         <span class="message-sender">@message.SenderName</span>
                                         <span class="message-time text-muted">@message.SentAt.ToString("g")</span>
                                     </div>
-                                    <div class="message-body">@message.Body</div>
+                                    <div class="message-body">@Html.Raw(MentionMarkupFormatter.ToHtml(message.Body))</div>
                                 </div>
                             }
                         </div>
@@ -134,7 +135,7 @@
                         @Html.AntiForgeryToken()
                         <input type="hidden" asp-for="Form.ConversationId" value="@Model.ActiveConversation.ConversationId" />
                         <div class="input-group">
-                            <textarea class="form-control" asp-for="Form.Body" rows="2" maxlength="2000" placeholder="Type a message…" required></textarea>
+                            <textarea class="form-control" asp-for="Form.Body" rows="2" maxlength="2000" placeholder="Type a message…" required data-enable-mentions="true"></textarea>
                             <button class="btn btn-primary" type="submit">Send</button>
                         </div>
                         <span asp-validation-for="Form.Body" class="text-danger small"></span>

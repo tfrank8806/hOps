@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
+using hOps.web.Services;
 using hOps.web.ViewModels.MailLog;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -16,14 +17,17 @@ namespace hOps.web.Controllers
     public class MailLogController : BaseController
     {
         private readonly ILogger<MailLogController> _logger;
+        private readonly MentionService _mentionService;
 
         public MailLogController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            ILogger<MailLogController> logger)
+            ILogger<MailLogController> logger,
+            MentionService mentionService)
             : base(context, userManager)
         {
             _logger = logger;
+            _mentionService = mentionService;
         }
 
         [HttpGet]
@@ -77,6 +81,15 @@ namespace hOps.web.Controllers
 
             _context.PackageLogEntries.Add(entry);
             await _context.SaveChangesAsync();
+
+            var link = Url.Action(nameof(Index), "MailLog", null, Request.Scheme) ?? "/MailLog";
+
+            await _mentionService.CreateMentionNotificationsAsync(
+                entry.Notes,
+                user,
+                $"Mail Log Entry for {entry.RecipientName}",
+                link,
+                entry.Notes);
 
             TempData["MailLogMessage"] = "Package entry added.";
             return RedirectToAction(nameof(Index));

@@ -1,3 +1,4 @@
+@using hOps.web.Utilities
 @model BookmarksIndexViewModel
 @{ 
     ViewData["Title"] = "Bookmarks";
@@ -43,7 +44,7 @@
                     </div>
                     <div class="mb-3">
                         <label asp-for="Form.Description" class="form-label"></label>
-                        <textarea asp-for="Form.Description" class="form-control" rows="3"></textarea>
+                        <textarea asp-for="Form.Description" class="form-control" rows="3" data-enable-mentions="true"></textarea>
                         <span asp-validation-for="Form.Description" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
@@ -103,7 +104,7 @@
                                                 <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
                                                 @if (!string.IsNullOrWhiteSpace(bookmark.Description))
                                                 {
-                                                    <div class="text-muted small mt-1">@bookmark.Description</div>
+                                                    <div class="text-muted small mt-1">@Html.Raw(MentionMarkupFormatter.ToHtml(bookmark.Description))</div>
                                                 }
                                                 @if (bookmark.CreatedBy is not null)
                                                 {
@@ -155,7 +156,7 @@
                                                                 </div>
                                                                 <div class="mb-3">
                                                                     <label class="form-label" for="bookmark-edit-description-@bookmark.Id">Description</label>
-                                                                    <textarea class="form-control" id="bookmark-edit-description-@bookmark.Id" name="Description" rows="3" maxlength="500">@bookmark.Description</textarea>
+                                                                    <textarea class="form-control" id="bookmark-edit-description-@bookmark.Id" name="Description" rows="3" maxlength="500" data-enable-mentions="true">@bookmark.Description</textarea>
                                                                 </div>
                                                             </div>
                                                             <div class="modal-footer">
@@ -203,7 +204,7 @@
                                                 <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
                                                 @if (!string.IsNullOrWhiteSpace(bookmark.Description))
                                                 {
-                                                    <div class="text-muted small mt-1">@bookmark.Description</div>
+                                                    <div class="text-muted small mt-1">@Html.Raw(MentionMarkupFormatter.ToHtml(bookmark.Description))</div>
                                                 }
                                                 @if (bookmark.CreatedBy is not null)
                                                 {
@@ -255,7 +256,7 @@
                                                                 </div>
                                                                 <div class="mb-3">
                                                                     <label class="form-label" for="bookmark-edit-description-@bookmark.Id">Description</label>
-                                                                    <textarea class="form-control" id="bookmark-edit-description-@bookmark.Id" name="Description" rows="3" maxlength="500">@bookmark.Description</textarea>
+                                                                    <textarea class="form-control" id="bookmark-edit-description-@bookmark.Id" name="Description" rows="3" maxlength="500" data-enable-mentions="true">@bookmark.Description</textarea>
                                                                 </div>
                                                             </div>
                                                             <div class="modal-footer">
@@ -295,7 +296,7 @@
                                                 <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
                                                 @if (!string.IsNullOrWhiteSpace(bookmark.Description))
                                                 {
-                                                    <div class="text-muted small mt-1">@bookmark.Description</div>
+                                                    <div class="text-muted small mt-1">@Html.Raw(MentionMarkupFormatter.ToHtml(bookmark.Description))</div>
                                                 }
                                             </div>
                                             <div class="d-flex align-items-center gap-2 flex-shrink-0">
@@ -329,7 +330,7 @@
                                                             </div>
                                                             <div class="mb-3">
                                                                 <label class="form-label" for="bookmark-edit-description-@bookmark.Id">Description</label>
-                                                                <textarea class="form-control" id="bookmark-edit-description-@bookmark.Id" name="Description" rows="3" maxlength="500">@bookmark.Description</textarea>
+                                                                <textarea class="form-control" id="bookmark-edit-description-@bookmark.Id" name="Description" rows="3" maxlength="500" data-enable-mentions="true">@bookmark.Description</textarea>
                                                             </div>
                                                         </div>
                                                         <div class="modal-footer">
