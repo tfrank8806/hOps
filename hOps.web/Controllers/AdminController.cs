@@ -40,24 +40,61 @@ namespace hOps.web.Controllers
         // List all users + roles + property access
         public async Task<IActionResult> Users()
         {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+                return Challenge();
+
+            var currentRoles = await _userManager.GetRolesAsync(currentUser);
+            var isAdmin = currentRoles.Contains("Admin");
+            HashSet<int> accessiblePropertyIds = new();
+
+            if (!isAdmin)
+            {
+                accessiblePropertyIds = (await _context.UserPropertyAccesses
+                        .Where(upa => upa.ApplicationUserId == currentUser.Id)
+                        .Select(upa => upa.PropertyId)
+                        .Distinct()
+                        .ToListAsync())
+                    .ToHashSet();
+            }
+
             var users = await _userManager.Users.ToListAsync();
             var vmList = new List<UserWithAccessViewModel>();
 
             foreach (var u in users)
             {
+                var propertyIds = await _context.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == u.Id)
+                    .Select(upa => upa.PropertyId)
+                    .ToListAsync();
+                var userRoles = (await _userManager.GetRolesAsync(u)).ToList();
+
+                if (!isAdmin)
+                {
+                    if (userRoles.Contains("Admin"))
+                    {
+                        continue;
+                    }
+
+                    var canView = u.Id == currentUser.Id
+                                  || propertyIds.Count == 0
+                                  || accessiblePropertyIds.Overlaps(propertyIds);
+
+                    if (!canView)
+                    {
+                        continue;
+                    }
+                }
+
                 var vm = new UserWithAccessViewModel
                 {
                     Id = u.Id,
                     Email = u.Email ?? "",
                     FirstName = u.FirstName,
                     LastName = u.LastName,
-                    Roles = (await _userManager.GetRolesAsync(u)).ToList()
+                    Roles = userRoles,
+                    PropertyIds = propertyIds
                 };
-
-                vm.PropertyIds = await _context.UserPropertyAccesses
-                    .Where(upa => upa.ApplicationUserId == u.Id)
-                    .Select(upa => upa.PropertyId)
-                    .ToListAsync();
 
                 vmList.Add(vm);
             }
@@ -89,16 +126,44 @@ namespace hOps.web.Controllers
             if (currentUser == null)
                 return Challenge();
             var currentRoles = await _userManager.GetRolesAsync(currentUser);
+            var isAdmin = currentRoles.Contains("Admin");
+            var targetRoles = (await _userManager.GetRolesAsync(user)).ToList();
+
+            if (!isAdmin && targetRoles.Contains("Admin"))
+            {
+                return Forbid();
+            }
+
+            HashSet<int> accessiblePropertyIds;
+            if (isAdmin)
+            {
+                accessiblePropertyIds = allProperties.Select(p => p.Id).ToHashSet();
+            }
+            else
+            {
+                accessiblePropertyIds = (await _context.UserPropertyAccesses
+                        .Where(upa => upa.ApplicationUserId == currentUser.Id)
+                        .Select(upa => upa.PropertyId)
+                        .Distinct()
+                        .ToListAsync())
+                    .ToHashSet();
+
+                var canEdit = user.Id == currentUser.Id
+                              || userProps.Count == 0
+                              || accessiblePropertyIds.Overlaps(userProps);
+
+                if (!canEdit)
+                {
+                    return Forbid();
+                }
+            }
 
             List<Property> assignableProps = allProperties;
-            if (currentRoles.Contains("Manager") && !currentRoles.Contains("Admin"))
+            if (!isAdmin)
             {
-                var managerPropIds = await _context.UserPropertyAccesses
-                    .Where(upa => upa.ApplicationUserId == currentUser.Id)
-                    .Select(upa => upa.PropertyId)
-                    .ToListAsync();
-
-                assignableProps = allProperties.Where(p => managerPropIds.Contains(p.Id)).ToList();
+                assignableProps = allProperties
+                    .Where(p => accessiblePropertyIds.Contains(p.Id))
+                    .ToList();
             }
 
             // Roles data
@@ -106,7 +171,7 @@ namespace hOps.web.Controllers
                 .Where(r => r.Name != null)
                 .Select(r => r.Name!)
                 .ToListAsync();
-            var userRoles = (await _userManager.GetRolesAsync(user))
+            var userRoles = targetRoles
                 .Where(r => !string.IsNullOrWhiteSpace(r))
                 .Select(r => r!)
                 .ToList();
@@ -140,17 +205,45 @@ namespace hOps.web.Controllers
             if (currentUser == null)
                 return Challenge();
             var currentRoles = await _userManager.GetRolesAsync(currentUser);
+            var isAdmin = currentRoles.Contains("Admin");
+
+            var targetRoles = (await _userManager.GetRolesAsync(user)).ToList();
+            if (!isAdmin && targetRoles.Contains("Admin"))
+            {
+                return Forbid();
+            }
+
+            var targetPropertyIds = await _context.UserPropertyAccesses
+                .Where(upa => upa.ApplicationUserId == user.Id)
+                .Select(upa => upa.PropertyId)
+                .ToListAsync();
+
+            HashSet<int> accessiblePropertyIds;
+            if (isAdmin)
+            {
+                accessiblePropertyIds = allProperties.Select(p => p.Id).ToHashSet();
+            }
+            else
+            {
+                accessiblePropertyIds = (await _context.UserPropertyAccesses
+                        .Where(upa => upa.ApplicationUserId == currentUser.Id)
+                        .Select(upa => upa.PropertyId)
+                        .Distinct()
+                        .ToListAsync())
+                    .ToHashSet();
+
+                var canEdit = user.Id == currentUser.Id
+                              || targetPropertyIds.Count == 0
+                              || accessiblePropertyIds.Overlaps(targetPropertyIds);
+
+                if (!canEdit)
+                {
+                    return Forbid();
+                }
+            }
 
             // Determine allowed properties
-            HashSet<int> allowedPropIds = allProperties.Select(p => p.Id).ToHashSet();
-            if (currentRoles.Contains("Manager") && !currentRoles.Contains("Admin"))
-            {
-                var mgrPropIds = await _context.UserPropertyAccesses
-                    .Where(upa => upa.ApplicationUserId == currentUser.Id)
-                    .Select(upa => upa.PropertyId)
-                    .ToListAsync();
-                allowedPropIds = mgrPropIds.ToHashSet();
-            }
+            var allowedPropIds = accessiblePropertyIds;
 
             // Remove existing accesses that are within allowed set
             var existingAccesses = await _context.UserPropertyAccesses
@@ -177,7 +270,7 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
 
             // Handle role assignments
-            var currentUserRoles = (await _userManager.GetRolesAsync(user))
+            var currentUserRoles = targetRoles
                 .Where(r => !string.IsNullOrWhiteSpace(r))
                 .Select(r => r!)
                 .ToList();
