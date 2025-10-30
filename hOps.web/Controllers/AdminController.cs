@@ -207,9 +207,14 @@ namespace hOps.web.Controllers
 
         public async Task<IActionResult> AccessRequests()
         {
-            var requests = await _context.UserAccessRequests
-                .Where(r => !r.IsRejected && !_context.Users.Any(u => u.Email == r.Email))
-                .ToListAsync();
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            var requests = await LoadVisibleAccessRequestsAsync(currentUser, roles);
 
             return View(requests);
         }
@@ -217,9 +222,15 @@ namespace hOps.web.Controllers
         [HttpGet]
         public async Task<JsonResult> GetPendingAccessRequestCount()
         {
-            var count = await _context.UserAccessRequests
-                .CountAsync(r => !r.IsRejected && !_context.Users.Any(u => u.Email == r.Email));
-            return Json(count);
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Json(0);
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            var requests = await LoadVisibleAccessRequestsAsync(currentUser, roles);
+            return Json(requests.Count);
         }
 
         [HttpPost]
@@ -348,6 +359,52 @@ HotelOps Admin Team
         {
             return characterSet[RandomNumberGenerator.GetInt32(characterSet.Length)];
         }
+
+        private async Task<List<UserAccessRequest>> LoadVisibleAccessRequestsAsync(ApplicationUser currentUser, IList<string> currentRoles)
+        {
+            var pendingRequests = await _context.UserAccessRequests
+                .Where(r => !r.IsRejected && !_context.Users.Any(u => u.Email == r.Email))
+                .OrderBy(r => r.RequestedAt)
+                .ToListAsync();
+
+            if (currentRoles.Contains("Admin"))
+            {
+                return pendingRequests;
+            }
+
+            var accessiblePropertyIds = await _context.UserPropertyAccesses
+                .Where(upa => upa.ApplicationUserId == currentUser.Id)
+                .Select(upa => upa.PropertyId)
+                .Distinct()
+                .ToListAsync();
+
+            if (!accessiblePropertyIds.Any())
+            {
+                return new List<UserAccessRequest>();
+            }
+
+            var accessibleCodes = await _context.Properties
+                .Where(p => accessiblePropertyIds.Contains(p.Id) && !string.IsNullOrWhiteSpace(p.Code))
+                .Select(p => p.Code!)
+                .ToListAsync();
+
+            var normalizedCodes = new HashSet<string>(
+                accessibleCodes
+                    .Where(code => !string.IsNullOrWhiteSpace(code))
+                    .Select(code => code.Trim().ToUpperInvariant()));
+
+            if (normalizedCodes.Count == 0)
+            {
+                return new List<UserAccessRequest>();
+            }
+
+            return pendingRequests
+                .Where(r =>
+                    !string.IsNullOrWhiteSpace(r.PropertyCode) &&
+                    normalizedCodes.Contains(r.PropertyCode.Trim().ToUpperInvariant()))
+                .ToList();
+        }
+
         public IActionResult Settings()
         {
             return View();
