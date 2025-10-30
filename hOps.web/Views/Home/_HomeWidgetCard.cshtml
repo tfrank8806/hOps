@@ -7,6 +7,24 @@
 
 @{
     var items = Model.Items ?? Array.Empty<object>();
+
+    string GetDateColor(DateTime dateTime)
+    {
+        var localDate = dateTime.ToLocalTime().Date;
+        var today = DateTime.Today;
+
+        if (localDate >= today)
+        {
+            return "#198754"; // bootstrap green
+        }
+
+        if (localDate == today.AddDays(-1))
+        {
+            return "#fd7e14"; // orange
+        }
+
+        return "#dc3545"; // bootstrap red
+    }
 }
 
 <div class="card shadow-sm h-100">
@@ -44,7 +62,7 @@
                             </div>
                             <span class="badge" style="background-color:@hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetColor(order.Status)">@order.Status</span>
                         </div>
-                        <div class="text-muted small mt-1">Opened @order.CreatedAt.ToLocalTime().ToString("g")</div>
+                        <div class="small mt-1" style="color:@GetDateColor(order.CreatedAt);">Opened @order.CreatedAt.ToLocalTime().ToString("g")</div>
                     </li>
                 }
             </ul>
@@ -66,7 +84,7 @@
                             <span class="fw-semibold">@entry.Title</span>
                         }
                         <div class="text-muted small">@entry.Type.ToString() &middot; @entry.Status.ToString()</div>
-                        <div class="text-muted small">Logged @entry.CreatedAt.ToLocalTime().ToString("g")</div>
+                        <div class="small" style="color:@GetDateColor(entry.CreatedAt);">Logged @entry.CreatedAt.ToLocalTime().ToString("g")</div>
                     </li>
                 }
             </ul>
@@ -119,7 +137,7 @@
                                 }
                             </div>
                         }
-                        <div class="text-muted small">Logged @package.LoggedAt.ToLocalTime().ToString("g")</div>
+                        <div class="small" style="color:@GetDateColor(package.LoggedAt);">Logged @package.LoggedAt.ToLocalTime().ToString("g")</div>
                     </li>
                 }
             </ul>
@@ -140,7 +158,7 @@
                         {
                             <span class="fw-semibold">@calendarEvent.Title</span>
                         }
-                        <div class="text-muted small">@calendarEvent.Start.ToLocalTime().ToString("g") @if (calendarEvent.End.HasValue){<text>- @calendarEvent.End.Value.ToLocalTime().ToString("g")</text>}</div>
+                        <div class="small" style="color:@GetDateColor(calendarEvent.Start);">@calendarEvent.Start.ToLocalTime().ToString("g") @if (calendarEvent.End.HasValue){<text>- @calendarEvent.End.Value.ToLocalTime().ToString("g")</text>}</div>
                         @if (!string.IsNullOrWhiteSpace(calendarEvent.CategoryName))
                         {
                             <span class="badge rounded-pill" style="background-color:@(calendarEvent.CategoryColor ?? "#0d6efd");">@calendarEvent.CategoryName</span>
