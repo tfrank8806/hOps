@@ -24,8 +24,8 @@
 </div>
 
 <div class="card mb-4">
-    <div class="card-body log-body">
-        @Html.Raw(MentionMarkupFormatter.ToHtml(Model.Body))
+    <div class="card-body log-body rich-text-output">
+        @Html.Raw(RichTextRenderer.ToHtml(Model.Body))
     </div>
 </div>
 
@@ -41,7 +41,7 @@
                         {
                             <li class="mb-3">
                                 <div class="fw-semibold">@comment.CreatorName <span class="text-muted small">@comment.CreatedAt.ToLocalTime().ToString("g")</span></div>
-                                <div class="comment-body">@Html.Raw(MentionMarkupFormatter.ToHtml(comment.Body))</div>
+                                <div class="comment-body rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(comment.Body))</div>
                             </li>
                         }
                     </ul>
@@ -56,7 +56,8 @@
                         <input type="hidden" asp-for="NewComment.LogId" />
                         <div class="mb-3">
                             <label asp-for="NewComment.Body" class="form-label"></label>
-                            <textarea asp-for="NewComment.Body" class="form-control" rows="3" placeholder="Share an update or clarification..." data-enable-mentions="true"></textarea>
+                            <textarea asp-for="NewComment.Body" class="form-control" rows="3" placeholder="Share an update or clarification..." data-enable-mentions="true" data-rich-text="true"></textarea>
+                            <div class="form-text">Basic formatting works here too for quick emphasis.</div>
                             <span asp-validation-for="NewComment.Body" class="text-danger"></span>
                         </div>
                         <button type="submit" class="btn btn-primary">Post Comment</button>

@@ -81,6 +81,29 @@ namespace hOps.web.Utilities
             });
         }
 
+        public static string ReplaceMentionsWithPlaceholders(string? content, out List<MentionToken> tokens)
+        {
+            if (string.IsNullOrEmpty(content))
+            {
+                tokens = new List<MentionToken>();
+                return string.Empty;
+            }
+
+            var index = 0;
+            var collected = new List<MentionToken>();
+            var replaced = MentionRegex.Replace(content, match =>
+            {
+                var name = GetGroupValue(match, "name", "plainName");
+                var userId = DecodeIdentifier(GetGroupValue(match, "id", "plainId"));
+                var placeholder = $"[[MENTION_{index++}]]";
+                collected.Add(new MentionToken(placeholder, name, userId));
+                return placeholder;
+            });
+
+            tokens = collected;
+            return replaced;
+        }
+
         private static string GetGroupValue(Match match, string primaryGroup, string fallbackGroup)
         {
             var value = match.Groups[primaryGroup].Value;
@@ -129,5 +152,6 @@ namespace hOps.web.Utilities
         }
 
         public readonly record struct MentionReference(string UserId, string DisplayName);
+        public readonly record struct MentionToken(string Placeholder, string DisplayName, string UserId);
     }
 }

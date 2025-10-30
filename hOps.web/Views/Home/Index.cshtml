@@ -48,7 +48,7 @@
                     }
                     else
                     {
-                        <div class="announcement-content">@Html.Raw(MentionMarkupFormatter.ToHtml(Model.Announcement.Content))</div>
+                        <div class="announcement-content rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(Model.Announcement.Content))</div>
                         if (Model.Announcement.UpdatedAt.HasValue)
                         {
                             <p class="text-muted small mb-0 mt-2">Last updated @Model.Announcement.UpdatedAt.Value.ToLocalTime().ToString("g") @if (!string.IsNullOrWhiteSpace(Model.Announcement.UpdatedByName)){<text> by @Model.Announcement.UpdatedByName</text>}</p>
@@ -63,7 +63,8 @@
                                 <input type="hidden" name="PropertyId" value="@property!.Id" />
                                 <div class="mb-3">
                                     <label for="announcementContent" class="form-label">Announcement</label>
-                                    <textarea class="form-control" id="announcementContent" name="Content" rows="6" maxlength="4000" data-enable-mentions="true">@Model.Announcement.Content</textarea>
+                                    <textarea class="form-control" id="announcementContent" name="Content" rows="6" maxlength="4000" data-enable-mentions="true" data-rich-text="true">@Model.Announcement.Content</textarea>
+                                    <div class="form-text">Use the toolbar for bold, italic, underline, lists, and quotes. Markdown shortcuts also work.</div>
                                 </div>
                                 <div class="d-flex justify-content-end gap-2">
                                     <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#announcementEditor">Cancel</button>
@@ -97,7 +98,8 @@
                             <input type="hidden" name="PropertyId" value="@property!.Id" />
                             <div class="mb-2">
                                 <label for="newBulletinContent" class="form-label">Share an update</label>
-                            <textarea class="form-control" id="newBulletinContent" name="Content" rows="3" maxlength="2000" placeholder="Add a note for the team" required data-enable-mentions="true"></textarea>
+                                <textarea class="form-control" id="newBulletinContent" name="Content" rows="3" maxlength="2000" placeholder="Add a note for the team" required data-enable-mentions="true" data-rich-text="true"></textarea>
+                                <div class="form-text">Formatting supports bold, italic, underline, lists, and quotes to highlight key details.</div>
                             </div>
                             <div class="d-flex justify-content-end">
                                 <button type="submit" class="btn btn-primary">Post to Bulletin</button>
@@ -138,7 +140,7 @@
                                                 </div>
                                             }
                                         </div>
-                                        <div class="bulletin-content">@Html.Raw(MentionMarkupFormatter.ToHtml(post.Content))</div>
+                                        <div class="bulletin-content rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(post.Content))</div>
 
                                         @if (post.CanEdit)
                                         {
@@ -149,7 +151,8 @@
                                                     <input type="hidden" name="PropertyId" value="@property!.Id" />
                                                     <div class="mb-2">
                                                         <label class="form-label" for="bulletinContent_@post.Id">Edit message</label>
-                                                        <textarea class="form-control" id="bulletinContent_@post.Id" name="Content" rows="3" maxlength="2000" data-enable-mentions="true">@post.Content</textarea>
+                                                        <textarea class="form-control" id="bulletinContent_@post.Id" name="Content" rows="3" maxlength="2000" data-enable-mentions="true" data-rich-text="true">@post.Content</textarea>
+                                                        <div class="form-text">Use the toolbar to emphasize changes before saving.</div>
                                                     </div>
                                                     <div class="d-flex justify-content-end gap-2">
                                                         <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#@collapseId">Cancel</button>
@@ -336,11 +339,6 @@
 
 @section Styles {
     <style>
-        .announcement-content,
-        .bulletin-content {
-            white-space: pre-wrap;
-        }
-
         .bulletin-item .btn-group {
             gap: 0.5rem;
         }

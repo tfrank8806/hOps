@@ -10,6 +10,7 @@
         "dependencies": {
           "ClosedXML": "0.104.0",
           "MailKit": "4.14.0",
+          "Markdig": "0.39.0",
           "Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore": "8.0.20",
           "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "8.0.20",
           "Microsoft.AspNetCore.Identity.UI": "8.0.20",
@@ -668,6 +669,14 @@
           "lib/net8.0/MailKit.dll": {
             "assemblyVersion": "4.14.0.0",
             "fileVersion": "4.14.0.0"
+          }
+        }
+      },
+      "Markdig/0.39.0": {
+        "runtime": {
+          "lib/net8.0/Markdig.dll": {
+            "assemblyVersion": "0.39.0.0",
+            "fileVersion": "0.39.0.0"
           }
         }
       },
@@ -2713,6 +2722,13 @@
       "sha512": "sha512-x1J8KIXGP8bWiiLox9g/hSdecqdDcOr9mZa4lumPjT1rvd+mnVm2pOOB4sYgABYcwW2uI7mAQMk7M+4OBD9iiA==",
       "path": "mailkit/4.14.0",
       "hashPath": "mailkit.4.14.0.nupkg.sha512"
+    },
+    "Markdig/0.39.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-3QgYSNxOdxsKPhzGZYUTdLi7kkljfC0ZEJlPNw+MvwVS26VaaMMrUIPm8ywzAKcqSW51Le2/yiHgNZpQoyLt6A==",
+      "path": "markdig/0.39.0",
+      "hashPath": "markdig.0.39.0.nupkg.sha512"
     },
     "Microsoft.AspNetCore.Cryptography.Internal/8.0.20": {
       "type": "package",

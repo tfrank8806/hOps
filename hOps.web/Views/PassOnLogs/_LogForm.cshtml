@@ -10,7 +10,8 @@
 
 <div class="mb-3">
     <label asp-for="Body" class="form-label"></label>
-    <textarea asp-for="Body" class="form-control" rows="8" data-enable-mentions="true"></textarea>
+    <textarea asp-for="Body" class="form-control" rows="8" data-enable-mentions="true" data-rich-text="true"></textarea>
+    <div class="form-text">Add emphasis, lists, and quotes with the toolbar to make your update easier to scan.</div>
     <span asp-validation-for="Body" class="text-danger"></span>
 </div>
 

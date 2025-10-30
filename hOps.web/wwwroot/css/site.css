@@ -85,6 +85,61 @@ body {
     transform: translateY(6px);
 }
 
+.rich-text-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.rich-text-toolbar .btn {
+    min-width: 2rem;
+}
+
+.rich-text-input {
+    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    min-height: 6rem;
+}
+
+.rich-text-output {
+    color: #1f2937;
+    line-height: 1.6;
+    font-size: 0.95rem;
+}
+
+.rich-text-output p {
+    margin-bottom: 0.75rem;
+}
+
+.rich-text-output p:last-child,
+.rich-text-output ul:last-child,
+.rich-text-output ol:last-child,
+.rich-text-output blockquote:last-child {
+    margin-bottom: 0;
+}
+
+.rich-text-output ul,
+.rich-text-output ol {
+    padding-left: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.rich-text-output li + li {
+    margin-top: 0.25rem;
+}
+
+.rich-text-output blockquote {
+    border-left: 4px solid rgba(13, 110, 253, 0.25);
+    padding-left: 1rem;
+    color: #4b5563;
+    font-style: italic;
+    margin: 0 0 0.75rem;
+}
+
+.rich-text-output mark {
+    background-color: rgba(255, 221, 89, 0.5);
+    padding: 0 0.25rem;
+}
+
 .sidebar-backdrop {
     position: fixed;
     top: 0;
@@ -243,11 +298,6 @@ body.sidebar-collapsed .sidebar .sidebar-inner {
 .log-unread {
     border-left: 4px solid #0d6efd;
     background-color: #f0f6ff;
-}
-
-.log-body,
-.comment-body {
-    white-space: pre-wrap;
 }
 
 .calendar-table {

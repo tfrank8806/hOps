@@ -382,3 +382,4 @@ C:\hOps\hOps.web.Tests\obj\Debug\net8.0\refint\hOps.web.Tests.dll
 C:\hOps\hOps.web.Tests\obj\Debug\net8.0\hOps.web.Tests.pdb
 C:\hOps\hOps.web.Tests\obj\Debug\net8.0\hOps.web.Tests.genruntimeconfig.cache
 C:\hOps\hOps.web.Tests\obj\Debug\net8.0\ref\hOps.web.Tests.dll
+C:\hops\hOps.web.Tests\bin\Debug\net8.0\Markdig.dll
