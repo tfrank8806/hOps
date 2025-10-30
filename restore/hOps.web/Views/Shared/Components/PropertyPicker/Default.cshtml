@@ -1,0 +1,29 @@
+﻿@model List<hOps.web.Models.Property>
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor httpAccessor
+
+@{
+    var session = httpAccessor.HttpContext.Session;
+    int? currentId = session.GetInt32("CurrentPropertyId");
+}
+
+@if (Model != null && Model.Count > 1)
+{
+    <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            @{
+                var sel = Model.FirstOrDefault(p => p.Id == currentId) ?? Model[0];
+                @($"{sel.Name} ({sel.Code})")
+            }
+        </a>
+        <ul class="dropdown-menu">
+            @foreach (var p in Model)
+            {
+                <li>
+                    <a class="dropdown-item" asp-controller="Home" asp-action="SwitchProperty" asp-route-propertyId="@p.Id">
+                        @p.Name (@p.Code)
+                    </a>
+                </li>
+            }
+        </ul>
+    </li>
+}

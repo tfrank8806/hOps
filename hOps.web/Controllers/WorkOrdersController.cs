@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -144,13 +144,15 @@ namespace hOps.web.Controllers
             {
                 if (accessiblePropertyIds.Count == 1)
                 {
-                    selectedPropertyIds = accessiblePropertyIds;
+                    selectedPropertyIds = new List<int> { accessiblePropertyIds.First() };
                 }
                 else
                 {
                     ModelState.AddModelError("Form.SelectedPropertyIds", "Please select at least one property.");
                 }
             }
+
+            form.SelectedPropertyIds = selectedPropertyIds;
 
             if (!ModelState.IsValid)
             {
@@ -311,7 +313,7 @@ namespace hOps.web.Controllers
             var detailPreview = string.IsNullOrWhiteSpace(workOrder.Details) ? null : workOrder.Details.Trim();
             if (!string.IsNullOrWhiteSpace(detailPreview) && detailPreview.Length > 500)
             {
-                detailPreview = $"{detailPreview[..500]}…";
+                detailPreview = $"{detailPreview[..500]}ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½";
             }
             var safeDetails = string.IsNullOrWhiteSpace(detailPreview)
                 ? null

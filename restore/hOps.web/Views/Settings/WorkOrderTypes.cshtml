@@ -1,0 +1,32 @@
+﻿@model List<hOps.web.Models.WorkOrderType>
+@{
+    ViewData["Title"] = "Work Order Types";
+}
+
+<h2>@ViewData["Title"]</h2>
+<p><a class="btn btn-primary" asp-action="CreateWorkOrderType">Add Type</a></p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Color</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@item.Name</td>
+                <td><span style="background:@item.Color; padding:4px 12px; color:white">@item.Color</span></td>
+                <td>
+                    <a asp-action="EditWorkOrderType" asp-route-id="@item.Id" class="btn btn-warning btn-sm">Edit</a>
+                    <form asp-action="DeleteWorkOrderType" asp-route-id="@item.Id" method="post" style="display:inline">
+                        <button class="btn btn-danger btn-sm" onclick="return confirm('Delete this work order type?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

@@ -1,0 +1,58 @@
+﻿@model List<hOps.web.Models.UserAccessRequest>
+
+@{
+    ViewData["Title"] = "Access Requests";
+}
+
+<h2>Pending Access Requests</h2>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
+@if (!Model.Any())
+{
+    <p>No pending access requests.</p>
+}
+else
+{
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Property Code</th>
+                <th>Requested At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var req in Model)
+            {
+                <tr>
+                    <td>@req.FirstName @req.LastName</td>
+                    <td>@req.Email</td>
+                    <td>@req.MobilePhone</td>
+                    <td>@req.PropertyCode</td>
+                    <td>@req.RequestedAt.ToString("g")</td>
+                    <td>
+                        <form asp-action="Approve" asp-controller="Admin" method="post" style="display:inline;">
+                            <input type="hidden" name="id" value="@req.Id" />
+                            <button type="submit" class="btn btn-success btn-sm">Approve</button>
+                        </form>
+                        <form asp-action="Reject" asp-controller="Admin" method="post" style="display:inline;">
+                            <input type="hidden" name="id" value="@req.Id" />
+                            <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

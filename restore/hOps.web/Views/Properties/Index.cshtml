@@ -1,0 +1,33 @@
+﻿@model IEnumerable<hOps.web.Models.Property>
+@{
+    ViewData["Title"] = "Properties";
+}
+
+<h2>Properties</h2>
+<p>
+    <a class="btn btn-primary" asp-action="Create">Add New Property</a>
+</p>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Code</th>
+            <th>Name</th>
+            <th>Address</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var prop in Model)
+        {
+            <tr>
+                <td>@prop.Code</td>
+                <td>@prop.Name</td>
+                <td>@prop.Address</td>
+                <td>
+                    <a asp-action="Edit" asp-route-id="@prop.Id" class="btn btn-sm btn-warning">Edit</a>
+                    <a asp-action="Delete" asp-route-id="@prop.Id" class="btn btn-sm btn-danger">Delete</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
