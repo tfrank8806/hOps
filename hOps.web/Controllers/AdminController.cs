@@ -241,11 +241,15 @@ namespace hOps.web.Controllers
 
             var tempPassword = GenerateTemporaryPassword();
             var result = await _userManager.CreateAsync(user, tempPassword);
-            if (result.Succeeded)
+            if (!result.Succeeded)
             {
-                await _userManager.AddToRoleAsync(user, "User");
+                TempData["Error"] = "Failed to create user: " + string.Join(", ", result.Errors.Select(e => e.Description));
+                return RedirectToAction(nameof(AccessRequests));
+            }
 
-                var message = $@"
+            await _userManager.AddToRoleAsync(user, "User");
+
+            var message = $@"
 Hi {user.FirstName},<br/><br/>
 Your access request for HotelOps has been <strong>approved</strong>.<br/>
 You can now log in using your email and temporary password:<br/>
@@ -253,15 +257,10 @@ You can now log in using your email and temporary password:<br/>
 Please change your password after login.<br/><br/>
 HotelOps Admin Team
 ";
-                await _emailSender.SendEmailAsync(user.Email, "HotelOps Access Approved", message);
-                TempData["Success"] = "Access granted and user created.";
-            }
-            else
-            {
-                TempData["Error"] = "Failed to create user: " + string.Join(", ", result.Errors.Select(e => e.Description));
-            }
+            await _emailSender.SendEmailAsync(user.Email, "HotelOps Access Approved", message);
 
-            return RedirectToAction(nameof(AccessRequests));
+            TempData["Success"] = "Access granted and a temporary password email has been sent. Assign properties for the user below.";
+            return RedirectToAction(nameof(EditUserProperties), new { userId = user.Id });
         }
 
         [HttpPost]

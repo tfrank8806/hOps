@@ -6,6 +6,11 @@
 
 <h2>Edit Properties & Roles for @Model.Email</h2>
 
+@if (TempData["Success"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
 <form asp-action="EditUserProperties" method="post">
     <input type="hidden" asp-for="UserId" />
 
