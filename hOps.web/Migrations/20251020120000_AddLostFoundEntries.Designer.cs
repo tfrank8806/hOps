@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using hOps.web.Models;
 using hOps.web.Data;
-using hOps.web.Models;
 
 #nullable disable
 

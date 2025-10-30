@@ -232,7 +232,12 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> Rooms(int propertyId)
         {
             var currentUser = await _userManager.GetUserAsync(User);
-            var roles = await _userManager.GetRolesAsync(currentUser);
+            if (currentUser == null)
+                return Challenge();
+            var roles = (await _userManager.GetRolesAsync(currentUser))
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Select(r => r!)
+                .ToList();
 
             List<Property> accessibleProps;
             if (roles.Contains("Admin"))
@@ -262,7 +267,12 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> SaveRooms(int propertyId, List<Room> rooms)
         {
             var currentUser = await _userManager.GetUserAsync(User);
-            var roles = await _userManager.GetRolesAsync(currentUser);
+            if (currentUser == null)
+                return Challenge();
+            var roles = (await _userManager.GetRolesAsync(currentUser))
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Select(r => r!)
+                .ToList();
             bool allowed = roles.Contains("Admin") ||
                 await _db.UserPropertyAccesses.AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == propertyId);
             if (!allowed) return Forbid();
@@ -324,7 +334,10 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
-            var roles = await _userManager.GetRolesAsync(currentUser);
+            var roles = (await _userManager.GetRolesAsync(currentUser))
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Select(r => r!)
+                .ToList();
 
             List<Property> accessibleProps;
             if (roles.Contains("Admin"))
@@ -509,7 +522,12 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> AddFloor([FromBody] AddFloorDto dto)
         {
             var user = await _userManager.GetUserAsync(User);
-            var roles = await _userManager.GetRolesAsync(user);
+            if (user == null)
+                return Challenge();
+            var roles = (await _userManager.GetRolesAsync(user))
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Select(r => r!)
+                .ToList();
             bool allowed = roles.Contains("Admin") ||
                 await _db.UserPropertyAccesses.AnyAsync(a => a.ApplicationUserId == user.Id && a.PropertyId == dto.PropertyId);
             if (!allowed) return Forbid();

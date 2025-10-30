@@ -85,6 +85,8 @@ namespace hOps.web.Controllers
 
             // Determine which properties current editor is allowed to assign
             var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+                return Challenge();
             var currentRoles = await _userManager.GetRolesAsync(currentUser);
 
             List<Property> assignableProps = allProperties;
@@ -99,8 +101,14 @@ namespace hOps.web.Controllers
             }
 
             // Roles data
-            var allRoles = _roleManager.Roles.Select(r => r.Name).ToList();
-            var userRoles = (await _userManager.GetRolesAsync(user)).ToList();
+            var allRoles = await _roleManager.Roles
+                .Where(r => r.Name != null)
+                .Select(r => r.Name!)
+                .ToListAsync();
+            var userRoles = (await _userManager.GetRolesAsync(user))
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Select(r => r!)
+                .ToList();
 
             var vm = new EditUserPropertiesViewModel
             {
@@ -128,6 +136,8 @@ namespace hOps.web.Controllers
 
             var allProperties = await _context.Properties.ToListAsync();
             var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+                return Challenge();
             var currentRoles = await _userManager.GetRolesAsync(currentUser);
 
             // Determine allowed properties
@@ -166,8 +176,14 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
 
             // Handle role assignments
-            var currentUserRoles = await _userManager.GetRolesAsync(user);
-            var desiredRoles = vm.SelectedRoles ?? new List<string>();
+            var currentUserRoles = (await _userManager.GetRolesAsync(user))
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Select(r => r!)
+                .ToList();
+            var desiredRoles = (vm.SelectedRoles ?? new List<string>())
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Select(r => r!)
+                .ToList();
 
             // Add roles not currently assigned
             foreach (var role in desiredRoles.Except(currentUserRoles))
