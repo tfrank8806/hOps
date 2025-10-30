@@ -29,6 +29,7 @@ namespace hOps.web.Controllers
         private readonly ILogger<WorkOrdersController> _logger;
         private readonly MentionService _mentionService;
         private readonly IEmailSender _emailSender;
+        private readonly IUserTimeZoneService _timeZoneService;
 
         public WorkOrdersController(
             ApplicationDbContext context,
@@ -37,13 +38,15 @@ namespace hOps.web.Controllers
             IConfiguration configuration,
             ILogger<WorkOrdersController> logger,
             MentionService mentionService,
-            IEmailSender emailSender) : base(context, userManager)
+            IEmailSender emailSender,
+            IUserTimeZoneService timeZoneService) : base(context, userManager)
         {
             _environment = environment;
             _configuration = configuration;
             _logger = logger;
             _mentionService = mentionService;
             _emailSender = emailSender;
+            _timeZoneService = timeZoneService;
         }
 
         [HttpGet]
@@ -95,7 +98,8 @@ namespace hOps.web.Controllers
                 worksheet.Cell(rowNumber, 4).Value = order.WorkOrderType ?? string.Empty;
                 worksheet.Cell(rowNumber, 5).Value = order.Issue;
                 worksheet.Cell(rowNumber, 6).Value = order.DueDate;
-                worksheet.Cell(rowNumber, 7).Value = order.CreatedAt.ToLocalTime();
+                var createdLocal = _timeZoneService.ConvertToUserTime(order.CreatedAt);
+                worksheet.Cell(rowNumber, 7).Value = createdLocal;
                 worksheet.Cell(rowNumber, 8).Value = string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator;
                 worksheet.Cell(rowNumber, 9).Value = string.Join(Environment.NewLine, order.Properties);
                 worksheet.Cell(rowNumber, 10).Value = string.Join(Environment.NewLine, order.Attachments.Select(a => a.FileName));
@@ -301,7 +305,7 @@ namespace hOps.web.Controllers
             var dueDateValue = workOrder.DueDate;
             var dueDateText = dueDateValue == default
                 ? "Not set"
-                : dueDateValue.ToLocalTime().ToString("MMM d, yyyy h:mm tt");
+                : _timeZoneService.ConvertToUserTime(dueDateValue).ToString("MMM d, yyyy h:mm tt");
             dueDateText = WebUtility.HtmlEncode(dueDateText);
 
             var detailPreview = string.IsNullOrWhiteSpace(workOrder.Details) ? null : workOrder.Details.Trim();

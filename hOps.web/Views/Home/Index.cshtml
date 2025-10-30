@@ -51,7 +51,8 @@
                         <div class="announcement-content rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(Model.Announcement.Content))</div>
                         if (Model.Announcement.UpdatedAt.HasValue)
                         {
-                            <p class="text-muted small mb-0 mt-2">Last updated @Model.Announcement.UpdatedAt.Value.ToLocalTime().ToString("g") @if (!string.IsNullOrWhiteSpace(Model.Announcement.UpdatedByName)){<text> by @Model.Announcement.UpdatedByName</text>}</p>
+                            var updatedLocal = TimeZoneService.ConvertToUserTime(Model.Announcement.UpdatedAt.Value);
+                            <p class="text-muted small mb-0 mt-2">Last updated @updatedLocal.ToString("g") @if (!string.IsNullOrWhiteSpace(Model.Announcement.UpdatedByName)){<text> by @Model.Announcement.UpdatedByName</text>}</p>
                         }
                     }
 
@@ -120,11 +121,15 @@
                                         <div class="d-flex justify-content-between align-items-start">
                                             <div>
                                                 <h3 class="h6 mb-1">@(!string.IsNullOrWhiteSpace(post.CreatedByName) ? post.CreatedByName : "Team Member")</h3>
-                                                <p class="mb-2 text-muted small">Posted @post.CreatedAt.ToLocalTime().ToString("g")
-                                                    @if (post.UpdatedAt.HasValue)
-                                                    {
-                                                        <span class="ms-2">· Updated @post.UpdatedAt.Value.ToLocalTime().ToString("g") @if (!string.IsNullOrWhiteSpace(post.UpdatedByName)){<text>by @post.UpdatedByName</text>}</span>
-                                                    }
+                                                @{
+                                                    var createdLocal = TimeZoneService.ConvertToUserTime(post.CreatedAt);
+                                                    var updatedLocal = post.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(post.UpdatedAt.Value) : (DateTime?)null;
+                                                }
+                                                <p class="mb-2 text-muted small">Posted @createdLocal.ToString("g")
+                                                @if (post.UpdatedAt.HasValue)
+                                                {
+                                                    <span class="ms-2">· Updated @updatedLocal?.ToString("g") @if (!string.IsNullOrWhiteSpace(post.UpdatedByName)){<text>by @post.UpdatedByName</text>}</span>
+                                                }
                                                 </p>
                                             </div>
                                             @if (post.CanEdit)

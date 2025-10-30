@@ -39,6 +39,8 @@ builder.Services.AddTransient<IEmailSender, EmailSender>();
 builder.Services.AddScoped<DirectMessageService>();
 builder.Services.AddScoped<MentionService>();
 builder.Services.AddHostedService<DailySummaryEmailService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IUserTimeZoneService, UserTimeZoneService>();
 
 // Add session support
 builder.Services.AddDistributedMemoryCache();

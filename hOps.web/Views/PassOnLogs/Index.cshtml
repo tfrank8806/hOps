@@ -71,7 +71,10 @@ else
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                     <div>
                         <h5 class="mb-1">@log.Title</h5>
-                        <div class="text-muted small">By @log.CreatorName • @log.CreatedAt.ToLocalTime().ToString("g")</div>
+                        @{
+                            var createdLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
+                        }
+                        <div class="text-muted small">By @log.CreatorName • @createdLocal.ToString("g")</div>
                     </div>
                     @if (log.IsUnread)
                     {

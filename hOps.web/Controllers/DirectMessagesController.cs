@@ -18,14 +18,17 @@ namespace hOps.web.Controllers
     public class DirectMessagesController : BaseController
     {
         private readonly DirectMessageService _messageService;
+        private readonly IUserTimeZoneService _timeZoneService;
 
         public DirectMessagesController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            DirectMessageService messageService)
+            DirectMessageService messageService,
+            IUserTimeZoneService timeZoneService)
             : base(context, userManager)
         {
             _messageService = messageService;
+            _timeZoneService = timeZoneService;
         }
 
         [HttpGet]
@@ -94,10 +97,10 @@ namespace hOps.web.Controllers
                                     ? "You"
                                     : conversationItems.FirstOrDefault(c => c.ParticipantId == m.SenderId)?.ParticipantName ?? "User",
                                 Body = m.Body,
-                                SentAt = m.SentAt.ToLocalTime(),
+                                SentAt = _timeZoneService.ConvertToUserTime(m.SentAt),
                                 IsOwnMessage = m.IsOwnMessage,
                                 IsRead = m.IsRead,
-                                ReadAt = m.ReadAt?.ToLocalTime()
+                                ReadAt = m.ReadAt.HasValue ? _timeZoneService.ConvertToUserTime(m.ReadAt.Value) : (DateTime?)null
                             })
                             .ToList()
                     };

@@ -244,8 +244,11 @@
                                                 </ul>
                                             }
                                         </td>
+                                        @{
+                                            var uploadedLocal = TimeZoneService.ConvertToUserTime(doc.UploadedAtUtc);
+                                        }
                                         <td class="text-end">
-                                            <div>@doc.UploadedAtUtc.ToLocalTime().ToString("g")</div>
+                                            <div>@uploadedLocal.ToString("g")</div>
                                             <div class="text-muted small">@doc.UploadedByDisplayName</div>
                                         </td>
                                         <td class="text-end">

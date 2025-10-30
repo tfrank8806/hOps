@@ -93,7 +93,7 @@
                                                                 data-event-details="@(calendarEvent.Details ?? string.Empty)"
                                                                 data-event-properties="@calendarEvent.PropertiesDisplay"
                                                                 data-event-created-by="@calendarEvent.CreatedByDisplay"
-                                                                data-event-created-at="@calendarEvent.CreatedAtUtc.ToLocalTime().ToString("f")"
+                                                                data-event-created-at="@TimeZoneService.ConvertToUserTime(calendarEvent.CreatedAtUtc).ToString("f")"
                                                                 data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = calendarEvent.Id })">
                                                             <span class="calendar-event-indicator" style="background-color: @calendarEvent.CategoryColor"></span>
                                                             <span class="calendar-event-title">@calendarEvent.Title</span>
@@ -139,7 +139,7 @@
                                     data-event-details="@(upcoming.Details ?? string.Empty)"
                                     data-event-properties="@upcoming.PropertiesDisplay"
                                     data-event-created-by="@upcoming.CreatedByDisplay"
-                                    data-event-created-at="@upcoming.CreatedAtUtc.ToLocalTime().ToString("f")"
+                                    data-event-created-at="@TimeZoneService.ConvertToUserTime(upcoming.CreatedAtUtc).ToString("f")"
                                     data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = upcoming.Id })">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="fw-semibold">@upcoming.Title</span>

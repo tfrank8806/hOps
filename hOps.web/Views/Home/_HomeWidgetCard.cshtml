@@ -10,8 +10,8 @@
 
     string GetDateColor(DateTime dateTime)
     {
-        var localDate = dateTime.ToLocalTime().Date;
-        var today = DateTime.Today;
+        var localDate = TimeZoneService.ConvertToUserTime(dateTime).Date;
+        var today = TimeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
 
         if (localDate >= today)
         {
@@ -62,7 +62,10 @@
                             </div>
                             <span class="badge" style="background-color:@hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetColor(order.Status)">@order.Status</span>
                         </div>
-                        <div class="small mt-1" style="color:@GetDateColor(order.CreatedAt);">Opened @order.CreatedAt.ToLocalTime().ToString("g")</div>
+                        @{
+                            var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
+                        }
+                        <div class="small mt-1" style="color:@GetDateColor(order.CreatedAt);">Opened @createdLocal.ToString("g")</div>
                     </li>
                 }
             </ul>
@@ -84,7 +87,10 @@
                             <span class="fw-semibold">@entry.Title</span>
                         }
                         <div class="text-muted small">@entry.Type.ToString() &middot; @entry.Status.ToString()</div>
-                        <div class="small" style="color:@GetDateColor(entry.CreatedAt);">Logged @entry.CreatedAt.ToLocalTime().ToString("g")</div>
+                        @{
+                            var loggedLocal = TimeZoneService.ConvertToUserTime(entry.CreatedAt);
+                        }
+                        <div class="small" style="color:@GetDateColor(entry.CreatedAt);">Logged @loggedLocal.ToString("g")</div>
                     </li>
                 }
             </ul>
@@ -137,7 +143,10 @@
                                 }
                             </div>
                         }
-                        <div class="small" style="color:@GetDateColor(package.LoggedAt);">Logged @package.LoggedAt.ToLocalTime().ToString("g")</div>
+                        @{
+                            var packageLoggedLocal = TimeZoneService.ConvertToUserTime(package.LoggedAt);
+                        }
+                        <div class="small" style="color:@GetDateColor(package.LoggedAt);">Logged @packageLoggedLocal.ToString("g")</div>
                     </li>
                 }
             </ul>
@@ -158,7 +167,11 @@
                         {
                             <span class="fw-semibold">@calendarEvent.Title</span>
                         }
-                        <div class="small" style="color:@GetDateColor(calendarEvent.Start);">@calendarEvent.Start.ToLocalTime().ToString("g") @if (calendarEvent.End.HasValue){<text>- @calendarEvent.End.Value.ToLocalTime().ToString("g")</text>}</div>
+                        @{
+                            var startLocal = TimeZoneService.ConvertToUserTime(calendarEvent.Start);
+                            var endLocal = calendarEvent.End.HasValue ? TimeZoneService.ConvertToUserTime(calendarEvent.End.Value) : (DateTime?)null;
+                        }
+                        <div class="small" style="color:@GetDateColor(calendarEvent.Start);">@startLocal.ToString("g") @if (endLocal.HasValue){<text>- @endLocal.Value.ToString("g")</text>}</div>
                         @if (!string.IsNullOrWhiteSpace(calendarEvent.CategoryName))
                         {
                             <span class="badge rounded-pill" style="background-color:@(calendarEvent.CategoryColor ?? "#0d6efd");">@calendarEvent.CategoryName</span>

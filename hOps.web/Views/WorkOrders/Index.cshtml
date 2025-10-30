@@ -297,7 +297,10 @@
                                         <td>@order.WorkOrderType</td>
                                         <td>@Html.Raw(MentionMarkupFormatter.ToHtml(order.Issue))</td>
                                         <td class="@(isPastDue ? "fw-bold text-danger" : string.Empty)">@order.DueDate.ToString("MMM dd, yyyy")</td>
-                                        <td>@order.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                                        @{
+                                            var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
+                                        }
+                                        <td>@createdLocal.ToString("MMM dd, yyyy")</td>
                                         <td>@(string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator)</td>
                                         <td>
                                             @foreach (var property in order.Properties)

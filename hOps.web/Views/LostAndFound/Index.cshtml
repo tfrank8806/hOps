@@ -259,7 +259,10 @@
                                                 <span class="fw-semibold">@(!string.IsNullOrWhiteSpace(entry.ItemFound) ? entry.ItemFound : "Found Item")</span>
                                             </button>
                                             <div class="small text-muted">
-                                                @(entry.DateFound?.ToString("MMM d, yyyy") ?? entry.CreatedAt.ToLocalTime().ToString("MMM d, yyyy"))
+                                                @{
+                                                    var createdLocal = TimeZoneService.ConvertToUserTime(entry.CreatedAt);
+                                                }
+                                                @(entry.DateFound?.ToString("MMM d, yyyy") ?? createdLocal.ToString("MMM d, yyyy"))
                                                 @if (!string.IsNullOrWhiteSpace(entry.Location))
                                                 {
                                                     <span>&nbsp;&middot; @entry.Location</span>
@@ -297,7 +300,10 @@
                                                 <span class="fw-semibold">@(!string.IsNullOrWhiteSpace(entry.ItemLost) ? entry.ItemLost : "Lost Item")</span>
                                             </button>
                                             <div class="small text-muted">
-                                                @(entry.DateReportedLost?.ToString("MMM d, yyyy") ?? entry.CreatedAt.ToLocalTime().ToString("MMM d, yyyy"))
+                                                @{
+                                                    var createdLocal = TimeZoneService.ConvertToUserTime(entry.CreatedAt);
+                                                }
+                                                @(entry.DateReportedLost?.ToString("MMM d, yyyy") ?? createdLocal.ToString("MMM d, yyyy"))
                                                 @if (!string.IsNullOrWhiteSpace(entry.GuestName))
                                                 {
                                                     <span>&nbsp;&middot; @entry.GuestName</span>
@@ -333,7 +339,10 @@
                             <dd class="col-sm-8">@entry.Status</dd>
 
                             <dt class="col-sm-4">Logged On</dt>
-                            <dd class="col-sm-8">@entry.CreatedAt.ToLocalTime().ToString("f")</dd>
+                            @{
+                                var createdLocal = TimeZoneService.ConvertToUserTime(entry.CreatedAt);
+                            }
+                            <dd class="col-sm-8">@createdLocal.ToString("f")</dd>
 
                             <dt class="col-sm-4">Logged By</dt>
                             <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(entry.CreatedByDisplayName) ? entry.CreatedByDisplayName : entry.CreatedByUser?.Email)</dd>

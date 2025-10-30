@@ -18,7 +18,10 @@
         <dt class="col-sm-2">Property Code</dt>
         <dd class="col-sm-10">@Model.PropertyCode</dd>
         <dt class="col-sm-2">Requested At</dt>
-        <dd class="col-sm-10">@Model.RequestedAt.ToLocalTime()</dd>
+        @{
+            var requestedLocal = TimeZoneService.ConvertToUserTime(Model.RequestedAt);
+        }
+        <dd class="col-sm-10">@requestedLocal</dd>
         <dt class="col-sm-2">Status</dt>
         <dd class="col-sm-10">
             @if (Model.IsApproved)

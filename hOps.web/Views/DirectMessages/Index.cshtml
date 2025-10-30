@@ -56,7 +56,7 @@
                                     <span class="fw-semibold">@conversation.ParticipantName</span>
                                     @if (conversation.LastMessageAt.HasValue)
                                     {
-                                        <small class="text-muted">@conversation.LastMessageAt.Value.ToLocalTime().ToString("g")</small>
+                                    <small class="text-muted">@TimeZoneService.ConvertToUserTime(conversation.LastMessageAt.Value).ToString("g")</small>
                                     }
                                 </div>
                                 <div class="small text-muted @(conversation.HasUnread ? "fw-semibold text-primary" : "")">

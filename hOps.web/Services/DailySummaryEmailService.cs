@@ -161,6 +161,7 @@ namespace hOps.web.Services
             var builder = new StringBuilder();
             var userName = BuildUserDisplayName(user);
             var safeName = WebUtility.HtmlEncode(userName);
+            var userTimeZone = ResolveUserTimeZone(user);
 
             builder.AppendLine($@"<p>Hello {safeName},</p>");
             builder.AppendLine($@"<p>Here is your activity summary for {summaryDate:MMMM d, yyyy}.</p>");
@@ -172,7 +173,7 @@ namespace hOps.web.Services
                 foreach (var log in logs.OrderBy(l => l.CreatedAt))
                 {
                     var logTitle = WebUtility.HtmlEncode(log.Title);
-                    var createdAtLocal = log.CreatedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt", CultureInfo.CurrentCulture);
+                    var createdAtLocal = FormatUserLocal(log.CreatedAt, userTimeZone, "MMM d, yyyy h:mm tt");
                     var safeCreated = WebUtility.HtmlEncode(createdAtLocal);
                     var properties = log.Properties
                         .Select(lp => lp.Property?.Name ?? $"Property #{lp.PropertyId}")
@@ -202,7 +203,7 @@ namespace hOps.web.Services
                 {
                     var propertyName = post.Property?.Name ?? "Property";
                     var safeProperty = WebUtility.HtmlEncode(propertyName);
-                    var createdAtLocal = post.CreatedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt", CultureInfo.CurrentCulture);
+                    var createdAtLocal = FormatUserLocal(post.CreatedAt, userTimeZone, "MMM d, yyyy h:mm tt");
                     var safeCreated = WebUtility.HtmlEncode(createdAtLocal);
                     var content = MentionMarkupFormatter.ToDisplayText(post.Content);
                     if (!string.IsNullOrWhiteSpace(content) && content.Length > 350)
@@ -255,6 +256,37 @@ namespace hOps.web.Services
             }
 
             return target.ToUniversalTime();
+        }
+
+        private static TimeZoneInfo ResolveUserTimeZone(ApplicationUser user)
+        {
+            var normalized = DefaultTimeZoneProvider.NormalizeForStorage(user.TimeZoneId);
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(normalized);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return TimeZoneInfo.Utc;
+            }
+            catch (InvalidTimeZoneException)
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+
+        private static string FormatUserLocal(DateTime utcDateTime, TimeZoneInfo timeZone, string format)
+        {
+            var utc = utcDateTime.Kind switch
+            {
+                DateTimeKind.Utc => utcDateTime,
+                DateTimeKind.Unspecified => DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc),
+                DateTimeKind.Local => utcDateTime.ToUniversalTime(),
+                _ => utcDateTime
+            };
+
+            var localized = TimeZoneInfo.ConvertTimeFromUtc(utc, timeZone);
+            return localized.ToString(format, CultureInfo.CurrentCulture);
         }
     }
 }

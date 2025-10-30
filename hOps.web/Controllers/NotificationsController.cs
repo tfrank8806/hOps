@@ -15,14 +15,17 @@ namespace hOps.web.Controllers
     public class NotificationsController : BaseController
     {
         private readonly DirectMessageService _messageService;
+        private readonly IUserTimeZoneService _timeZoneService;
 
         public NotificationsController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            DirectMessageService messageService)
+            DirectMessageService messageService,
+            IUserTimeZoneService timeZoneService)
             : base(context, userManager)
         {
             _messageService = messageService;
+            _timeZoneService = timeZoneService;
         }
 
         [HttpGet]
@@ -42,7 +45,7 @@ namespace hOps.web.Controllers
                     Title = n.Title,
                     Content = n.Content,
                     LinkUrl = n.LinkUrl,
-                    CreatedAt = n.CreatedAt.ToLocalTime(),
+                    CreatedAt = _timeZoneService.ConvertToUserTime(n.CreatedAt),
                     IsRead = n.IsRead,
                     Type = n.Type
                 })

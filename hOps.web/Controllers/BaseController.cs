@@ -1,5 +1,7 @@
 ﻿using hOps.web.Data;
 using hOps.web.Models;
+using hOps.web.Utilities;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -55,6 +57,10 @@ public class BaseController : Controller
             }
 
             ViewBag.CurrentProperty = currentProperty;
+
+            var normalizedTimeZoneId = DefaultTimeZoneProvider.NormalizeForStorage(user.TimeZoneId);
+            HttpContext.Items["UserTimeZoneId"] = normalizedTimeZoneId;
+            HttpContext.Session.SetString("UserTimeZoneId", normalizedTimeZoneId);
         }
 
         await next(); // Continue with the request

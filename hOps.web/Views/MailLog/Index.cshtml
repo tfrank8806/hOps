@@ -121,8 +121,10 @@
                                 <tbody>
                                     @foreach (var entry in Model.Entries)
                                     {
+                                        var loggedLocal = TimeZoneService.ConvertToUserTime(entry.LoggedAt);
+                                        var deliveredLocal = entry.DeliveredAt.HasValue ? TimeZoneService.ConvertToUserTime(entry.DeliveredAt.Value) : (DateTime?)null;
                                         <tr>
-                                            <td>@entry.LoggedAt.ToLocalTime().ToString("g")</td>
+                                            <td>@loggedLocal.ToString("g")</td>
                                             <td>@entry.RecipientName</td>
                                             <td>@(string.IsNullOrWhiteSpace(entry.Carrier) ? "-" : entry.Carrier)</td>
                                             <td>@(string.IsNullOrWhiteSpace(entry.TrackingNumber) ? "-" : entry.TrackingNumber)</td>
@@ -146,7 +148,7 @@
                                                     @(entry.Delivered ? "Yes" : "No")
                                                 </span>
                                             </td>
-                                            <td>@(entry.DeliveredAt.HasValue ? entry.DeliveredAt.Value.ToLocalTime().ToString("g") : "-")</td>
+                                            <td>@(deliveredLocal.HasValue ? deliveredLocal.Value.ToString("g") : "-")</td>
                                             <td class="text-end actions-cell">
                                                 <form asp-action="ToggleDelivered" method="post" class="d-inline">
                                                     @Html.AntiForgeryToken()
