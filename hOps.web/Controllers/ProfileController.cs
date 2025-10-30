@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using hOps.web.Data;
 using hOps.web.Models;
+using hOps.web.Utilities;
 using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -70,7 +71,7 @@ namespace hOps.web.Controllers
                 try
                 {
                     var tz = TimeZoneInfo.FindSystemTimeZoneById(model.TimeZoneId.Trim());
-                    resolvedTimeZoneId = tz.Id;
+                    resolvedTimeZoneId = DefaultTimeZoneProvider.NormalizeForStorage(tz.Id);
                 }
                 catch (TimeZoneNotFoundException)
                 {
@@ -91,7 +92,7 @@ namespace hOps.web.Controllers
                 }
                 if (string.IsNullOrWhiteSpace(model.TimeZoneId))
                 {
-                    model.TimeZoneId = user.TimeZoneId;
+                    model.TimeZoneId = DefaultTimeZoneProvider.GetEffectiveTimeZoneId(user.TimeZoneId);
                 }
 
                 return View("Index", await BuildViewModel(user, model));
@@ -141,7 +142,8 @@ namespace hOps.web.Controllers
                 : (int?)null;
 
             user.DefaultPropertyId = selectedDefaultPropertyId;
-            user.TimeZoneId = resolvedTimeZoneId ?? user.TimeZoneId ?? TimeZoneInfo.Utc.Id;
+            var desiredTimeZoneId = resolvedTimeZoneId ?? user.TimeZoneId;
+            user.TimeZoneId = DefaultTimeZoneProvider.NormalizeForStorage(desiredTimeZoneId);
 
             var updateResult = await _userManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
@@ -441,10 +443,11 @@ namespace hOps.web.Controllers
 
             profileVm.ProfilePhotoPath ??= user.ProfilePhotoPath;
             profileVm.DefaultPropertyId ??= user.DefaultPropertyId;
-            var userTimeZoneId = string.IsNullOrWhiteSpace(user.TimeZoneId) ? TimeZoneInfo.Utc.Id : user.TimeZoneId;
-            profileVm.TimeZoneId = string.IsNullOrWhiteSpace(profileVm.TimeZoneId)
+            var userTimeZoneId = DefaultTimeZoneProvider.NormalizeForStorage(user.TimeZoneId);
+            var preferredTimeZoneId = string.IsNullOrWhiteSpace(profileVm.TimeZoneId)
                 ? userTimeZoneId
-                : profileVm.TimeZoneId;
+                : profileVm.TimeZoneId!.Trim();
+            profileVm.TimeZoneId = DefaultTimeZoneProvider.NormalizeForStorage(preferredTimeZoneId);
 
             var accessibleProperties = await _context.UserPropertyAccesses
                 .Where(upa => upa.ApplicationUserId == user.Id)

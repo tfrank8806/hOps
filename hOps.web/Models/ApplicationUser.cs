@@ -1,5 +1,5 @@
-using System;
 using Microsoft.AspNetCore.Identity;
+using hOps.web.Utilities;
 
 #nullable enable
 namespace hOps.web.Models
@@ -37,6 +37,6 @@ namespace hOps.web.Models
         public ICollection<DocumentFolder> CreatedDocumentFolders { get; set; } = new List<DocumentFolder>();
         public ICollection<UserPropertyEmailSubscription> EmailPropertySubscriptions { get; set; } = new List<UserPropertyEmailSubscription>();
 
-        public string TimeZoneId { get; set; } = TimeZoneInfo.Utc.Id;
+        public string TimeZoneId { get; set; } = DefaultTimeZoneProvider.NormalizeForStorage(null);
     }
 }

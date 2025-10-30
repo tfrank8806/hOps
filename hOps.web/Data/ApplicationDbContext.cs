@@ -1,4 +1,5 @@
 ﻿using hOps.web.Models;
+using hOps.web.Utilities;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -63,7 +64,7 @@ namespace hOps.web.Data
 
             builder.Entity<ApplicationUser>()
                 .Property(u => u.TimeZoneId)
-                .HasDefaultValue("UTC");
+                .HasDefaultValue(DefaultTimeZoneProvider.DefaultTimeZoneId);
 
             // Composite key for UserPropertyAccess
             builder.Entity<UserPropertyAccess>()
