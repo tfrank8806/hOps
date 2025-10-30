@@ -142,7 +142,7 @@
                 </nav>
             </div>
         </aside>
-
+        <div class="sidebar-backdrop d-lg-none" id="sidebarBackdrop"></div>
         <div class="main-content flex-grow-1 d-flex flex-column">
             <header class="main-header">
                 <div class="container-fluid py-2 d-flex align-items-center justify-content-between">
@@ -243,6 +243,7 @@
             const body = document.body;
             const sidebar = document.getElementById('sidebar');
             const toggles = document.querySelectorAll('.sidebar-toggle');
+            const backdrop = document.getElementById('sidebarBackdrop');
             const mediaQuery = window.matchMedia('(max-width: 991.98px)');
 
             function updateAria() {
@@ -253,12 +254,30 @@
                 }
             }
 
+            function syncBackdrop() {
+                if (!backdrop) {
+                    return;
+                }
+
+                const isCollapsed = body.classList.contains('sidebar-collapsed');
+                backdrop.classList.toggle('show', !isCollapsed);
+            }
+
             function toggleSidebar() {
                 body.classList.toggle('sidebar-collapsed');
                 updateAria();
+                syncBackdrop();
             }
 
             toggles.forEach(btn => btn.addEventListener('click', toggleSidebar));
+
+            if (backdrop) {
+                backdrop.addEventListener('click', () => {
+                    body.classList.add('sidebar-collapsed');
+                    updateAria();
+                    syncBackdrop();
+                });
+            }
 
             function handleScreenChange(e) {
                 if (e.matches) {
@@ -267,6 +286,7 @@
                     body.classList.remove('sidebar-collapsed');
                 }
                 updateAria();
+                syncBackdrop();
             }
 
             handleScreenChange(mediaQuery);

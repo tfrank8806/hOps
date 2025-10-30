@@ -28,6 +28,7 @@ body {
     transition: width 0.3s ease, padding 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
     border-right: 1px solid rgba(13, 110, 253, 0.08);
     box-shadow: 2px 0 18px rgba(15, 46, 97, 0.08);
+    z-index: 1060;
 }
 
 .sidebar-inner {
@@ -82,6 +83,27 @@ body {
 
 .sidebar-toggle-icon::after {
     transform: translateY(6px);
+}
+
+.sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.35);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    z-index: 1050;
+}
+
+.sidebar-backdrop.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .sidebar-menu .nav {
@@ -381,6 +403,10 @@ body.sidebar-collapsed .sidebar .sidebar-inner {
     .main-header {
         position: relative;
     }
+
+    .sidebar-backdrop {
+        display: block;
+    }
 }
 
 @media (min-width: 992px) {
@@ -389,6 +415,10 @@ body.sidebar-collapsed .sidebar .sidebar-inner {
         padding: 0;
         border: none;
         box-shadow: none;
+    }
+
+    .sidebar-backdrop {
+        display: none;
     }
 }
 .calendar-page {
