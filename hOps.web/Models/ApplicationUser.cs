@@ -35,5 +35,7 @@ namespace hOps.web.Models
         public ICollection<UserNotification> Notifications { get; set; } = new List<UserNotification>();
         public ICollection<Document> UploadedDocuments { get; set; } = new List<Document>();
         public ICollection<DocumentFolder> CreatedDocumentFolders { get; set; } = new List<DocumentFolder>();
+
+        public string TimeZoneId { get; set; } = TimeZoneInfo.Utc.Id;
     }
 }

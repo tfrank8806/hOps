@@ -90,6 +90,13 @@
                         }
                         <span asp-validation-for="Profile.DefaultPropertyId" class="text-danger"></span>
                     </div>
+                    <div class="mb-3">
+                        <label asp-for="Profile.TimeZoneId" class="form-label"></label>
+                        <select asp-for="Profile.TimeZoneId" asp-items="Model.TimeZoneOptions" class="form-select">
+                            <option value="">Select a time zone</option>
+                        </select>
+                        <span asp-validation-for="Profile.TimeZoneId" class="text-danger"></span>
+                    </div>
                     <div class="text-end">
                         <button type="submit" class="btn btn-primary">Save Changes</button>
                     </div>

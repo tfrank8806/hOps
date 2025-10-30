@@ -64,12 +64,34 @@ namespace hOps.web.Controllers
                 ModelState.AddModelError("Profile.DefaultPropertyId", "You do not have access to the selected property.");
             }
 
+            string? resolvedTimeZoneId = null;
+            if (!string.IsNullOrWhiteSpace(model.TimeZoneId))
+            {
+                try
+                {
+                    var tz = TimeZoneInfo.FindSystemTimeZoneById(model.TimeZoneId.Trim());
+                    resolvedTimeZoneId = tz.Id;
+                }
+                catch (TimeZoneNotFoundException)
+                {
+                    ModelState.AddModelError("Profile.TimeZoneId", "Please select a valid time zone.");
+                }
+                catch (InvalidTimeZoneException)
+                {
+                    ModelState.AddModelError("Profile.TimeZoneId", "Please select a valid time zone.");
+                }
+            }
+
             if (!ModelState.IsValid)
             {
                 model.ProfilePhotoPath = user.ProfilePhotoPath;
                 if (model.DefaultPropertyId == null)
                 {
                     model.DefaultPropertyId = user.DefaultPropertyId;
+                }
+                if (string.IsNullOrWhiteSpace(model.TimeZoneId))
+                {
+                    model.TimeZoneId = user.TimeZoneId;
                 }
 
                 return View("Index", await BuildViewModel(user, model));
@@ -119,6 +141,7 @@ namespace hOps.web.Controllers
                 : (int?)null;
 
             user.DefaultPropertyId = selectedDefaultPropertyId;
+            user.TimeZoneId = resolvedTimeZoneId ?? user.TimeZoneId ?? TimeZoneInfo.Utc.Id;
 
             var updateResult = await _userManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
@@ -318,6 +341,10 @@ namespace hOps.web.Controllers
 
             profileVm.ProfilePhotoPath ??= user.ProfilePhotoPath;
             profileVm.DefaultPropertyId ??= user.DefaultPropertyId;
+            var userTimeZoneId = string.IsNullOrWhiteSpace(user.TimeZoneId) ? TimeZoneInfo.Utc.Id : user.TimeZoneId;
+            profileVm.TimeZoneId = string.IsNullOrWhiteSpace(profileVm.TimeZoneId)
+                ? userTimeZoneId
+                : profileVm.TimeZoneId;
 
             var accessibleProperties = await _context.UserPropertyAccesses
                 .Where(upa => upa.ApplicationUserId == user.Id)
@@ -336,6 +363,16 @@ namespace hOps.web.Controllers
                     Value = p.Id.ToString(),
                     Text = $"{p.Name} ({p.Code})",
                     Selected = profileVm.DefaultPropertyId == p.Id
+                })
+                .ToList();
+
+            var selectedTimeZoneId = profileVm.TimeZoneId?.Trim();
+            var timeZoneOptions = TimeZoneInfo.GetSystemTimeZones()
+                .Select(tz => new SelectListItem
+                {
+                    Value = tz.Id,
+                    Text = $"{tz.DisplayName} ({tz.Id})",
+                    Selected = string.Equals(tz.Id, selectedTimeZoneId, StringComparison.OrdinalIgnoreCase)
                 })
                 .ToList();
 
@@ -381,7 +418,7 @@ namespace hOps.web.Controllers
                 .Select(d => new EmailPreferenceDepartmentOption
                 {
                     Id = d.Id,
-                    Name = d.Name,
+                    Name = d.Name ?? string.Empty,
                     Selected = subscriptionIds.Contains(d.Id)
                 })
                 .ToList();
@@ -391,6 +428,7 @@ namespace hOps.web.Controllers
                 Profile = profileVm,
                 ChangePassword = changePasswordVm,
                 PropertyOptions = propertyOptions,
+                TimeZoneOptions = timeZoneOptions,
                 EmailPreferences = emailPreferencesVm
             };
         }

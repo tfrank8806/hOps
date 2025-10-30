@@ -32,6 +32,9 @@ namespace hOps.web.ViewModels
 
         [Display(Name = "Default Property")]
         public int? DefaultPropertyId { get; set; }
+
+        [Display(Name = "Time Zone")]
+        public string? TimeZoneId { get; set; }
     }
 
     public class ChangePasswordFormViewModel
@@ -86,6 +89,7 @@ namespace hOps.web.ViewModels
         public ProfileFormViewModel Profile { get; set; } = new();
         public ChangePasswordFormViewModel ChangePassword { get; set; } = new();
         public IEnumerable<SelectListItem> PropertyOptions { get; set; } = Enumerable.Empty<SelectListItem>();
+        public IEnumerable<SelectListItem> TimeZoneOptions { get; set; } = Enumerable.Empty<SelectListItem>();
         public EmailPreferencesViewModel EmailPreferences { get; set; } = new();
     }
 }
