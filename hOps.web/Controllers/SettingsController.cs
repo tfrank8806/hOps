@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -992,6 +994,203 @@ namespace hOps.web.Controllers
             }
 
             return RedirectToSettingsList(nameof(CalendarCategories), propertyId, onlyGlobal);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Rooms(int? propertyId = null)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            if (!properties.Any())
+            {
+                return Forbid();
+            }
+
+            var selectedPropertyId = propertyId ?? properties.First().Id;
+            if (properties.All(p => p.Id != selectedPropertyId))
+            {
+                selectedPropertyId = properties.First().Id;
+            }
+
+            var selectedProperty = properties.First(p => p.Id == selectedPropertyId);
+
+            var rooms = await _db.Rooms
+                .Where(r => r.PropertyId == selectedPropertyId)
+                .OrderBy(r => r.Floor)
+                .ThenBy(r => r.RoomNumber)
+                .ToListAsync();
+
+            ViewBag.PropertyId = selectedPropertyId;
+            ViewBag.PropertyName = selectedProperty.Name;
+            ViewBag.AllProperties = properties;
+
+            return View("Rooms", rooms);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveRooms(int propertyId, List<Room> rooms)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            if (!properties.Any(p => p.Id == propertyId))
+            {
+                return Forbid();
+            }
+
+            rooms ??= new List<Room>();
+
+            var sanitizedRooms = rooms
+                .Where(r => r != null)
+                .Select(r => new Room
+                {
+                    Id = r.Id,
+                    PropertyId = propertyId,
+                    RoomNumber = r.RoomNumber?.Trim() ?? string.Empty,
+                    Floor = r.Floor,
+                    RoomType = r.RoomType?.Trim() ?? string.Empty,
+                    Description = string.IsNullOrWhiteSpace(r.Description) ? null : r.Description.Trim()
+                })
+                .Where(r => !string.IsNullOrWhiteSpace(r.RoomNumber))
+                .ToList();
+
+            var existingRooms = await _db.Rooms
+                .Where(r => r.PropertyId == propertyId)
+                .ToListAsync();
+
+            var incomingById = sanitizedRooms
+                .Where(r => r.Id > 0)
+                .ToDictionary(r => r.Id);
+
+            foreach (var existing in existingRooms.ToList())
+            {
+                if (incomingById.TryGetValue(existing.Id, out var updated))
+                {
+                    existing.RoomNumber = updated.RoomNumber;
+                    existing.Floor = updated.Floor;
+                    existing.RoomType = updated.RoomType;
+                    existing.Description = updated.Description;
+                }
+                else
+                {
+                    _db.Rooms.Remove(existing);
+                }
+            }
+
+            var newRooms = sanitizedRooms.Where(r => r.Id <= 0);
+            foreach (var room in newRooms)
+            {
+                _db.Rooms.Add(new Room
+                {
+                    PropertyId = propertyId,
+                    RoomNumber = room.RoomNumber,
+                    Floor = room.Floor,
+                    RoomType = room.RoomType,
+                    Description = room.Description
+                });
+            }
+
+            await _db.SaveChangesAsync();
+
+            TempData["RoomsMessage"] = "Rooms updated successfully.";
+            return RedirectToAction(nameof(Rooms), new { propertyId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ImportRooms(int propertyId, IFormFile? csvFile)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            if (!properties.Any(p => p.Id == propertyId))
+            {
+                return Forbid();
+            }
+
+            if (csvFile == null || csvFile.Length == 0)
+            {
+                TempData["RoomsMissing"] = "Select a CSV file to import rooms.";
+                return RedirectToAction(nameof(Rooms), new { propertyId });
+            }
+
+            var importedRooms = new List<Room>();
+            try
+            {
+                using var stream = csvFile.OpenReadStream();
+                using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+                var lineNumber = 0;
+                var skippedHeader = false;
+
+                while (!reader.EndOfStream)
+                {
+                    var line = await reader.ReadLineAsync();
+                    lineNumber++;
+
+                    if (string.IsNullOrWhiteSpace(line))
+                    {
+                        continue;
+                    }
+
+                    var columns = line.Split(',');
+
+                    if (!skippedHeader && columns.Length > 0 &&
+                        columns[0].Trim().Equals("RoomNumber", System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        skippedHeader = true;
+                        continue;
+                    }
+
+                    var roomNumber = columns.ElementAtOrDefault(0)?.Trim();
+                    if (string.IsNullOrWhiteSpace(roomNumber))
+                    {
+                        continue;
+                    }
+
+                    var floorText = columns.ElementAtOrDefault(1)?.Trim();
+                    int.TryParse(floorText, out var floor);
+
+                    var roomType = columns.ElementAtOrDefault(2)?.Trim() ?? string.Empty;
+                    var description = columns.ElementAtOrDefault(3)?.Trim();
+
+                    importedRooms.Add(new Room
+                    {
+                        PropertyId = propertyId,
+                        RoomNumber = roomNumber,
+                        Floor = floor,
+                        RoomType = roomType,
+                        Description = string.IsNullOrWhiteSpace(description) ? null : description
+                    });
+                }
+            }
+            catch
+            {
+                TempData["RoomsMissing"] = "Unable to read the uploaded CSV file.";
+                return RedirectToAction(nameof(Rooms), new { propertyId });
+            }
+
+            if (!importedRooms.Any())
+            {
+                TempData["RoomsMissing"] = "No rooms were found in the uploaded file.";
+                return RedirectToAction(nameof(Rooms), new { propertyId });
+            }
+
+            var existingRooms = await _db.Rooms
+                .Where(r => r.PropertyId == propertyId)
+                .ToListAsync();
+
+            _db.Rooms.RemoveRange(existingRooms);
+            await _db.SaveChangesAsync();
+
+            _db.Rooms.AddRange(importedRooms);
+            await _db.SaveChangesAsync();
+
+            TempData["RoomsMessage"] = $"Imported {importedRooms.Count} room{(importedRooms.Count == 1 ? string.Empty : "s")}.";
+            return RedirectToAction(nameof(Rooms), new { propertyId });
+        }
+
+        [HttpGet]
+        public IActionResult DownloadRoomsTemplate()
+        {
+            const string content = "RoomNumber,Floor,RoomType,Description\r\n101,1,Standard,Near elevator\r\n";
+            var bytes = Encoding.UTF8.GetBytes(content);
+            return File(bytes, "text/csv", "rooms-template.csv");
         }
 
         // - Layout Editor & Save -
