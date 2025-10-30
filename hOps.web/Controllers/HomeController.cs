@@ -319,17 +319,17 @@ namespace hOps.web.Controllers
 
         private async Task PopulateRoomTilesAsync(HomeIndexViewModel viewModel, int propertyId)
         {
-            var layoutData = await _context.RoomLayouts
-                .Where(l => l.PropertyId == propertyId)
-                .Join(
-                    _context.Rooms.Where(r => r.PropertyId == propertyId),
-                    layout => layout.RoomId,
-                    room => room.Id,
-                    (layout, room) => new
-                    {
-                        Layout = layout,
-                        Room = room,
-                    })
+            var layoutData = await (
+                from layout in _context.RoomLayouts
+                where layout.PropertyId == propertyId
+                join room in _context.Rooms.Where(r => r.PropertyId == propertyId)
+                    on layout.RoomId equals room.Id into roomGroup
+                from room in roomGroup.DefaultIfEmpty()
+                select new
+                {
+                    Layout = layout,
+                    Room = room
+                })
                 .AsNoTracking()
                 .ToListAsync();
 
@@ -384,12 +384,18 @@ namespace hOps.web.Controllers
 
             foreach (var entry in layoutData)
             {
+                var hasRoom = entry.Room != null && entry.Room.Id != 0;
+                var baseRoomNumber = hasRoom ? entry.Room!.RoomNumber : null;
+                var displayLabel = !string.IsNullOrWhiteSpace(entry.Layout.Label)
+                    ? entry.Layout.Label!.Trim()
+                    : (!string.IsNullOrWhiteSpace(baseRoomNumber) ? baseRoomNumber! : $"Tile {entry.Layout.Id}");
+
                 var tile = new RoomLayoutTileViewModel
                 {
                     LayoutId = entry.Layout.Id,
-                    RoomId = entry.Room.Id,
-                    RoomNumber = entry.Room.RoomNumber,
-                    RoomType = entry.Room.RoomType,
+                    RoomId = hasRoom ? entry.Room!.Id : 0,
+                    RoomNumber = displayLabel,
+                    RoomType = hasRoom ? entry.Room!.RoomType : "Custom Tile",
                     Floor = entry.Layout.Floor,
                     X = entry.Layout.X,
                     Y = entry.Layout.Y,
@@ -403,34 +409,41 @@ namespace hOps.web.Controllers
                     CssClass = "room-tile",
                 };
 
-                var matchingOrders = activeWorkOrders
-                    .Where(wo => MatchesRoom(entry.Room.RoomNumber, wo.Location))
-                    .ToList();
-
-                if (matchingOrders.Any())
+                if (!hasRoom)
                 {
-                    tile.CssClass = AppendCss(tile.CssClass, "room-tile--workorder");
-                    tile.Badges.Add(new RoomTileBadgeViewModel
-                    {
-                        Text = matchingOrders.Count == 1 ? "1 WO" : $"{matchingOrders.Count} WO",
-                        Variant = "danger",
-                        Url = Url.Action("Index", "WorkOrders"),
-                    });
+                    tile.CssClass = AppendCss(tile.CssClass, "room-tile--custom");
                 }
-
-                var matchingLostFound = openLostFound
-                    .Where(lf => MatchesRoom(entry.Room.RoomNumber, lf.Location))
-                    .ToList();
-
-                if (matchingLostFound.Any())
+                else if (!string.IsNullOrWhiteSpace(baseRoomNumber))
                 {
-                    tile.CssClass = AppendCss(tile.CssClass, "room-tile--lostfound");
-                    tile.Badges.Add(new RoomTileBadgeViewModel
+                    var matchingOrders = activeWorkOrders
+                        .Where(wo => MatchesRoom(baseRoomNumber!, wo.Location))
+                        .ToList();
+
+                    if (matchingOrders.Any())
                     {
-                        Text = matchingLostFound.Count == 1 ? "1 L&F" : $"{matchingLostFound.Count} L&F",
-                        Variant = "warning",
-                        Url = Url.Action("Index", "LostAndFound"),
-                    });
+                        tile.CssClass = AppendCss(tile.CssClass, "room-tile--workorder");
+                        tile.Badges.Add(new RoomTileBadgeViewModel
+                        {
+                            Text = matchingOrders.Count == 1 ? "1 WO" : $"{matchingOrders.Count} WO",
+                            Variant = "danger",
+                            Url = Url.Action("Index", "WorkOrders"),
+                        });
+                    }
+
+                    var matchingLostFound = openLostFound
+                        .Where(lf => MatchesRoom(baseRoomNumber!, lf.Location))
+                        .ToList();
+
+                    if (matchingLostFound.Any())
+                    {
+                        tile.CssClass = AppendCss(tile.CssClass, "room-tile--lostfound");
+                        tile.Badges.Add(new RoomTileBadgeViewModel
+                        {
+                            Text = matchingLostFound.Count == 1 ? "1 L&F" : $"{matchingLostFound.Count} L&F",
+                            Variant = "warning",
+                            Url = Url.Action("Index", "LostAndFound"),
+                        });
+                    }
                 }
 
                 viewModel.RoomTiles.Add(tile);

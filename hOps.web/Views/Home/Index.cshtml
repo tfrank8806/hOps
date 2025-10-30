@@ -239,11 +239,12 @@
                                     var height = Math.Round((double)tile.Height / maxHeightAll * 100, 2);
                                     var overlayBg = $"{tile.FloorColor}33";
                                     var navigateUrl = tile.Badges.FirstOrDefault(b => !string.IsNullOrWhiteSpace(b.Url))?.Url ?? string.Empty;
-                                    var ariaLabel = $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} room {tile.RoomNumber}";
-                                    if (tile.Badges.Any())
-                                    {
-                                        ariaLabel = $"{ariaLabel} with {string.Join(", ", tile.Badges.Select(b => b.Text))}";
-                                    }
+                                    var ariaLabelBase = tile.RoomId == 0
+                                        ? $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} {tile.RoomNumber}"
+                                        : $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} room {tile.RoomNumber}";
+                                    var ariaLabel = tile.Badges.Any()
+                                        ? $"{ariaLabelBase} with {string.Join(", ", tile.Badges.Select(b => b.Text))}"
+                                        : ariaLabelBase;
                                     <div class="@($"{tile.CssClass} room-tile-overlay")"
                                          data-floor="@tile.Floor"
                                          data-navigate-url="@navigateUrl"
@@ -290,7 +291,7 @@
                                 <section class="layout-floor-section mb-4 @(isActive ? string.Empty : "d-none")" data-floor="@floorGroup.Key">
                                     <header class="d-flex align-items-center justify-content-between mb-2">
                                         <h3 class="h6 mb-0">Floor @floorGroup.Key</h3>
-                                        <span class="text-muted small">@floorGroup.Count() room@(floorGroup.Count() == 1 ? string.Empty : "s")</span>
+                                        <span class="text-muted small">@floorGroup.Count() tile@(floorGroup.Count() == 1 ? string.Empty : "s")</span>
                                     </header>
                                     <div class="layout-canvas" style="--layout-width:@maxWidth; --layout-height:@maxHeight;">
                                         @foreach (var tile in floorGroup)
@@ -382,6 +383,12 @@
             background: linear-gradient(135deg, rgba(255, 193, 7, 0.12), rgba(255, 255, 255, 0.92));
         }
 
+        .layout-canvas .room-tile--custom {
+            border-style: dashed;
+            border-color: rgba(73, 80, 87, 0.65);
+            background: linear-gradient(135deg, rgba(108, 117, 125, 0.12), rgba(255, 255, 255, 0.96));
+        }
+
         .layout-canvas.multi-floor {
             isolation: isolate;
         }
@@ -423,6 +430,10 @@
             align-items: center;
             text-align: center;
             padding: 0.4rem;
+        }
+
+        .room-tile-overlay.room-tile--custom {
+            border-style: dashed;
         }
 
         .room-tile-overlay:hover {
