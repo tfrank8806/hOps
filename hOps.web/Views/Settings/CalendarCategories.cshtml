@@ -1,5 +1,66 @@
-﻿@model List<hOps.web.Models.CalendarCategory>
+@model List<hOps.web.Models.CalendarCategory>
 @using Microsoft.AspNetCore.Mvc.Rendering
+@functions {
+    private static string NormalizeColorHex(string? color)
+    {
+        const string fallback = "#6c757d";
+        if (string.IsNullOrWhiteSpace(color))
+        {
+            return fallback;
+        }
+
+        var trimmed = color.Trim();
+        if (!trimmed.StartsWith("#", System.StringComparison.Ordinal))
+        {
+            trimmed = "#" + trimmed;
+        }
+
+        if (trimmed.Length == 4)
+        {
+            var r = trimmed[1];
+            var g = trimmed[2];
+            var b = trimmed[3];
+            trimmed = $"#{r}{r}{g}{g}{b}{b}";
+        }
+
+        if (trimmed.Length != 7)
+        {
+            return fallback;
+        }
+
+        for (var i = 1; i < trimmed.Length; i++)
+        {
+            var c = trimmed[i];
+            var isHex = (c >= '0' && c <= '9') ||
+                        (c >= 'a' && c <= 'f') ||
+                        (c >= 'A' && c <= 'F');
+            if (!isHex)
+            {
+                return fallback;
+            }
+        }
+
+        return trimmed;
+    }
+
+    private static string GetTextColorForBackground(string normalizedHex)
+    {
+        if (string.IsNullOrEmpty(normalizedHex) || normalizedHex.Length != 7)
+        {
+            normalizedHex = "#6c757d";
+        }
+
+        if (!int.TryParse(normalizedHex.Substring(1, 2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var r) ||
+            !int.TryParse(normalizedHex.Substring(3, 2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var g) ||
+            !int.TryParse(normalizedHex.Substring(5, 2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var b))
+        {
+            return "#ffffff";
+        }
+
+        var luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0;
+        return luminance > 0.6 ? "#000000" : "#ffffff";
+    }
+}
 @{
     ViewData["Title"] = "Calendar Categories";
     var filterOptions = ViewBag.PropertyFilterOptions as List<SelectListItem> ?? new List<SelectListItem>();
@@ -38,9 +99,16 @@
             var scopeLabel = item.PropertyId.HasValue
                 ? (item.Property != null ? $"{item.Property.Name} ({item.Property.Code})" : $"Property #{item.PropertyId}")
                 : "Global";
+            var swatchColor = NormalizeColorHex(item.Color);
+            var textColor = GetTextColorForBackground(swatchColor);
             <tr>
                 <td>@item.Name</td>
-                <td><span class="badge text-bg-secondary" style="background:@item.Color">@item.Color</span></td>
+                <td>
+                    <span class="badge d-inline-flex align-items-center justify-content-center px-3"
+                          style="background-color:@swatchColor; color:@textColor; border:1px solid rgba(0,0,0,0.1); min-width:4.5rem;">
+                        @swatchColor
+                    </span>
+                </td>
                 <td>@scopeLabel</td>
                 <td class="text-end">
                     <a class="btn btn-sm btn-outline-primary" asp-action="EditCalendarCategory" asp-route-id="@item.Id" asp-route-propertyId="@selectedPropertyId" asp-route-onlyGlobal="@onlyGlobal" asp-route-returnUrl="@currentUrl">Edit</a>
@@ -66,4 +134,3 @@
         })();
     </script>
 }
-
