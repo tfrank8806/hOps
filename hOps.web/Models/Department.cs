@@ -12,5 +12,8 @@ namespace hOps.web.Models
 
         [Display(Name = "Color Code (HEX)")]
         public string Color { get; set; } = "#6c757d"; // default gray
+
+        public int? PropertyId { get; set; }
+        public Property? Property { get; set; }
     }
 }

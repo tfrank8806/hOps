@@ -1,32 +1,69 @@
 ﻿@model List<hOps.web.Models.WorkOrderType>
+@using Microsoft.AspNetCore.Mvc.Rendering
 @{
     ViewData["Title"] = "Work Order Types";
+    var filterOptions = ViewBag.PropertyFilterOptions as List<SelectListItem> ?? new List<SelectListItem>();
+    string createUrl = ViewBag.CreateWorkOrderTypeUrl as string ?? Url.Action("CreateWorkOrderType") ?? string.Empty;
+    int? selectedPropertyId = ViewBag.SelectedPropertyId as int?;
+    bool onlyGlobal = ViewBag.OnlyGlobal as bool? ?? false;
+    string currentUrl = Context.Request.Path + Context.Request.QueryString;
 }
 
-<h2>@ViewData["Title"]</h2>
-<p><a class="btn btn-primary" asp-action="CreateWorkOrderType">Add Type</a></p>
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-3">
+    <h2 class="h4 mb-0">Work Order Types</h2>
+    <div class="d-flex align-items-center gap-2">
+        <label for="workOrderTypePropertyFilter" class="form-label mb-0">Scope:</label>
+        <select id="workOrderTypePropertyFilter" class="form-select form-select-sm" style="width:auto; min-width:220px;">
+            @foreach (var option in filterOptions)
+            {
+                <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
+            }
+        </select>
+    </div>
+    <a class="btn btn-primary" href="@createUrl">Add Type</a>
+</div>
 
-<table class="table">
+<table class="table table-striped align-middle">
     <thead>
         <tr>
             <th>Name</th>
             <th>Color</th>
-            <th></th>
+            <th>Applies To</th>
+            <th class="text-end">Actions</th>
         </tr>
     </thead>
     <tbody>
         @foreach (var item in Model)
         {
+            var scopeLabel = item.PropertyId.HasValue
+                ? (item.Property != null ? $"{item.Property.Name} ({item.Property.Code})" : $"Property #{item.PropertyId}")
+                : "Global";
             <tr>
                 <td>@item.Name</td>
-                <td><span style="background:@item.Color; padding:4px 12px; color:white">@item.Color</span></td>
-                <td>
-                    <a asp-action="EditWorkOrderType" asp-route-id="@item.Id" class="btn btn-warning btn-sm">Edit</a>
-                    <form asp-action="DeleteWorkOrderType" asp-route-id="@item.Id" method="post" style="display:inline">
-                        <button class="btn btn-danger btn-sm" onclick="return confirm('Delete this work order type?')">Delete</button>
+                <td><span class="badge text-bg-secondary" style="background:@item.Color">@item.Color</span></td>
+                <td>@scopeLabel</td>
+                <td class="text-end">
+                    <a class="btn btn-sm btn-outline-primary" asp-action="EditWorkOrderType" asp-route-id="@item.Id" asp-route-propertyId="@selectedPropertyId" asp-route-onlyGlobal="@onlyGlobal" asp-route-returnUrl="@currentUrl">Edit</a>
+                    <form asp-action="DeleteWorkOrderType" asp-route-id="@item.Id" asp-route-propertyId="@selectedPropertyId" asp-route-onlyGlobal="@onlyGlobal" asp-route-returnUrl="@currentUrl" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this work order type?');">Delete</button>
                     </form>
                 </td>
             </tr>
         }
     </tbody>
 </table>
+
+@section Scripts {
+    <script>
+        (function () {
+            const filter = document.getElementById('workOrderTypePropertyFilter');
+            if (!filter) return;
+            filter.addEventListener('change', function () {
+                if (this.value) {
+                    window.location.href = this.value;
+                }
+            });
+        })();
+    </script>
+}
+

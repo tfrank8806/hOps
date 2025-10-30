@@ -249,6 +249,30 @@ namespace hOps.web.Data
                 .HasForeignKey(s => s.DepartmentId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            builder.Entity<Department>()
+                .HasOne(d => d.Property)
+                .WithMany(p => p.Departments)
+                .HasForeignKey(d => d.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<WorkOrderType>()
+                .HasOne(t => t.Property)
+                .WithMany(p => p.WorkOrderTypes)
+                .HasForeignKey(t => t.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<PhonebookType>()
+                .HasOne(t => t.Property)
+                .WithMany(p => p.PhonebookTypes)
+                .HasForeignKey(t => t.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<CalendarCategory>()
+                .HasOne(c => c.Property)
+                .WithMany(p => p.CalendarCategories)
+                .HasForeignKey(c => c.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             builder.Entity<Document>()
                 .HasOne(d => d.UploadedBy)
                 .WithMany(u => u.UploadedDocuments)

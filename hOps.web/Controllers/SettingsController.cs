@@ -2,13 +2,13 @@
 using hOps.web.Models;
 using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using Microsoft.AspNetCore.Http;
 using System.Linq;
 
 namespace hOps.web.Controllers
@@ -25,358 +25,1013 @@ namespace hOps.web.Controllers
             _userManager = userManager;
         }
 
-        // — Departments CRUD —
-        public async Task<IActionResult> Departments()
+        private async Task<List<Property>> GetEditablePropertiesAsync()
         {
-            var departments = await _db.Departments.ToListAsync();
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return new List<Property>();
+            }
+
+            var roles = (await _userManager.GetRolesAsync(currentUser))
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Select(r => r!)
+                .ToList();
+
+            if (roles.Contains("Admin"))
+            {
+                return await _db.Properties
+                    .OrderBy(p => p.Name)
+                    .ToListAsync();
+            }
+
+            var accessibleIds = await _db.UserPropertyAccesses
+                .Where(upa => upa.ApplicationUserId == currentUser.Id)
+                .Select(upa => upa.PropertyId)
+                .Distinct()
+                .ToListAsync();
+
+            return await _db.Properties
+                .Where(p => accessibleIds.Contains(p.Id))
+                .OrderBy(p => p.Name)
+                .ToListAsync();
+        }
+
+        private List<SelectListItem> BuildPropertySelectList(IEnumerable<Property> properties, int? selectedPropertyId, bool includeGlobal = true)
+        {
+            var items = new List<SelectListItem>();
+            if (includeGlobal)
+            {
+                items.Add(new SelectListItem("Global (all properties)", "", selectedPropertyId == null));
+            }
+
+            foreach (var property in properties)
+            {
+                items.Add(new SelectListItem(
+                    $"{property.Name} ({property.Code})",
+                    property.Id.ToString(),
+                    selectedPropertyId == property.Id));
+            }
+
+            return items;
+        }
+
+        private List<SelectListItem> BuildPropertyFilterOptions(string actionName, IEnumerable<Property> properties, int? propertyId, bool onlyGlobal)
+        {
+            var options = new List<SelectListItem>
+            {
+                new SelectListItem("All entries", Url.Action(actionName, new { }), !propertyId.HasValue && !onlyGlobal),
+                new SelectListItem("Global (all properties)", Url.Action(actionName, new { onlyGlobal = true }), !propertyId.HasValue && onlyGlobal)
+            };
+
+            foreach (var property in properties)
+            {
+                options.Add(new SelectListItem(
+                    $"{property.Name} ({property.Code})",
+                    Url.Action(actionName, new { propertyId = property.Id }) ?? string.Empty,
+                    propertyId == property.Id));
+            }
+
+            return options;
+        }
+
+        private IActionResult RedirectToSettingsList(string actionName, int? propertyId, bool onlyGlobal)
+        {
+            if (propertyId.HasValue && propertyId.Value > 0)
+            {
+                return RedirectToAction(actionName, new { propertyId = propertyId.Value });
+            }
+
+            if (onlyGlobal)
+            {
+                return RedirectToAction(actionName, new { onlyGlobal = true });
+            }
+
+            return RedirectToAction(actionName);
+        }
+
+        // — Departments CRUD —
+
+        public async Task<IActionResult> Departments(int? propertyId = null, bool onlyGlobal = false)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            if (propertyId.HasValue && propertyId.Value > 0 && !editablePropertyIds.Contains(propertyId.Value))
+            {
+                return Forbid();
+            }
+
+            ViewBag.PropertyFilterOptions = BuildPropertyFilterOptions(nameof(Departments), properties, propertyId, onlyGlobal);
+            ViewBag.SelectedPropertyId = propertyId;
+            ViewBag.OnlyGlobal = onlyGlobal;
+
+            var query = _db.Departments.Include(d => d.Property).AsNoTracking().AsQueryable();
+            if (onlyGlobal)
+            {
+                query = query.Where(d => d.PropertyId == null);
+            }
+            else if (propertyId.HasValue && propertyId.Value > 0)
+            {
+                query = query.Where(d => d.PropertyId == propertyId.Value);
+            }
+
+            var departments = await query
+                .OrderBy(d => d.Name)
+                .ToListAsync();
+
+            var currentUrl = HttpContext.Request.Path + HttpContext.Request.QueryString;
+            ViewBag.CreateDepartmentUrl = propertyId.HasValue && propertyId.Value > 0
+                ? Url.Action(nameof(CreateDepartment), new { propertyId = propertyId.Value, returnUrl = currentUrl })
+                : (onlyGlobal
+                    ? Url.Action(nameof(CreateDepartment), new { onlyGlobal = true, returnUrl = currentUrl })
+                    : Url.Action(nameof(CreateDepartment), new { returnUrl = currentUrl }));
+
             return View(departments);
         }
 
-        public IActionResult CreateDepartment() => View();
+        public async Task<IActionResult> CreateDepartment(int? propertyId = null, bool onlyGlobal = false, string? returnUrl = null)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+            int? normalizedPropertyId = null;
+            if (propertyId.HasValue && propertyId.Value > 0 && editablePropertyIds.Contains(propertyId.Value))
+            {
+                normalizedPropertyId = propertyId.Value;
+            }
+
+            ViewBag.PropertyOptions = BuildPropertySelectList(properties, normalizedPropertyId);
+            ViewBag.SelectedPropertyId = normalizedPropertyId;
+            ViewBag.OnlyGlobal = onlyGlobal;
+            ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                ? Url.Action(nameof(Departments))
+                : returnUrl;
+
+            var model = new Department
+            {
+                PropertyId = normalizedPropertyId
+            };
+
+            return View(model);
+        }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateDepartment(Department model)
+        public async Task<IActionResult> CreateDepartment(Department model, int? selectedPropertyId, bool onlyGlobal, string? returnUrl)
         {
-            if (!ModelState.IsValid) return View(model);
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            int? normalizedPropertyId = null;
+            if (selectedPropertyId.HasValue && selectedPropertyId.Value > 0)
+            {
+                if (editablePropertyIds.Contains(selectedPropertyId.Value))
+                {
+                    normalizedPropertyId = selectedPropertyId.Value;
+                }
+                else
+                {
+                    ModelState.AddModelError("PropertyId", "You do not have access to that property.");
+                }
+            }
+
+            model.PropertyId = normalizedPropertyId;
+
+            if (!ModelState.IsValid)
+            {
+                ViewBag.PropertyOptions = BuildPropertySelectList(properties, model.PropertyId);
+                ViewBag.SelectedPropertyId = normalizedPropertyId;
+                ViewBag.OnlyGlobal = onlyGlobal;
+                ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                    ? Url.Action(nameof(Departments))
+                    : returnUrl;
+                return View(model);
+            }
+
             _db.Departments.Add(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(Departments));
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToSettingsList(nameof(Departments), model.PropertyId, onlyGlobal);
         }
 
-        public async Task<IActionResult> EditDepartment(int id)
+        public async Task<IActionResult> EditDepartment(int id, int? propertyId = null, bool onlyGlobal = false, string? returnUrl = null)
         {
             var dept = await _db.Departments.FindAsync(id);
             if (dept == null) return NotFound();
+
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            if (dept.PropertyId.HasValue && dept.PropertyId.Value > 0 && !editablePropertyIds.Contains(dept.PropertyId.Value))
+            {
+                return Forbid();
+            }
+
+            int? normalizedPropertyId = null;
+            if (propertyId.HasValue && propertyId.Value > 0 && editablePropertyIds.Contains(propertyId.Value))
+            {
+                normalizedPropertyId = propertyId.Value;
+            }
+
+            ViewBag.PropertyOptions = BuildPropertySelectList(properties, dept.PropertyId);
+            ViewBag.SelectedPropertyId = normalizedPropertyId;
+            ViewBag.OnlyGlobal = onlyGlobal;
+            ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                ? Url.Action(nameof(Departments))
+                : returnUrl;
+
             return View(dept);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditDepartment(Department model)
+        public async Task<IActionResult> EditDepartment(Department model, int? selectedPropertyId, bool onlyGlobal, string? returnUrl)
         {
-            if (!ModelState.IsValid) return View(model);
+            var existing = await _db.Departments.AsNoTracking().FirstOrDefaultAsync(d => d.Id == model.Id);
+            if (existing == null)
+            {
+                return NotFound();
+            }
+
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            if (existing.PropertyId.HasValue && existing.PropertyId.Value > 0 && !editablePropertyIds.Contains(existing.PropertyId.Value))
+            {
+                return Forbid();
+            }
+
+            int? normalizedPropertyId = null;
+            if (selectedPropertyId.HasValue && selectedPropertyId.Value > 0)
+            {
+                if (editablePropertyIds.Contains(selectedPropertyId.Value))
+                {
+                    normalizedPropertyId = selectedPropertyId.Value;
+                }
+                else
+                {
+                    ModelState.AddModelError("PropertyId", "You do not have access to that property.");
+                }
+            }
+
+            model.PropertyId = normalizedPropertyId;
+
+            if (!ModelState.IsValid)
+            {
+                ViewBag.PropertyOptions = BuildPropertySelectList(properties, model.PropertyId);
+                ViewBag.SelectedPropertyId = normalizedPropertyId;
+                ViewBag.OnlyGlobal = onlyGlobal;
+                ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                    ? Url.Action(nameof(Departments))
+                    : returnUrl;
+                return View(model);
+            }
+
             _db.Departments.Update(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(Departments));
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToSettingsList(nameof(Departments), model.PropertyId, onlyGlobal);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteDepartment(int id)
+        public async Task<IActionResult> DeleteDepartment(int id, int? propertyId = null, bool onlyGlobal = false, string? returnUrl = null)
         {
             var dept = await _db.Departments.FindAsync(id);
             if (dept == null) return NotFound();
+
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+            if (dept.PropertyId.HasValue && dept.PropertyId.Value > 0 && !editablePropertyIds.Contains(dept.PropertyId.Value))
+            {
+                return Forbid();
+            }
+
             _db.Departments.Remove(dept);
             await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(Departments));
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToSettingsList(nameof(Departments), propertyId, onlyGlobal);
         }
 
         // — WorkOrderTypes CRUD —
-        public async Task<IActionResult> WorkOrderTypes()
+
+        public async Task<IActionResult> WorkOrderTypes(int? propertyId = null, bool onlyGlobal = false)
         {
-            var types = await _db.WorkOrderTypes.ToListAsync();
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            if (propertyId.HasValue && propertyId.Value > 0 && !editablePropertyIds.Contains(propertyId.Value))
+            {
+                return Forbid();
+            }
+
+            ViewBag.PropertyFilterOptions = BuildPropertyFilterOptions(nameof(WorkOrderTypes), properties, propertyId, onlyGlobal);
+            ViewBag.SelectedPropertyId = propertyId;
+            ViewBag.OnlyGlobal = onlyGlobal;
+
+            var query = _db.WorkOrderTypes.Include(t => t.Property).AsNoTracking().AsQueryable();
+            if (onlyGlobal)
+            {
+                query = query.Where(t => t.PropertyId == null);
+            }
+            else if (propertyId.HasValue && propertyId.Value > 0)
+            {
+                query = query.Where(t => t.PropertyId == propertyId.Value);
+            }
+
+            var types = await query
+                .OrderBy(t => t.Name)
+                .ToListAsync();
+
+            var currentUrl = HttpContext.Request.Path + HttpContext.Request.QueryString;
+            ViewBag.CreateWorkOrderTypeUrl = propertyId.HasValue && propertyId.Value > 0
+                ? Url.Action(nameof(CreateWorkOrderType), new { propertyId = propertyId.Value, returnUrl = currentUrl })
+                : (onlyGlobal
+                    ? Url.Action(nameof(CreateWorkOrderType), new { onlyGlobal = true, returnUrl = currentUrl })
+                    : Url.Action(nameof(CreateWorkOrderType), new { returnUrl = currentUrl }));
+
             return View(types);
         }
 
-        public IActionResult CreateWorkOrderType()
+        public async Task<IActionResult> CreateWorkOrderType(int? propertyId = null, bool onlyGlobal = false, string? returnUrl = null)
         {
             ViewData["FormAction"] = nameof(CreateWorkOrderType);
-            return View("WorkOrderTypeForm", new WorkOrderType());
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+            int? normalizedPropertyId = null;
+            if (propertyId.HasValue && propertyId.Value > 0 && editablePropertyIds.Contains(propertyId.Value))
+            {
+                normalizedPropertyId = propertyId.Value;
+            }
+
+            ViewBag.PropertyOptions = BuildPropertySelectList(properties, normalizedPropertyId);
+            ViewBag.SelectedPropertyId = normalizedPropertyId;
+            ViewBag.OnlyGlobal = onlyGlobal;
+            ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                ? Url.Action(nameof(WorkOrderTypes))
+                : returnUrl;
+
+            var model = new WorkOrderType
+            {
+                PropertyId = normalizedPropertyId
+            };
+
+            return View("WorkOrderTypeForm", model);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateWorkOrderType(WorkOrderType model)
+        public async Task<IActionResult> CreateWorkOrderType(WorkOrderType model, int? selectedPropertyId, bool onlyGlobal, string? returnUrl)
         {
-            if (!ModelState.IsValid) return View("WorkOrderTypeForm", model);
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            int? normalizedPropertyId = null;
+            if (selectedPropertyId.HasValue && selectedPropertyId.Value > 0)
+            {
+                if (editablePropertyIds.Contains(selectedPropertyId.Value))
+                {
+                    normalizedPropertyId = selectedPropertyId.Value;
+                }
+                else
+                {
+                    ModelState.AddModelError("PropertyId", "You do not have access to that property.");
+                }
+            }
+
+            model.PropertyId = normalizedPropertyId;
+
+            if (!ModelState.IsValid)
+            {
+                ViewData["FormAction"] = nameof(CreateWorkOrderType);
+                ViewBag.PropertyOptions = BuildPropertySelectList(properties, model.PropertyId);
+                ViewBag.SelectedPropertyId = normalizedPropertyId;
+                ViewBag.OnlyGlobal = onlyGlobal;
+                ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                    ? Url.Action(nameof(WorkOrderTypes))
+                    : returnUrl;
+                return View("WorkOrderTypeForm", model);
+            }
+
             _db.WorkOrderTypes.Add(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(WorkOrderTypes));
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToSettingsList(nameof(WorkOrderTypes), model.PropertyId, onlyGlobal);
         }
 
-        public async Task<IActionResult> EditWorkOrderType(int id)
+        public async Task<IActionResult> EditWorkOrderType(int id, int? propertyId = null, bool onlyGlobal = false, string? returnUrl = null)
         {
             var item = await _db.WorkOrderTypes.FindAsync(id);
             if (item == null) return NotFound();
             ViewData["FormAction"] = nameof(EditWorkOrderType);
+
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            if (item.PropertyId.HasValue && item.PropertyId.Value > 0 && !editablePropertyIds.Contains(item.PropertyId.Value))
+            {
+                return Forbid();
+            }
+
+            int? normalizedPropertyId = null;
+            if (propertyId.HasValue && propertyId.Value > 0 && editablePropertyIds.Contains(propertyId.Value))
+            {
+                normalizedPropertyId = propertyId.Value;
+            }
+
+            ViewBag.PropertyOptions = BuildPropertySelectList(properties, item.PropertyId);
+            ViewBag.SelectedPropertyId = normalizedPropertyId;
+            ViewBag.OnlyGlobal = onlyGlobal;
+            ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                ? Url.Action(nameof(WorkOrderTypes))
+                : returnUrl;
+
             return View("WorkOrderTypeForm", item);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditWorkOrderType(WorkOrderType model)
+        public async Task<IActionResult> EditWorkOrderType(WorkOrderType model, int? selectedPropertyId, bool onlyGlobal, string? returnUrl)
         {
-            if (!ModelState.IsValid) return View("WorkOrderTypeForm", model);
+            var existing = await _db.WorkOrderTypes.AsNoTracking().FirstOrDefaultAsync(t => t.Id == model.Id);
+            if (existing == null)
+            {
+                return NotFound();
+            }
+
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            if (existing.PropertyId.HasValue && existing.PropertyId.Value > 0 && !editablePropertyIds.Contains(existing.PropertyId.Value))
+            {
+                return Forbid();
+            }
+
+            int? normalizedPropertyId = null;
+            if (selectedPropertyId.HasValue && selectedPropertyId.Value > 0)
+            {
+                if (editablePropertyIds.Contains(selectedPropertyId.Value))
+                {
+                    normalizedPropertyId = selectedPropertyId.Value;
+                }
+                else
+                {
+                    ModelState.AddModelError("PropertyId", "You do not have access to that property.");
+                }
+            }
+
+            model.PropertyId = normalizedPropertyId;
+
+            if (!ModelState.IsValid)
+            {
+                ViewData["FormAction"] = nameof(EditWorkOrderType);
+                ViewBag.PropertyOptions = BuildPropertySelectList(properties, model.PropertyId);
+                ViewBag.SelectedPropertyId = normalizedPropertyId;
+                ViewBag.OnlyGlobal = onlyGlobal;
+                ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                    ? Url.Action(nameof(WorkOrderTypes))
+                    : returnUrl;
+                return View("WorkOrderTypeForm", model);
+            }
+
             _db.WorkOrderTypes.Update(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(WorkOrderTypes));
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToSettingsList(nameof(WorkOrderTypes), model.PropertyId, onlyGlobal);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteWorkOrderType(int id)
+        public async Task<IActionResult> DeleteWorkOrderType(int id, int? propertyId = null, bool onlyGlobal = false, string? returnUrl = null)
         {
             var item = await _db.WorkOrderTypes.FindAsync(id);
             if (item == null) return NotFound();
+
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+            if (item.PropertyId.HasValue && item.PropertyId.Value > 0 && !editablePropertyIds.Contains(item.PropertyId.Value))
+            {
+                return Forbid();
+            }
+
             _db.WorkOrderTypes.Remove(item);
             await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(WorkOrderTypes));
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToSettingsList(nameof(WorkOrderTypes), propertyId, onlyGlobal);
         }
 
         // — PhonebookTypes CRUD —
-        public async Task<IActionResult> PhonebookTypes()
+
+        public async Task<IActionResult> PhonebookTypes(int? propertyId = null, bool onlyGlobal = false)
         {
-            var list = await _db.PhonebookTypes.ToListAsync();
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            if (propertyId.HasValue && propertyId.Value > 0 && !editablePropertyIds.Contains(propertyId.Value))
+            {
+                return Forbid();
+            }
+
+            ViewBag.PropertyFilterOptions = BuildPropertyFilterOptions(nameof(PhonebookTypes), properties, propertyId, onlyGlobal);
+            ViewBag.SelectedPropertyId = propertyId;
+            ViewBag.OnlyGlobal = onlyGlobal;
+
+            var query = _db.PhonebookTypes.Include(t => t.Property).AsNoTracking().AsQueryable();
+            if (onlyGlobal)
+            {
+                query = query.Where(t => t.PropertyId == null);
+            }
+            else if (propertyId.HasValue && propertyId.Value > 0)
+            {
+                query = query.Where(t => t.PropertyId == propertyId.Value);
+            }
+
+            var list = await query
+                .OrderBy(t => t.Name)
+                .ToListAsync();
+
+            var currentUrl = HttpContext.Request.Path + HttpContext.Request.QueryString;
+            ViewBag.CreatePhonebookTypeUrl = propertyId.HasValue && propertyId.Value > 0
+                ? Url.Action(nameof(CreatePhonebookType), new { propertyId = propertyId.Value, returnUrl = currentUrl })
+                : (onlyGlobal
+                    ? Url.Action(nameof(CreatePhonebookType), new { onlyGlobal = true, returnUrl = currentUrl })
+                    : Url.Action(nameof(CreatePhonebookType), new { returnUrl = currentUrl }));
+
             return View(list);
         }
 
-        public IActionResult CreatePhonebookType()
+        public async Task<IActionResult> CreatePhonebookType(int? propertyId = null, bool onlyGlobal = false, string? returnUrl = null)
         {
             ViewData["FormAction"] = nameof(CreatePhonebookType);
-            return View("PhonebookTypeForm", new PhonebookType());
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+            int? normalizedPropertyId = null;
+            if (propertyId.HasValue && propertyId.Value > 0 && editablePropertyIds.Contains(propertyId.Value))
+            {
+                normalizedPropertyId = propertyId.Value;
+            }
+
+            ViewBag.PropertyOptions = BuildPropertySelectList(properties, normalizedPropertyId);
+            ViewBag.SelectedPropertyId = normalizedPropertyId;
+            ViewBag.OnlyGlobal = onlyGlobal;
+            ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                ? Url.Action(nameof(PhonebookTypes))
+                : returnUrl;
+
+            var model = new PhonebookType
+            {
+                PropertyId = normalizedPropertyId
+            };
+
+            return View("PhonebookTypeForm", model);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreatePhonebookType(PhonebookType model)
+        public async Task<IActionResult> CreatePhonebookType(PhonebookType model, int? selectedPropertyId, bool onlyGlobal, string? returnUrl)
         {
-            if (!ModelState.IsValid) return View("PhonebookTypeForm", model);
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            int? normalizedPropertyId = null;
+            if (selectedPropertyId.HasValue && selectedPropertyId.Value > 0)
+            {
+                if (editablePropertyIds.Contains(selectedPropertyId.Value))
+                {
+                    normalizedPropertyId = selectedPropertyId.Value;
+                }
+                else
+                {
+                    ModelState.AddModelError("PropertyId", "You do not have access to that property.");
+                }
+            }
+
+            model.PropertyId = normalizedPropertyId;
+
+            if (!ModelState.IsValid)
+            {
+                ViewData["FormAction"] = nameof(CreatePhonebookType);
+                ViewBag.PropertyOptions = BuildPropertySelectList(properties, model.PropertyId);
+                ViewBag.SelectedPropertyId = normalizedPropertyId;
+                ViewBag.OnlyGlobal = onlyGlobal;
+                ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                    ? Url.Action(nameof(PhonebookTypes))
+                    : returnUrl;
+                return View("PhonebookTypeForm", model);
+            }
+
             _db.PhonebookTypes.Add(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(PhonebookTypes));
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToSettingsList(nameof(PhonebookTypes), model.PropertyId, onlyGlobal);
         }
 
-        public async Task<IActionResult> EditPhonebookType(int id)
+        public async Task<IActionResult> EditPhonebookType(int id, int? propertyId = null, bool onlyGlobal = false, string? returnUrl = null)
         {
             var type = await _db.PhonebookTypes.FindAsync(id);
             if (type == null) return NotFound();
             ViewData["FormAction"] = nameof(EditPhonebookType);
+
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            if (type.PropertyId.HasValue && type.PropertyId.Value > 0 && !editablePropertyIds.Contains(type.PropertyId.Value))
+            {
+                return Forbid();
+            }
+
+            int? normalizedPropertyId = null;
+            if (propertyId.HasValue && propertyId.Value > 0 && editablePropertyIds.Contains(propertyId.Value))
+            {
+                normalizedPropertyId = propertyId.Value;
+            }
+
+            ViewBag.PropertyOptions = BuildPropertySelectList(properties, type.PropertyId);
+            ViewBag.SelectedPropertyId = normalizedPropertyId;
+            ViewBag.OnlyGlobal = onlyGlobal;
+            ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                ? Url.Action(nameof(PhonebookTypes))
+                : returnUrl;
+
             return View("PhonebookTypeForm", type);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditPhonebookType(PhonebookType model)
+        public async Task<IActionResult> EditPhonebookType(PhonebookType model, int? selectedPropertyId, bool onlyGlobal, string? returnUrl)
         {
-            if (!ModelState.IsValid) return View("PhonebookTypeForm", model);
+            var existing = await _db.PhonebookTypes.AsNoTracking().FirstOrDefaultAsync(t => t.Id == model.Id);
+            if (existing == null)
+            {
+                return NotFound();
+            }
+
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            if (existing.PropertyId.HasValue && existing.PropertyId.Value > 0 && !editablePropertyIds.Contains(existing.PropertyId.Value))
+            {
+                return Forbid();
+            }
+
+            int? normalizedPropertyId = null;
+            if (selectedPropertyId.HasValue && selectedPropertyId.Value > 0)
+            {
+                if (editablePropertyIds.Contains(selectedPropertyId.Value))
+                {
+                    normalizedPropertyId = selectedPropertyId.Value;
+                }
+                else
+                {
+                    ModelState.AddModelError("PropertyId", "You do not have access to that property.");
+                }
+            }
+
+            model.PropertyId = normalizedPropertyId;
+
+            if (!ModelState.IsValid)
+            {
+                ViewData["FormAction"] = nameof(EditPhonebookType);
+                ViewBag.PropertyOptions = BuildPropertySelectList(properties, model.PropertyId);
+                ViewBag.SelectedPropertyId = normalizedPropertyId;
+                ViewBag.OnlyGlobal = onlyGlobal;
+                ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                    ? Url.Action(nameof(PhonebookTypes))
+                    : returnUrl;
+                return View("PhonebookTypeForm", model);
+            }
+
             _db.PhonebookTypes.Update(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(PhonebookTypes));
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToSettingsList(nameof(PhonebookTypes), model.PropertyId, onlyGlobal);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeletePhonebookType(int id)
+        public async Task<IActionResult> DeletePhonebookType(int id, int? propertyId = null, bool onlyGlobal = false, string? returnUrl = null)
         {
             var type = await _db.PhonebookTypes.FindAsync(id);
             if (type == null) return NotFound();
+
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+            if (type.PropertyId.HasValue && type.PropertyId.Value > 0 && !editablePropertyIds.Contains(type.PropertyId.Value))
+            {
+                return Forbid();
+            }
+
             _db.PhonebookTypes.Remove(type);
             await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(PhonebookTypes));
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToSettingsList(nameof(PhonebookTypes), propertyId, onlyGlobal);
         }
 
         // — CalendarCategories CRUD —
-        public async Task<IActionResult> CalendarCategories()
+
+        public async Task<IActionResult> CalendarCategories(int? propertyId = null, bool onlyGlobal = false)
         {
-            var list = await _db.CalendarCategories.ToListAsync();
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            if (propertyId.HasValue && propertyId.Value > 0 && !editablePropertyIds.Contains(propertyId.Value))
+            {
+                return Forbid();
+            }
+
+            ViewBag.PropertyFilterOptions = BuildPropertyFilterOptions(nameof(CalendarCategories), properties, propertyId, onlyGlobal);
+            ViewBag.SelectedPropertyId = propertyId;
+            ViewBag.OnlyGlobal = onlyGlobal;
+
+            var query = _db.CalendarCategories.Include(c => c.Property).AsNoTracking().AsQueryable();
+            if (onlyGlobal)
+            {
+                query = query.Where(c => c.PropertyId == null);
+            }
+            else if (propertyId.HasValue && propertyId.Value > 0)
+            {
+                query = query.Where(c => c.PropertyId == propertyId.Value);
+            }
+
+            var list = await query
+                .OrderBy(c => c.Name)
+                .ToListAsync();
+
+            var currentUrl = HttpContext.Request.Path + HttpContext.Request.QueryString;
+            ViewBag.CreateCalendarCategoryUrl = propertyId.HasValue && propertyId.Value > 0
+                ? Url.Action(nameof(CreateCalendarCategory), new { propertyId = propertyId.Value, returnUrl = currentUrl })
+                : (onlyGlobal
+                    ? Url.Action(nameof(CreateCalendarCategory), new { onlyGlobal = true, returnUrl = currentUrl })
+                    : Url.Action(nameof(CreateCalendarCategory), new { returnUrl = currentUrl }));
+
             return View(list);
         }
 
-        public IActionResult CreateCalendarCategory()
+        public async Task<IActionResult> CreateCalendarCategory(int? propertyId = null, bool onlyGlobal = false, string? returnUrl = null)
         {
             ViewData["FormAction"] = nameof(CreateCalendarCategory);
-            return View("CalendarCategoryForm", new CalendarCategory());
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+            int? normalizedPropertyId = null;
+            if (propertyId.HasValue && propertyId.Value > 0 && editablePropertyIds.Contains(propertyId.Value))
+            {
+                normalizedPropertyId = propertyId.Value;
+            }
+
+            ViewBag.PropertyOptions = BuildPropertySelectList(properties, normalizedPropertyId);
+            ViewBag.SelectedPropertyId = normalizedPropertyId;
+            ViewBag.OnlyGlobal = onlyGlobal;
+            ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                ? Url.Action(nameof(CalendarCategories))
+                : returnUrl;
+
+            var model = new CalendarCategory
+            {
+                PropertyId = normalizedPropertyId
+            };
+
+            return View("CalendarCategoryForm", model);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateCalendarCategory(CalendarCategory model)
+        public async Task<IActionResult> CreateCalendarCategory(CalendarCategory model, int? selectedPropertyId, bool onlyGlobal, string? returnUrl)
         {
-            if (!ModelState.IsValid) return View("CalendarCategoryForm", model);
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            int? normalizedPropertyId = null;
+            if (selectedPropertyId.HasValue && selectedPropertyId.Value > 0)
+            {
+                if (editablePropertyIds.Contains(selectedPropertyId.Value))
+                {
+                    normalizedPropertyId = selectedPropertyId.Value;
+                }
+                else
+                {
+                    ModelState.AddModelError("PropertyId", "You do not have access to that property.");
+                }
+            }
+
+            model.PropertyId = normalizedPropertyId;
+
+            if (!ModelState.IsValid)
+            {
+                ViewData["FormAction"] = nameof(CreateCalendarCategory);
+                ViewBag.PropertyOptions = BuildPropertySelectList(properties, model.PropertyId);
+                ViewBag.SelectedPropertyId = normalizedPropertyId;
+                ViewBag.OnlyGlobal = onlyGlobal;
+                ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                    ? Url.Action(nameof(CalendarCategories))
+                    : returnUrl;
+                return View("CalendarCategoryForm", model);
+            }
+
             _db.CalendarCategories.Add(model);
             await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(CalendarCategories));
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToSettingsList(nameof(CalendarCategories), model.PropertyId, onlyGlobal);
         }
 
-        public async Task<IActionResult> EditCalendarCategory(int id)
+        public async Task<IActionResult> EditCalendarCategory(int id, int? propertyId = null, bool onlyGlobal = false, string? returnUrl = null)
         {
             var item = await _db.CalendarCategories.FindAsync(id);
             if (item == null) return NotFound();
+
             ViewData["FormAction"] = nameof(EditCalendarCategory);
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+
+            if (item.PropertyId.HasValue && item.PropertyId.Value > 0 && !editablePropertyIds.Contains(item.PropertyId.Value))
+            {
+                return Forbid();
+            }
+
+            int? normalizedPropertyId = null;
+            if (propertyId.HasValue && propertyId.Value > 0 && editablePropertyIds.Contains(propertyId.Value))
+            {
+                normalizedPropertyId = propertyId.Value;
+            }
+
+            ViewBag.PropertyOptions = BuildPropertySelectList(properties, item.PropertyId);
+            ViewBag.SelectedPropertyId = normalizedPropertyId;
+            ViewBag.OnlyGlobal = onlyGlobal;
+            ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                ? Url.Action(nameof(CalendarCategories))
+                : returnUrl;
+
             return View("CalendarCategoryForm", item);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditCalendarCategory(CalendarCategory model)
+        public async Task<IActionResult> EditCalendarCategory(CalendarCategory model, int? selectedPropertyId, bool onlyGlobal, string? returnUrl)
         {
-            if (!ModelState.IsValid) return View("CalendarCategoryForm", model);
-            _db.CalendarCategories.Update(model);
-            await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(CalendarCategories));
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteCalendarCategory(int id)
-        {
-            var item = await _db.CalendarCategories.FindAsync(id);
-            if (item == null) return NotFound();
-            _db.CalendarCategories.Remove(item);
-            await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(CalendarCategories));
-        }
-
-        // — Room Management (CRUD + CSV Import/Export) —
-        public async Task<IActionResult> Rooms(int propertyId)
-        {
-            var currentUser = await _userManager.GetUserAsync(User);
-            if (currentUser == null)
-                return Challenge();
-            var roles = (await _userManager.GetRolesAsync(currentUser))
-                .Where(r => !string.IsNullOrWhiteSpace(r))
-                .Select(r => r!)
-                .ToList();
-
-            List<Property> accessibleProps;
-            if (roles.Contains("Admin"))
-                accessibleProps = await _db.Properties.ToListAsync();
-            else
-                accessibleProps = await _db.UserPropertyAccesses
-                    .Where(upa => upa.ApplicationUserId == currentUser.Id)
-                    .Select(upa => upa.Property)
-                    .ToListAsync();
-
-            if (!accessibleProps.Any()) return Forbid();
-            if (!accessibleProps.Any(p => p.Id == propertyId))
-                propertyId = accessibleProps.First().Id;
-
-            var rooms = await _db.Rooms.Where(r => r.PropertyId == propertyId).ToListAsync();
-
-            ViewBag.PropertyId = propertyId;
-            ViewBag.PropertyName = accessibleProps.FirstOrDefault(p => p.Id == propertyId)?.Name
-                ?? (await _db.Properties.Where(p => p.Id == propertyId).Select(p => p.Name).FirstOrDefaultAsync())
-                ?? $"Property {propertyId}";
-            ViewBag.AllProperties = accessibleProps;
-            return View(rooms);
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SaveRooms(int propertyId, List<Room> rooms)
-        {
-            var currentUser = await _userManager.GetUserAsync(User);
-            if (currentUser == null)
-                return Challenge();
-            var roles = (await _userManager.GetRolesAsync(currentUser))
-                .Where(r => !string.IsNullOrWhiteSpace(r))
-                .Select(r => r!)
-                .ToList();
-            bool allowed = roles.Contains("Admin") ||
-                await _db.UserPropertyAccesses.AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == propertyId);
-            if (!allowed) return Forbid();
-
-            foreach (var r in rooms)
+            var existing = await _db.CalendarCategories.AsNoTracking().FirstOrDefaultAsync(c => c.Id == model.Id);
+            if (existing == null)
             {
-                r.PropertyId = propertyId;
-                if (string.IsNullOrWhiteSpace(r.RoomNumber)) continue;
-                if (r.Id == 0) _db.Rooms.Add(r);
-                else _db.Rooms.Update(r);
-            }
-            await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(Rooms), new { propertyId });
-        }
-
-        public FileResult DownloadRoomsTemplate()
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine("RoomNumber,Floor,RoomType,Description");
-            sb.AppendLine("101,1,Standard,Sample description");
-            return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "rooms_template.csv");
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> ImportRooms(int propertyId, IFormFile csvFile)
-        {
-            if (csvFile == null || csvFile.Length == 0) return BadRequest("CSV file is empty");
-
-            using var reader = new System.IO.StreamReader(csvFile.OpenReadStream());
-            await reader.ReadLineAsync();
-            var newRooms = new List<Room>();
-            while (!reader.EndOfStream)
-            {
-                var line = await reader.ReadLineAsync();
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                var parts = line.Split(',');
-                if (parts.Length < 4) continue;
-                newRooms.Add(new Room
-                {
-                    PropertyId = propertyId,
-                    RoomNumber = parts[0].Trim(),
-                    Floor = int.TryParse(parts[1].Trim(), out int f) ? f : 0,
-                    RoomType = parts[2].Trim(),
-                    Description = parts[3].Trim()
-                });
-            }
-            _db.Rooms.RemoveRange(_db.Rooms.Where(r => r.PropertyId == propertyId));
-            await _db.Rooms.AddRangeAsync(newRooms);
-            await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(Rooms), new { propertyId });
-        }
-
-        // — Layout Editor —
-        public async Task<IActionResult> LayoutEditor(int propertyId, int? floor)
-        {
-            var currentUser = await _userManager.GetUserAsync(User);
-            if (currentUser == null)
-            {
-                return Challenge();
+                return NotFound();
             }
 
-            var roles = (await _userManager.GetRolesAsync(currentUser))
-                .Where(r => !string.IsNullOrWhiteSpace(r))
-                .Select(r => r!)
-                .ToList();
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
 
-            List<Property> accessibleProps;
-            if (roles.Contains("Admin"))
-            {
-                accessibleProps = await _db.Properties.ToListAsync();
-            }
-            else
-            {
-                accessibleProps = await _db.UserPropertyAccesses
-                    .Where(upa => upa.ApplicationUserId == currentUser.Id)
-                    .Select(upa => upa.Property)
-                    .ToListAsync();
-            }
-
-            if (!accessibleProps.Any())
+            if (existing.PropertyId.HasValue && existing.PropertyId.Value > 0 && !editablePropertyIds.Contains(existing.PropertyId.Value))
             {
                 return Forbid();
             }
 
-            if (propertyId <= 0 || !accessibleProps.Any(p => p.Id == propertyId))
+            int? normalizedPropertyId = null;
+            if (selectedPropertyId.HasValue && selectedPropertyId.Value > 0)
             {
-                propertyId = accessibleProps.First().Id;
+                if (editablePropertyIds.Contains(selectedPropertyId.Value))
+                {
+                    normalizedPropertyId = selectedPropertyId.Value;
+                }
+                else
+                {
+                    ModelState.AddModelError("PropertyId", "You do not have access to that property.");
+                }
             }
 
-            var rooms = await _db.Rooms.Where(r => r.PropertyId == propertyId).ToListAsync();
-            if (!rooms.Any())
+            model.PropertyId = normalizedPropertyId;
+
+            if (!ModelState.IsValid)
             {
-                TempData["RoomsMissing"] = "Please add rooms for this property before editing the layout.";
-                return RedirectToAction(nameof(Rooms), new { propertyId });
+                ViewData["FormAction"] = nameof(EditCalendarCategory);
+                ViewBag.PropertyOptions = BuildPropertySelectList(properties, model.PropertyId);
+                ViewBag.SelectedPropertyId = normalizedPropertyId;
+                ViewBag.OnlyGlobal = onlyGlobal;
+                ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                    ? Url.Action(nameof(CalendarCategories))
+                    : returnUrl;
+                return View("CalendarCategoryForm", model);
             }
 
-            var floors = rooms.Select(r => r.Floor).Distinct().OrderBy(f => f).ToList();
-            int selectedFloor = floor ?? floors.First();
+            _db.CalendarCategories.Update(model);
+            await _db.SaveChangesAsync();
 
-            var allLayouts = await _db.RoomLayouts
-                .Where(l => l.PropertyId == propertyId)
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToSettingsList(nameof(CalendarCategories), model.PropertyId, onlyGlobal);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteCalendarCategory(int id, int? propertyId = null, bool onlyGlobal = false, string? returnUrl = null)
+        {
+            var item = await _db.CalendarCategories.FindAsync(id);
+            if (item == null) return NotFound();
+
+            var properties = await GetEditablePropertiesAsync();
+            var editablePropertyIds = properties.Select(p => p.Id).ToHashSet();
+            if (item.PropertyId.HasValue && item.PropertyId.Value > 0 && !editablePropertyIds.Contains(item.PropertyId.Value))
+            {
+                return Forbid();
+            }
+
+            _db.CalendarCategories.Remove(item);
+            await _db.SaveChangesAsync();
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToSettingsList(nameof(CalendarCategories), propertyId, onlyGlobal);
+        }
+
+        // - Layout Editor & Save -
+
+        public async Task<IActionResult> LayoutEditor(int? propertyId = null, int? floor = null)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            if (!properties.Any())
+            {
+                return Forbid();
+            }
+
+            var selectedPropertyId = propertyId ?? properties.First().Id;
+            if (properties.All(p => p.Id != selectedPropertyId))
+            {
+                selectedPropertyId = properties.First().Id;
+            }
+
+            var rooms = await _db.Rooms
+                .Where(r => r.PropertyId == selectedPropertyId)
+                .OrderBy(r => r.Floor)
+                .ThenBy(r => r.RoomNumber)
                 .ToListAsync();
 
-            var layoutDtos = allLayouts
+            var layouts = await _db.RoomLayouts
+                .Where(l => l.PropertyId == selectedPropertyId)
+                .ToListAsync();
+
+            var floors = rooms
+                .Select(r => r.Floor)
+                .Union(layouts.Select(l => l.Floor))
+                .Distinct()
+                .OrderBy(f => f)
+                .ToList();
+
+            var selectedFloor = floor.HasValue && floors.Contains(floor.Value)
+                ? floor.Value
+                : (floors.Any() ? floors.First() : 1);
+
+            var layoutDtos = layouts
                 .Select(l => new LayoutEditorRoomLayoutViewModel
                 {
                     Id = l.Id,
@@ -397,11 +1052,6 @@ namespace hOps.web.Controllers
                 .GroupBy(l => l.Floor)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            if (!layoutsByFloor.TryGetValue(selectedFloor, out var layoutsForFloor))
-            {
-                layoutsForFloor = new List<LayoutEditorRoomLayoutViewModel>();
-            }
-
             var roomDtos = rooms
                 .Select(r => new LayoutEditorRoomViewModel
                 {
@@ -411,17 +1061,29 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
+            var propertyOptions = properties
+                .Select(p => new SelectListItem
+                {
+                    Text = $"{p.Name} ({p.Code})",
+                    Value = Url.Action(nameof(LayoutEditor), new { propertyId = p.Id, floor = selectedFloor }) ?? "#",
+                    Selected = p.Id == selectedPropertyId
+                })
+                .ToList();
+
             var vm = new LayoutEditorViewModel
             {
-                PropertyId = propertyId,
-                PropertyName = accessibleProps.FirstOrDefault(p => p.Id == propertyId)?.Name
-                    ?? $"Property {propertyId}",
+                PropertyId = selectedPropertyId,
+                PropertyName = properties.First(p => p.Id == selectedPropertyId).Name,
                 SelectedFloor = selectedFloor,
                 AllFloors = floors,
                 Rooms = roomDtos,
-                Layouts = layoutsForFloor,
-                LayoutsByFloor = layoutsByFloor
+                Layouts = layoutsByFloor.TryGetValue(selectedFloor, out var floorLayouts)
+                    ? floorLayouts
+                    : new List<LayoutEditorRoomLayoutViewModel>(),
+                LayoutsByFloor = layoutsByFloor,
+                PropertyOptions = propertyOptions
             };
+
             return View(vm);
         }
 
@@ -433,22 +1095,23 @@ namespace hOps.web.Controllers
                 return BadRequest();
             }
 
+            var properties = await GetEditablePropertiesAsync();
+            if (properties.All(p => p.Id != request.PropertyId))
+            {
+                return Forbid();
+            }
+
             var propertyId = request.PropertyId;
             var floor = request.Floor;
-            var layoutDtos = request.Layouts ?? new List<RoomLayoutDto>();
-
             var layoutsOnFloor = await _db.RoomLayouts
                 .Where(l => l.PropertyId == propertyId && l.Floor == floor)
                 .ToListAsync();
 
-            var keepSet = new HashSet<RoomLayout>();
+            var keepIds = new HashSet<int>();
             var orderedLayouts = new List<RoomLayout>();
 
-            foreach (var dto in layoutDtos)
+            foreach (var dto in request.Layouts ?? new List<RoomLayoutDto>())
             {
-                dto.PropertyId = propertyId;
-                dto.Floor = floor;
-
                 var trimmedLabel = string.IsNullOrWhiteSpace(dto.Label) ? null : dto.Label!.Trim();
                 var normalizedShapeType = string.IsNullOrWhiteSpace(dto.ShapeType) ? null : dto.ShapeType!.Trim();
                 var normalizedShapeData = string.IsNullOrWhiteSpace(dto.ShapeData) ? null : dto.ShapeData!.Trim();
@@ -459,7 +1122,7 @@ namespace hOps.web.Controllers
                     layoutEntity = layoutsOnFloor.FirstOrDefault(l => l.Id == dto.Id);
                 }
 
-                if (layoutEntity == null && dto.RoomId != 0)
+                if (layoutEntity == null && dto.RoomId > 0)
                 {
                     layoutEntity = layoutsOnFloor.FirstOrDefault(l => l.RoomId == dto.RoomId);
                 }
@@ -468,14 +1131,16 @@ namespace hOps.web.Controllers
                 {
                     layoutEntity = new RoomLayout
                     {
-                        PropertyId = dto.PropertyId,
+                        PropertyId = propertyId,
                         RoomId = dto.RoomId,
-                        Floor = dto.Floor
+                        Floor = floor
                     };
                     _db.RoomLayouts.Add(layoutEntity);
                     layoutsOnFloor.Add(layoutEntity);
                 }
 
+                layoutEntity.RoomId = dto.RoomId;
+                layoutEntity.Floor = floor;
                 layoutEntity.X = dto.X;
                 layoutEntity.Y = dto.Y;
                 layoutEntity.Width = dto.Width;
@@ -484,16 +1149,18 @@ namespace hOps.web.Controllers
                 layoutEntity.ShapeType = normalizedShapeType;
                 layoutEntity.ShapeData = normalizedShapeData;
 
-                keepSet.Add(layoutEntity);
                 orderedLayouts.Add(layoutEntity);
+                if (layoutEntity.Id > 0)
+                {
+                    keepIds.Add(layoutEntity.Id);
+                }
             }
 
             foreach (var existing in layoutsOnFloor.ToList())
             {
-                if (!keepSet.Contains(existing))
+                if (existing.Id > 0 && !keepIds.Contains(existing.Id))
                 {
                     _db.RoomLayouts.Remove(existing);
-                    layoutsOnFloor.Remove(existing);
                 }
             }
 
@@ -516,42 +1183,8 @@ namespace hOps.web.Controllers
 
             return Json(new { success = true, layouts = responseLayouts });
         }
-
-        // — Add Floor (called from LayoutEditor via AJAX) —
-        [HttpPost]
-        public async Task<IActionResult> AddFloor([FromBody] AddFloorDto dto)
-        {
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null)
-                return Challenge();
-            var roles = (await _userManager.GetRolesAsync(user))
-                .Where(r => !string.IsNullOrWhiteSpace(r))
-                .Select(r => r!)
-                .ToList();
-            bool allowed = roles.Contains("Admin") ||
-                await _db.UserPropertyAccesses.AnyAsync(a => a.ApplicationUserId == user.Id && a.PropertyId == dto.PropertyId);
-            if (!allowed) return Forbid();
-
-            bool exists = await _db.Rooms.AnyAsync(r => r.PropertyId == dto.PropertyId && r.Floor == dto.Floor);
-            if (!exists)
-            {
-                var dummy = new Room
-                {
-                    PropertyId = dto.PropertyId,
-                    RoomNumber = $"Floor{dto.Floor}-placeholder",
-                    Floor = dto.Floor,
-                    RoomType = "Custom"
-                };
-                _db.Rooms.Add(dummy);
-                await _db.SaveChangesAsync();
-            }
-            return Ok();
-        }
-    }
-
-    public class AddFloorDto
-    {
-        public int PropertyId { get; set; }
-        public int Floor { get; set; }
     }
 }
+
+
+

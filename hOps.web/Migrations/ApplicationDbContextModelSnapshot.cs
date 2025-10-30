@@ -344,7 +344,12 @@ namespace hOps.web.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("PropertyId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("PropertyId");
 
                     b.ToTable("CalendarCategories");
                 });
@@ -426,7 +431,12 @@ namespace hOps.web.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("PropertyId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("PropertyId");
 
                     b.ToTable("Departments");
                 });
@@ -934,7 +944,12 @@ namespace hOps.web.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("PropertyId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("PropertyId");
 
                     b.ToTable("PhonebookTypes");
                 });
@@ -1292,7 +1307,12 @@ namespace hOps.web.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("PropertyId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("PropertyId");
 
                     b.ToTable("WorkOrderTypes", (string)null);
                 });
@@ -1401,6 +1421,16 @@ namespace hOps.web.Migrations
                     b.Navigation("UpdatedBy");
                 });
 
+            modelBuilder.Entity("hOps.web.Models.CalendarCategory", b =>
+                {
+                    b.HasOne("hOps.web.Models.Property", "Property")
+                        .WithMany("CalendarCategories")
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Property");
+                });
+
             modelBuilder.Entity("hOps.web.Models.CalendarEvent", b =>
                 {
                     b.HasOne("hOps.web.Models.CalendarCategory", "Category")
@@ -1435,6 +1465,16 @@ namespace hOps.web.Migrations
                         .IsRequired();
 
                     b.Navigation("CalendarEvent");
+
+                    b.Navigation("Property");
+                });
+
+            modelBuilder.Entity("hOps.web.Models.Department", b =>
+                {
+                    b.HasOne("hOps.web.Models.Property", "Property")
+                        .WithMany("Departments")
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("Property");
                 });
@@ -1681,6 +1721,16 @@ namespace hOps.web.Migrations
                     b.Navigation("PhonebookType");
                 });
 
+            modelBuilder.Entity("hOps.web.Models.PhonebookType", b =>
+                {
+                    b.HasOne("hOps.web.Models.Property", "Property")
+                        .WithMany("PhonebookTypes")
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Property");
+                });
+
             modelBuilder.Entity("hOps.web.Models.Room", b =>
                 {
                     b.HasOne("hOps.web.Models.Property", "Property")
@@ -1818,6 +1868,16 @@ namespace hOps.web.Migrations
                     b.Navigation("WorkOrder");
                 });
 
+            modelBuilder.Entity("hOps.web.Models.WorkOrderType", b =>
+                {
+                    b.HasOne("hOps.web.Models.Property", "Property")
+                        .WithMany("WorkOrderTypes")
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Property");
+                });
+
             modelBuilder.Entity("hOps.web.Models.ApplicationUser", b =>
                 {
                     b.Navigation("CreatedBookmarks");
@@ -1881,7 +1941,11 @@ namespace hOps.web.Migrations
 
                     b.Navigation("BulletinPosts");
 
+                    b.Navigation("CalendarCategories");
+
                     b.Navigation("CalendarEvents");
+
+                    b.Navigation("Departments");
 
                     b.Navigation("DocumentLinks");
 
@@ -1895,11 +1959,15 @@ namespace hOps.web.Migrations
 
                     b.Navigation("PassOnLogLinks");
 
+                    b.Navigation("PhonebookTypes");
+
                     b.Navigation("Rooms");
 
                     b.Navigation("UserAccesses");
 
                     b.Navigation("WorkOrderLinks");
+
+                    b.Navigation("WorkOrderTypes");
                 });
 
             modelBuilder.Entity("hOps.web.Models.WorkOrder", b =>

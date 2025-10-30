@@ -31,6 +31,10 @@ namespace hOps.web.Models
         public ICollection<LostFoundEntry> LostFoundEntries { get; set; } = new List<LostFoundEntry>();
 
         public ICollection<Bookmark> Bookmarks { get; set; } = new List<Bookmark>();
+        public ICollection<Department> Departments { get; set; } = new List<Department>();
+        public ICollection<WorkOrderType> WorkOrderTypes { get; set; } = new List<WorkOrderType>();
+        public ICollection<PhonebookType> PhonebookTypes { get; set; } = new List<PhonebookType>();
+        public ICollection<CalendarCategory> CalendarCategories { get; set; } = new List<CalendarCategory>();
 
         [InverseProperty(nameof(PassOnLogProperty.Property))]
         public ICollection<PassOnLogProperty> PassOnLogLinks { get; set; } = new List<PassOnLogProperty>();
@@ -45,3 +49,4 @@ namespace hOps.web.Models
         public ICollection<PackageLogEntry> PackageLogEntries { get; set; } = new List<PackageLogEntry>();
     }
 }
+

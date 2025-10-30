@@ -1,6 +1,7 @@
 @using System
 @using System.Linq
 @using System.Text.Json
+@using Microsoft.AspNetCore.Mvc.Rendering
 @model hOps.web.ViewModels.LayoutEditorViewModel
 
 @{
@@ -11,9 +12,22 @@
         : Model.PropertyName;
     int selFloor = Model.SelectedFloor;
     var floors = Model.AllFloors;
+    var propertyOptions = Model.PropertyOptions ?? new List<SelectListItem>();
 }
 
-<h2>Layout Editor - @propertyName, Floor @selFloor</h2>
+<div class="d-flex flex-column flex-xl-row align-items-xl-center justify-content-xl-between gap-3 mb-3">
+    <h2 class="h4 mb-0">Layout Editor</h2>
+    <div class="d-flex align-items-center gap-2">
+        <label for="layoutPropertySelect" class="form-label mb-0">Property:</label>
+        <select id="layoutPropertySelect" class="form-select form-select-sm" style="width:auto; min-width:240px;">
+            @foreach (var option in propertyOptions)
+            {
+                <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
+            }
+        </select>
+    </div>
+    <div class="text-muted small">@propertyName - Floor @selFloor</div>
+</div>
 
 @section Styles {
     <style>
@@ -126,8 +140,8 @@
         <label class="form-check-label" for="chkSnap">Snap to grid</label>
     </div>
     <div class="control-group">
-        <button id="zoomInBtn" class="btn btn-sm btn-outline-secondary" type="button">＋</button>
-        <button id="zoomOutBtn" class="btn btn-sm btn-outline-secondary" type="button">－</button>
+        <button id="zoomInBtn" class="btn btn-sm btn-outline-secondary" type="button">ï¼‹</button>
+        <button id="zoomOutBtn" class="btn btn-sm btn-outline-secondary" type="button">ï¼</button>
     </div>
     <div class="control-group">
         <button id="undoBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>Undo</button>
@@ -201,9 +215,9 @@
                          ">
                     <span class="room-label">@label</span>
                     <div class="box-controls">
-                        <button class="btn btn-sm btn-light btn-customize-shape" title="Customize shape">✎</button>
-                        <button class="btn btn-sm btn-light btn-move-back" title="Move back">⮐</button>
-                        <button class="btn btn-sm btn-light btn-delete-shape" title="Delete">✖</button>
+                        <button class="btn btn-sm btn-light btn-customize-shape" title="Customize shape">Shape</button>
+                        <button class="btn btn-sm btn-light btn-move-back" title="Move back">Back</button>
+                        <button class="btn btn-sm btn-light btn-delete-shape" title="Delete">Delete</button>
                     </div>
                     <div class="resize-handle" style="
                             position:absolute; right:0; bottom:0;
@@ -223,10 +237,10 @@
             <label for="shapePresetSelect" class="form-label">Preset</label>
             <select id="shapePresetSelect" class="form-select form-select-sm">
                 <option value="rectangle">Rectangle</option>
-                <option value="l-top-left">L — Top Left</option>
-                <option value="l-top-right">L — Top Right</option>
-                <option value="l-bottom-left">L — Bottom Left</option>
-                <option value="l-bottom-right">L — Bottom Right</option>
+                <option value="l-top-left">L - Top Left</option>
+                <option value="l-top-right">L - Top Right</option>
+                <option value="l-bottom-left">L - Bottom Left</option>
+                <option value="l-bottom-right">L - Bottom Right</option>
                 <option value="custom">Custom (clip-path)</option>
             </select>
         </div>
@@ -245,7 +259,16 @@
 
 @section Scripts {
     <script>
-        (function(){
+        (function () {
+            const propertySelect = document.getElementById("layoutPropertySelect");
+            if (propertySelect) {
+                propertySelect.addEventListener("change", function () {
+                    if (this.value) {
+                        window.location.href = this.value;
+                    }
+                });
+            }
+
             const propertyId = @Model.PropertyId;
             const selectedFloor = @Model.SelectedFloor;
             const existingFloors = @Html.Raw(JsonSerializer.Serialize(Model.AllFloors ?? Enumerable.Empty<int>()));
@@ -949,19 +972,19 @@
                 const btnCustomize = document.createElement("button");
                 btnCustomize.classList.add("btn", "btn-sm", "btn-light", "btn-customize-shape");
                 btnCustomize.title = "Customize shape";
-                btnCustomize.innerText = "✎";
+                btnCustomize.innerText = "âœŽ";
                 controls.appendChild(btnCustomize);
 
                 const btnMoveBack = document.createElement("button");
                 btnMoveBack.classList.add("btn", "btn-sm", "btn-light", "btn-move-back");
                 btnMoveBack.title = "Move back to palette";
-                btnMoveBack.innerText = "⮐";
+                btnMoveBack.innerText = "â®";
                 controls.appendChild(btnMoveBack);
 
                 const btnDel = document.createElement("button");
                 btnDel.classList.add("btn", "btn-sm", "btn-light", "btn-delete-shape");
                 btnDel.title = "Delete shape";
-                btnDel.innerText = "✖";
+                btnDel.innerText = "âœ–";
                 controls.appendChild(btnDel);
 
                 div.appendChild(controls);
@@ -1224,4 +1247,5 @@
         })();
     </script>
 }
+
 

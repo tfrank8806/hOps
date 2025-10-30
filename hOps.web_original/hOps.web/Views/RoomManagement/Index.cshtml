@@ -1,0 +1,63 @@
+﻿@model List<hOps.web.Models.Room>
+@{
+    ViewData["Title"] = "Rooms";
+    int propertyId = ViewBag.PropertyId;
+}
+
+<h2>Rooms for Property @propertyId</h2>
+
+<form asp-action="Save" method="post">
+    <input type="hidden" name="propertyId" value="@propertyId" />
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Room Number</th>
+                <th>Room Type</th>
+                <th>Floor</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (int i = 0; i < Model.Count; i++)
+            {
+                <tr>
+                    <td>
+                        <input asp-for="@Model[i].RoomNumber" class="form-control" />
+                        <input type="hidden" asp-for="@Model[i].Id" />
+                    </td>
+                    <td>
+                        <input asp-for="@Model[i].RoomType" class="form-control" />
+                    </td>
+                    <td>
+                        <input asp-for="@Model[i].Floor" class="form-control" />
+                    </td>
+                    <td>
+                        <input asp-for="@Model[i].Description" class="form-control" />
+                    </td>
+                </tr>
+            }
+            <tr>
+                <td>
+                    <input name="rooms[@Model.Count].RoomNumber" class="form-control" placeholder="New Room" />
+                    <input type="hidden" name="rooms[@Model.Count].Id" value="0" />
+                </td>
+                <td><input name="rooms[@Model.Count].RoomType" class="form-control" /></td>
+                <td><input name="rooms[@Model.Count].Floor" class="form-control" /></td>
+                <td><input name="rooms[@Model.Count].Description" class="form-control" /></td>
+            </tr>
+        </tbody>
+    </table>
+    <button type="submit" class="btn btn-success">Save</button>
+</form>
+
+<hr />
+
+<form asp-action="Import" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="propertyId" value="@propertyId" />
+    <div class="mb-3">
+        <label>Upload CSV</label>
+        <input type="file" name="csvFile" accept=".csv" class="form-control" />
+    </div>
+    <button type="submit" class="btn btn-primary">Import</button>
+    <a asp-action="DownloadTemplate" class="btn btn-secondary">Download Template</a>
+</form>

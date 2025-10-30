@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using hOps.web.Models;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace hOps.web.ViewModels
 {
@@ -12,6 +13,7 @@ namespace hOps.web.ViewModels
         public List<LayoutEditorRoomViewModel> Rooms { get; set; } = new List<LayoutEditorRoomViewModel>();
         public List<LayoutEditorRoomLayoutViewModel> Layouts { get; set; } = new List<LayoutEditorRoomLayoutViewModel>();
         public Dictionary<int, List<LayoutEditorRoomLayoutViewModel>> LayoutsByFloor { get; set; } = new Dictionary<int, List<LayoutEditorRoomLayoutViewModel>>();
+        public List<SelectListItem> PropertyOptions { get; set; } = new List<SelectListItem>();
     }
 
     public class LayoutEditorRoomViewModel

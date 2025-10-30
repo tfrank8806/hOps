@@ -12,5 +12,8 @@ namespace hOps.web.Models
 
         [Display(Name = "Color Code (HEX)")]
         public string Color { get; set; } = "#0d6efd";
+
+        public int? PropertyId { get; set; }
+        public Property? Property { get; set; }
     }
 }
