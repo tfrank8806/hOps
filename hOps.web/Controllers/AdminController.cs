@@ -1,4 +1,4 @@
-using hOps.web.Data;
+﻿using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 
 
 namespace hOps.web.Controllers
@@ -189,7 +190,7 @@ namespace hOps.web.Controllers
             foreach (var role in desiredRoles.Except(currentUserRoles))
             {
                 if (currentRoles.Contains("Manager") && !currentRoles.Contains("Admin") && role == "Admin")
-                    continue; // Managers can�t assign Admin role
+                    continue; // Managers can’t assign Admin role
                 await _userManager.AddToRoleAsync(user, role);
             }
 
@@ -234,10 +235,12 @@ namespace hOps.web.Controllers
                 Email = request.Email,
                 FirstName = request.FirstName,
                 LastName = request.LastName,
-                MobilePhone = request.MobilePhone
+                MobilePhone = request.MobilePhone,
+                MustChangePassword = true
             };
 
-            var result = await _userManager.CreateAsync(user, "TempPassword@123");
+            var tempPassword = GenerateTemporaryPassword();
+            var result = await _userManager.CreateAsync(user, tempPassword);
             if (result.Succeeded)
             {
                 await _userManager.AddToRoleAsync(user, "User");
@@ -246,7 +249,7 @@ namespace hOps.web.Controllers
 Hi {user.FirstName},<br/><br/>
 Your access request for HotelOps has been <strong>approved</strong>.<br/>
 You can now log in using your email and temporary password:<br/>
-<strong>Password:</strong> TempPassword@123<br/><br/>
+<strong>Password:</strong> {tempPassword}<br/><br/>
 Please change your password after login.<br/><br/>
 HotelOps Admin Team
 ";
@@ -285,11 +288,83 @@ HotelOps Admin Team
             return RedirectToAction(nameof(AccessRequests));
         }
 
+        private static string GenerateTemporaryPassword()
+        {
+            var options = new PasswordOptions
+            {
+                RequiredLength = 12,
+                RequiredUniqueChars = 4,
+                RequireDigit = true,
+                RequireLowercase = true,
+                RequireUppercase = true,
+                RequireNonAlphanumeric = true
+            };
+
+            string[] randomChars = new[]
+            {
+                "ABCDEFGHJKLMNPQRSTUVWXYZ",
+                "abcdefghijkmnopqrstuvwxyz",
+                "0123456789",
+                "!@$?_-"
+            };
+
+            var chars = new List<char>();
+
+            if (options.RequireUppercase)
+            {
+                chars.Add(GetRandomChar(randomChars[0]));
+            }
+
+            if (options.RequireLowercase)
+            {
+                chars.Add(GetRandomChar(randomChars[1]));
+            }
+
+            if (options.RequireDigit)
+            {
+                chars.Add(GetRandomChar(randomChars[2]));
+            }
+
+            if (options.RequireNonAlphanumeric)
+            {
+                chars.Add(GetRandomChar(randomChars[3]));
+            }
+
+            while (chars.Count < options.RequiredLength || chars.Distinct().Count() < options.RequiredUniqueChars)
+            {
+                var set = randomChars[RandomNumberGenerator.GetInt32(randomChars.Length)];
+                chars.Add(GetRandomChar(set));
+            }
+
+            for (var i = chars.Count - 1; i > 0; i--)
+            {
+                var swapIndex = RandomNumberGenerator.GetInt32(i + 1);
+                (chars[i], chars[swapIndex]) = (chars[swapIndex], chars[i]);
+            }
+
+            return new string(chars.ToArray());
+        }
+
+        private static char GetRandomChar(string characterSet)
+        {
+            return characterSet[RandomNumberGenerator.GetInt32(characterSet.Length)];
+        }
         public IActionResult Settings()
         {
             return View();
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
