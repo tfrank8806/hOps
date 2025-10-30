@@ -49,6 +49,7 @@ namespace hOps.web.Data
         public DbSet<Document> Documents { get; set; }
         public DbSet<DocumentFolder> DocumentFolders { get; set; }
         public DbSet<DocumentProperty> DocumentProperties { get; set; }
+        public DbSet<UserPropertyEmailSubscription> UserPropertyEmailSubscriptions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -59,6 +60,10 @@ namespace hOps.web.Data
                 .WithMany()
                 .HasForeignKey(u => u.DefaultPropertyId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<ApplicationUser>()
+                .Property(u => u.TimeZoneId)
+                .HasDefaultValue("UTC");
 
             // Composite key for UserPropertyAccess
             builder.Entity<UserPropertyAccess>()
@@ -73,6 +78,33 @@ namespace hOps.web.Data
                 .HasOne(upa => upa.Property)
                 .WithMany(p => p.UserAccesses)
                 .HasForeignKey(upa => upa.PropertyId);
+
+            builder.Entity<UserPropertyEmailSubscription>()
+                .HasKey(pes => new { pes.UserId, pes.PropertyId });
+
+            builder.Entity<UserPropertyEmailSubscription>()
+                .HasOne(pes => pes.User)
+                .WithMany(u => u.EmailPropertySubscriptions)
+                .HasForeignKey(pes => pes.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<UserPropertyEmailSubscription>()
+                .HasOne(pes => pes.Property)
+                .WithMany(p => p.EmailSubscriptions)
+                .HasForeignKey(pes => pes.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<UserPropertyEmailSubscription>()
+                .Property(pes => pes.IncludeInLogAlerts)
+                .HasDefaultValue(true);
+
+            builder.Entity<UserPropertyEmailSubscription>()
+                .Property(pes => pes.IncludeInDailySummary)
+                .HasDefaultValue(true);
+
+            builder.Entity<UserPropertyEmailSubscription>()
+                .Property(pes => pes.IncludeInWorkOrderAlerts)
+                .HasDefaultValue(true);
 
             builder.Entity<WorkOrder>()
                 .HasMany(wo => wo.Properties)

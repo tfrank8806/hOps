@@ -239,13 +239,52 @@ namespace hOps.web.Controllers
                 .LoadAsync();
 
             var departmentId = workOrder.DepartmentId.Value;
+            var workOrderPropertyIds = workOrder.Properties
+                .Select(p => p.PropertyId)
+                .Where(pid => pid > 0)
+                .Distinct()
+                .ToList();
 
-            var recipients = await _context.Users
+            var recipientCandidates = await _context.Users
                 .Where(u => u.EmailOnWorkOrderDepartment
                             && u.DepartmentEmailSubscriptions.Any(s => s.DepartmentId == departmentId)
                             && !string.IsNullOrWhiteSpace(u.Email)
                             && (createdBy == null || u.Id != createdBy.Id))
+                .Select(u => new
+                {
+                    User = u,
+                    PropertyPreferences = u.EmailPropertySubscriptions.Select(s => new { s.PropertyId, s.IncludeInWorkOrderAlerts }),
+                    AccessIds = u.UserPropertyAccesses!.Select(upa => upa.PropertyId)
+                })
                 .ToListAsync();
+
+            var recipients = recipientCandidates
+                .Where(r =>
+                {
+                    var preferenceIds = r.PropertyPreferences
+                        .Where(p => p.IncludeInWorkOrderAlerts)
+                        .Select(p => p.PropertyId)
+                        .ToHashSet();
+
+                    if (!preferenceIds.Any())
+                    {
+                        preferenceIds = r.AccessIds.ToHashSet();
+                    }
+
+                    if (!preferenceIds.Any())
+                    {
+                        return false;
+                    }
+
+                    if (!workOrderPropertyIds.Any())
+                    {
+                        return true;
+                    }
+
+                    return workOrderPropertyIds.Any(id => preferenceIds.Contains(id));
+                })
+                .Select(r => r.User)
+                .ToList();
 
             if (!recipients.Any())
             {

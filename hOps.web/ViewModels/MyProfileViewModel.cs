@@ -75,6 +75,8 @@ namespace hOps.web.ViewModels
 
         public List<int> SelectedDepartmentIds { get; set; } = new();
         public List<EmailPreferenceDepartmentOption> DepartmentOptions { get; set; } = new();
+        public List<int> SelectedPropertyIds { get; set; } = new();
+        public List<EmailPreferencePropertyOption> PropertyOptions { get; set; } = new();
     }
 
     public class EmailPreferenceDepartmentOption
@@ -82,6 +84,17 @@ namespace hOps.web.ViewModels
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public bool Selected { get; set; }
+    }
+
+    public class EmailPreferencePropertyOption
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public bool IncludeInLogAlerts { get; set; }
+        public bool IncludeInDailySummary { get; set; }
+        public bool IncludeInWorkOrderAlerts { get; set; }
+        public List<EmailPreferenceDepartmentOption> Departments { get; set; } = new();
+        public List<int> SelectedDepartmentIds { get; set; } = new();
     }
 
     public class MyProfileViewModel

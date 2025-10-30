@@ -123,31 +123,63 @@
                         <input class="form-check-input" asp-for="EmailPreferences.EmailOnWorkOrderDepartment" />
                         <label class="form-check-label" asp-for="EmailPreferences.EmailOnWorkOrderDepartment"></label>
                     </div>
-                    <div class="mb-4">
-                        <label class="form-label fw-semibold">Departments for work order alerts</label>
-                        @if (Model.EmailPreferences.DepartmentOptions?.Any() == true)
+                    @if (Model.EmailPreferences.PropertyOptions?.Any() == true)
+                    {
+                        for (var i = 0; i < Model.EmailPreferences.PropertyOptions.Count; i++)
                         {
-                            <div class="d-flex flex-column gap-1">
-                                @foreach (var option in Model.EmailPreferences.DepartmentOptions)
+                            var propertyOption = Model.EmailPreferences.PropertyOptions[i];
+                            var logCheckboxId = $"prop_{propertyOption.Id}_log";
+                            var summaryCheckboxId = $"prop_{propertyOption.Id}_daily";
+                            var workOrderCheckboxId = $"prop_{propertyOption.Id}_workorders";
+                            <div class="border rounded p-3 mb-4">
+                                <input type="hidden" asp-for="EmailPreferences.PropertyOptions[i].Id" />
+                                <input type="hidden" asp-for="EmailPreferences.PropertyOptions[i].Name" />
+                                <h5 class="mb-3">@propertyOption.Name</h5>
+
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" asp-for="EmailPreferences.PropertyOptions[i].IncludeInLogAlerts" id="@logCheckboxId" />
+                                    <label class="form-check-label" for="@logCheckboxId">Email me when new log entries are posted for this property</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" asp-for="EmailPreferences.PropertyOptions[i].IncludeInDailySummary" id="@summaryCheckboxId" />
+                                    <label class="form-check-label" for="@summaryCheckboxId">Include this property in my daily summary email</label>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" asp-for="EmailPreferences.PropertyOptions[i].IncludeInWorkOrderAlerts" id="@workOrderCheckboxId" />
+                                    <label class="form-check-label" for="@workOrderCheckboxId">Send work order alerts for this property</label>
+                                </div>
+
+                                @if (propertyOption.Departments?.Any() == true)
                                 {
-                                    <div class="form-check">
-                                        <input class="form-check-input"
-                                               type="checkbox"
-                                               name="EmailPreferences.SelectedDepartmentIds"
-                                               value="@option.Id"
-                                               id="departmentOption_@option.Id"
-                                               @(option.Selected ? "checked" : null) />
-                                        <label class="form-check-label" for="departmentOption_@option.Id">@option.Name</label>
+                                    <div class="mb-2 fw-semibold">Departments for work order alerts</div>
+                                    <div class="form-text mb-2">Select departments within this property to watch for new work orders.</div>
+                                    <div class="d-flex flex-column gap-1">
+                                        @for (var j = 0; j < propertyOption.Departments.Count; j++)
+                                        {
+                                            var deptOption = propertyOption.Departments[j];
+                                            var deptCheckboxId = $"prop_{propertyOption.Id}_dept_{deptOption.Id}";
+                                            <div class="form-check">
+                                                <input type="hidden" asp-for="EmailPreferences.PropertyOptions[i].Departments[j].Id" />
+                                                <input type="hidden" asp-for="EmailPreferences.PropertyOptions[i].Departments[j].Name" />
+                                                <input class="form-check-input"
+                                                       asp-for="EmailPreferences.PropertyOptions[i].Departments[j].Selected"
+                                                       id="@deptCheckboxId" />
+                                                <label class="form-check-label" for="@deptCheckboxId">@deptOption.Name</label>
+                                            </div>
+                                        }
                                     </div>
+                                }
+                                else
+                                {
+                                    <p class="text-muted small mb-0">No departments are available for this property.</p>
                                 }
                             </div>
                         }
-                        else
-                        {
-                            <p class="text-muted small mb-0">No departments are available.</p>
-                        }
-                        <div class="form-text">Select departments to receive alerts when new work orders are assigned.</div>
-                    </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mb-3">You do not have access to any properties.</p>
+                    }
                     <div class="form-check mb-3">
                         <input class="form-check-input" asp-for="EmailPreferences.EmailDailySummary" />
                         <label class="form-check-label" asp-for="EmailPreferences.EmailDailySummary"></label>

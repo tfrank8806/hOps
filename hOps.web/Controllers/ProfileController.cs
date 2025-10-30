@@ -207,17 +207,82 @@ namespace hOps.web.Controllers
                 return RedirectToAction("Login", "Account", new { area = "Identity" });
             }
 
-            var allDepartmentIds = await _context.Departments
-                .OrderBy(d => d.Name)
-                .Select(d => d.Id)
-                .ToListAsync();
-
-            var validDepartmentIds = new HashSet<int>(allDepartmentIds);
-
-            var selectedDepartmentIds = model.SelectedDepartmentIds?
-                .Where(id => validDepartmentIds.Contains(id))
+            var accessiblePropertyIds = await _context.UserPropertyAccesses
+                .Where(upa => upa.ApplicationUserId == user.Id)
+                .Select(upa => upa.PropertyId)
                 .Distinct()
-                .ToList() ?? new List<int>();
+                .ToListAsync();
+            var accessiblePropertySet = new HashSet<int>(accessiblePropertyIds);
+
+            var departmentInfo = await _context.Departments
+                .Where(d => d.PropertyId.HasValue && accessiblePropertySet.Contains(d.PropertyId.Value))
+                .Select(d => new { d.Id, PropertyId = d.PropertyId!.Value, d.Name })
+                .ToListAsync();
+            var validDepartmentIds = new HashSet<int>(departmentInfo.Select(d => d.Id));
+            var departmentLookup = departmentInfo
+                .GroupBy(d => d.PropertyId)
+                .ToDictionary(g => g.Key, g => g
+                    .Select(x => new EmailPreferenceDepartmentOption
+                    {
+                        Id = x.Id,
+                        Name = x.Name ?? string.Empty
+                    })
+                    .ToList());
+
+            var propertyOptionModels = model.PropertyOptions ?? new List<EmailPreferencePropertyOption>();
+            var validPropertyOptions = propertyOptionModels
+                .Where(po => accessiblePropertySet.Contains(po.Id))
+                .Select(po => new EmailPreferencePropertyOption
+                {
+                    Id = po.Id,
+                    Name = po.Name ?? string.Empty,
+                    IncludeInLogAlerts = po.IncludeInLogAlerts,
+                    IncludeInDailySummary = po.IncludeInDailySummary,
+                    IncludeInWorkOrderAlerts = po.IncludeInWorkOrderAlerts,
+                    Departments = po.Departments ?? new List<EmailPreferenceDepartmentOption>()
+                })
+                .ToList();
+
+            foreach (var propertyOption in validPropertyOptions)
+            {
+                var allowedDepartments = departmentLookup.TryGetValue(propertyOption.Id, out var deptOptions)
+                    ? deptOptions
+                    : new List<EmailPreferenceDepartmentOption>();
+
+                var selectedDepartmentIds = new HashSet<int>(propertyOption.Departments?
+                    .Where(d => d.Selected && validDepartmentIds.Contains(d.Id))
+                    .Select(d => d.Id) ?? Enumerable.Empty<int>());
+
+                propertyOption.Departments = allowedDepartments
+                    .Select(d => new EmailPreferenceDepartmentOption
+                    {
+                        Id = d.Id,
+                        Name = d.Name,
+                        Selected = selectedDepartmentIds.Contains(d.Id)
+                    })
+                    .ToList();
+
+                propertyOption.SelectedDepartmentIds = propertyOption.Departments
+                    .Where(d => d.Selected)
+                    .Select(d => d.Id)
+                    .Distinct()
+                    .ToList();
+            }
+
+            model.PropertyOptions = validPropertyOptions;
+            model.SelectedDepartmentIds = validPropertyOptions
+                .SelectMany(po => po.SelectedDepartmentIds)
+                .Distinct()
+                .ToList();
+            model.SelectedPropertyIds = validPropertyOptions
+                .Select(po => po.Id)
+                .Distinct()
+                .ToList();
+
+            if (!ModelState.IsValid)
+            {
+                return View("Index", await BuildViewModel(user, emailPreferences: model));
+            }
 
             user.EmailOnMessage = model.EmailOnMessage;
             user.EmailOnMention = model.EmailOnMention;
@@ -233,28 +298,30 @@ namespace hOps.web.Controllers
                     ModelState.AddModelError(string.Empty, error.Description);
                 }
 
-                model.SelectedDepartmentIds = selectedDepartmentIds;
                 return View("Index", await BuildViewModel(user, emailPreferences: model));
             }
 
-            var existingSubscriptions = await _context.UserDepartmentSubscriptions
+            var existingDepartmentSubscriptions = await _context.UserDepartmentSubscriptions
                 .Where(s => s.UserId == user.Id)
                 .ToListAsync();
 
-            var toRemove = existingSubscriptions
-                .Where(s => !selectedDepartmentIds.Contains(s.DepartmentId))
+            var aggregatedDepartmentIds = model.PropertyOptions
+                .SelectMany(po => po.SelectedDepartmentIds)
+                .Distinct()
                 .ToList();
 
-            if (toRemove.Any())
+            var deptSubscriptionsToRemove = existingDepartmentSubscriptions
+                .Where(s => !aggregatedDepartmentIds.Contains(s.DepartmentId))
+                .ToList();
+            if (deptSubscriptionsToRemove.Any())
             {
-                _context.UserDepartmentSubscriptions.RemoveRange(toRemove);
+                _context.UserDepartmentSubscriptions.RemoveRange(deptSubscriptionsToRemove);
             }
 
-            var existingDepartmentIds = existingSubscriptions
+            var existingDepartmentIds = existingDepartmentSubscriptions
                 .Select(s => s.DepartmentId)
                 .ToHashSet();
-
-            foreach (var departmentId in selectedDepartmentIds)
+            foreach (var departmentId in aggregatedDepartmentIds)
             {
                 if (!existingDepartmentIds.Contains(departmentId))
                 {
@@ -264,6 +331,39 @@ namespace hOps.web.Controllers
                         DepartmentId = departmentId
                     });
                 }
+            }
+
+            var existingPropertyPrefs = await _context.UserPropertyEmailSubscriptions
+                .Where(s => s.UserId == user.Id)
+                .ToListAsync();
+            var existingPrefMap = existingPropertyPrefs.ToDictionary(s => s.PropertyId);
+            var propertyIdsToKeep = new HashSet<int>();
+
+            foreach (var propertyOption in model.PropertyOptions)
+            {
+                propertyIdsToKeep.Add(propertyOption.Id);
+                if (!existingPrefMap.TryGetValue(propertyOption.Id, out var pref))
+                {
+                    pref = new UserPropertyEmailSubscription
+                    {
+                        UserId = user.Id,
+                        PropertyId = propertyOption.Id
+                    };
+                    _context.UserPropertyEmailSubscriptions.Add(pref);
+                    existingPrefMap[propertyOption.Id] = pref;
+                }
+
+                pref.IncludeInLogAlerts = propertyOption.IncludeInLogAlerts;
+                pref.IncludeInDailySummary = propertyOption.IncludeInDailySummary;
+                pref.IncludeInWorkOrderAlerts = propertyOption.IncludeInWorkOrderAlerts;
+            }
+
+            var propertyPrefsToRemove = existingPropertyPrefs
+                .Where(pref => !propertyIdsToKeep.Contains(pref.PropertyId))
+                .ToList();
+            if (propertyPrefsToRemove.Any())
+            {
+                _context.UserPropertyEmailSubscriptions.RemoveRange(propertyPrefsToRemove);
             }
 
             await _context.SaveChangesAsync();
@@ -366,6 +466,86 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
+            var accessiblePropertyIdSet = new HashSet<int>(accessibleProperties.Select(p => p.Id));
+
+            var propertyPreferences = await _context.UserPropertyEmailSubscriptions
+                .Where(s => s.UserId == user.Id)
+                .ToListAsync();
+            var propertyPreferenceMap = propertyPreferences.ToDictionary(s => s.PropertyId);
+
+            var userDepartmentIds = await _context.UserDepartmentSubscriptions
+                .Where(s => s.UserId == user.Id)
+                .Select(s => s.DepartmentId)
+                .ToListAsync();
+            var userDepartmentSet = new HashSet<int>(userDepartmentIds);
+
+            var departmentEntities = await _context.Departments
+                .Where(d => d.PropertyId.HasValue && accessiblePropertyIdSet.Contains(d.PropertyId.Value))
+                .OrderBy(d => d.Name)
+                .ToListAsync();
+            var departmentsByProperty = departmentEntities
+                .GroupBy(d => d.PropertyId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var propertyPreferenceOptions = new List<EmailPreferencePropertyOption>();
+            foreach (var property in accessibleProperties)
+            {
+                propertyPreferenceMap.TryGetValue(property.Id, out var preference);
+
+                var departmentOptions = departmentsByProperty.TryGetValue(property.Id, out var deptList)
+                    ? deptList
+                    : new List<Department>();
+
+                var departmentSelections = departmentOptions
+                    .Select(d => new EmailPreferenceDepartmentOption
+                    {
+                        Id = d.Id,
+                        Name = d.Name ?? string.Empty,
+                        Selected = userDepartmentSet.Contains(d.Id)
+                    })
+                    .ToList();
+
+                propertyPreferenceOptions.Add(new EmailPreferencePropertyOption
+                {
+                    Id = property.Id,
+                    Name = string.IsNullOrWhiteSpace(property.Code) ? property.Name : $"{property.Name} ({property.Code})",
+                    IncludeInLogAlerts = preference?.IncludeInLogAlerts ?? true,
+                    IncludeInDailySummary = preference?.IncludeInDailySummary ?? true,
+                    IncludeInWorkOrderAlerts = preference?.IncludeInWorkOrderAlerts ?? true,
+                    Departments = departmentSelections,
+                    SelectedDepartmentIds = departmentSelections.Where(d => d.Selected).Select(d => d.Id).ToList()
+                });
+            }
+
+            if (emailPreferences?.PropertyOptions != null && emailPreferences.PropertyOptions.Any())
+            {
+                var postedOptions = emailPreferences.PropertyOptions.ToDictionary(po => po.Id);
+                foreach (var option in propertyPreferenceOptions)
+                {
+                    if (postedOptions.TryGetValue(option.Id, out var posted))
+                    {
+                        option.IncludeInLogAlerts = posted.IncludeInLogAlerts;
+                        option.IncludeInDailySummary = posted.IncludeInDailySummary;
+                        option.IncludeInWorkOrderAlerts = posted.IncludeInWorkOrderAlerts;
+
+                        var postedDepartmentIds = posted.Departments?
+                            .Where(d => d.Selected)
+                            .Select(d => d.Id)
+                            .ToHashSet() ?? new HashSet<int>();
+
+                        foreach (var deptOption in option.Departments)
+                        {
+                            deptOption.Selected = postedDepartmentIds.Contains(deptOption.Id);
+                        }
+
+                        option.SelectedDepartmentIds = option.Departments
+                            .Where(d => d.Selected)
+                            .Select(d => d.Id)
+                            .ToList();
+                    }
+                }
+            }
+
             var selectedTimeZoneId = profileVm.TimeZoneId?.Trim();
             var timeZoneOptions = TimeZoneInfo.GetSystemTimeZones()
                 .Select(tz => new SelectListItem
@@ -378,50 +558,26 @@ namespace hOps.web.Controllers
 
             var changePasswordVm = changePassword ?? new ChangePasswordFormViewModel();
 
-            var departments = await _context.Departments
-                .OrderBy(d => d.Name)
-                .Select(d => new { d.Id, d.Name })
-                .ToListAsync();
-
-            List<int> subscriptionIds;
-            if (emailPreferences != null)
-            {
-                subscriptionIds = emailPreferences.SelectedDepartmentIds?
-                    .Distinct()
-                    .ToList() ?? new List<int>();
-            }
-            else
-            {
-                subscriptionIds = await _context.UserDepartmentSubscriptions
-                    .Where(s => s.UserId == user.Id)
-                    .Select(s => s.DepartmentId)
-                    .ToListAsync();
-            }
-
-            var validDepartmentIds = new HashSet<int>(departments.Select(d => d.Id));
-            subscriptionIds = subscriptionIds
-                .Where(validDepartmentIds.Contains)
-                .ToList();
-
             var emailPreferencesVm = emailPreferences ?? new EmailPreferencesViewModel
             {
                 EmailOnMessage = user.EmailOnMessage,
                 EmailOnMention = user.EmailOnMention,
                 EmailOnWorkOrderDepartment = user.EmailOnWorkOrderDepartment,
                 EmailOnLogEntry = user.EmailOnLogEntry,
-                EmailDailySummary = user.EmailDailySummary,
-                SelectedDepartmentIds = subscriptionIds.ToList()
+                EmailDailySummary = user.EmailDailySummary
             };
 
-            emailPreferencesVm.SelectedDepartmentIds = subscriptionIds.ToList();
-            emailPreferencesVm.DepartmentOptions = departments
-                .Select(d => new EmailPreferenceDepartmentOption
-                {
-                    Id = d.Id,
-                    Name = d.Name ?? string.Empty,
-                    Selected = subscriptionIds.Contains(d.Id)
-                })
+            emailPreferencesVm.PropertyOptions = propertyPreferenceOptions;
+            emailPreferencesVm.SelectedDepartmentIds = propertyPreferenceOptions
+                .SelectMany(p => p.SelectedDepartmentIds)
+                .Distinct()
                 .ToList();
+            emailPreferencesVm.SelectedPropertyIds = propertyPreferenceOptions
+                .Where(p => p.IncludeInLogAlerts || p.IncludeInDailySummary || p.IncludeInWorkOrderAlerts)
+                .Select(p => p.Id)
+                .Distinct()
+                .ToList();
+            emailPreferencesVm.DepartmentOptions = new List<EmailPreferenceDepartmentOption>();
 
             return new MyProfileViewModel
             {

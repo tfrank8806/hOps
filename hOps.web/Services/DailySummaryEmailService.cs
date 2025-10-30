@@ -77,17 +77,12 @@ namespace hOps.web.Services
             var users = await context.Users
                 .Where(u => u.EmailDailySummary && !string.IsNullOrWhiteSpace(u.Email))
                 .Include(u => u.UserPropertyAccesses)
+                .Include(u => u.EmailPropertySubscriptions)
                 .ToListAsync(cancellationToken);
 
             foreach (var user in users)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-
-                if (user.UserPropertyAccesses == null || user.UserPropertyAccesses.Count == 0)
-                {
-                    user.DailySummaryLastSentUtc = dayStartUtc;
-                    continue;
-                }
 
                 if (user.DailySummaryLastSentUtc.HasValue)
                 {
@@ -98,10 +93,19 @@ namespace hOps.web.Services
                     }
                 }
 
-                var propertyIds = user.UserPropertyAccesses
-                    .Select(upa => upa.PropertyId)
+                var propertyIds = user.EmailPropertySubscriptions?
+                    .Where(p => p.IncludeInDailySummary)
+                    .Select(p => p.PropertyId)
                     .Distinct()
-                    .ToList();
+                    .ToList() ?? new List<int>();
+
+                if (!propertyIds.Any() && user.UserPropertyAccesses != null)
+                {
+                    propertyIds = user.UserPropertyAccesses
+                        .Select(upa => upa.PropertyId)
+                        .Distinct()
+                        .ToList();
+                }
 
                 if (!propertyIds.Any())
                 {

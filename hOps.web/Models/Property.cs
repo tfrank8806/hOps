@@ -47,6 +47,6 @@ namespace hOps.web.Models
         public ICollection<BulletinPost> BulletinPosts { get; set; } = new List<BulletinPost>();
 
         public ICollection<PackageLogEntry> PackageLogEntries { get; set; } = new List<PackageLogEntry>();
+        public ICollection<UserPropertyEmailSubscription> EmailSubscriptions { get; set; } = new List<UserPropertyEmailSubscription>();
     }
 }
-

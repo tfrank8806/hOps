@@ -23,7 +23,7 @@ namespace hOps.web.Models
         public int? DefaultPropertyId { get; set; }
         public Property? DefaultProperty { get; set; }
 
-        public ICollection<UserPropertyAccess>? UserPropertyAccesses { get; set; }
+        public ICollection<UserPropertyAccess> UserPropertyAccesses { get; set; } = new List<UserPropertyAccess>();
         public ICollection<UserDepartmentSubscription> DepartmentEmailSubscriptions { get; set; } = new List<UserDepartmentSubscription>();
 
         public ICollection<CalendarEvent> CreatedCalendarEvents { get; set; } = new List<CalendarEvent>();
@@ -35,6 +35,7 @@ namespace hOps.web.Models
         public ICollection<UserNotification> Notifications { get; set; } = new List<UserNotification>();
         public ICollection<Document> UploadedDocuments { get; set; } = new List<Document>();
         public ICollection<DocumentFolder> CreatedDocumentFolders { get; set; } = new List<DocumentFolder>();
+        public ICollection<UserPropertyEmailSubscription> EmailPropertySubscriptions { get; set; } = new List<UserPropertyEmailSubscription>();
 
         public string TimeZoneId { get; set; } = TimeZoneInfo.Utc.Id;
     }
