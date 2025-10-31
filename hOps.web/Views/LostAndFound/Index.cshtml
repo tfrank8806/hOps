@@ -323,7 +323,7 @@
 
     @foreach (var entry in Model.FoundEntries.Concat(Model.LostEntries))
     {
-        <div class="modal fade" id="entryModal-@entry.Id" tabindex="-1" aria-labelledby="entryModalLabel-@entry.Id" aria-hidden="true">
+        <div class="modal fade lost-found-modal" id="entryModal-@entry.Id" tabindex="-1" aria-labelledby="entryModalLabel-@entry.Id" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -480,6 +480,12 @@
                 filtersCollapseEl.addEventListener('hidden.bs.collapse', updateFilterButtonLabel);
                 updateFilterButtonLabel();
             }
+
+            document.querySelectorAll('.lost-found-modal').forEach(modalEl => {
+                if (modalEl.parentElement !== document.body) {
+                    document.body.appendChild(modalEl);
+                }
+            });
         })();
     </script>
 }
