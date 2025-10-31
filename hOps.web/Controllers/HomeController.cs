@@ -7,6 +7,7 @@ using hOps.web.Models;
 using hOps.web.Services;
 using hOps.web.ViewModels.Home;
 using hOps.web.ViewModels.WorkOrders;
+using hOps.web.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -55,6 +56,7 @@ namespace hOps.web.Controllers
             await PopulateRoomTilesAsync(viewModel, propertyId);
             await PopulateWorkOrdersAsync(viewModel, propertyId);
             await PopulateLostFoundAsync(viewModel, propertyId);
+            await PopulatePassOnLogsAsync(viewModel, propertyId);
             await PopulatePackageLogAsync(viewModel, propertyId);
             await PopulateUpcomingEventsAsync(viewModel, propertyId);
 
@@ -509,6 +511,31 @@ namespace hOps.web.Controllers
             viewModel.LostFoundEntries = recentLostFound;
         }
 
+        private async Task PopulatePassOnLogsAsync(HomeIndexViewModel viewModel, int propertyId)
+        {
+            var recentLogs = await _context.PassOnLogs
+                .Where(log => log.Properties.Any(lp => lp.PropertyId == propertyId))
+                .Include(log => log.CreatedBy)
+                .OrderByDescending(log => log.CreatedAt)
+                .Take(6)
+                .AsNoTracking()
+                .ToListAsync();
+
+            viewModel.PassOnLogs = recentLogs
+                .Select(log => new PassOnLogSummaryViewModel
+                {
+                    Id = log.Id,
+                    Title = log.Title,
+                    Preview = BuildPassOnLogPreview(log.Body),
+                    CreatorName = BuildDisplayName(log.CreatedBy),
+                    CreatedAt = log.CreatedAt,
+                    DetailUrl = Url.Action("Details", "PassOnLogs", new { id = log.Id })
+                        ?? Url.Action("Index", "PassOnLogs")
+                        ?? string.Empty,
+                })
+                .ToList();
+        }
+
         private async Task PopulatePackageLogAsync(HomeIndexViewModel viewModel, int propertyId)
         {
             var recentPackages = await _context.PackageLogEntries
@@ -605,6 +632,22 @@ namespace hOps.web.Controllers
             }
 
             return endDate.AddDays(1).AddTicks(-1);
+        }
+
+        private static string BuildPassOnLogPreview(string body)
+        {
+            var preview = MentionMarkupFormatter.ToDisplayText(body ?? string.Empty)
+                .ReplaceLineEndings(" ")
+                .Trim();
+
+            if (string.IsNullOrWhiteSpace(preview))
+            {
+                return string.Empty;
+            }
+
+            return preview.Length <= 140
+                ? preview
+                : $"{preview[..140]}...";
         }
 
         private static string BuildDisplayName(ApplicationUser? user)

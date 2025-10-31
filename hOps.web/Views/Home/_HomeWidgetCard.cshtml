@@ -180,6 +180,34 @@
                 }
             </ul>
         }
+        else if (items.First() is PassOnLogSummaryViewModel)
+        {
+            var logs = items.OfType<PassOnLogSummaryViewModel>();
+            <ul class="list-unstyled mb-0 widget-list">
+                @foreach (var log in logs)
+                {
+                    var hasLink = !string.IsNullOrWhiteSpace(log.DetailUrl);
+                    var postedLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
+                    var authorName = string.IsNullOrWhiteSpace(log.CreatorName) ? "Unknown" : log.CreatorName;
+                    <li class="widget-item">
+                        @if (hasLink)
+                        {
+                            <a class="fw-semibold" href="@log.DetailUrl">@log.Title</a>
+                        }
+                        else
+                        {
+                            <span class="fw-semibold">@log.Title</span>
+                        }
+                        <div class="text-muted small">By @authorName</div>
+                        @if (!string.IsNullOrWhiteSpace(log.Preview))
+                        {
+                            <div class="small text-muted mt-1">@log.Preview</div>
+                        }
+                        <div class="small mt-1" style="color:@GetDateColor(log.CreatedAt);">Posted @postedLocal.ToString("g")</div>
+                    </li>
+                }
+            </ul>
+        }
         else
         {
             <p class="text-muted mb-0">Unsupported widget type.</p>

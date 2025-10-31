@@ -22,6 +22,8 @@ namespace hOps.web.ViewModels.Home
         public List<PackageLogSummaryViewModel> PackageLogs { get; set; } = new();
 
         public List<CalendarEventSummaryViewModel> UpcomingEvents { get; set; } = new();
+
+        public List<PassOnLogSummaryViewModel> PassOnLogs { get; set; } = new();
     }
 
     public class ManagerAnnouncementViewModel
@@ -110,6 +112,16 @@ namespace hOps.web.ViewModels.Home
         public DateTime? End { get; set; }
         public string CategoryName { get; set; } = string.Empty;
         public string? CategoryColor { get; set; }
+        public string DetailUrl { get; set; } = string.Empty;
+    }
+
+    public class PassOnLogSummaryViewModel
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Preview { get; set; } = string.Empty;
+        public string CreatorName { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
         public string DetailUrl { get; set; } = string.Empty;
     }
 }
