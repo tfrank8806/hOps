@@ -40,33 +40,230 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
-            if (!conversationId.HasValue && !string.IsNullOrWhiteSpace(userId) && !string.Equals(userId, currentUser.Id, StringComparison.OrdinalIgnoreCase))
+            var viewModel = await BuildViewModelAsync(currentUser, conversationId, userId);
+            return View(viewModel);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Widget(int? conversationId, string? userId)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
             {
-                var conversation = await _messageService.GetOrCreateConversationAsync(currentUser.Id, userId);
-                conversationId = conversation.Id;
+                return Challenge();
+            }
+
+            var viewModel = await BuildViewModelAsync(currentUser, conversationId, userId);
+            return View("Widget", viewModel);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Send(DirectMessageForm form, string? context)
+        {
+            if (!ModelState.IsValid)
+            {
+                TempData["DirectMessageError"] = "Please enter a message before sending.";
+                return RedirectToContext(context, new { conversationId = form.ConversationId });
+            }
+
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var access = await GetMessagingAccessContextAsync(currentUser);
+
+            var conversation = await _context.DirectMessageConversations
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == form.ConversationId && (c.ParticipantAId == currentUser.Id || c.ParticipantBId == currentUser.Id));
+
+            if (conversation == null)
+            {
+                TempData["DirectMessageError"] = "Conversation not found or you do not have access.";
+                return RedirectToContext(context);
+            }
+
+            var recipientId = conversation.ParticipantAId == currentUser.Id
+                ? conversation.ParticipantBId
+                : conversation.ParticipantAId;
+
+            if (!access.IsAdmin && !access.AllowedUserIds.Contains(recipientId))
+            {
+                TempData["DirectMessageError"] = "You can only message teammates assigned to your properties.";
+                return RedirectToContext(context);
+            }
+
+            await _messageService.SendMessageAsync(form.ConversationId, currentUser.Id, recipientId, form.Body);
+            TempData["DirectMessageMessage"] = "Message sent.";
+            return RedirectToContext(context, new { conversationId = form.ConversationId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Start(NewConversationForm form, string? context)
+        {
+            if (!ModelState.IsValid)
+            {
+                TempData["DirectMessageError"] = "Select a recipient and enter a message.";
+                return RedirectToContext(context);
+            }
+
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var access = await GetMessagingAccessContextAsync(currentUser);
+            if (!access.IsAdmin && !access.AllowedUserIds.Contains(form.RecipientUserId))
+            {
+                TempData["DirectMessageError"] = "You can only message teammates assigned to your properties.";
+                return RedirectToContext(context);
+            }
+
+            try
+            {
+                var message = await _messageService.StartConversationAsync(currentUser.Id, form.RecipientUserId, form.Body);
+                TempData["DirectMessageMessage"] = "Conversation started.";
+                return RedirectToContext(context, new { conversationId = message.ConversationId });
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["DirectMessageError"] = ex.Message;
+                return RedirectToContext(context);
+            }
+        }
+
+        private RedirectToActionResult RedirectToContext(string? context, object? routeValues = null)
+        {
+            var target = string.Equals(context, "widget", StringComparison.OrdinalIgnoreCase)
+                ? nameof(Widget)
+                : nameof(Index);
+            return RedirectToAction(target, routeValues);
+        }
+
+        private async Task<MessagingAccessContext> GetMessagingAccessContextAsync(ApplicationUser user)
+        {
+            var roles = await _userManager.GetRolesAsync(user);
+            var isAdmin = roles.Contains("Admin");
+
+            var propertyIds = (await _context.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == user.Id)
+                    .Select(upa => upa.PropertyId)
+                    .ToListAsync())
+                .ToHashSet();
+
+            var allowedUserIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (propertyIds.Count > 0)
+            {
+                var propertyUserIds = await _context.UserPropertyAccesses
+                    .Where(upa => propertyIds.Contains(upa.PropertyId) && upa.ApplicationUserId != user.Id)
+                    .Select(upa => upa.ApplicationUserId)
+                    .Distinct()
+                    .ToListAsync();
+
+                foreach (var id in propertyUserIds)
+                {
+                    allowedUserIds.Add(id);
+                }
+            }
+
+            var adminRoleId = await _context.Roles
+                .Where(r => r.NormalizedName == "ADMIN")
+                .Select(r => r.Id)
+                .FirstOrDefaultAsync();
+
+            if (adminRoleId != null)
+            {
+                var adminUserIds = await _context.UserRoles
+                    .Where(ur => ur.RoleId == adminRoleId && ur.UserId != user.Id)
+                    .Select(ur => ur.UserId)
+                    .ToListAsync();
+
+                foreach (var id in adminUserIds)
+                {
+                    allowedUserIds.Add(id);
+                }
+            }
+
+            if (isAdmin)
+            {
+                return new MessagingAccessContext(true, propertyIds, allowedUserIds);
+            }
+
+            return new MessagingAccessContext(false, propertyIds, allowedUserIds);
+        }
+
+        private sealed record MessagingAccessContext(bool IsAdmin, HashSet<int> PropertyIds, HashSet<string> AllowedUserIds);
+
+        private async Task<DirectMessagePageViewModel> BuildViewModelAsync(ApplicationUser currentUser, int? conversationId, string? userId)
+        {
+            var access = await GetMessagingAccessContextAsync(currentUser);
+
+            var resolvedConversationId = conversationId;
+            if (!resolvedConversationId.HasValue && !string.IsNullOrWhiteSpace(userId) && !string.Equals(userId, currentUser.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                if (access.IsAdmin || access.AllowedUserIds.Contains(userId))
+                {
+                    var conversation = await _messageService.GetOrCreateConversationAsync(currentUser.Id, userId);
+                    resolvedConversationId = conversation.Id;
+                }
             }
 
             var summaries = await _messageService.GetConversationSummariesAsync(currentUser.Id);
-            var otherUserIds = summaries.Select(s => s.OtherUserId).Distinct().ToList();
+            var allowedRecipientIds = access.IsAdmin
+                ? null
+                : access.AllowedUserIds.ToList();
 
-            var otherUsers = await _userManager.Users
-                .Where(u => otherUserIds.Contains(u.Id))
+            var filteredSummaries = access.IsAdmin
+                ? summaries
+                : summaries.Where(summary => allowedRecipientIds!.Contains(summary.OtherUserId)).ToList();
+
+            if (!resolvedConversationId.HasValue)
+            {
+                var fallbackSummary = filteredSummaries
+                    .OrderByDescending(s => s.LastMessageAt ?? DateTime.MinValue)
+                    .FirstOrDefault();
+
+                if (fallbackSummary == null && access.IsAdmin)
+                {
+                    fallbackSummary = summaries
+                        .OrderByDescending(s => s.LastMessageAt ?? DateTime.MinValue)
+                        .FirstOrDefault();
+                }
+
+                if (fallbackSummary != null)
+                {
+                    resolvedConversationId = fallbackSummary.ConversationId;
+                }
+            }
+
+            var participantIds = filteredSummaries.Select(s => s.OtherUserId).Distinct().ToList();
+            var participantInfo = await _userManager.Users
+                .Where(u => participantIds.Contains(u.Id))
                 .Select(u => new
                 {
                     u.Id,
                     Name = BuildDisplayName(u)
                 })
                 .ToListAsync();
+            var nameLookup = participantInfo.ToDictionary(u => u.Id, u => u.Name);
 
-            var conversationItems = summaries
+            var conversationItems = filteredSummaries
                 .Select(summary =>
                 {
-                    var other = otherUsers.FirstOrDefault(u => u.Id == summary.OtherUserId);
+                    var participantName = nameLookup.TryGetValue(summary.OtherUserId, out var value)
+                        ? value
+                        : "Unknown user";
+
                     return new ConversationListItemViewModel
                     {
                         ConversationId = summary.ConversationId,
                         ParticipantId = summary.OtherUserId,
-                        ParticipantName = other?.Name ?? "Unknown user",
+                        ParticipantName = participantName,
                         LastMessagePreview = string.IsNullOrWhiteSpace(summary.LastMessagePreview)
                             ? null
                             : MentionMarkupFormatter.ToDisplayText(summary.LastMessagePreview),
@@ -77,11 +274,15 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
+            var conversationLookup = conversationItems
+                .GroupBy(c => c.ParticipantId, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().ConversationId, StringComparer.OrdinalIgnoreCase);
+
             ConversationDetailViewModel? activeConversation = null;
-            if (conversationId.HasValue)
+            if (resolvedConversationId.HasValue)
             {
-                var detail = await _messageService.GetConversationDetailAsync(conversationId.Value, currentUser.Id);
-                if (detail != null)
+                var detail = await _messageService.GetConversationDetailAsync(resolvedConversationId.Value, currentUser.Id);
+                if (detail != null && (access.IsAdmin || access.AllowedUserIds.Contains(detail.OtherUserId)))
                 {
                     activeConversation = new ConversationDetailViewModel
                     {
@@ -106,23 +307,81 @@ namespace hOps.web.Controllers
                     };
                 }
             }
+            else if (!filteredSummaries.Any() && summaries.Any())
+            {
+                var latest = summaries
+                    .OrderByDescending(s => s.LastMessageAt ?? DateTime.MinValue)
+                    .FirstOrDefault();
+                if (latest != null && (access.IsAdmin || access.AllowedUserIds.Contains(latest.OtherUserId)))
+                {
+                    var detail = await _messageService.GetConversationDetailAsync(latest.ConversationId, currentUser.Id);
+                    if (detail != null)
+                    {
+                        activeConversation = new ConversationDetailViewModel
+                        {
+                            ConversationId = detail.ConversationId,
+                            ParticipantId = detail.OtherUserId,
+                            ParticipantName = detail.OtherUserName,
+                            Messages = detail.Messages
+                                .Select(m => new DirectMessageBubbleViewModel
+                                {
+                                    MessageId = m.MessageId,
+                                    SenderId = m.SenderId,
+                                    SenderName = currentUser.Id == m.SenderId
+                                        ? "You"
+                                        : conversationItems.FirstOrDefault(c => c.ParticipantId == m.SenderId)?.ParticipantName ?? "User",
+                                    Body = m.Body,
+                                    SentAt = _timeZoneService.ConvertToUserTime(m.SentAt),
+                                    IsOwnMessage = m.IsOwnMessage,
+                                    IsRead = m.IsRead,
+                                    ReadAt = m.ReadAt.HasValue ? _timeZoneService.ConvertToUserTime(m.ReadAt.Value) : (DateTime?)null
+                                })
+                                .ToList()
+                        };
+                    }
+                }
+            }
 
-            var recipientCandidates = await _userManager.Users
-                .Where(u => u.Id != currentUser.Id)
+            var recipientQuery = _userManager.Users.Where(u => u.Id != currentUser.Id);
+            if (!access.IsAdmin)
+            {
+                if (allowedRecipientIds == null || allowedRecipientIds.Count == 0)
+                {
+                    recipientQuery = recipientQuery.Where(u => false);
+                }
+                else
+                {
+                    recipientQuery = recipientQuery.Where(u => allowedRecipientIds.Contains(u.Id));
+                }
+            }
+
+            var recipientCandidates = await recipientQuery
                 .OrderBy(u => u.FirstName)
                 .ThenBy(u => u.LastName)
+                .Select(u => new
+                {
+                    u.Id,
+                    Name = BuildDisplayName(u)
+                })
                 .ToListAsync();
+
+            var activeParticipantIds = conversationItems
+                .Select(c => c.ParticipantId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var availableRecipients = recipientCandidates
                 .Select(u => new MessageRecipientOptionViewModel
                 {
                     UserId = u.Id,
-                    DisplayName = BuildDisplayName(u),
-                    IsActive = conversationItems.Any(c => c.ParticipantId == u.Id)
+                    DisplayName = u.Name,
+                    IsActive = activeParticipantIds.Contains(u.Id),
+                    ConversationId = conversationLookup.TryGetValue(u.Id, out var conversationId)
+                        ? conversationId
+                        : (int?)null
                 })
                 .ToList();
 
-            var viewModel = new DirectMessagePageViewModel
+            return new DirectMessagePageViewModel
             {
                 Conversations = conversationItems,
                 ActiveConversation = activeConversation,
@@ -133,72 +392,6 @@ namespace hOps.web.Controllers
                 CurrentUserId = currentUser.Id,
                 AvailableRecipients = availableRecipients
             };
-
-            return View(viewModel);
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Send(DirectMessageForm form)
-        {
-            if (!ModelState.IsValid)
-            {
-                TempData["DirectMessageError"] = "Please enter a message before sending.";
-                return RedirectToAction(nameof(Index), new { conversationId = form.ConversationId });
-            }
-
-            var currentUser = await _userManager.GetUserAsync(User);
-            if (currentUser == null)
-            {
-                return Challenge();
-            }
-
-            var conversation = await _context.DirectMessageConversations
-                .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.Id == form.ConversationId && (c.ParticipantAId == currentUser.Id || c.ParticipantBId == currentUser.Id));
-
-            if (conversation == null)
-            {
-                TempData["DirectMessageError"] = "Conversation not found or you do not have access.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            var recipientId = conversation.ParticipantAId == currentUser.Id
-                ? conversation.ParticipantBId
-                : conversation.ParticipantAId;
-
-            await _messageService.SendMessageAsync(form.ConversationId, currentUser.Id, recipientId, form.Body);
-            TempData["DirectMessageMessage"] = "Message sent.";
-            return RedirectToAction(nameof(Index), new { conversationId = form.ConversationId });
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Start(NewConversationForm form)
-        {
-            if (!ModelState.IsValid)
-            {
-                TempData["DirectMessageError"] = "Select a recipient and enter a message.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            var currentUser = await _userManager.GetUserAsync(User);
-            if (currentUser == null)
-            {
-                return Challenge();
-            }
-
-            try
-            {
-                var message = await _messageService.StartConversationAsync(currentUser.Id, form.RecipientUserId, form.Body);
-                TempData["DirectMessageMessage"] = "Conversation started.";
-                return RedirectToAction(nameof(Index), new { conversationId = message.ConversationId });
-            }
-            catch (InvalidOperationException ex)
-            {
-                TempData["DirectMessageError"] = ex.Message;
-                return RedirectToAction(nameof(Index));
-            }
         }
 
         private static string BuildDisplayName(ApplicationUser user)

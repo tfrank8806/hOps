@@ -1,0 +1,184 @@
+@using hOps.web.Utilities
+@model hOps.web.ViewModels.Messages.DirectMessagePageViewModel
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Messages</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="direct-messages-widget-body">
+    <div class="direct-messages-widget h-100">
+        <header class="direct-messages-widget__header d-flex align-items-center justify-content-between">
+            <h1 class="h6 mb-0">Messages</h1>
+            <a class="btn btn-sm btn-outline-primary" asp-action="Index" title="Open full message center" target="_top">Open full view</a>
+        </header>
+
+        @if (TempData["DirectMessageError"] is string error)
+        {
+            <div class="alert alert-danger py-2 px-3 mb-3 small" role="alert">
+                @error
+            </div>
+        }
+
+        @if (TempData["DirectMessageMessage"] is string successMessage)
+        {
+            <div class="alert alert-success py-2 px-3 mb-3 small" role="alert">
+                @successMessage
+            </div>
+        }
+
+        <div class="direct-messages-widget__content">
+            <aside class="direct-messages-widget__conversations">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <h2 class="h6 mb-0 text-muted">Conversations</h2>
+                    <button class="btn btn-icon btn-light btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#widgetNewConversation" aria-expanded="false" aria-controls="widgetNewConversation" title="Start a new message" @(Model.AvailableRecipients.Any() ? string.Empty : "disabled")>
+                        <span class="visually-hidden">New conversation</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-lg" viewBox="0 0 16 16" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5V7.5H13a.5.5 0 0 1 0 1H8.5V13a.5.5 0 0 1-1 0V8.5H3a.5.5 0 0 1 0-1h4.5V2.5A.5.5 0 0 1 8 2Z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="collapse mb-3" id="widgetNewConversation" data-dm-new-conversation="true">
+                    @if (Model.AvailableRecipients.Any())
+                    {
+                        <form asp-action="Start" asp-route-context="widget" method="post" class="direct-messages-widget__new-conversation" data-dm-existing-url="@Url.Action("Widget", "DirectMessages")">
+                            @Html.AntiForgeryToken()
+                            <div class="mb-2">
+                                <label for="widgetNewRecipient" class="form-label small mb-1">Recipient</label>
+                                <select class="form-select form-select-sm" id="widgetNewRecipient" name="RecipientUserId" required>
+                                    <option value="" selected disabled>Select a teammate</option>
+                                    @foreach (var option in Model.AvailableRecipients)
+                                    {
+                                        <option value="@option.UserId" data-conversation-id="@option.ConversationId">@option.DisplayName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="mb-2">
+                                <label for="widgetNewBody" class="form-label small mb-1">Message</label>
+                                <textarea class="form-control form-control-sm" id="widgetNewBody" name="Body" rows="3" maxlength="2000" required data-enable-mentions="true"></textarea>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2 align-items-center">
+                                <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#widgetNewConversation">Cancel</button>
+                                <button class="btn btn-primary btn-sm" type="submit">Send</button>
+                            </div>
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="text-muted small p-2">
+                            Messaging is limited to teammates assigned to the same properties as you. Once you share a property with someone, they will appear here.
+                        </div>
+                    }
+                </div>
+                <div class="direct-messages-widget__conversation-list">
+                    @if (!Model.Conversations.Any())
+                    {
+                        <p class="text-muted small mb-0">No conversations yet.</p>
+                    }
+                    else
+                    {
+                        foreach (var conversation in Model.Conversations)
+                        {
+                            var url = Url.Action("Widget", new { conversationId = conversation.ConversationId });
+                            <a href="@url" class="direct-messages-widget__conversation-item @(Model.ActiveConversation?.ConversationId == conversation.ConversationId ? "active" : string.Empty)" target="_self">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <span class="fw-semibold">@conversation.ParticipantName</span>
+                                    @if (conversation.HasUnread)
+                                    {
+                                        <span class="badge bg-primary">@conversation.UnreadCount</span>
+                                    }
+                                </div>
+                                <div class="small text-muted mt-1">
+                                    @if (conversation.LastMessageAt.HasValue)
+                                    {
+                                        <span>@TimeZoneService.ConvertToUserTime(conversation.LastMessageAt.Value).ToString("g") &middot; </span>
+                                    }
+                                    <span>@(string.IsNullOrWhiteSpace(conversation.LastMessagePreview) ? "..." : conversation.LastMessagePreview)</span>
+                                </div>
+                            </a>
+                        }
+                    }
+                </div>
+            </aside>
+            <section class="direct-messages-widget__thread">
+                @if (Model.ActiveConversation != null)
+                {
+                    var participantName = Model.ActiveConversation.ParticipantName ?? "Conversation";
+                    var initial = participantName.Trim().Length > 0
+                        ? participantName.Trim()[0].ToString().ToUpperInvariant()
+                        : "?";
+                    var latestMessage = Model.ActiveConversation.Messages.LastOrDefault();
+                    var latestSnippet = latestMessage != null
+                        ? MentionMarkupFormatter.ToDisplayText(latestMessage.Body)
+                        : null;
+                    if (!string.IsNullOrWhiteSpace(latestSnippet) && latestSnippet.Length > 80)
+                    {
+                        latestSnippet = latestSnippet.Substring(0, 80) + "…";
+                    }
+                    var latestTimestamp = latestMessage != null
+                        ? TimeZoneService.ConvertToUserTime(latestMessage.SentAt).ToString("g")
+                        : null;
+                    <div class="direct-messages-widget__summary">
+                        <div class="direct-messages-widget__summary-avatar">@initial</div>
+                        <div class="direct-messages-widget__summary-body">
+                            <div class="d-flex justify-content-between align-items-center gap-2">
+                                <span class="direct-messages-widget__summary-name">@participantName</span>
+                                @if (!string.IsNullOrEmpty(latestTimestamp))
+                                {
+                                    <span class="direct-messages-widget__summary-meta">@latestTimestamp</span>
+                                }
+                            </div>
+                            <span class="direct-messages-widget__summary-meta">Direct messages</span>
+                            @if (!string.IsNullOrEmpty(latestSnippet))
+                            {
+                                <span class="direct-messages-widget__summary-snippet">@latestSnippet</span>
+                            }
+                        </div>
+                        <a class="btn btn-outline-primary btn-sm" href="mailto:@participantName">Email</a>
+                    </div>
+
+                    <div class="direct-message-thread flex-grow-1">
+                        <div class="direct-message-scroll" id="directMessageScroll">
+                            @foreach (var msg in Model.ActiveConversation.Messages)
+                            {
+                                var bubbleClass = msg.IsOwnMessage ? "message-outgoing" : "message-incoming";
+                                <div class="message-bubble @bubbleClass">
+                                    <div class="message-meta">
+                                        <span class="fw-semibold">@msg.SenderName</span>
+                                        <time datetime="@msg.SentAt.ToString("o")" class="text-muted">@msg.SentAt.ToString("g")</time>
+                                    </div>
+                                    <div class="message-body">
+                                        @Html.Raw(MentionMarkupFormatter.ToHtml(msg.Body))
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <form asp-action="Send" asp-route-context="widget" method="post" class="direct-message-composer mt-3">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="Form.ConversationId" value="@Model.ActiveConversation.ConversationId" />
+                        <div class="direct-message-composer__controls direct-message-composer__controls--compact">
+                            <textarea class="form-control flex-grow-1" asp-for="Form.Body" rows="2" maxlength="2000" placeholder="Type a message..." required data-enable-mentions="true"></textarea>
+                            <button class="btn btn-primary flex-shrink-0" type="submit">Send</button>
+                        </div>
+                        <span asp-validation-for="Form.Body" class="text-danger small"></span>
+                    </form>
+                }
+            </section>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/directMessages.js" asp-append-version="true"></script>
+</body>
+</html>
+

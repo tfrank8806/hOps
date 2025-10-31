@@ -62,6 +62,7 @@ namespace hOps.web.ViewModels.Messages
         public string UserId { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
         public bool IsActive { get; set; }
+        public int? ConversationId { get; set; }
     }
 
     public class NewConversationForm

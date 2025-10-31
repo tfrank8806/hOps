@@ -1,4 +1,8 @@
-﻿using hOps.web.Data;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Utilities;
 using Microsoft.AspNetCore.Http;
@@ -20,6 +24,12 @@ public class BaseController : Controller
 
     public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
+        ViewBag.UnreadDirectMessageCount = 0;
+        ViewBag.LatestDirectMessageParticipant = null;
+        ViewBag.LatestDirectMessageBody = null;
+        ViewBag.LatestDirectMessageSentAt = null;
+        ViewBag.LatestDirectMessageConversationId = null;
+
         var user = await _userManager.GetUserAsync(User);
         if (user != null)
         {
@@ -30,6 +40,7 @@ public class BaseController : Controller
                 .ToListAsync();
 
             ViewBag.UserProperties = props;
+            ViewBag.CurrentUserId = user.Id;
 
             int? currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
             Property? currentProperty = currentPropertyId.HasValue
@@ -45,7 +56,6 @@ public class BaseController : Controller
                 }
             }
 
-            // Fallback to first property if session value is missing or invalid
             if (currentProperty == null && props.Any())
             {
                 currentProperty = props.First();
@@ -61,8 +71,62 @@ public class BaseController : Controller
             var normalizedTimeZoneId = DefaultTimeZoneProvider.NormalizeForStorage(user.TimeZoneId);
             HttpContext.Items["UserTimeZoneId"] = normalizedTimeZoneId;
             HttpContext.Session.SetString("UserTimeZoneId", normalizedTimeZoneId);
+
+            var unreadMessageCount = await _context.DirectMessages
+                .Where(m => m.RecipientId == user.Id && !m.IsRead)
+                .CountAsync();
+            ViewBag.UnreadDirectMessageCount = unreadMessageCount;
+
+            var latestMessage = await _context.DirectMessages
+                .Where(m => m.RecipientId == user.Id || m.SenderId == user.Id)
+                .OrderByDescending(m => m.SentAt)
+                .Select(m => new
+                {
+                    m.SentAt,
+                    m.Body,
+                    m.SenderId,
+                    m.RecipientId,
+                    m.ConversationId
+                })
+                .FirstOrDefaultAsync();
+
+            if (latestMessage != null)
+            {
+                var otherUserId = string.Equals(latestMessage.SenderId ?? user.Id, user.Id, StringComparison.OrdinalIgnoreCase)
+                    ? (latestMessage.RecipientId ?? user.Id)
+                    : (latestMessage.SenderId ?? user.Id);
+
+                var otherUser = await _userManager.Users
+                    .Where(u => u.Id == otherUserId)
+                    .Select(u => new { u.FirstName, u.LastName, u.Email, u.UserName })
+                    .FirstOrDefaultAsync();
+
+                string? participantName = null;
+                if (otherUser != null)
+                {
+                    var parts = new List<string>();
+                    if (!string.IsNullOrWhiteSpace(otherUser.FirstName))
+                    {
+                        parts.Add(otherUser.FirstName);
+                    }
+                    if (!string.IsNullOrWhiteSpace(otherUser.LastName))
+                    {
+                        parts.Add(otherUser.LastName);
+                    }
+
+                    participantName = parts.Count > 0
+                        ? string.Join(" ", parts)
+                        : (otherUser.Email ?? otherUser.UserName ?? "Teammate");
+                }
+
+                ViewBag.LatestDirectMessageParticipant = participantName;
+                ViewBag.LatestDirectMessageBody = latestMessage.Body ?? string.Empty;
+                ViewBag.LatestDirectMessageSentAt = latestMessage.SentAt;
+                ViewBag.LatestDirectMessageConversationId = latestMessage.ConversationId;
+            }
         }
 
-        await next(); // Continue with the request
+        await next();
     }
 }
+

@@ -1,0 +1,19 @@
+
+.direct-messages-widget--composer-hidden .direct-messages-widget__thread {
+    display: none;
+}
+
+.direct-messages-widget--composer-hidden .direct-messages-widget__conversations {
+    flex: 1 1 auto;
+}
+
+.direct-messages-page--composer-hidden .direct-message-thread,
+.direct-messages-page--composer-hidden .direct-message-composer {
+    display: none;
+}
+
+
+.dm-hidden-by-new-conversation {
+    display: none !important;
+}
+

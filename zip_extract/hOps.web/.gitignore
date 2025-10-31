@@ -1,0 +1,8 @@
+bin/
+obj/
+*.user
+*.vs/
+.vs/
+appsettings.secret.json
+*.db
+wwwroot/uploads/
