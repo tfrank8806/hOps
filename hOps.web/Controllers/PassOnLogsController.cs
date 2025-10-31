@@ -615,13 +615,23 @@ namespace hOps.web.Controllers
 
         private async Task<List<Property>> GetAccessiblePropertiesAsync(string userId)
         {
-            return await _context.UserPropertyAccesses
+            var properties = await _context.UserPropertyAccesses
                 .Where(upa => upa.ApplicationUserId == userId)
                 .Include(upa => upa.Property)
                 .Select(upa => upa.Property)
                 .Distinct()
                 .OrderBy(p => p.Name)
                 .ToListAsync();
+
+            var currentPropertyId = (ViewBag.CurrentProperty as Property)?.Id;
+            if (currentPropertyId.HasValue)
+            {
+                properties = properties
+                    .Where(p => p.Id == currentPropertyId.Value)
+                    .ToList();
+            }
+
+            return properties;
         }
 
         private PassOnLogFormViewModel BuildFormViewModel(PassOnLogFormViewModel model, List<Property> accessibleProperties)

@@ -556,7 +556,6 @@ namespace hOps.web.Controllers
                 .Distinct()
                 .ToListAsync();
         }
-
         private async Task<WorkOrdersViewModel> BuildViewModelAsync(WorkOrderFilterInput filters, WorkOrderFormViewModel? form)
         {
             var user = await _userManager.GetUserAsync(User);
@@ -570,13 +569,37 @@ namespace hOps.web.Controllers
                 filters.SortOrder = "newest";
             }
 
-            if (filters.PropertyId.HasValue && !accessiblePropertyIds.Contains(filters.PropertyId.Value))
+            var currentPropertyId = GetCurrentPropertyId();
+            List<int> targetPropertyIds;
+            if (currentPropertyId.HasValue)
             {
-                filters.PropertyId = null;
+                if (accessiblePropertyIds.Contains(currentPropertyId.Value))
+                {
+                    targetPropertyIds = new List<int> { currentPropertyId.Value };
+                    filters.PropertyId = currentPropertyId.Value;
+                }
+                else
+                {
+                    targetPropertyIds = new List<int>();
+                    filters.PropertyId = null;
+                }
+            }
+            else
+            {
+                targetPropertyIds = accessiblePropertyIds.ToList();
+
+                if (filters.PropertyId.HasValue && targetPropertyIds.Contains(filters.PropertyId.Value))
+                {
+                    targetPropertyIds = new List<int> { filters.PropertyId.Value };
+                }
+                else
+                {
+                    filters.PropertyId = null;
+                }
             }
 
             var selectedPropertyIds = form?.SelectedPropertyIds != null
-                ? new HashSet<int>(form.SelectedPropertyIds.Where(id => accessiblePropertyIds.Contains(id)))
+                ? new HashSet<int>(form.SelectedPropertyIds.Where(id => targetPropertyIds.Contains(id)))
                 : new HashSet<int>();
 
             var query = _context.WorkOrders
@@ -587,9 +610,9 @@ namespace hOps.web.Controllers
                 .Include(w => w.Attachments)
                 .AsQueryable();
 
-            if (accessiblePropertyIds.Any())
+            if (targetPropertyIds.Any())
             {
-                query = query.Where(w => w.Properties.Any(p => accessiblePropertyIds.Contains(p.PropertyId)));
+                query = query.Where(w => w.Properties.Any(p => targetPropertyIds.Contains(p.PropertyId)));
             }
             else
             {
@@ -631,12 +654,6 @@ namespace hOps.web.Controllers
                     EF.Functions.Like(w.Location, $"%{term}%"));
             }
 
-            if (filters.PropertyId.HasValue)
-            {
-                var propertyId = filters.PropertyId.Value;
-                query = query.Where(w => w.Properties.Any(p => p.PropertyId == propertyId));
-            }
-
             query = filters.SortOrder?.ToLowerInvariant() switch
             {
                 "oldest" => query.OrderBy(w => w.CreatedAt),
@@ -673,29 +690,16 @@ namespace hOps.web.Controllers
             var workOrderTypes = await _context.WorkOrderTypes.OrderBy(t => t.Name).ToListAsync();
 
             var propertyOptions = await _context.Properties
-                .Where(p => accessiblePropertyIds.Contains(p.Id))
+                .Where(p => targetPropertyIds.Contains(p.Id))
                 .OrderBy(p => p.Name)
                 .Select(p => new PropertyOptionViewModel
                 {
                     Id = p.Id,
                     Name = p.Name,
                     Code = p.Code,
-                    IsSelected = false
+                    IsSelected = selectedPropertyIds.Contains(p.Id) || filters.PropertyId == p.Id
                 })
                 .ToListAsync();
-
-            if (selectedPropertyIds.Count > 0)
-            {
-                foreach (var option in propertyOptions)
-                {
-                    option.IsSelected = selectedPropertyIds.Contains(option.Id);
-                }
-            }
-
-            if (selectedPropertyIds.Count == 0 && propertyOptions.Count == 1)
-            {
-                propertyOptions[0].IsSelected = true;
-            }
 
             var creatorOptions = workOrders
                 .Where(wo => !string.IsNullOrWhiteSpace(wo.CreatedById) && wo.CreatedBy != null)
@@ -715,22 +719,23 @@ namespace hOps.web.Controllers
                 .ToList();
 
             var locationSuggestions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var roomSuggestions = await _context.Rooms
-                .Where(r => accessiblePropertyIds.Contains(r.PropertyId))
-                .Select(r => r.RoomNumber)
-                .Distinct()
-                .ToListAsync();
-            foreach (var room in roomSuggestions.Where(r => !string.IsNullOrWhiteSpace(r)))
+            if (targetPropertyIds.Any())
             {
-                locationSuggestions.Add(room);
+                var roomSuggestions = await _context.Rooms
+                    .Where(r => targetPropertyIds.Contains(r.PropertyId))
+                    .Select(r => r.RoomNumber)
+                    .Distinct()
+                    .ToListAsync();
+                foreach (var room in roomSuggestions.Where(r => !string.IsNullOrWhiteSpace(r)))
+                {
+                    locationSuggestions.Add(room);
+                }
             }
 
             foreach (var loc in workOrders.Select(wo => wo.Location).Where(l => !string.IsNullOrWhiteSpace(l)))
             {
                 locationSuggestions.Add(loc);
             }
-
-            var currentProperty = ViewBag.CurrentProperty as Property;
 
             var effectiveForm = form ?? new WorkOrderFormViewModel
             {
@@ -743,21 +748,19 @@ namespace hOps.web.Controllers
                 effectiveForm.Status = defaultStatus;
             }
 
-            if (!effectiveForm.SelectedPropertyIds.Any())
+            effectiveForm.SelectedPropertyIds = effectiveForm.SelectedPropertyIds
+                .Where(targetPropertyIds.Contains)
+                .Distinct()
+                .ToList();
+
+            if (!effectiveForm.SelectedPropertyIds.Any() && targetPropertyIds.Any())
             {
-                if (propertyOptions.Any(po => po.IsSelected))
-                {
-                    effectiveForm.SelectedPropertyIds = propertyOptions.Where(po => po.IsSelected).Select(po => po.Id).ToList();
-                }
-                else if (currentProperty != null)
-                {
-                    effectiveForm.SelectedPropertyIds = new List<int> { currentProperty.Id };
-                    var match = propertyOptions.FirstOrDefault(p => p.Id == currentProperty.Id);
-                    if (match != null)
-                    {
-                        match.IsSelected = true;
-                    }
-                }
+                effectiveForm.SelectedPropertyIds = targetPropertyIds.ToList();
+            }
+
+            foreach (var option in propertyOptions)
+            {
+                option.IsSelected = effectiveForm.SelectedPropertyIds.Contains(option.Id);
             }
 
             var viewModel = new WorkOrdersViewModel
@@ -777,6 +780,13 @@ namespace hOps.web.Controllers
 
             return viewModel;
         }
-    }
+
+        private int? GetCurrentPropertyId()
+        {
+            return (ViewBag.CurrentProperty as Property)?.Id;
+        }
+
+
+                }
 }
 

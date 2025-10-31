@@ -49,6 +49,13 @@ namespace hOps.web.Controllers
             }
 
             var accessibleProperties = await GetAccessiblePropertiesAsync(user.Id);
+            var currentPropertyId = (ViewBag.CurrentProperty as Property)?.Id;
+            if (currentPropertyId.HasValue)
+            {
+                accessibleProperties = accessibleProperties
+                    .Where(p => p.Id == currentPropertyId.Value)
+                    .ToList();
+            }
 
             var propertyIds = accessibleProperties.Select(p => p.Id).ToList();
             var propertySelectionKey = "Form.SelectedPropertyIds";
@@ -58,17 +65,14 @@ namespace hOps.web.Controllers
                 ModelState.AddModelError(string.Empty, "You do not have access to any properties to associate with this event.");
             }
 
-            if (!form.SelectedPropertyIds.Any())
+            form.SelectedPropertyIds = form.SelectedPropertyIds
+                .Where(id => propertyIds.Contains(id))
+                .Distinct()
+                .ToList();
+
+            if (!form.SelectedPropertyIds.Any() && propertyIds.Count == 1)
             {
-                var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
-                if (currentPropertyId.HasValue && propertyIds.Contains(currentPropertyId.Value))
-                {
-                    form.SelectedPropertyIds = new List<int> { currentPropertyId.Value };
-                }
-                else if (accessibleProperties.Count == 1)
-                {
-                    form.SelectedPropertyIds = new List<int> { accessibleProperties[0].Id };
-                }
+                form.SelectedPropertyIds = new List<int> { propertyIds[0] };
             }
 
             if (!form.SelectedPropertyIds.Any())
@@ -356,6 +360,10 @@ namespace hOps.web.Controllers
         private async Task<CalendarViewModel> BuildViewModelAsync(ApplicationUser user, DateTime targetMonth, CalendarEventFormViewModel? formOverride = null)
         {
             var accessibleProperties = await GetAccessiblePropertiesAsync(user.Id);
+            var currentPropertyId = (ViewBag.CurrentProperty as Property)?.Id;
+            var visibleProperties = currentPropertyId.HasValue
+                ? accessibleProperties.Where(p => p.Id == currentPropertyId.Value).ToList()
+                : accessibleProperties.ToList();
 
             var categoryOptions = await GetCalendarCategoryOptionsAsync();
 
@@ -375,18 +383,21 @@ namespace hOps.web.Controllers
 
             if (!form.SelectedPropertyIds.Any())
             {
-                var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
-                if (currentPropertyId.HasValue && accessibleProperties.Any(p => p.Id == currentPropertyId.Value))
+                if (currentPropertyId.HasValue && visibleProperties.Any(p => p.Id == currentPropertyId.Value))
                 {
                     form.SelectedPropertyIds = new List<int> { currentPropertyId.Value };
                 }
-                else if (accessibleProperties.Count == 1)
+                else if (visibleProperties.Count == 1)
                 {
-                    form.SelectedPropertyIds = new List<int> { accessibleProperties[0].Id };
+                    form.SelectedPropertyIds = new List<int> { visibleProperties[0].Id };
                 }
             }
 
-            var propertyIds = accessibleProperties.Select(p => p.Id).ToList();
+            var propertyIds = visibleProperties.Select(p => p.Id).ToList();
+            form.SelectedPropertyIds = form.SelectedPropertyIds
+                .Where(id => propertyIds.Contains(id))
+                .Distinct()
+                .ToList();
 
             IQueryable<CalendarEvent> eventsQuery = _context.CalendarEvents
                 .Include(e => e.Category)
@@ -451,18 +462,28 @@ namespace hOps.web.Controllers
                 UpcomingEvents = upcoming,
                 Form = form,
                 CategoryOptions = categoryOptions,
-                AccessibleProperties = accessibleProperties,
-                ShowPropertySelection = accessibleProperties.Count > 1
+                AccessibleProperties = visibleProperties,
+                ShowPropertySelection = visibleProperties.Count > 1
             };
         }
 
         private async Task<List<Property>> GetAccessiblePropertiesAsync(string userId)
         {
-            return await _context.UserPropertyAccesses
+            var properties = await _context.UserPropertyAccesses
                 .Where(upa => upa.ApplicationUserId == userId)
                 .Select(upa => upa.Property)
                 .OrderBy(p => p.Name)
                 .ToListAsync();
+
+            var currentPropertyId = (ViewBag.CurrentProperty as Property)?.Id;
+            if (currentPropertyId.HasValue)
+            {
+                properties = properties
+                    .Where(p => p.Id == currentPropertyId.Value)
+                    .ToList();
+            }
+
+            return properties;
         }
 
         private async Task<List<SelectListItem>> GetCalendarCategoryOptionsAsync()

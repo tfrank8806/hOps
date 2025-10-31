@@ -2,6 +2,7 @@ using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
@@ -11,19 +12,28 @@ using System.Threading.Tasks;
 namespace hOps.web.Controllers
 {
     [Authorize]
-    public class PhonebookController : Controller
+    public class PhonebookController : BaseController
     {
-        private readonly ApplicationDbContext _db;
-
-        public PhonebookController(ApplicationDbContext db)
+        public PhonebookController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+            : base(context, userManager)
         {
-            _db = db;
         }
 
         public async Task<IActionResult> Index(string? search, int? typeId)
         {
-            var contactsQuery = _db.PhonebookContacts
+            var currentProperty = ViewBag.CurrentProperty as Property;
+            if (currentProperty == null)
+            {
+                return View(new PhonebookIndexViewModel
+                {
+                    SearchTerm = search,
+                    SelectedTypeId = null
+                });
+            }
+
+            var contactsQuery = _context.PhonebookContacts
                 .Include(c => c.PhonebookType)
+                .Where(c => c.PhonebookType != null && c.PhonebookType.PropertyId == currentProperty.Id)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -44,20 +54,26 @@ namespace hOps.web.Controllers
                 );
             }
 
-            if (typeId.HasValue)
+            var types = await _context.PhonebookTypes
+                .Where(t => t.PropertyId == currentProperty.Id)
+                .OrderBy(t => t.Name)
+                .ToListAsync();
+
+            if (typeId.HasValue && types.Any(t => t.Id == typeId.Value))
             {
                 contactsQuery = contactsQuery.Where(c => c.PhonebookTypeId == typeId);
             }
+            else
+            {
+                typeId = null;
+            }
 
             var contacts = await contactsQuery
+                .AsNoTracking()
                 .OrderBy(c => c.TypeName)
                 .ThenBy(c => c.LastName)
                 .ThenBy(c => c.FirstName)
                 .ThenBy(c => c.Company)
-                .ToListAsync();
-
-            var types = await _db.PhonebookTypes
-                .OrderBy(t => t.Name)
                 .ToListAsync();
 
             var vm = new PhonebookIndexViewModel
@@ -73,9 +89,15 @@ namespace hOps.web.Controllers
 
         public async Task<IActionResult> Create()
         {
+            var propertyId = GetCurrentPropertyId();
+            if (!propertyId.HasValue)
+            {
+                return RedirectToAction(nameof(Index));
+            }
+
             var vm = new PhonebookContactFormViewModel
             {
-                Types = await LoadTypesAsync(),
+                Types = await LoadTypesAsync(propertyId.Value),
                 IsEdit = false
             };
 
@@ -86,24 +108,39 @@ namespace hOps.web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(PhonebookContactFormViewModel vm)
         {
-            await ValidateTypeAsync(vm.Contact);
+            var propertyId = GetCurrentPropertyId();
+            if (!propertyId.HasValue)
+            {
+                return RedirectToAction(nameof(Index));
+            }
+
+            await ValidateTypeAsync(vm.Contact, propertyId.Value);
 
             if (!ModelState.IsValid)
             {
-                vm.Types = await LoadTypesAsync();
+                vm.Types = await LoadTypesAsync(propertyId.Value);
                 vm.IsEdit = false;
                 return View("Form", vm);
             }
 
-            _db.PhonebookContacts.Add(vm.Contact);
-            await _db.SaveChangesAsync();
+            _context.PhonebookContacts.Add(vm.Contact);
+            await _context.SaveChangesAsync();
 
             return RedirectToAction(nameof(Index));
         }
 
         public async Task<IActionResult> Edit(int id)
         {
-            var contact = await _db.PhonebookContacts.FindAsync(id);
+            var propertyId = GetCurrentPropertyId();
+            if (!propertyId.HasValue)
+            {
+                return RedirectToAction(nameof(Index));
+            }
+
+            var contact = await _context.PhonebookContacts
+                .Include(c => c.PhonebookType)
+                .FirstOrDefaultAsync(c => c.Id == id && c.PhonebookType != null && c.PhonebookType.PropertyId == propertyId.Value);
+
             if (contact == null)
             {
                 return NotFound();
@@ -112,7 +149,7 @@ namespace hOps.web.Controllers
             var vm = new PhonebookContactFormViewModel
             {
                 Contact = contact,
-                Types = await LoadTypesAsync(),
+                Types = await LoadTypesAsync(propertyId.Value),
                 IsEdit = true
             };
 
@@ -128,16 +165,24 @@ namespace hOps.web.Controllers
                 return NotFound();
             }
 
-            await ValidateTypeAsync(vm.Contact);
+            var propertyId = GetCurrentPropertyId();
+            if (!propertyId.HasValue)
+            {
+                return RedirectToAction(nameof(Index));
+            }
+
+            await ValidateTypeAsync(vm.Contact, propertyId.Value);
 
             if (!ModelState.IsValid)
             {
-                vm.Types = await LoadTypesAsync();
+                vm.Types = await LoadTypesAsync(propertyId.Value);
                 vm.IsEdit = true;
                 return View("Form", vm);
             }
 
-            var existing = await _db.PhonebookContacts.FindAsync(id);
+            var existing = await _context.PhonebookContacts
+                .Include(c => c.PhonebookType)
+                .FirstOrDefaultAsync(c => c.Id == id && c.PhonebookType != null && c.PhonebookType.PropertyId == propertyId.Value);
             if (existing == null)
             {
                 return NotFound();
@@ -156,19 +201,20 @@ namespace hOps.web.Controllers
             existing.Address = vm.Contact.Address;
             existing.Notes = vm.Contact.Notes;
 
-            await _db.SaveChangesAsync();
+            await _context.SaveChangesAsync();
 
             return RedirectToAction(nameof(Index));
         }
 
-        private async Task<List<PhonebookType>> LoadTypesAsync()
+        private async Task<List<PhonebookType>> LoadTypesAsync(int propertyId)
         {
-            return await _db.PhonebookTypes
+            return await _context.PhonebookTypes
+                .Where(t => t.PropertyId == propertyId)
                 .OrderBy(t => t.Name)
                 .ToListAsync();
         }
 
-        private async Task ValidateTypeAsync(PhonebookContact contact)
+        private async Task ValidateTypeAsync(PhonebookContact contact, int propertyId)
         {
             contact.TypeName = contact.TypeName?.Trim() ?? string.Empty;
 
@@ -180,8 +226,8 @@ namespace hOps.web.Controllers
             }
 
             var normalizedType = contact.TypeName.ToLowerInvariant();
-            var match = await _db.PhonebookTypes
-                .FirstOrDefaultAsync(t => t.Name.ToLower() == normalizedType);
+            var match = await _context.PhonebookTypes
+                .FirstOrDefaultAsync(t => t.PropertyId == propertyId && t.Name.ToLower() == normalizedType);
 
             if (match == null)
             {
@@ -192,6 +238,11 @@ namespace hOps.web.Controllers
 
             contact.PhonebookTypeId = match.Id;
             contact.TypeName = match.Name;
+        }
+
+        private int? GetCurrentPropertyId()
+        {
+            return (ViewBag.CurrentProperty as Property)?.Id;
         }
     }
 }
