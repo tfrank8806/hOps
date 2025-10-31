@@ -1,4 +1,5 @@
 @using hOps.web.Utilities
+@using hOps.web.Utilities
 @model hOps.web.ViewModels.MailLog.MailLogIndexViewModel
 
 @{
@@ -22,6 +23,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         }
+        <div id="mailLogAlertContainer"></div>
     </div>
 
     <div class="col-12">
@@ -123,7 +125,7 @@
                                     {
                                         var loggedLocal = TimeZoneService.ConvertToUserTime(entry.LoggedAt);
                                         var deliveredLocal = entry.DeliveredAt.HasValue ? TimeZoneService.ConvertToUserTime(entry.DeliveredAt.Value) : (DateTime?)null;
-                                        <tr>
+                                        <tr data-entry-id="@entry.Id">
                                             <td>@loggedLocal.ToString("g")</td>
                                             <td>@entry.RecipientName</td>
                                             <td>@(string.IsNullOrWhiteSpace(entry.Carrier) ? "-" : entry.Carrier)</td>
@@ -144,17 +146,17 @@
                                             </td>
                                             <td>@(string.IsNullOrWhiteSpace(entry.LoggedByName) ? "-" : entry.LoggedByName)</td>
                                             <td class="delivered-cell">
-                                                <span class="badge @(entry.Delivered ? "text-bg-success" : "text-bg-secondary")">
+                                                <span class="badge delivered-badge @(entry.Delivered ? "text-bg-success" : "text-bg-secondary")">
                                                     @(entry.Delivered ? "Yes" : "No")
                                                 </span>
                                             </td>
-                                            <td>@(deliveredLocal.HasValue ? deliveredLocal.Value.ToString("g") : "-")</td>
+                                            <td data-col="deliveredAt">@(deliveredLocal.HasValue ? deliveredLocal.Value.ToString("g") : "-")</td>
                                             <td class="text-end actions-cell">
-                                                <form asp-action="ToggleDelivered" method="post" class="d-inline">
+                                                <form asp-action="ToggleDelivered" method="post" class="d-inline mail-log-toggle-form">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="id" value="@entry.Id" />
-                                                    <input type="hidden" name="delivered" value="@(!entry.Delivered)" />
-                                                    <button type="submit" class="btn btn-sm @(entry.Delivered ? "btn-outline-warning" : "btn-outline-success")">
+                                                    <input type="hidden" name="delivered" value="@(entry.Delivered ? "false" : "true")" />
+                                                    <button type="submit" class="btn btn-sm toggle-delivered-button @(entry.Delivered ? "btn-outline-warning" : "btn-outline-success")">
                                                         @(entry.Delivered ? "Mark Pending" : "Mark Delivered")
                                                     </button>
                                                 </form>
@@ -178,4 +180,5 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/mail-log.js" asp-append-version="true"></script>
 }

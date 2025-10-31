@@ -18,16 +18,19 @@ namespace hOps.web.Controllers
     {
         private readonly ILogger<MailLogController> _logger;
         private readonly MentionService _mentionService;
+        private readonly IUserTimeZoneService _timeZoneService;
 
         public MailLogController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             ILogger<MailLogController> logger,
-            MentionService mentionService)
+            MentionService mentionService,
+            IUserTimeZoneService timeZoneService)
             : base(context, userManager)
         {
             _logger = logger;
             _mentionService = mentionService;
+            _timeZoneService = timeZoneService;
         }
 
         [HttpGet]
@@ -121,10 +124,26 @@ namespace hOps.web.Controllers
 
             await _context.SaveChangesAsync();
 
-            TempData["MailLogMessage"] = delivered
+            var message = delivered
                 ? "Package marked as delivered."
                 : "Package marked as awaiting pickup.";
 
+            if (IsAjaxRequest())
+            {
+                var deliveredLocal = entry.DeliveredAt.HasValue
+                    ? _timeZoneService.ConvertToUserTime(entry.DeliveredAt.Value).ToString("g")
+                    : null;
+
+                return Json(new
+                {
+                    success = true,
+                    delivered = entry.Delivered,
+                    deliveredAt = deliveredLocal,
+                    message
+                });
+            }
+
+            TempData["MailLogMessage"] = message;
             return RedirectToAction(nameof(Index));
         }
 
@@ -216,6 +235,19 @@ namespace hOps.web.Controllers
         {
             return await _context.UserPropertyAccesses
                 .AnyAsync(upa => upa.PropertyId == propertyId && upa.ApplicationUserId == user.Id);
+        }
+
+        private bool IsAjaxRequest()
+        {
+            if (Request.Headers.TryGetValue("X-Requested-With", out var headerValue) &&
+                headerValue == "XMLHttpRequest")
+            {
+                return true;
+            }
+
+            var acceptHeader = Request.Headers["Accept"].ToString();
+            return !string.IsNullOrWhiteSpace(acceptHeader) &&
+                   acceptHeader.Contains("application/json", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string BuildDisplayName(ApplicationUser? user)
