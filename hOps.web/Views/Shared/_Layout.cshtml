@@ -232,6 +232,8 @@
         </div>
     </div>
 
+    <div id="sidebarQuickMenu" class="sidebar-quick-menu" aria-hidden="true"></div>
+
     <script src="~/lib/jquery/dist/jquery.min.js" asp-append-version="true"></script>
     @RenderSection("Scripts", required: false)
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -246,6 +248,11 @@
             const toggles = document.querySelectorAll('.sidebar-toggle');
             const backdrop = document.getElementById('sidebarBackdrop');
             const mediaQuery = window.matchMedia('(max-width: 991.98px)');
+            const quickMenu = document.getElementById('sidebarQuickMenu');
+            const sidebarMenu = document.querySelector('.sidebar-menu');
+            const QUICK_MENU_WIDTH = 240;
+            let quickMenuHideTimer;
+            const SIDEBAR_STORAGE_KEY = 'sidebarCollapsed';
 
             function updateAria() {
                 const expanded = !body.classList.contains('sidebar-collapsed');
@@ -264,31 +271,125 @@
                 backdrop.classList.toggle('show', !isCollapsed);
             }
 
-            function toggleSidebar() {
-                body.classList.toggle('sidebar-collapsed');
-                updateAria();
-                syncBackdrop();
+            function hideQuickMenu(immediate = true) {
+                if (!quickMenu) {
+                    return;
+                }
+                if (immediate) {
+                    quickMenu.classList.remove('show');
+                } else {
+                    quickMenu.classList.remove('show');
+                }
+                quickMenu.setAttribute('aria-hidden', 'true');
             }
 
-            toggles.forEach(btn => btn.addEventListener('click', toggleSidebar));
+            function cancelHideQuickMenu() {
+                if (quickMenuHideTimer) {
+                    window.clearTimeout(quickMenuHideTimer);
+                    quickMenuHideTimer = undefined;
+                }
+            }
+
+            function scheduleHideQuickMenu() {
+                if (!quickMenu) {
+                    return;
+                }
+                cancelHideQuickMenu();
+                quickMenuHideTimer = window.setTimeout(() => hideQuickMenu(true), 180);
+            }
+
+            function showQuickMenu(trigger) {
+                if (!quickMenu || !sidebarMenu) {
+                    return;
+                }
+                if (!body.classList.contains('sidebar-collapsed')) {
+                    return;
+                }
+
+                cancelHideQuickMenu();
+                quickMenu.innerHTML = sidebarMenu.innerHTML;
+
+                const rect = trigger.getBoundingClientRect();
+                const top = rect.bottom + window.scrollY + 8;
+                let left = rect.left + window.scrollX;
+                const maxLeft = document.documentElement.clientWidth - QUICK_MENU_WIDTH - 16;
+                left = Math.max(16, Math.min(left, maxLeft));
+
+                quickMenu.style.top = `${top}px`;
+                quickMenu.style.left = `${left}px`;
+                quickMenu.classList.add('show');
+                quickMenu.setAttribute('aria-hidden', 'false');
+            }
+
+            function setSidebarCollapsed(collapsed, options) {
+                const persist = options?.persist ?? true;
+                body.classList.toggle('sidebar-collapsed', collapsed);
+                if (persist) {
+                    try {
+                        localStorage.setItem(SIDEBAR_STORAGE_KEY, collapsed ? 'true' : 'false');
+                    } catch (err) {
+                        console.warn('Failed to store sidebar state:', err);
+                    }
+                }
+                updateAria();
+                syncBackdrop();
+                if (!collapsed) {
+                    hideQuickMenu(true);
+                }
+            }
+
+            function toggleSidebar() {
+                const currentlyCollapsed = body.classList.contains('sidebar-collapsed');
+                setSidebarCollapsed(!currentlyCollapsed);
+            }
+
+            toggles.forEach(btn => {
+                btn.addEventListener('click', toggleSidebar);
+                if (quickMenu) {
+                    btn.addEventListener('mouseenter', () => {
+                        cancelHideQuickMenu();
+                        showQuickMenu(btn);
+                    });
+                    btn.addEventListener('mouseleave', scheduleHideQuickMenu);
+                    btn.addEventListener('focus', () => {
+                        cancelHideQuickMenu();
+                        showQuickMenu(btn);
+                    });
+                    btn.addEventListener('blur', scheduleHideQuickMenu);
+                }
+            });
 
             if (backdrop) {
                 backdrop.addEventListener('click', () => {
-                    body.classList.add('sidebar-collapsed');
-                    updateAria();
-                    syncBackdrop();
+                    setSidebarCollapsed(true);
                 });
             }
 
             function handleScreenChange(e) {
                 if (e.matches) {
-                    body.classList.add('sidebar-collapsed');
+                    setSidebarCollapsed(true, { persist: false });
                 } else {
-                    body.classList.remove('sidebar-collapsed');
+                    let collapsedPreference = false;
+                    try {
+                        collapsedPreference = localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
+                    } catch (err) {
+                        collapsedPreference = false;
+                    }
+                    setSidebarCollapsed(collapsedPreference, { persist: false });
                 }
-                updateAria();
-                syncBackdrop();
             }
+
+            (function initialiseSidebarState() {
+                let initialCollapsed = mediaQuery.matches;
+                if (!mediaQuery.matches) {
+                    try {
+                        initialCollapsed = localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
+                    } catch (err) {
+                        initialCollapsed = false;
+                    }
+                }
+                setSidebarCollapsed(initialCollapsed, { persist: false });
+            })();
 
             handleScreenChange(mediaQuery);
             if (mediaQuery.addEventListener) {
@@ -296,6 +397,26 @@
             } else if (mediaQuery.addListener) {
                 mediaQuery.addListener(handleScreenChange);
             }
+
+            if (quickMenu) {
+                quickMenu.addEventListener('mouseenter', cancelHideQuickMenu);
+                quickMenu.addEventListener('mouseleave', scheduleHideQuickMenu);
+                quickMenu.addEventListener('focusin', cancelHideQuickMenu);
+                quickMenu.addEventListener('focusout', evt => {
+                    if (!quickMenu.contains(evt.relatedTarget)) {
+                        scheduleHideQuickMenu();
+                    }
+                });
+                quickMenu.addEventListener('click', () => hideQuickMenu(true));
+            }
+
+            window.addEventListener('scroll', () => hideQuickMenu(true));
+            window.addEventListener('resize', () => hideQuickMenu(true));
+            document.addEventListener('keydown', evt => {
+                if (evt.key === 'Escape') {
+                    hideQuickMenu(true);
+                }
+            });
 
             async function fetchAccessRequestCount() {
                 try {
