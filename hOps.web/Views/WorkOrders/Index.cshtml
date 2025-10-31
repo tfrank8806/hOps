@@ -5,6 +5,12 @@
     ViewData["Title"] = "Work Orders";
     ViewData["MainContainerClass"] = "main-inner--wide";
     bool showPropertySelector = Model.PropertyOptions.Count > 1;
+    var formAction = Model.IsEditing ? "Edit" : "Create";
+    var formRouteId = Model.IsEditing && Model.EditingWorkOrderId.HasValue
+        ? Model.EditingWorkOrderId.Value.ToString()
+        : null;
+    var formTitle = Model.IsEditing ? "Edit Work Order" : "Create Work Order";
+    var submitLabel = Model.IsEditing ? "Update Work Order" : "Submit Work Order";
 }
 
 @section Styles {
@@ -67,52 +73,52 @@
 
             #workorders-print-area th:nth-child(1),
             #workorders-print-area td:nth-child(1) {
-                width: 8%;
+                width: 7%;
             }
 
             #workorders-print-area th:nth-child(2),
             #workorders-print-area td:nth-child(2) {
-                width: 14%;
+                width: 8%;
             }
 
             #workorders-print-area th:nth-child(3),
             #workorders-print-area td:nth-child(3) {
-                width: 12%;
+                width: 14%;
             }
 
             #workorders-print-area th:nth-child(4),
             #workorders-print-area td:nth-child(4) {
-                width: 10%;
+                width: 12%;
             }
 
             #workorders-print-area th:nth-child(5),
             #workorders-print-area td:nth-child(5) {
-                width: 18%;
+                width: 9%;
             }
 
             #workorders-print-area th:nth-child(6),
             #workorders-print-area td:nth-child(6) {
-                width: 7%;
+                width: 18%;
             }
 
             #workorders-print-area th:nth-child(7),
             #workorders-print-area td:nth-child(7) {
-                width: 8%;
+                width: 7%;
             }
 
             #workorders-print-area th:nth-child(8),
             #workorders-print-area td:nth-child(8) {
-                width: 8%;
+                width: 7%;
             }
 
             #workorders-print-area th:nth-child(9),
             #workorders-print-area td:nth-child(9) {
-                width: 8%;
+                width: 12%;
             }
 
             #workorders-print-area th:nth-child(10),
             #workorders-print-area td:nth-child(10) {
-                width: 7%;
+                width: 5%;
             }
 
             #workorders-print-area .badge {
@@ -246,19 +252,35 @@
                     </div>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0 workorders-table">
+                        <colgroup>
+                            <col class="col-actions" />
+                            <col class="col-status" />
+                            <col class="col-location" />
+                            <col class="col-department" />
+                            <col class="col-type" />
+                            <col class="col-issue" />
+                            <col class="col-due" />
+                            <col class="col-created" />
+                            <col class="col-creator" />
+                            <col class="col-attachments" />
+                        </colgroup>
                         <thead class="table-light">
                             <tr>
-                                <th>Status</th>
-                                <th>Location</th>
-                                <th>Department</th>
-                                <th>Type</th>
-                                <th>Issue</th>
-                                <th>Due</th>
-                                <th>Created</th>
-                                <th>Creator</th>
-                                <th>Property</th>
-                                <th>Attachments</th>
+                                <th scope="col" class="text-center">Actions</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Location</th>
+                                <th scope="col">Department</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Issue</th>
+                                <th scope="col">Due</th>
+                                <th scope="col">Created</th>
+                                <th scope="col">Creator</th>
+                                <th scope="col" class="text-center" aria-label="Attachments">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                                        <path fill="currentColor" d="M6.354 13.657a3.5 3.5 0 0 1-4.95-4.95l6.718-6.718a2.5 2.5 0 0 1 3.536 3.536L5.621 11.612a1.5 1.5 0 1 1-2.121-2.121l5.303-5.304a.5.5 0 1 1 .708.708L4.208 10.2a.5.5 0 0 0 .707.707l5.303-5.303a1.5 1.5 0 1 0-2.121-2.121L1.379 10.5a2.5 2.5 0 1 0 3.536 3.536l5.657-5.657a.5.5 0 0 1 .707.708l-5.657 5.657Z" />
+                                    </svg>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -273,18 +295,34 @@
                                 foreach (var order in Model.WorkOrders)
                                 {
                                     var isPastDue = order.DueDate.Date < DateTime.Today;
-                                    <tr style="border-left: 4px solid @order.StatusColor;">
-                                        <td>
+                                    var isEditingRow = Model.EditingWorkOrderId.HasValue && Model.EditingWorkOrderId.Value == order.Id;
+                                    <tr class="workorder-row @(isEditingRow ? "table-active" : string.Empty)" style="border-left: 4px solid @order.StatusColor;">
+                                        <td class="col-actions text-center">
+                                            <a class="btn btn-outline-primary btn-sm"
+                                               asp-action="Edit"
+                                               asp-route-id="@order.Id"
+                                               asp-route-SortOrder="@Model.Filters.SortOrder"
+                                               asp-route-RoomNumber="@Model.Filters.RoomNumber"
+                                               asp-route-DepartmentId="@Model.Filters.DepartmentId"
+                                               asp-route-WorkOrderTypeId="@Model.Filters.WorkOrderTypeId"
+                                               asp-route-Status="@Model.Filters.Status"
+                                               asp-route-CreatorId="@Model.Filters.CreatorId"
+                                               asp-route-Search="@Model.Filters.Search"
+                                               asp-route-PropertyId="@Model.Filters.PropertyId">
+                                                Edit
+                                            </a>
+                                        </td>
+                                        <td class="col-status">
                                             <span class="badge" style="background-color:@order.StatusColor;">@order.Status</span>
                                         </td>
-                                        <td>
-                                            <div class="fw-semibold">@order.Location</div>
+                                        <td class="col-location">
+                                            <div class="fw-semibold workorder-location">@order.Location</div>
                                             @if (!string.IsNullOrWhiteSpace(order.Details))
                                             {
-                                                <small class="text-muted">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Details))</small>
+                                                <small class="text-muted workorder-details">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Details))</small>
                                             }
                                         </td>
-                                        <td>
+                                        <td class="col-department">
                                             @if (!string.IsNullOrWhiteSpace(order.Department))
                                             {
                                                 <span class="badge" style="background-color:@order.DepartmentColor;">@order.Department</span>
@@ -294,31 +332,37 @@
                                                 <span class="text-muted">Unassigned</span>
                                             }
                                         </td>
-                                        <td>@order.WorkOrderType</td>
-                                        <td>@Html.Raw(MentionMarkupFormatter.ToHtml(order.Issue))</td>
-                                        <td class="@(isPastDue ? "fw-bold text-danger" : string.Empty)">@order.DueDate.ToString("MMM dd, yyyy")</td>
+                                        <td class="col-type">@order.WorkOrderType</td>
+                                        <td class="col-issue">
+                                            <div class="workorder-issue">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Issue))</div>
+                                        </td>
+                                        <td class="col-due @(isPastDue ? "fw-bold text-danger" : string.Empty)">@order.DueDate.ToString("MMM dd, yyyy")</td>
                                         @{
                                             var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
                                         }
-                                        <td>@createdLocal.ToString("MMM dd, yyyy")</td>
-                                        <td>@(string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator)</td>
-                                        <td>
-                                            @foreach (var property in order.Properties)
-                                            {
-                                                <div>@property</div>
-                                            }
-                                        </td>
-                                        <td>
+                                        <td class="col-created">@createdLocal.ToString("MMM dd, yyyy")</td>
+                                        <td class="col-creator">@(string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator)</td>
+                                        <td class="col-attachments text-center">
                                             @if (order.Attachments.Any())
                                             {
-                                                foreach (var attachment in order.Attachments)
-                                                {
-                                                    <a href="@attachment.FilePath" target="_blank" class="d-block">@attachment.FileName</a>
-                                                }
+                                                <div class="d-flex flex-wrap justify-content-center gap-2">
+                                                    @foreach (var attachment in order.Attachments)
+                                                    {
+                                                        <a href="@attachment.FilePath"
+                                                           target="_blank"
+                                                           class="attachment-link"
+                                                           title="@attachment.FileName">
+                                                            <span class="visually-hidden">View attachment (@attachment.FileName)</span>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                                                                <path fill="currentColor" d="M6.354 13.657a3.5 3.5 0 0 1-4.95-4.95l6.718-6.718a2.5 2.5 0 0 1 3.536 3.536L5.621 11.612a1.5 1.5 0 1 1-2.121-2.121l5.303-5.304a.5.5 0 1 1 .708.708L4.208 10.2a.5.5 0 0 0 .707.707l5.303-5.303a1.5 1.5 0 1 0-2.121-2.121L1.379 10.5a2.5 2.5 0 1 0 3.536 3.536l5.657-5.657a.5.5 0 0 1 .707.708l-5.657 5.657Z" />
+                                                            </svg>
+                                                        </a>
+                                                    }
+                                                </div>
                                             }
                                             else
                                             {
-                                                <span class="text-muted">None</span>
+                                                <span class="text-muted small">N/A</span>
                                             }
                                         </td>
                                     </tr>
@@ -333,13 +377,29 @@
 
     <div class="col-12 col-xl-4 col-xxl-3">
         <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">Create Work Order</h5>
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">@formTitle</h5>
+                @if (Model.IsEditing)
+                {
+                    <a class="btn btn-sm btn-light"
+                       asp-action="Index"
+                       asp-route-SortOrder="@Model.Filters.SortOrder"
+                       asp-route-RoomNumber="@Model.Filters.RoomNumber"
+                       asp-route-DepartmentId="@Model.Filters.DepartmentId"
+                       asp-route-WorkOrderTypeId="@Model.Filters.WorkOrderTypeId"
+                       asp-route-Status="@Model.Filters.Status"
+                       asp-route-CreatorId="@Model.Filters.CreatorId"
+                       asp-route-Search="@Model.Filters.Search"
+                       asp-route-PropertyId="@Model.Filters.PropertyId">
+                        Cancel
+                    </a>
+                }
             </div>
             <div class="card-body">
-                <form asp-action="Create" method="post" enctype="multipart/form-data">
+                <form asp-action="@formAction" asp-route-id="@formRouteId" method="post" enctype="multipart/form-data">
                     @Html.AntiForgeryToken()
                     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                    <input type="hidden" asp-for="Form.Id" />
 
                     <div class="mb-3">
                         <label asp-for="Form.Status" class="form-label"></label>
@@ -410,7 +470,16 @@
                     <div class="mb-3 mt-3">
                         <label asp-for="Form.Photos" class="form-label"></label>
                         <input asp-for="Form.Photos" class="form-control" type="file" accept="image/*" multiple />
-                        <span class="form-text">Upload supporting photos (optional)</span>
+                        <span class="form-text">
+                            @if (Model.IsEditing)
+                            {
+                                @:Upload photos to add new attachments (existing files remain available).
+                            }
+                            else
+                            {
+                                @:Upload supporting photos (optional).
+                            }
+                        </span>
                         <span asp-validation-for="Form.Photos" class="text-danger"></span>
                     </div>
 
@@ -436,7 +505,7 @@
                         </div>
                     }
 
-                    <button type="submit" class="btn btn-primary w-100">Submit Work Order</button>
+                    <button type="submit" class="btn btn-primary w-100">@submitLabel</button>
                 </form>
             </div>
         </div>

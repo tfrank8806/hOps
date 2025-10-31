@@ -7,6 +7,8 @@ namespace hOps.web.ViewModels.WorkOrders
 {
     public class WorkOrderFormViewModel
     {
+        public int? Id { get; set; }
+
         [Required]
         [Display(Name = "Status")]
         public string Status { get; set; } = string.Empty;

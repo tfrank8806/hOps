@@ -16,5 +16,7 @@ namespace hOps.web.ViewModels.WorkOrders
         public List<SelectListItem> CreatorOptions { get; set; } = new();
         public List<string> LocationSuggestions { get; set; } = new();
         public Dictionary<string, string> StatusColorMap { get; set; } = new();
+        public int? EditingWorkOrderId { get; set; }
+        public bool IsEditing => EditingWorkOrderId.HasValue;
     }
 }

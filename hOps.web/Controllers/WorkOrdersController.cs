@@ -57,6 +57,45 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
+        public async Task<IActionResult> Edit(int id, [FromQuery] WorkOrderFilterInput filters)
+        {
+            var workOrder = await _context.WorkOrders
+                .Include(w => w.Properties)
+                .FirstOrDefaultAsync(w => w.Id == id);
+
+            if (workOrder == null)
+            {
+                return NotFound();
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+
+            if (!workOrder.Properties.Any(p => accessiblePropertyIds.Contains(p.PropertyId)))
+            {
+                return Forbid();
+            }
+
+            var form = new WorkOrderFormViewModel
+            {
+                Id = workOrder.Id,
+                Status = workOrder.Status,
+                Location = workOrder.Location,
+                WorkOrderTypeId = workOrder.WorkOrderTypeId,
+                Issue = workOrder.Issue,
+                Details = workOrder.Details,
+                DueDate = workOrder.DueDate,
+                DepartmentId = workOrder.DepartmentId,
+                SelectedPropertyIds = workOrder.Properties.Select(p => p.PropertyId).ToList()
+            };
+
+            var viewModel = await BuildViewModelAsync(filters, form);
+            viewModel.EditingWorkOrderId = workOrder.Id;
+
+            return View("Index", viewModel);
+        }
+
+        [HttpGet]
         public async Task<IActionResult> Export([FromQuery] WorkOrderFilterInput filters)
         {
             var viewModel = await BuildViewModelAsync(filters, null);
@@ -228,6 +267,120 @@ namespace hOps.web.Controllers
             }
 
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, [Bind(Prefix = "Form")] WorkOrderFormViewModel form)
+        {
+            if (!form.Id.HasValue || form.Id.Value != id)
+            {
+                return BadRequest();
+            }
+
+            var filters = new WorkOrderFilterInput();
+            var user = await _userManager.GetUserAsync(User);
+            var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+
+            var workOrder = await _context.WorkOrders
+                .Include(w => w.Properties)
+                .Include(w => w.Attachments)
+                .FirstOrDefaultAsync(w => w.Id == id);
+
+            if (workOrder == null)
+            {
+                return NotFound();
+            }
+
+            if (!workOrder.Properties.Any(p => accessiblePropertyIds.Contains(p.PropertyId)))
+            {
+                return Forbid();
+            }
+
+            var selectedPropertyIds = form.SelectedPropertyIds?
+                .Where(pid => accessiblePropertyIds.Contains(pid))
+                .Distinct()
+                .ToList() ?? new List<int>();
+
+            if (!selectedPropertyIds.Any())
+            {
+                ModelState.AddModelError("Form.SelectedPropertyIds", "Please select at least one property.");
+            }
+
+            form.SelectedPropertyIds = selectedPropertyIds;
+
+            if (!ModelState.IsValid)
+            {
+                var invalidModel = await BuildViewModelAsync(filters, form);
+                invalidModel.EditingWorkOrderId = id;
+                return View("Index", invalidModel);
+            }
+
+            workOrder.Status = form.Status;
+            workOrder.Location = form.Location ?? string.Empty;
+            workOrder.WorkOrderTypeId = form.WorkOrderTypeId;
+            workOrder.Issue = form.Issue;
+            workOrder.Details = form.Details;
+            workOrder.DueDate = form.DueDate;
+            workOrder.DepartmentId = form.DepartmentId;
+
+            var accessiblePropertySet = new HashSet<int>(accessiblePropertyIds);
+            var toRemove = workOrder.Properties
+                .Where(p => accessiblePropertySet.Contains(p.PropertyId) && !selectedPropertyIds.Contains(p.PropertyId))
+                .ToList();
+            foreach (var property in toRemove)
+            {
+                workOrder.Properties.Remove(property);
+                _context.WorkOrderProperties.Remove(property);
+            }
+
+            var remainingPropertyIds = workOrder.Properties.Select(p => p.PropertyId).ToHashSet();
+            foreach (var propertyId in selectedPropertyIds)
+            {
+                if (remainingPropertyIds.Contains(propertyId))
+                {
+                    continue;
+                }
+
+                workOrder.Properties.Add(new WorkOrderProperty
+                {
+                    PropertyId = propertyId
+                });
+                remainingPropertyIds.Add(propertyId);
+            }
+
+            if (form.Photos != null && form.Photos.Count > 0)
+            {
+                var uploadPath = Path.Combine(_environment.WebRootPath, "uploads", "workorders");
+                Directory.CreateDirectory(uploadPath);
+
+                foreach (var file in form.Photos)
+                {
+                    if (file.Length <= 0)
+                    {
+                        continue;
+                    }
+
+                    var extension = Path.GetExtension(file.FileName);
+                    var fileName = $"{Guid.NewGuid()}{extension}";
+                    var fullPath = Path.Combine(uploadPath, fileName);
+
+                    using (var stream = System.IO.File.Create(fullPath))
+                    {
+                        await file.CopyToAsync(stream);
+                    }
+
+                    workOrder.Attachments.Add(new WorkOrderAttachment
+                    {
+                        FilePath = Path.Combine("/uploads/workorders", fileName).Replace("\\", "/"),
+                        OriginalFileName = file.FileName
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Index), new { highlight = workOrder.Id });
         }
 
         private async Task SendDepartmentAlertEmailsAsync(WorkOrder workOrder, string workOrderLink, ApplicationUser? createdBy)
@@ -618,7 +771,8 @@ namespace hOps.web.Controllers
                 PropertyOptions = propertyOptions,
                 CreatorOptions = creatorOptions,
                 LocationSuggestions = locationSuggestions.OrderBy(x => x).ToList(),
-                StatusColorMap = statusColorMap
+                StatusColorMap = statusColorMap,
+                EditingWorkOrderId = form?.Id
             };
 
             return viewModel;
