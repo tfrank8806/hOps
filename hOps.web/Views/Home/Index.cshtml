@@ -7,9 +7,11 @@
     ViewData["Title"] = "Home";
     var property = Model.CurrentProperty;
     var hasProperty = property != null;
+    ViewData["MainContainerClass"] = "main-inner--wide home-main-container";
+    ViewData["ContentSurfaceClass"] = "content-surface--flush";
 }
 
-<div class="container-fluid main-inner">
+<div class="home-dashboard">
     @if (TempData["HomeMessage"] is string successMessage)
     {
         <div class="alert alert-success alert-dismissible fade show" role="alert">

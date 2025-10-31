@@ -320,6 +320,32 @@ main .container-fluid.main-inner--wide {
     margin-bottom: 0;
 }
 
+.content-surface--flush {
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background-color: transparent;
+}
+
+.home-main-container {
+    max-width: 100%;
+}
+
+.home-dashboard {
+    padding: 2rem 2rem 2.5rem;
+}
+
+.home-dashboard .row {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+@media (max-width: 767.98px) {
+    .home-dashboard {
+        padding: 1.25rem 1rem 1.5rem;
+    }
+}
+
 body.sidebar-collapsed .sidebar {
     width: 0;
     padding: 0;
