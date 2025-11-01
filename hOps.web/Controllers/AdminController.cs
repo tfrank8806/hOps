@@ -86,6 +86,19 @@ namespace hOps.web.Controllers
                     }
                 }
 
+                var canDelete = false;
+                if (isAdmin)
+                {
+                    canDelete = u.Id != currentUser.Id;
+                }
+                else
+                {
+                    if (u.Id != currentUser.Id && propertyIds.Any())
+                    {
+                        canDelete = propertyIds.All(pid => accessiblePropertyIds.Contains(pid));
+                    }
+                }
+
                 var vm = new UserWithAccessViewModel
                 {
                     Id = u.Id,
@@ -93,13 +106,90 @@ namespace hOps.web.Controllers
                     FirstName = u.FirstName,
                     LastName = u.LastName,
                     Roles = userRoles,
-                    PropertyIds = propertyIds
+                    PropertyIds = propertyIds,
+                    CanDelete = canDelete
                 };
 
                 vmList.Add(vm);
             }
 
             return View(vmList);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteUser(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                TempData["AdminUsersError"] = "Invalid user.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            if (currentUser.Id == userId)
+            {
+                TempData["AdminUsersError"] = "You cannot delete your own account.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var targetUser = await _userManager.FindByIdAsync(userId);
+            if (targetUser == null)
+            {
+                TempData["AdminUsersError"] = "User not found.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var currentRoles = await _userManager.GetRolesAsync(currentUser);
+            var isAdmin = currentRoles.Contains("Admin");
+            var targetRoles = await _userManager.GetRolesAsync(targetUser);
+
+            if (!isAdmin)
+            {
+                if (targetRoles.Contains("Admin"))
+                {
+                    TempData["AdminUsersError"] = "You do not have permission to delete this user.";
+                    return RedirectToAction(nameof(Users));
+                }
+
+                var accessiblePropertyIds = (await _context.UserPropertyAccesses
+                        .Where(upa => upa.ApplicationUserId == currentUser.Id)
+                        .Select(upa => upa.PropertyId)
+                        .Distinct()
+                        .ToListAsync())
+                    .ToHashSet();
+
+                var targetPropertyIds = await _context.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == targetUser.Id)
+                    .Select(upa => upa.PropertyId)
+                    .Distinct()
+                    .ToListAsync();
+
+                if (!targetPropertyIds.Any() || !targetPropertyIds.All(accessiblePropertyIds.Contains))
+                {
+                    TempData["AdminUsersError"] = "You do not have permission to delete this user.";
+                    return RedirectToAction(nameof(Users));
+                }
+            }
+
+            var deleteResult = await _userManager.DeleteAsync(targetUser);
+            if (!deleteResult.Succeeded)
+            {
+                var error = deleteResult.Errors.Select(e => e.Description).FirstOrDefault() ?? "Unable to delete user.";
+                TempData["AdminUsersError"] = error;
+            }
+            else
+            {
+                var label = targetUser.Email ?? targetUser.UserName ?? "user";
+                TempData["AdminUsersMessage"] = $"Deleted user {label}.";
+            }
+
+            return RedirectToAction(nameof(Users));
         }
 
         [HttpGet]

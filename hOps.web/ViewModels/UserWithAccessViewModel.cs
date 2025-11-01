@@ -10,6 +10,7 @@ namespace hOps.web.Models
         public string LastName { get; set; } = "";
         public IList<string> Roles { get; set; } = new List<string>();
         public IList<int> PropertyIds { get; set; } = new List<int>();
+        public bool CanDelete { get; set; }
         // Optionally, you can include a list of property names or full Property objects
     }
 }

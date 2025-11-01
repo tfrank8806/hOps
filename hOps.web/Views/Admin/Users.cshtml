@@ -6,6 +6,22 @@
 
 <h2>Users</h2>
 
+@if (TempData["AdminUsersMessage"] is string successMessage)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @successMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["AdminUsersError"] is string errorMessage)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
 <table class="table table-striped">
     <thead>
         <tr>
@@ -36,9 +52,27 @@
                     }
                 </td>
                 <td>
-                    <a asp-action="EditUserProperties" asp-controller="Admin" asp-route-userId="@user.Id" class="btn btn-sm btn-info">
-                        Assign Properties
-                    </a>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a asp-action="EditUserProperties" asp-controller="Admin" asp-route-userId="@user.Id" class="btn btn-sm btn-info">
+                            Assign Properties
+                        </a>
+                        @if (user.CanDelete)
+                        {
+                            <form asp-action="DeleteUser" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="userId" value="@user.Id" />
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete user @user.Email? This action cannot be undone.');">
+                                    Delete
+                                </button>
+                            </form>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-sm btn-danger" disabled title="You do not have permission to delete this user.">
+                                Delete
+                            </button>
+                        }
+                    </div>
                 </td>
             </tr>
         }
