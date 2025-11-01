@@ -92,7 +92,14 @@
                             <h2 class="h5 mb-0">@Model.ActiveConversation.ParticipantName</h2>
                             <small class="text-muted">Direct messages</small>
                         </div>
-                        <a class="btn btn-outline-secondary btn-sm" href="mailto:@Model.ActiveConversation.ParticipantName">Email</a>
+                        @if (!string.IsNullOrWhiteSpace(Model.ActiveConversation.ParticipantEmail))
+                        {
+                            <a class="btn btn-outline-secondary btn-sm" href="mailto:@Model.ActiveConversation.ParticipantEmail">Email</a>
+                        }
+                        else
+                        {
+                            <button class="btn btn-outline-secondary btn-sm" type="button" disabled title="Email address unavailable">Email</button>
+                        }
                     </div>
                 }
                 else
@@ -126,6 +133,7 @@
                 else
                 {
                     var participantName = Model.ActiveConversation.ParticipantName ?? "Conversation";
+                    var participantEmail = Model.ActiveConversation.ParticipantEmail;
                     var initial = participantName.Trim().Length > 0
                         ? participantName.Trim()[0].ToString().ToUpperInvariant()
                         : "?";
@@ -135,7 +143,14 @@
                             <span class="direct-messages-widget__summary-name">@participantName</span>
                             <span class="direct-messages-widget__summary-meta">Direct messages</span>
                         </div>
-                        <a class="btn btn-outline-primary btn-sm" href="mailto:@participantName">Email</a>
+                        @if (!string.IsNullOrWhiteSpace(participantEmail))
+                        {
+                            <a class="btn btn-outline-primary btn-sm" href="mailto:@participantEmail">Email</a>
+                        }
+                        else
+                        {
+                            <button class="btn btn-outline-primary btn-sm" type="button" disabled title="Email address unavailable">Email</button>
+                        }
                     </div>
 
                     <div class="direct-message-thread flex-grow-1">

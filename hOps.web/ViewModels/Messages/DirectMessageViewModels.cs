@@ -9,6 +9,7 @@ namespace hOps.web.ViewModels.Messages
         public int ConversationId { get; set; }
         public string ParticipantId { get; set; } = string.Empty;
         public string ParticipantName { get; set; } = string.Empty;
+        public string? ParticipantEmail { get; set; }
         public string? ParticipantAvatarUrl { get; set; }
         public string? LastMessagePreview { get; set; }
         public DateTime? LastMessageAt { get; set; }
@@ -33,6 +34,7 @@ namespace hOps.web.ViewModels.Messages
         public int ConversationId { get; set; }
         public string ParticipantId { get; set; } = string.Empty;
         public string ParticipantName { get; set; } = string.Empty;
+        public string? ParticipantEmail { get; set; }
         public string? ParticipantAvatarUrl { get; set; }
         public List<DirectMessageBubbleViewModel> Messages { get; set; } = new();
     }

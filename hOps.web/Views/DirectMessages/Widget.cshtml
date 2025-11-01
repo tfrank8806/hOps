@@ -112,6 +112,7 @@
                 @if (Model.ActiveConversation != null)
                 {
                     var participantName = Model.ActiveConversation.ParticipantName ?? "Conversation";
+                    var participantEmail = Model.ActiveConversation.ParticipantEmail;
                     var initial = participantName.Trim().Length > 0
                         ? participantName.Trim()[0].ToString().ToUpperInvariant()
                         : "?";
@@ -142,7 +143,14 @@
                                 <span class="direct-messages-widget__summary-snippet">@latestSnippet</span>
                             }
                         </div>
-                        <a class="btn btn-outline-primary btn-sm" href="mailto:@participantName">Email</a>
+                        @if (!string.IsNullOrWhiteSpace(participantEmail))
+                        {
+                            <a class="btn btn-outline-primary btn-sm" href="mailto:@participantEmail">Email</a>
+                        }
+                        else
+                        {
+                            <button class="btn btn-outline-primary btn-sm" type="button" disabled title="Email address unavailable">Email</button>
+                        }
                     </div>
 
                     <div class="direct-message-thread flex-grow-1">

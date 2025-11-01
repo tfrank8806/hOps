@@ -247,10 +247,12 @@ namespace hOps.web.Controllers
                 .Select(u => new
                 {
                     u.Id,
-                    Name = BuildDisplayName(u)
+                    Name = BuildDisplayName(u),
+                    u.Email
                 })
                 .ToListAsync();
             var nameLookup = participantInfo.ToDictionary(u => u.Id, u => u.Name);
+            var emailLookup = participantInfo.ToDictionary(u => u.Id, u => u.Email);
 
             var conversationItems = filteredSummaries
                 .Select(summary =>
@@ -264,6 +266,9 @@ namespace hOps.web.Controllers
                         ConversationId = summary.ConversationId,
                         ParticipantId = summary.OtherUserId,
                         ParticipantName = participantName,
+                        ParticipantEmail = emailLookup.TryGetValue(summary.OtherUserId, out var participantEmail)
+                            ? participantEmail
+                            : null,
                         LastMessagePreview = string.IsNullOrWhiteSpace(summary.LastMessagePreview)
                             ? null
                             : MentionMarkupFormatter.ToDisplayText(summary.LastMessagePreview),
@@ -289,6 +294,7 @@ namespace hOps.web.Controllers
                         ConversationId = detail.ConversationId,
                         ParticipantId = detail.OtherUserId,
                         ParticipantName = detail.OtherUserName,
+                        ParticipantEmail = detail.OtherUserEmail,
                         Messages = detail.Messages
                             .Select(m => new DirectMessageBubbleViewModel
                             {
@@ -322,6 +328,7 @@ namespace hOps.web.Controllers
                             ConversationId = detail.ConversationId,
                             ParticipantId = detail.OtherUserId,
                             ParticipantName = detail.OtherUserName,
+                            ParticipantEmail = detail.OtherUserEmail,
                             Messages = detail.Messages
                                 .Select(m => new DirectMessageBubbleViewModel
                                 {

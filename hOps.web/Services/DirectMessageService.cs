@@ -153,6 +153,7 @@ namespace hOps.web.Services
                 ConversationId = conversation.Id,
                 OtherUserId = otherUserId ?? string.Empty,
                 OtherUserName = otherUser != null ? BuildDisplayName(otherUser) : "Unknown user",
+                OtherUserEmail = otherUser?.Email,
                 Messages = conversation.Messages
                     .Select(m => new MessageDetail
                     {
@@ -325,6 +326,7 @@ namespace hOps.web.Services
         public int ConversationId { get; set; }
         public string OtherUserId { get; set; } = string.Empty;
         public string OtherUserName { get; set; } = string.Empty;
+        public string? OtherUserEmail { get; set; }
         public List<MessageDetail> Messages { get; set; } = new();
     }
 
