@@ -1,4 +1,7 @@
 @using System
+@using System.Globalization
+@using System.Linq
+@using Microsoft.AspNetCore.Http.Extensions
 @using hOps.web.Utilities
 @model hOps.web.ViewModels.WorkOrders.WorkOrdersViewModel
 @{ 
@@ -11,6 +14,48 @@
         : null;
     var formTitle = Model.IsEditing ? "Edit Work Order" : "Create Work Order";
     var submitLabel = Model.IsEditing ? "Update Work Order" : "Submit Work Order";
+
+    var filterQuery = new QueryBuilder();
+    filterQuery.Add("SortOrder", Model.Filters.SortOrder);
+
+    if (!string.IsNullOrWhiteSpace(Model.Filters.RoomNumber))
+    {
+        filterQuery.Add("RoomNumber", Model.Filters.RoomNumber);
+    }
+
+    if (!string.IsNullOrWhiteSpace(Model.Filters.Search))
+    {
+        filterQuery.Add("Search", Model.Filters.Search);
+    }
+
+    foreach (var departmentId in Model.Filters.DepartmentIds)
+    {
+        filterQuery.Add("DepartmentIds", departmentId.ToString(CultureInfo.InvariantCulture));
+    }
+
+    foreach (var workOrderTypeId in Model.Filters.WorkOrderTypeIds)
+    {
+        filterQuery.Add("WorkOrderTypeIds", workOrderTypeId.ToString(CultureInfo.InvariantCulture));
+    }
+
+    foreach (var status in Model.Filters.Statuses)
+    {
+        filterQuery.Add("Statuses", status);
+    }
+
+    foreach (var creatorId in Model.Filters.CreatorIds)
+    {
+        filterQuery.Add("CreatorIds", creatorId);
+    }
+
+    foreach (var propertyId in Model.Filters.PropertyIds)
+    {
+        filterQuery.Add("PropertyIds", propertyId.ToString(CultureInfo.InvariantCulture));
+    }
+
+    var filterQueryString = filterQuery.ToQueryString().ToString();
+    var exportUrl = $"{Url.Action("Export")}{filterQueryString}";
+    var indexUrlWithFilters = $"{Url.Action("Index")}{filterQueryString}";
 }
 
 @section Styles {
@@ -152,78 +197,111 @@
             <div id="workOrdersFiltersCollapse" class="collapse">
                 <div class="card-body">
                     <form method="get" class="row g-3">
-                    <div class="col-md-4">
-                        <label for="SortOrder" class="form-label">Sort</label>
-                        <select class="form-select" id="SortOrder" name="SortOrder">
-                            <option value="newest" selected="@(Model.Filters.SortOrder == "newest" ? "selected" : null)">Newest First</option>
-                            <option value="oldest" selected="@(Model.Filters.SortOrder == "oldest" ? "selected" : null)">Oldest First</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="RoomNumber" class="form-label">Room / Location</label>
-                        <input type="text" class="form-control" id="RoomNumber" name="RoomNumber" value="@Model.Filters.RoomNumber" />
-                    </div>
-                    <div class="col-md-4">
-                        <label for="Status" class="form-label">Status</label>
-                        <select class="form-select" id="Status" name="Status">
-                            <option value="">All</option>
-                            @foreach (var status in Model.StatusOptions)
-                            {
-                                <option value="@status.Key" selected="@(string.Equals(Model.Filters.Status, status.Key, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@status.Label</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="DepartmentId" class="form-label">Department</label>
-                        <select class="form-select" id="DepartmentId" name="DepartmentId">
-                            <option value="">All</option>
-                            @foreach (var dept in Model.Departments)
-                            {
-                                <option value="@dept.Id" selected="@(Model.Filters.DepartmentId == dept.Id ? "selected" : null)">@dept.Name</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="WorkOrderTypeId" class="form-label">Work Order Type</label>
-                        <select class="form-select" id="WorkOrderTypeId" name="WorkOrderTypeId">
-                            <option value="">All</option>
-                            @foreach (var type in Model.WorkOrderTypes)
-                            {
-                                <option value="@type.Id" selected="@(Model.Filters.WorkOrderTypeId == type.Id ? "selected" : null)">@type.Name</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="CreatorId" class="form-label">Creator</label>
-                        <select class="form-select" id="CreatorId" name="CreatorId">
-                            <option value="">All</option>
-                            @foreach (var creator in Model.CreatorOptions)
-                            {
-                                <option value="@creator.Value" selected="@(Model.Filters.CreatorId == creator.Value ? "selected" : null)">@creator.Text</option>
-                            }
-                        </select>
-                    </div>
-                    @if (Model.PropertyOptions.Count > 1)
-                    {
                         <div class="col-md-4">
-                            <label for="PropertyId" class="form-label">Property</label>
-                            <select class="form-select" id="PropertyId" name="PropertyId">
-                                <option value="">All</option>
-                            @foreach (var property in Model.PropertyOptions)
-                            {
-                                <option value="@property.Id" selected="@(Model.Filters.PropertyId == property.Id ? "selected" : null)">@property.Name (@property.Code)</option>
-                            }
+                            <label for="SortOrder" class="form-label">Sort</label>
+                            <select class="form-select" id="SortOrder" name="SortOrder">
+                                <option value="newest" selected="@(Model.Filters.SortOrder == "newest" ? "selected" : null)">Newest First</option>
+                                <option value="oldest" selected="@(Model.Filters.SortOrder == "oldest" ? "selected" : null)">Oldest First</option>
                             </select>
                         </div>
-                    }
-                    <div class="col-md-8">
-                        <label for="Search" class="form-label">Keyword Search</label>
-                        <input type="text" class="form-control" id="Search" name="Search" value="@Model.Filters.Search" placeholder="Search issue, details, or location" />
-                    </div>
-                    <div class="col-md-4 d-flex align-items-end justify-content-end gap-2">
-                        <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
-                        <button type="submit" class="btn btn-primary">Apply Filters</button>
-                    </div>
+                        <div class="col-md-4">
+                            <label for="RoomNumber" class="form-label">Room / Location</label>
+                            <input type="text" class="form-control" id="RoomNumber" name="RoomNumber" value="@Model.Filters.RoomNumber" />
+                        </div>
+                        <div class="col-md-4">
+                            <label for="Statuses" class="form-label">Status</label>
+                            <select class="form-select js-checkbox-multiselect"
+                                    id="Statuses"
+                                    name="Statuses"
+                                    multiple
+                                    data-placeholder="All statuses"
+                                    data-all-label="All statuses">
+                                @foreach (var status in Model.StatusOptions)
+                                {
+                                    var isSelected = Model.Filters.Statuses.Any(s => string.Equals(s, status.Key, StringComparison.OrdinalIgnoreCase));
+                                    <option value="@status.Key" selected="@(isSelected ? "selected" : null)">@status.Label</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="DepartmentIds" class="form-label">Department</label>
+                            <select class="form-select js-checkbox-multiselect"
+                                    id="DepartmentIds"
+                                    name="DepartmentIds"
+                                    multiple
+                                    data-placeholder="All departments"
+                                    data-all-label="All departments">
+                                @foreach (var dept in Model.Departments)
+                                {
+                                    var isSelected = Model.Filters.DepartmentIds.Contains(dept.Id);
+                                    <option value="@dept.Id" selected="@(isSelected ? "selected" : null)">@dept.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="WorkOrderTypeIds" class="form-label">Work Order Type</label>
+                            <select class="form-select js-checkbox-multiselect"
+                                    id="WorkOrderTypeIds"
+                                    name="WorkOrderTypeIds"
+                                    multiple
+                                    data-placeholder="All types"
+                                    data-all-label="All types">
+                                @foreach (var type in Model.WorkOrderTypes)
+                                {
+                                    var isSelected = Model.Filters.WorkOrderTypeIds.Contains(type.Id);
+                                    <option value="@type.Id" selected="@(isSelected ? "selected" : null)">@type.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="CreatorIds" class="form-label">Creator</label>
+                            <select class="form-select js-checkbox-multiselect"
+                                    id="CreatorIds"
+                                    name="CreatorIds"
+                                    multiple
+                                    data-placeholder="All creators"
+                                    data-all-label="All creators">
+                                @foreach (var creator in Model.CreatorOptions)
+                                {
+                                    if (string.IsNullOrWhiteSpace(creator.Value))
+                                    {
+                                        continue;
+                                    }
+
+                                    var isSelected = Model.Filters.CreatorIds.Any(id => string.Equals(id, creator.Value, StringComparison.OrdinalIgnoreCase));
+                                    <option value="@creator.Value" selected="@(isSelected ? "selected" : null)">@creator.Text</option>
+                                }
+                            </select>
+                        </div>
+                        @if (Model.PropertyFilterOptions.Count > 0)
+                        {
+                            <div class="col-md-4">
+                                <label for="PropertyIds" class="form-label">Property</label>
+                                <select class="form-select js-checkbox-multiselect"
+                                        id="PropertyIds"
+                                        name="PropertyIds"
+                                        multiple
+                                        data-placeholder="All properties"
+                                        data-all-label="All properties">
+                                    @foreach (var property in Model.PropertyFilterOptions)
+                                    {
+                                        var isSelected = property.IsFilterSelected;
+                                        var propertyLabel = string.IsNullOrWhiteSpace(property.Code)
+                                            ? property.Name
+                                            : $"{property.Name} ({property.Code})";
+                                        <option value="@property.Id" selected="@(isSelected ? "selected" : null)">@propertyLabel</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                        <div class="col-md-8">
+                            <label for="Search" class="form-label">Keyword Search</label>
+                            <input type="text" class="form-control" id="Search" name="Search" value="@Model.Filters.Search" placeholder="Search issue, details, or location" />
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end justify-content-end gap-2">
+                            <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
+                            <button type="submit" class="btn btn-primary">Apply Filters</button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -237,15 +315,7 @@
                         <button type="button" class="btn btn-outline-secondary btn-sm" id="printWorkOrdersButton">
                             Print Current List
                         </button>
-                        <a asp-action="Export"
-                           asp-route-SortOrder="@Model.Filters.SortOrder"
-                           asp-route-RoomNumber="@Model.Filters.RoomNumber"
-                           asp-route-DepartmentId="@Model.Filters.DepartmentId"
-                           asp-route-WorkOrderTypeId="@Model.Filters.WorkOrderTypeId"
-                           asp-route-Status="@Model.Filters.Status"
-                           asp-route-CreatorId="@Model.Filters.CreatorId"
-                           asp-route-Search="@Model.Filters.Search"
-                           asp-route-PropertyId="@Model.Filters.PropertyId"
+                        <a href="@exportUrl"
                            class="btn btn-outline-success btn-sm">
                             Export to Excel
                         </a>
@@ -299,16 +369,7 @@
                                     <tr class="workorder-row @(isEditingRow ? "table-active" : string.Empty)" style="border-left: 4px solid @order.StatusColor;">
                                         <td class="col-actions text-center">
                                             <a class="btn btn-outline-primary btn-sm"
-                                               asp-action="Edit"
-                                               asp-route-id="@order.Id"
-                                               asp-route-SortOrder="@Model.Filters.SortOrder"
-                                               asp-route-RoomNumber="@Model.Filters.RoomNumber"
-                                               asp-route-DepartmentId="@Model.Filters.DepartmentId"
-                                               asp-route-WorkOrderTypeId="@Model.Filters.WorkOrderTypeId"
-                                               asp-route-Status="@Model.Filters.Status"
-                                               asp-route-CreatorId="@Model.Filters.CreatorId"
-                                               asp-route-Search="@Model.Filters.Search"
-                                               asp-route-PropertyId="@Model.Filters.PropertyId">
+                                               href="@($"{Url.Action("Edit", new { id = order.Id })}{filterQueryString}")">
                                                 Edit
                                             </a>
                                         </td>
@@ -382,15 +443,7 @@
                 @if (Model.IsEditing)
                 {
                     <a class="btn btn-sm btn-light"
-                       asp-action="Index"
-                       asp-route-SortOrder="@Model.Filters.SortOrder"
-                       asp-route-RoomNumber="@Model.Filters.RoomNumber"
-                       asp-route-DepartmentId="@Model.Filters.DepartmentId"
-                       asp-route-WorkOrderTypeId="@Model.Filters.WorkOrderTypeId"
-                       asp-route-Status="@Model.Filters.Status"
-                       asp-route-CreatorId="@Model.Filters.CreatorId"
-                       asp-route-Search="@Model.Filters.Search"
-                       asp-route-PropertyId="@Model.Filters.PropertyId">
+                       href="@indexUrlWithFilters">
                         Cancel
                     </a>
                 }

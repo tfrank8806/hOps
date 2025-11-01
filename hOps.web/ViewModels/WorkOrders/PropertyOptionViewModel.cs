@@ -6,5 +6,6 @@ namespace hOps.web.ViewModels.WorkOrders
         public string Name { get; set; } = string.Empty;
         public string Code { get; set; } = string.Empty;
         public bool IsSelected { get; set; }
+        public bool IsFilterSelected { get; set; }
     }
 }

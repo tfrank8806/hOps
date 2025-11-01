@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace hOps.web.ViewModels
@@ -30,6 +33,7 @@ namespace hOps.web.ViewModels
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Code { get; set; } = string.Empty;
+        public bool IsSelected { get; set; }
     }
 
     public class PassOnLogIndexViewModel
@@ -64,13 +68,31 @@ namespace hOps.web.ViewModels
         public DateTime? EndDate { get; set; }
 
         [Display(Name = "Creator")]
-        public string? CreatorId { get; set; }
+        public List<string> CreatorIds { get; set; } = new();
 
         [Display(Name = "Keyword")]
         public string? SearchTerm { get; set; }
 
+        public List<int> PropertyIds { get; set; } = new();
+
         public List<SelectListItem> CreatorOptions { get; set; } = new();
         public List<SelectListItem> SortOptions { get; set; } = new();
+        public List<PassOnLogPropertyOptionViewModel> PropertyOptions { get; set; } = new();
+
+        public void Normalize()
+        {
+            SortOrder = string.IsNullOrWhiteSpace(SortOrder) ? "newest" : SortOrder.Trim().ToLowerInvariant();
+            SearchTerm = string.IsNullOrWhiteSpace(SearchTerm) ? null : SearchTerm.Trim();
+            CreatorIds = CreatorIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            PropertyIds = PropertyIds
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+        }
     }
 
     public class PassOnLogDetailsViewModel

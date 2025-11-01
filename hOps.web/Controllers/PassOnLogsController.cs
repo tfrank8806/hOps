@@ -38,7 +38,7 @@ namespace hOps.web.Controllers
             _logger = logger;
         }
 
-        public async Task<IActionResult> Index(string? sortOrder, DateTime? startDate, DateTime? endDate, string? creatorId, string? searchTerm)
+        public async Task<IActionResult> Index([FromQuery] PassOnLogFiltersViewModel? filters)
         {
             var currentUser = await _userManager.GetUserAsync(User);
             if (currentUser == null)
@@ -46,17 +46,11 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
+            filters ??= new PassOnLogFiltersViewModel();
+            filters.Normalize();
+
             var accessibleProperties = await GetAccessiblePropertiesAsync(currentUser.Id);
             var accessiblePropertyIds = accessibleProperties.Select(p => p.Id).ToList();
-
-            var filters = new PassOnLogFiltersViewModel
-            {
-                SortOrder = string.IsNullOrWhiteSpace(sortOrder) ? SortNewest : sortOrder,
-                StartDate = startDate,
-                EndDate = endDate,
-                CreatorId = creatorId,
-                SearchTerm = searchTerm
-            };
 
             filters.SortOptions = new List<SelectListItem>
             {
@@ -74,6 +68,11 @@ namespace hOps.web.Controllers
                 }
             };
 
+            filters.PropertyIds = filters.PropertyIds
+                .Where(id => accessiblePropertyIds.Contains(id))
+                .Distinct()
+                .ToList();
+
             IQueryable<PassOnLog> baseQuery = _context.PassOnLogs;
 
             if (accessiblePropertyIds.Any())
@@ -85,8 +84,14 @@ namespace hOps.web.Controllers
                 baseQuery = baseQuery.Where(_ => false);
             }
 
+            if (filters.PropertyIds.Any())
+            {
+                baseQuery = baseQuery.Where(log => log.Properties.Any(lp => filters.PropertyIds.Contains(lp.PropertyId)));
+            }
+
             var creatorIds = await baseQuery
                 .Select(log => log.CreatedById)
+                .Where(id => id != null)
                 .Distinct()
                 .ToListAsync();
 
@@ -94,26 +99,28 @@ namespace hOps.web.Controllers
                 .Where(u => creatorIds.Contains(u.Id))
                 .ToListAsync();
 
-            filters.CreatorOptions = new List<SelectListItem>
-            {
-                new SelectListItem
-                {
-                    Value = string.Empty,
-                    Text = "All Creators",
-                    Selected = string.IsNullOrEmpty(filters.CreatorId)
-                }
-            };
+            var creatorFilterSet = new HashSet<string>(filters.CreatorIds, StringComparer.OrdinalIgnoreCase);
 
-            foreach (var creator in creatorUsers.OrderBy(c => c.FirstName).ThenBy(c => c.LastName))
-            {
-                var name = FormatUserName(creator.FirstName, creator.LastName, creator.Email ?? string.Empty);
-                filters.CreatorOptions.Add(new SelectListItem
+            filters.CreatorOptions = creatorUsers
+                .OrderBy(c => c.FirstName)
+                .ThenBy(c => c.LastName)
+                .Select(creator => new SelectListItem
                 {
-                    Text = name,
+                    Text = FormatUserName(creator.FirstName, creator.LastName, creator.Email ?? string.Empty),
                     Value = creator.Id,
-                    Selected = creator.Id == filters.CreatorId
-                });
-            }
+                    Selected = creatorFilterSet.Contains(creator.Id)
+                })
+                .ToList();
+
+            filters.PropertyOptions = accessibleProperties
+                .Select(p => new PassOnLogPropertyOptionViewModel
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Code = p.Code,
+                    IsSelected = filters.PropertyIds.Contains(p.Id)
+                })
+                .ToList();
 
             IQueryable<PassOnLog> logsQuery = baseQuery;
             logsQuery = logsQuery.Include(log => log.CreatedBy);
@@ -133,14 +140,14 @@ namespace hOps.web.Controllers
                 logsQuery = logsQuery.Where(log => log.CreatedAt < to);
             }
 
-            if (!string.IsNullOrEmpty(filters.CreatorId))
+            if (creatorFilterSet.Any())
             {
-                logsQuery = logsQuery.Where(log => log.CreatedById == filters.CreatorId);
+                logsQuery = logsQuery.Where(log => log.CreatedById != null && creatorFilterSet.Contains(log.CreatedById));
             }
 
-            if (!string.IsNullOrWhiteSpace(filters.SearchTerm))
+            if (!string.IsNullOrEmpty(filters.SearchTerm))
             {
-                var term = filters.SearchTerm.Trim();
+                var term = filters.SearchTerm!;
                 logsQuery = logsQuery.Where(log => EF.Functions.Like(log.Title, $"%{term}%") || EF.Functions.Like(log.Body, $"%{term}%"));
             }
 
@@ -636,16 +643,18 @@ namespace hOps.web.Controllers
 
         private PassOnLogFormViewModel BuildFormViewModel(PassOnLogFormViewModel model, List<Property> accessibleProperties)
         {
+            model.SelectedPropertyIds ??= new List<int>();
+            var selectedSet = new HashSet<int>(model.SelectedPropertyIds);
+
             model.PropertyOptions = accessibleProperties
                 .Select(p => new PassOnLogPropertyOptionViewModel
                 {
                     Id = p.Id,
                     Name = p.Name,
-                    Code = p.Code
+                    Code = p.Code,
+                    IsSelected = selectedSet.Contains(p.Id)
                 })
                 .ToList();
-
-            model.SelectedPropertyIds ??= new List<int>();
 
             return model;
         }

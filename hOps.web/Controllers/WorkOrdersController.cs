@@ -556,51 +556,34 @@ namespace hOps.web.Controllers
                 .Distinct()
                 .ToListAsync();
         }
-        private async Task<WorkOrdersViewModel> BuildViewModelAsync(WorkOrderFilterInput filters, WorkOrderFormViewModel? form)
+        private async Task<WorkOrdersViewModel> BuildViewModelAsync(WorkOrderFilterInput? filters, WorkOrderFormViewModel? form)
         {
+            filters ??= new WorkOrderFilterInput();
+            filters.Normalize();
+
             var user = await _userManager.GetUserAsync(User);
             var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
             var statuses = WorkOrderStatusOptions.All;
             var statusColorMap = statuses.ToDictionary(s => s.Key, s => s.ColorHex, StringComparer.OrdinalIgnoreCase);
             var defaultStatus = _configuration.GetValue<string>("WorkOrders:DefaultStatus") ?? statuses.First().Key;
 
-            if (string.IsNullOrWhiteSpace(filters.SortOrder))
-            {
-                filters.SortOrder = "newest";
-            }
-
             var currentPropertyId = GetCurrentPropertyId();
-            List<int> targetPropertyIds;
-            if (currentPropertyId.HasValue)
-            {
-                if (accessiblePropertyIds.Contains(currentPropertyId.Value))
-                {
-                    targetPropertyIds = new List<int> { currentPropertyId.Value };
-                    filters.PropertyId = currentPropertyId.Value;
-                }
-                else
-                {
-                    targetPropertyIds = new List<int>();
-                    filters.PropertyId = null;
-                }
-            }
-            else
-            {
-                targetPropertyIds = accessiblePropertyIds.ToList();
+            var normalizedPropertyFilters = filters.PropertyIds
+                .Where(id => accessiblePropertyIds.Contains(id))
+                .Distinct()
+                .ToList();
 
-                if (filters.PropertyId.HasValue && targetPropertyIds.Contains(filters.PropertyId.Value))
-                {
-                    targetPropertyIds = new List<int> { filters.PropertyId.Value };
-                }
-                else
-                {
-                    filters.PropertyId = null;
-                }
+            if (!normalizedPropertyFilters.Any() && currentPropertyId.HasValue && accessiblePropertyIds.Contains(currentPropertyId.Value))
+            {
+                normalizedPropertyFilters.Add(currentPropertyId.Value);
             }
 
-            var selectedPropertyIds = form?.SelectedPropertyIds != null
-                ? new HashSet<int>(form.SelectedPropertyIds.Where(id => targetPropertyIds.Contains(id)))
-                : new HashSet<int>();
+            filters.PropertyIds = normalizedPropertyFilters;
+
+            var targetPropertyIds = normalizedPropertyFilters.Any()
+                ? normalizedPropertyFilters
+                : accessiblePropertyIds.ToList();
+            var targetPropertySet = new HashSet<int>(targetPropertyIds);
 
             var query = _context.WorkOrders
                 .Include(w => w.WorkOrderType)
@@ -610,51 +593,54 @@ namespace hOps.web.Controllers
                 .Include(w => w.Attachments)
                 .AsQueryable();
 
-            if (targetPropertyIds.Any())
+            if (targetPropertySet.Any())
             {
-                query = query.Where(w => w.Properties.Any(p => targetPropertyIds.Contains(p.PropertyId)));
+                query = query.Where(w => w.Properties.Any(p => targetPropertySet.Contains(p.PropertyId)));
             }
             else
             {
                 query = query.Where(_ => false);
             }
 
-            if (!string.IsNullOrWhiteSpace(filters.RoomNumber))
+            if (!string.IsNullOrEmpty(filters.RoomNumber))
             {
-                var roomFilter = filters.RoomNumber.Trim();
-                query = query.Where(w => w.Location.Contains(roomFilter));
+                query = query.Where(w => w.Location.Contains(filters.RoomNumber!));
             }
 
-            if (filters.DepartmentId.HasValue)
+            if (filters.DepartmentIds.Any())
             {
-                query = query.Where(w => w.DepartmentId == filters.DepartmentId.Value);
+                var departmentSet = new HashSet<int>(filters.DepartmentIds);
+                query = query.Where(w => w.DepartmentId.HasValue && departmentSet.Contains(w.DepartmentId.Value));
             }
 
-            if (filters.WorkOrderTypeId.HasValue)
+            if (filters.WorkOrderTypeIds.Any())
             {
-                query = query.Where(w => w.WorkOrderTypeId == filters.WorkOrderTypeId.Value);
+                var typeSet = new HashSet<int>(filters.WorkOrderTypeIds);
+                query = query.Where(w => w.WorkOrderTypeId.HasValue && typeSet.Contains(w.WorkOrderTypeId.Value));
             }
 
-            if (!string.IsNullOrWhiteSpace(filters.Status))
+            if (filters.Statuses.Any())
             {
-                query = query.Where(w => w.Status == filters.Status);
+                var statusSet = new HashSet<string>(filters.Statuses, StringComparer.OrdinalIgnoreCase);
+                query = query.Where(w => statusSet.Contains(w.Status));
             }
 
-            if (!string.IsNullOrWhiteSpace(filters.CreatorId))
+            if (filters.CreatorIds.Any())
             {
-                query = query.Where(w => w.CreatedById == filters.CreatorId);
+                var creatorSet = new HashSet<string>(filters.CreatorIds, StringComparer.OrdinalIgnoreCase);
+                query = query.Where(w => w.CreatedById != null && creatorSet.Contains(w.CreatedById));
             }
 
-            if (!string.IsNullOrWhiteSpace(filters.Search))
+            if (!string.IsNullOrEmpty(filters.Search))
             {
-                var term = filters.Search.Trim();
+                var term = filters.Search!;
                 query = query.Where(w =>
                     EF.Functions.Like(w.Issue, $"%{term}%") ||
                     EF.Functions.Like(w.Details ?? string.Empty, $"%{term}%") ||
                     EF.Functions.Like(w.Location, $"%{term}%"));
             }
 
-            query = filters.SortOrder?.ToLowerInvariant() switch
+            query = filters.SortOrder switch
             {
                 "oldest" => query.OrderBy(w => w.CreatedAt),
                 _ => query.OrderByDescending(w => w.CreatedAt)
@@ -689,17 +675,7 @@ namespace hOps.web.Controllers
             var departments = await _context.Departments.OrderBy(d => d.Name).ToListAsync();
             var workOrderTypes = await _context.WorkOrderTypes.OrderBy(t => t.Name).ToListAsync();
 
-            var propertyOptions = await _context.Properties
-                .Where(p => targetPropertyIds.Contains(p.Id))
-                .OrderBy(p => p.Name)
-                .Select(p => new PropertyOptionViewModel
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    Code = p.Code,
-                    IsSelected = selectedPropertyIds.Contains(p.Id) || filters.PropertyId == p.Id
-                })
-                .ToListAsync();
+            var creatorFilters = new HashSet<string>(filters.CreatorIds, StringComparer.OrdinalIgnoreCase);
 
             var creatorOptions = workOrders
                 .Where(wo => !string.IsNullOrWhiteSpace(wo.CreatedById) && wo.CreatedBy != null)
@@ -714,15 +690,16 @@ namespace hOps.web.Controllers
                 .Select(x => new SelectListItem
                 {
                     Value = x.CreatedById!,
-                    Text = string.IsNullOrWhiteSpace(x.Name) ? "Unknown" : x.Name
+                    Text = string.IsNullOrWhiteSpace(x.Name) ? "Unknown" : x.Name,
+                    Selected = !string.IsNullOrWhiteSpace(x.CreatedById) && creatorFilters.Contains(x.CreatedById)
                 })
                 .ToList();
 
             var locationSuggestions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (targetPropertyIds.Any())
+            if (targetPropertySet.Any())
             {
                 var roomSuggestions = await _context.Rooms
-                    .Where(r => targetPropertyIds.Contains(r.PropertyId))
+                    .Where(r => targetPropertySet.Contains(r.PropertyId))
                     .Select(r => r.RoomNumber)
                     .Distinct()
                     .ToListAsync();
@@ -749,19 +726,43 @@ namespace hOps.web.Controllers
             }
 
             effectiveForm.SelectedPropertyIds = effectiveForm.SelectedPropertyIds
-                .Where(targetPropertyIds.Contains)
+                .Where(targetPropertySet.Contains)
                 .Distinct()
                 .ToList();
 
-            if (!effectiveForm.SelectedPropertyIds.Any() && targetPropertyIds.Any())
+            if (!effectiveForm.SelectedPropertyIds.Any() && targetPropertySet.Any())
             {
-                effectiveForm.SelectedPropertyIds = targetPropertyIds.ToList();
+                effectiveForm.SelectedPropertyIds = targetPropertySet.ToList();
             }
 
-            foreach (var option in propertyOptions)
-            {
-                option.IsSelected = effectiveForm.SelectedPropertyIds.Contains(option.Id);
-            }
+            var accessibleProperties = await _context.Properties
+                .Where(p => accessiblePropertyIds.Contains(p.Id))
+                .OrderBy(p => p.Name)
+                .Select(p => new { p.Id, p.Name, p.Code })
+                .ToListAsync();
+
+            var propertyFilterSet = new HashSet<int>(filters.PropertyIds);
+
+            var propertyFilterOptions = accessibleProperties
+                .Select(p => new PropertyOptionViewModel
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Code = p.Code,
+                    IsFilterSelected = propertyFilterSet.Contains(p.Id)
+                })
+                .ToList();
+
+            var propertyFormOptions = accessibleProperties
+                .Where(p => targetPropertySet.Contains(p.Id))
+                .Select(p => new PropertyOptionViewModel
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Code = p.Code,
+                    IsSelected = effectiveForm.SelectedPropertyIds.Contains(p.Id)
+                })
+                .ToList();
 
             var viewModel = new WorkOrdersViewModel
             {
@@ -771,7 +772,8 @@ namespace hOps.web.Controllers
                 StatusOptions = statuses.ToList(),
                 Departments = departments,
                 WorkOrderTypes = workOrderTypes,
-                PropertyOptions = propertyOptions,
+                PropertyOptions = propertyFormOptions,
+                PropertyFilterOptions = propertyFilterOptions,
                 CreatorOptions = creatorOptions,
                 LocationSuggestions = locationSuggestions.OrderBy(x => x).ToList(),
                 StatusColorMap = statusColorMap,

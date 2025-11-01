@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using hOps.web.Models;
 using Microsoft.AspNetCore.Http;
 
@@ -24,7 +27,22 @@ namespace hOps.web.ViewModels
 
         public string? Keyword { get; set; }
 
-        public int? PropertyId { get; set; }
+        public List<int> PropertyIds { get; set; } = new();
+
+        public void Normalize()
+        {
+            SortOrder = string.IsNullOrWhiteSpace(SortOrder) ? "newest" : SortOrder.Trim().ToLowerInvariant();
+            RoomNumber = string.IsNullOrWhiteSpace(RoomNumber) ? null : RoomNumber.Trim();
+            GuestName = string.IsNullOrWhiteSpace(GuestName) ? null : GuestName.Trim();
+            FoundBy = string.IsNullOrWhiteSpace(FoundBy) ? null : FoundBy.Trim();
+            Creator = string.IsNullOrWhiteSpace(Creator) ? null : Creator.Trim();
+            Keyword = string.IsNullOrWhiteSpace(Keyword) ? null : Keyword.Trim();
+
+            PropertyIds = PropertyIds
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+        }
     }
 
     public class LostFoundSubmissionViewModel

@@ -20,35 +20,61 @@
 <form method="get" class="card mb-4">
     <div class="card-body">
         <div class="row g-3 align-items-end">
-            <div class="col-md-2">
-                <label class="form-label" for="sortOrder">Sort</label>
-                <select class="form-select" id="sortOrder" name="sortOrder">
+            <div class="col-sm-6 col-md-3 col-lg-2">
+                <label class="form-label" for="SortOrder">Sort</label>
+                <select class="form-select" id="SortOrder" name="SortOrder">
                     @foreach (var option in Model.Filters.SortOptions)
                     {
                         <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
                     }
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="form-label" for="startDate">From</label>
-                <input type="date" class="form-control" id="startDate" name="startDate" value="@Model.Filters.StartDate?.ToString("yyyy-MM-dd")" />
+            <div class="col-sm-6 col-md-3 col-lg-2">
+                <label class="form-label" for="StartDate">From</label>
+                <input type="date" class="form-control" id="StartDate" name="StartDate" value="@Model.Filters.StartDate?.ToString("yyyy-MM-dd")" />
             </div>
-            <div class="col-md-2">
-                <label class="form-label" for="endDate">To</label>
-                <input type="date" class="form-control" id="endDate" name="endDate" value="@Model.Filters.EndDate?.ToString("yyyy-MM-dd")" />
+            <div class="col-sm-6 col-md-3 col-lg-2">
+                <label class="form-label" for="EndDate">To</label>
+                <input type="date" class="form-control" id="EndDate" name="EndDate" value="@Model.Filters.EndDate?.ToString("yyyy-MM-dd")" />
             </div>
-            <div class="col-md-3">
-                <label class="form-label" for="creatorId">Creator</label>
-                <select class="form-select" id="creatorId" name="creatorId">
+            <div class="col-sm-6 col-md-6 col-lg-3">
+                <label class="form-label" for="CreatorIds">Creator</label>
+                <select class="form-select js-checkbox-multiselect"
+                        id="CreatorIds"
+                        name="CreatorIds"
+                        multiple
+                        data-placeholder="All creators"
+                        data-all-label="All creators">
                     @foreach (var option in Model.Filters.CreatorOptions)
                     {
+                        if (string.IsNullOrWhiteSpace(option.Value))
+                        {
+                            continue;
+                        }
                         <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
                     }
                 </select>
             </div>
-            <div class="col-md-3">
-                <label class="form-label" for="searchTerm">Keyword</label>
-                <input type="text" class="form-control" id="searchTerm" name="searchTerm" value="@Model.Filters.SearchTerm" placeholder="Search title or body" />
+            <div class="col-sm-6 col-md-6 col-lg-3">
+                <label class="form-label" for="PropertyIds">Property</label>
+                <select class="form-select js-checkbox-multiselect"
+                        id="PropertyIds"
+                        name="PropertyIds"
+                        multiple
+                        data-placeholder="All properties"
+                        data-all-label="All properties">
+                    @foreach (var property in Model.Filters.PropertyOptions)
+                    {
+                        var label = string.IsNullOrWhiteSpace(property.Code)
+                            ? property.Name
+                            : $"{property.Name} ({property.Code})";
+                        <option value="@property.Id" selected="@(property.IsSelected ? "selected" : null)">@label</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-lg-4">
+                <label class="form-label" for="SearchTerm">Keyword</label>
+                <input type="text" class="form-control" id="SearchTerm" name="SearchTerm" value="@Model.Filters.SearchTerm" placeholder="Search title or body" />
             </div>
         </div>
     </div>

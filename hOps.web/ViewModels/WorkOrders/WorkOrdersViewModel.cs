@@ -12,6 +12,7 @@ namespace hOps.web.ViewModels.WorkOrders
         public List<WorkOrderStatusOption> StatusOptions { get; set; } = new();
         public List<Department> Departments { get; set; } = new();
         public List<WorkOrderType> WorkOrderTypes { get; set; } = new();
+        public List<PropertyOptionViewModel> PropertyFilterOptions { get; set; } = new();
         public List<PropertyOptionViewModel> PropertyOptions { get; set; } = new();
         public List<SelectListItem> CreatorOptions { get; set; } = new();
         public List<string> LocationSuggestions { get; set; } = new();

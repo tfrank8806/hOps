@@ -147,11 +147,11 @@ namespace hOps.web.Controllers
 
             TempData["Success"] = "Lost & Found entry logged successfully.";
 
-            int? redirectPropertyId = targetPropertyIds.Count == 1
-                ? targetPropertyIds.First()
-                : filters.PropertyId;
+            var redirectPropertyIds = targetPropertyIds.Any()
+                ? targetPropertyIds
+                : filters.PropertyIds;
 
-            return RedirectToAction(nameof(Index), new { propertyId = redirectPropertyId });
+            return RedirectToAction(nameof(Index), new { propertyIds = redirectPropertyIds });
         }
 
         [HttpPost]
@@ -187,7 +187,7 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
 
             TempData["Success"] = "Entry status updated.";
-            return RedirectToAction(nameof(Index), new { propertyId = entry.PropertyId });
+            return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
         }
 
         private async Task<LostAndFoundIndexViewModel> BuildIndexViewModel(LostFoundFilterInput filters, LostFoundSubmissionViewModel? submission)
@@ -197,6 +197,9 @@ namespace hOps.web.Controllers
             {
                 return new LostAndFoundIndexViewModel();
             }
+
+            filters ??= new LostFoundFilterInput();
+            filters.Normalize();
 
             var accessibleProperties = await _context.UserPropertyAccesses
                 .Where(upa => upa.ApplicationUserId == currentUser.Id)
@@ -211,37 +214,30 @@ namespace hOps.web.Controllers
                 return new LostAndFoundIndexViewModel();
             }
 
-            filters ??= new LostFoundFilterInput();
-            if (string.IsNullOrWhiteSpace(filters.SortOrder))
-            {
-                filters.SortOrder = "newest";
-            }
+            var normalizedPropertyFilters = filters.PropertyIds
+                .Where(id => accessiblePropertyIds.Contains(id))
+                .Distinct()
+                .ToList();
 
-            if (filters.PropertyId.HasValue && !accessiblePropertyIds.Contains(filters.PropertyId.Value))
-            {
-                filters.PropertyId = accessiblePropertyIds.First();
-            }
-            else if (!filters.PropertyId.HasValue)
+            if (!normalizedPropertyFilters.Any())
             {
                 var sessionPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
                 if (sessionPropertyId.HasValue && accessiblePropertyIds.Contains(sessionPropertyId.Value))
                 {
-                    filters.PropertyId = sessionPropertyId.Value;
-                }
-                else
-                {
-                    filters.PropertyId = accessiblePropertyIds.First();
+                    normalizedPropertyFilters.Add(sessionPropertyId.Value);
                 }
             }
+
+            filters.PropertyIds = normalizedPropertyFilters;
 
             var entriesQuery = _context.LostFoundEntries
                 .Include(e => e.Property)
                 .Include(e => e.CreatedByUser)
                 .Where(e => accessiblePropertyIds.Contains(e.PropertyId));
 
-            if (filters.PropertyId.HasValue)
+            if (normalizedPropertyFilters.Any())
             {
-                entriesQuery = entriesQuery.Where(e => e.PropertyId == filters.PropertyId.Value);
+                entriesQuery = entriesQuery.Where(e => normalizedPropertyFilters.Contains(e.PropertyId));
             }
 
             var entries = await entriesQuery.ToListAsync();
@@ -266,45 +262,45 @@ namespace hOps.web.Controllers
                     ((!e.DateFound.HasValue && !e.DateReportedLost.HasValue) && e.CreatedAt.Date <= to));
             }
 
-            if (!string.IsNullOrWhiteSpace(filters.RoomNumber))
+            if (!string.IsNullOrEmpty(filters.RoomNumber))
             {
                 filteredEntries = filteredEntries.Where(e => !string.IsNullOrWhiteSpace(e.Location) &&
-                    e.Location.Contains(filters.RoomNumber, StringComparison.OrdinalIgnoreCase));
+                    e.Location.Contains(filters.RoomNumber!, StringComparison.OrdinalIgnoreCase));
             }
 
-            if (!string.IsNullOrWhiteSpace(filters.GuestName))
+            if (!string.IsNullOrEmpty(filters.GuestName))
             {
                 filteredEntries = filteredEntries.Where(e => !string.IsNullOrWhiteSpace(e.GuestName) &&
-                    e.GuestName.Contains(filters.GuestName, StringComparison.OrdinalIgnoreCase));
+                    e.GuestName.Contains(filters.GuestName!, StringComparison.OrdinalIgnoreCase));
             }
 
-            if (!string.IsNullOrWhiteSpace(filters.FoundBy))
+            if (!string.IsNullOrEmpty(filters.FoundBy))
             {
                 filteredEntries = filteredEntries.Where(e => !string.IsNullOrWhiteSpace(e.FoundBy) &&
-                    e.FoundBy.Contains(filters.FoundBy, StringComparison.OrdinalIgnoreCase));
+                    e.FoundBy.Contains(filters.FoundBy!, StringComparison.OrdinalIgnoreCase));
             }
 
-            if (!string.IsNullOrWhiteSpace(filters.Creator))
+            if (!string.IsNullOrEmpty(filters.Creator))
             {
                 filteredEntries = filteredEntries.Where(e =>
-                    (!string.IsNullOrWhiteSpace(e.CreatedByDisplayName) && e.CreatedByDisplayName.Contains(filters.Creator, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrWhiteSpace(e.CreatedByDisplayName) && e.CreatedByDisplayName.Contains(filters.Creator!, StringComparison.OrdinalIgnoreCase)) ||
                     (e.CreatedByUser != null && (
-                        (!string.IsNullOrWhiteSpace(e.CreatedByUser.FirstName) && e.CreatedByUser.FirstName.Contains(filters.Creator, StringComparison.OrdinalIgnoreCase)) ||
-                        (!string.IsNullOrWhiteSpace(e.CreatedByUser.LastName) && e.CreatedByUser.LastName.Contains(filters.Creator, StringComparison.OrdinalIgnoreCase))
+                        (!string.IsNullOrWhiteSpace(e.CreatedByUser.FirstName) && e.CreatedByUser.FirstName.Contains(filters.Creator!, StringComparison.OrdinalIgnoreCase)) ||
+                        (!string.IsNullOrWhiteSpace(e.CreatedByUser.LastName) && e.CreatedByUser.LastName.Contains(filters.Creator!, StringComparison.OrdinalIgnoreCase))
                     )));
             }
 
-            if (!string.IsNullOrWhiteSpace(filters.Keyword))
+            if (!string.IsNullOrEmpty(filters.Keyword))
             {
                 filteredEntries = filteredEntries.Where(e =>
-                    (e.Location?.Contains(filters.Keyword, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (e.Notes?.Contains(filters.Keyword, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (e.ItemFound?.Contains(filters.Keyword, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (e.ItemLost?.Contains(filters.Keyword, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (e.Stored?.Contains(filters.Keyword, StringComparison.OrdinalIgnoreCase) ?? false));
+                    (e.Location?.Contains(filters.Keyword!, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (e.Notes?.Contains(filters.Keyword!, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (e.ItemFound?.Contains(filters.Keyword!, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (e.ItemLost?.Contains(filters.Keyword!, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (e.Stored?.Contains(filters.Keyword!, StringComparison.OrdinalIgnoreCase) ?? false));
             }
 
-            filteredEntries = filters.SortOrder?.ToLowerInvariant() == "oldest"
+            filteredEntries = filters.SortOrder == "oldest"
                 ? filteredEntries.OrderBy(e => e.CreatedAt)
                 : filteredEntries.OrderByDescending(e => e.CreatedAt);
 
@@ -375,9 +371,16 @@ namespace hOps.web.Controllers
                 submission.DateReportedLost = DateTime.Today;
             }
 
-            if (!submission.SelectedPropertyIds.Any() && filters.PropertyId.HasValue)
+            if (!submission.SelectedPropertyIds.Any())
             {
-                submission.SelectedPropertyIds.Add(filters.PropertyId.Value);
+                if (normalizedPropertyFilters.Any())
+                {
+                    submission.SelectedPropertyIds = normalizedPropertyFilters.ToList();
+                }
+                else if (accessiblePropertyIds.Any())
+                {
+                    submission.SelectedPropertyIds.Add(accessiblePropertyIds.First());
+                }
             }
 
             return new LostAndFoundIndexViewModel

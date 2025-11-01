@@ -23,7 +23,7 @@
         !string.IsNullOrWhiteSpace(Model.Filters.FoundBy) ||
         !string.IsNullOrWhiteSpace(Model.Filters.Creator) ||
         !string.IsNullOrWhiteSpace(Model.Filters.Keyword) ||
-        Model.Filters.PropertyId.HasValue;
+        Model.Filters.PropertyIds.Count > 0;
 }
 
 <div class="lost-found-page d-flex flex-column flex-grow-1">
@@ -219,11 +219,20 @@
                         <input type="text" id="keyword" name="Keyword" class="form-control" value="@Model.Filters.Keyword" placeholder="Search notes, items, storage..." />
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label" for="propertyId">Property</label>
-                        <select id="propertyId" name="PropertyId" class="form-select">
+                        <label class="form-label" for="filterPropertyIds">Property</label>
+                        <select id="filterPropertyIds"
+                                name="PropertyIds"
+                                class="form-select js-checkbox-multiselect"
+                                multiple
+                                data-placeholder="All properties"
+                                data-all-label="All properties">
                             @foreach (var property in Model.AccessibleProperties)
                             {
-                                <option value="@property.Id" selected="@(Model.Filters.PropertyId == property.Id ? "selected" : null)">@property.Name (@property.Code)</option>
+                                var selected = Model.Filters.PropertyIds.Contains(property.Id);
+                                var label = string.IsNullOrWhiteSpace(property.Code)
+                                    ? property.Name
+                                    : $"{property.Name} ({property.Code})";
+                                <option value="@property.Id" selected="@(selected ? "selected" : null)">@label</option>
                             }
                         </select>
                     </div>
