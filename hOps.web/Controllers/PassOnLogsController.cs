@@ -4,12 +4,16 @@ using hOps.web.Services;
 using hOps.web.Utilities;
 using hOps.web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System;
+using System.IO;
 using System.Net;
 using System.Text;
 
@@ -24,18 +28,21 @@ namespace hOps.web.Controllers
         private readonly MentionService _mentionService;
         private readonly IEmailSender _emailSender;
         private readonly ILogger<PassOnLogsController> _logger;
+        private readonly IWebHostEnvironment _environment;
 
         public PassOnLogsController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             MentionService mentionService,
             IEmailSender emailSender,
-            ILogger<PassOnLogsController> logger)
+            ILogger<PassOnLogsController> logger,
+            IWebHostEnvironment environment)
             : base(context, userManager)
         {
             _mentionService = mentionService;
             _emailSender = emailSender;
             _logger = logger;
+            _environment = environment;
         }
 
         public async Task<IActionResult> Index([FromQuery] PassOnLogFiltersViewModel? filters)
@@ -246,8 +253,27 @@ namespace hOps.web.Controllers
                 });
             }
 
+            var uploadedAttachments = await SaveAttachmentsAsync(model.Files);
+            foreach (var upload in uploadedAttachments)
+            {
+                log.Attachments.Add(upload.Attachment);
+            }
+
             _context.PassOnLogs.Add(log);
-            await _context.SaveChangesAsync();
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                foreach (var upload in uploadedAttachments)
+                {
+                    DeletePhysicalFile(upload.PhysicalPath);
+                }
+
+                throw;
+            }
 
             var link = Url.Action(nameof(Details), "PassOnLogs", new { id = log.Id }, Request.Scheme)
                 ?? Url.Action(nameof(Index), "PassOnLogs") ?? "/PassOnLogs";
@@ -379,6 +405,7 @@ namespace hOps.web.Controllers
 
             var log = await _context.PassOnLogs
                 .Include(l => l.Properties)
+                .Include(l => l.Attachments)
                 .FirstOrDefaultAsync(l => l.Id == id);
 
             if (log == null)
@@ -403,7 +430,15 @@ namespace hOps.web.Controllers
                 Id = log.Id,
                 Title = log.Title,
                 Body = log.Body,
-                SelectedPropertyIds = log.Properties.Select(p => p.PropertyId).ToList()
+                SelectedPropertyIds = log.Properties.Select(p => p.PropertyId).ToList(),
+                ExistingAttachments = log.Attachments
+                    .Select(a => new PassOnLogAttachmentViewModel
+                    {
+                        Id = a.Id,
+                        FileName = GetAttachmentDisplayName(a),
+                        DownloadUrl = a.FilePath
+                    })
+                    .ToList()
             };
 
             model = BuildFormViewModel(model, accessibleProperties);
@@ -428,6 +463,7 @@ namespace hOps.web.Controllers
 
             var log = await _context.PassOnLogs
                 .Include(l => l.Properties)
+                .Include(l => l.Attachments)
                 .FirstOrDefaultAsync(l => l.Id == id);
 
             if (log == null)
@@ -447,12 +483,24 @@ namespace hOps.web.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
+            var existingAttachments = log.Attachments
+                .Select(a => new PassOnLogAttachmentViewModel
+                {
+                    Id = a.Id,
+                    FileName = GetAttachmentDisplayName(a),
+                    DownloadUrl = a.FilePath
+                })
+                .ToList();
+
+            model.ExistingAttachments = existingAttachments;
+
             model = BuildFormViewModel(model, accessibleProperties);
 
             EnsurePropertySelection(model, accessibleProperties.Select(p => p.Id).ToList());
 
             if (!ModelState.IsValid)
             {
+                model.ExistingAttachments = existingAttachments;
                 return View(model);
             }
 
@@ -479,7 +527,45 @@ namespace hOps.web.Controllers
                 }
             }
 
-            await _context.SaveChangesAsync();
+            var attachmentsMarkedForDeletion = new List<string>();
+            if (model.AttachmentsToDelete != null && model.AttachmentsToDelete.Any())
+            {
+                var toRemove = log.Attachments
+                    .Where(a => model.AttachmentsToDelete.Contains(a.Id))
+                    .ToList();
+
+                foreach (var attachment in toRemove)
+                {
+                    attachmentsMarkedForDeletion.Add(GetPhysicalPathForAttachment(attachment.FilePath));
+                    log.Attachments.Remove(attachment);
+                    _context.PassOnLogAttachments.Remove(attachment);
+                }
+            }
+
+            var uploadedAttachments = await SaveAttachmentsAsync(model.Files);
+            foreach (var upload in uploadedAttachments)
+            {
+                log.Attachments.Add(upload.Attachment);
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                foreach (var upload in uploadedAttachments)
+                {
+                    DeletePhysicalFile(upload.PhysicalPath);
+                }
+
+                throw;
+            }
+
+            foreach (var path in attachmentsMarkedForDeletion)
+            {
+                DeletePhysicalFile(path);
+            }
 
             var link = Url.Action(nameof(Details), "PassOnLogs", new { id = log.Id }, Request.Scheme)
                 ?? Url.Action(nameof(Index), "PassOnLogs") ?? "/PassOnLogs";
@@ -508,6 +594,7 @@ namespace hOps.web.Controllers
                 .Include(l => l.Properties).ThenInclude(lp => lp.Property)
                 .Include(l => l.Comments).ThenInclude(c => c.CreatedBy)
                 .Include(l => l.Views).ThenInclude(v => v.Viewer)
+                .Include(l => l.Attachments)
                 .FirstOrDefaultAsync(l => l.Id == id);
 
             if (log == null)
@@ -677,6 +764,102 @@ namespace hOps.web.Controllers
             }
         }
 
+        private async Task<List<UploadedAttachmentInfo>> SaveAttachmentsAsync(IEnumerable<IFormFile>? files)
+        {
+            var uploads = new List<UploadedAttachmentInfo>();
+            if (files == null)
+            {
+                return uploads;
+            }
+
+            var uploadRoot = Path.Combine(_environment.WebRootPath, "uploads", "passonlogs");
+            Directory.CreateDirectory(uploadRoot);
+
+            foreach (var file in files)
+            {
+                if (file == null || file.Length <= 0)
+                {
+                    continue;
+                }
+
+                var originalFileName = Path.GetFileName(file.FileName);
+                var extension = Path.GetExtension(originalFileName);
+                var uniqueName = $"{Guid.NewGuid()}{extension}";
+                var physicalPath = Path.Combine(uploadRoot, uniqueName);
+
+                using (var stream = System.IO.File.Create(physicalPath))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                var relativePath = Path.Combine("/uploads/passonlogs", uniqueName).Replace("\\", "/");
+
+                uploads.Add(new UploadedAttachmentInfo
+                {
+                    Attachment = new PassOnLogAttachment
+                    {
+                        FilePath = relativePath,
+                        OriginalFileName = originalFileName
+                    },
+                    PhysicalPath = physicalPath
+                });
+            }
+
+            return uploads;
+        }
+
+        private string GetPhysicalPathForAttachment(string? storedPath)
+        {
+            if (string.IsNullOrWhiteSpace(storedPath))
+            {
+                return string.Empty;
+            }
+
+            var trimmed = storedPath.TrimStart('/', '\\');
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                return string.Empty;
+            }
+
+            var normalized = trimmed.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+            return Path.Combine(_environment.WebRootPath, normalized);
+        }
+
+        private void DeletePhysicalFile(string? physicalPath)
+        {
+            if (string.IsNullOrWhiteSpace(physicalPath))
+            {
+                return;
+            }
+
+            try
+            {
+                if (System.IO.File.Exists(physicalPath))
+                {
+                    System.IO.File.Delete(physicalPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete pass-on log attachment at {Path}", physicalPath);
+            }
+        }
+
+        private static string GetAttachmentDisplayName(PassOnLogAttachment attachment)
+        {
+            if (!string.IsNullOrWhiteSpace(attachment.OriginalFileName))
+            {
+                return attachment.OriginalFileName;
+            }
+
+            if (string.IsNullOrWhiteSpace(attachment.FilePath))
+            {
+                return "Attachment";
+            }
+
+            return Path.GetFileName(attachment.FilePath);
+        }
+
         private PassOnLogDetailsViewModel BuildDetailsViewModel(PassOnLog log, string currentUserId)
         {
             var vm = new PassOnLogDetailsViewModel
@@ -707,6 +890,15 @@ namespace hOps.web.Controllers
                         ViewedAt = v.ViewedAt
                     })
                     .ToList(),
+                Attachments = log.Attachments
+                    .OrderBy(a => GetAttachmentDisplayName(a), StringComparer.OrdinalIgnoreCase)
+                    .Select(a => new PassOnLogAttachmentViewModel
+                    {
+                        Id = a.Id,
+                        FileName = GetAttachmentDisplayName(a),
+                        DownloadUrl = a.FilePath
+                    })
+                    .ToList(),
                 NewComment = new PassOnLogCommentInputModel
                 {
                     LogId = log.Id
@@ -714,6 +906,12 @@ namespace hOps.web.Controllers
             };
 
             return vm;
+        }
+
+        private sealed class UploadedAttachmentInfo
+        {
+            public PassOnLogAttachment Attachment { get; init; } = null!;
+            public string PhysicalPath { get; init; } = string.Empty;
         }
 
         private static bool IsLogUnread(PassOnLog log, string userId)

@@ -38,10 +38,28 @@
     </div>
 }
 
+<div class="card mb-4">
+    <div class="card-body">
+        <h4 class="h5 mb-3">Import / Export</h4>
+        <form asp-action="ImportRooms" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+            <input type="hidden" name="propertyId" value="@propertyId" />
+            <div class="col-md-6">
+                <label for="roomsCsvFile" class="form-label">Import rooms via CSV</label>
+                <input type="file" id="roomsCsvFile" name="csvFile" accept=".csv" class="form-control" />
+            </div>
+            <div class="col-md-6 d-flex flex-wrap align-items-center gap-2">
+                <button type="submit" class="btn btn-primary">Import CSV</button>
+                <a asp-action="DownloadRoomsTemplate" class="btn btn-outline-secondary">Download Template</a>
+            </div>
+        </form>
+    </div>
+</div>
+
 <form asp-action="SaveRooms" method="post" id="roomsForm">
     <input type="hidden" name="propertyId" value="@propertyId" />
 
-    <div class="d-flex justify-content-end mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <button type="button" class="btn btn-secondary js-add-row">+ Add Row</button>
         <button type="submit" class="btn btn-success">Save Rooms</button>
     </div>
 
@@ -93,48 +111,42 @@
         </tbody>
     </table>
 
-    <button type="button" id="btnAddRow" class="btn btn-secondary mb-3">➕ Add Row</button>
+    <button type="button" class="btn btn-secondary mb-3 js-add-row">+ Add Row</button>
 
 </form>
-
-<hr />
-
-<h4>Import / Export</h4>
-
-<form asp-action="ImportRooms" method="post" enctype="multipart/form-data" class="mt-2">
-        <input type="hidden" name="propertyId" value="@propertyId" />
-
-    <div class="row mb-3">
-        <div class="col-md-6">
-            <input type="file" name="csvFile" accept=".csv" class="form-control" />
-        </div>
-        <div class="col-md-6">
-            <button type="submit" class="btn btn-primary">Import CSV</button>
-            <a asp-action="DownloadRoomsTemplate" class="btn btn-secondary ms-2">Download Template</a>
-        </div>
-    </div>
-</form>
-
 @section Scripts {
 <script>
-    document.getElementById("btnAddRow").addEventListener("click", function () {
-        var table = document.getElementById("roomsTable").getElementsByTagName("tbody")[0];
-        var template = document.getElementById("newRowTemplate");
-        var clone = template.cloneNode(true);
+    const addRowButtons = document.querySelectorAll(".js-add-row");
+    const roomsTable = document.getElementById("roomsTable");
+    const roomsTableBody = roomsTable ? roomsTable.querySelector("tbody") : null;
+    const newRowTemplate = document.getElementById("newRowTemplate");
+
+    function addRoomRow() {
+        if (!roomsTableBody || !newRowTemplate) {
+            return;
+        }
+
+        var clone = newRowTemplate.cloneNode(true);
         clone.style.display = "";
         clone.removeAttribute("id");
 
-        var rowCount = table.querySelectorAll("tr:not(#newRowTemplate)").length;
+        var rowCount = roomsTableBody.querySelectorAll("tr:not(#newRowTemplate)").length;
         clone.innerHTML = clone.innerHTML.replace(/rooms\[\#\]/g, "rooms[" + rowCount + "]");
-        table.appendChild(clone);
+        roomsTableBody.appendChild(clone);
+    }
+
+    addRowButtons.forEach(function (btn) {
+        btn.addEventListener("click", addRoomRow);
     });
 
-    document.getElementById("roomsTable").addEventListener("click", function (e) {
-        if (e.target && e.target.classList.contains("btn-delete-row")) {
-            var row = e.target.closest("tr");
-            row.remove();
-        }
-    });
+    if (roomsTable) {
+        roomsTable.addEventListener("click", function (e) {
+            if (e.target && e.target.classList.contains("btn-delete-row")) {
+                var row = e.target.closest("tr");
+                row.remove();
+            }
+        });
+    }
 
     var select = document.getElementById("propertySelect");
     if (select) {

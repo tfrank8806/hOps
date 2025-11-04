@@ -19,5 +19,7 @@ namespace hOps.web.Models
         [Required]
         public string UpdatedById { get; set; } = string.Empty;
         public ApplicationUser? UpdatedBy { get; set; }
+
+        public ICollection<ManagerAnnouncementAttachment> Attachments { get; set; } = new List<ManagerAnnouncementAttachment>();
     }
 }

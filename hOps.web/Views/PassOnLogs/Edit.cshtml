@@ -5,7 +5,7 @@
 
 <h2 class="mb-4">Edit Pass On Log</h2>
 
-<form asp-action="Edit" method="post" class="card">
+<form asp-action="Edit" method="post" enctype="multipart/form-data" class="card">
     <div class="card-body">
         <input type="hidden" asp-for="Id" />
         <partial name="_LogForm" model="Model" />

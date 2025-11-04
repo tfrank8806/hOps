@@ -9,20 +9,29 @@ using hOps.web.ViewModels.Home;
 using hOps.web.ViewModels.WorkOrders;
 using hOps.web.Utilities;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.IO;
 
 namespace hOps.web.Controllers
 {
     public class HomeController : BaseController
     {
         private readonly MentionService _mentionService;
+        private readonly IWebHostEnvironment _environment;
 
-        public HomeController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, MentionService mentionService)
+        public HomeController(
+            ApplicationDbContext context,
+            UserManager<ApplicationUser> userManager,
+            MentionService mentionService,
+            IWebHostEnvironment environment)
             : base(context, userManager)
         {
             _mentionService = mentionService;
+            _environment = environment;
         }
 
         public async Task<IActionResult> Index()
@@ -97,7 +106,18 @@ namespace hOps.web.Controllers
                 .FirstOrDefaultAsync(p => p.Id == form.PropertyId);
 
             var announcement = await _context.ManagerAnnouncements
+                .Include(a => a.Attachments)
                 .FirstOrDefaultAsync(a => a.PropertyId == form.PropertyId);
+
+            var savedAnnouncementFiles = await SaveFilesAsync(form.Files, "announcements");
+            var newAnnouncementAttachments = savedAnnouncementFiles
+                .Select(file => new ManagerAnnouncementAttachment
+                {
+                    FilePath = file.RelativePath,
+                    OriginalFileName = file.OriginalFileName
+                })
+                .ToList();
+            var removedAnnouncementPaths = new List<string>();
 
             if (announcement == null)
             {
@@ -109,6 +129,11 @@ namespace hOps.web.Controllers
                     UpdatedAt = DateTime.UtcNow,
                 };
 
+                foreach (var attachment in newAnnouncementAttachments)
+                {
+                    announcement.Attachments.Add(attachment);
+                }
+
                 _context.ManagerAnnouncements.Add(announcement);
             }
             else
@@ -116,9 +141,46 @@ namespace hOps.web.Controllers
                 announcement.Content = form.Content.Trim();
                 announcement.UpdatedById = user.Id;
                 announcement.UpdatedAt = DateTime.UtcNow;
+
+                if (form.AttachmentsToDelete?.Any() == true)
+                {
+                    var toRemove = announcement.Attachments
+                        .Where(a => form.AttachmentsToDelete.Contains(a.Id))
+                        .ToList();
+
+                    foreach (var attachment in toRemove)
+                    {
+                        removedAnnouncementPaths.Add(ResolvePhysicalPath(attachment.FilePath));
+                        announcement.Attachments.Remove(attachment);
+                        _context.ManagerAnnouncementAttachments.Remove(attachment);
+                    }
+                }
+
+                foreach (var attachment in newAnnouncementAttachments)
+                {
+                    announcement.Attachments.Add(attachment);
+                }
             }
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                foreach (var file in savedAnnouncementFiles)
+                {
+                    DeleteFileIfExists(file.PhysicalPath);
+                }
+
+                throw;
+            }
+
+            foreach (var path in removedAnnouncementPaths)
+            {
+                DeleteFileIfExists(path);
+            }
+
             await _mentionService.CreateMentionNotificationsAsync(
                 announcement.Content,
                 user,
@@ -163,8 +225,35 @@ namespace hOps.web.Controllers
                 CreatedById = user.Id,
             };
 
+            var savedBulletinFiles = await SaveFilesAsync(form.Files, "bulletins");
+            var newBulletinAttachments = savedBulletinFiles
+                .Select(file => new BulletinPostAttachment
+                {
+                    FilePath = file.RelativePath,
+                    OriginalFileName = file.OriginalFileName
+                })
+                .ToList();
+
+            foreach (var attachment in newBulletinAttachments)
+            {
+                post.Attachments.Add(attachment);
+            }
+
             _context.BulletinPosts.Add(post);
-            await _context.SaveChangesAsync();
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                foreach (var file in savedBulletinFiles)
+                {
+                    DeleteFileIfExists(file.PhysicalPath);
+                }
+
+                throw;
+            }
 
             await _mentionService.CreateMentionNotificationsAsync(
                 post.Content,
@@ -204,6 +293,7 @@ namespace hOps.web.Controllers
                 .FirstOrDefaultAsync(p => p.Id == form.PropertyId);
 
             var post = await _context.BulletinPosts
+                .Include(p => p.Attachments)
                 .FirstOrDefaultAsync(p => p.Id == form.Id.Value && p.PropertyId == form.PropertyId);
 
             if (post == null)
@@ -224,7 +314,54 @@ namespace hOps.web.Controllers
             post.UpdatedAt = DateTime.UtcNow;
             post.UpdatedById = user.Id;
 
-            await _context.SaveChangesAsync();
+            var savedBulletinFiles = await SaveFilesAsync(form.Files, "bulletins");
+            var newBulletinAttachments = savedBulletinFiles
+                .Select(file => new BulletinPostAttachment
+                {
+                    FilePath = file.RelativePath,
+                    OriginalFileName = file.OriginalFileName
+                })
+                .ToList();
+            var removedPaths = new List<string>();
+
+            if (form.AttachmentsToDelete?.Any() == true)
+            {
+                var toRemove = post.Attachments
+                    .Where(a => form.AttachmentsToDelete.Contains(a.Id))
+                    .ToList();
+
+                foreach (var attachment in toRemove)
+                {
+                    removedPaths.Add(ResolvePhysicalPath(attachment.FilePath));
+                    post.Attachments.Remove(attachment);
+                    _context.BulletinPostAttachments.Remove(attachment);
+                }
+            }
+
+            foreach (var attachment in newBulletinAttachments)
+            {
+                post.Attachments.Add(attachment);
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                foreach (var file in savedBulletinFiles)
+                {
+                    DeleteFileIfExists(file.PhysicalPath);
+                }
+
+                throw;
+            }
+
+            foreach (var path in removedPaths)
+            {
+                DeleteFileIfExists(path);
+            }
+
             await _mentionService.CreateMentionNotificationsAsync(
                 post.Content,
                 user,
@@ -252,6 +389,7 @@ namespace hOps.web.Controllers
             }
 
             var post = await _context.BulletinPosts
+                .Include(p => p.Attachments)
                 .FirstOrDefaultAsync(p => p.Id == id && p.PropertyId == propertyId);
 
             if (post == null)
@@ -268,8 +406,19 @@ namespace hOps.web.Controllers
                 return Forbid();
             }
 
+            var attachmentPaths = post.Attachments
+                .Select(a => ResolvePhysicalPath(a.FilePath))
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .ToList();
+
             _context.BulletinPosts.Remove(post);
             await _context.SaveChangesAsync();
+
+            foreach (var path in attachmentPaths)
+            {
+                DeleteFileIfExists(path);
+            }
+
             TempData["HomeMessage"] = "Bulletin entry removed.";
             return RedirectToAction(nameof(Index));
         }
@@ -278,6 +427,7 @@ namespace hOps.web.Controllers
         {
             var announcement = await _context.ManagerAnnouncements
                 .Include(a => a.UpdatedBy)
+                .Include(a => a.Attachments)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(a => a.PropertyId == propertyId);
 
@@ -289,6 +439,15 @@ namespace hOps.web.Controllers
                     Content = announcement.Content,
                     UpdatedAt = announcement.UpdatedAt,
                     UpdatedByName = BuildDisplayName(announcement.UpdatedBy),
+                    Attachments = announcement.Attachments
+                        .OrderBy(a => BuildAttachmentDisplayName(a.OriginalFileName, a.FilePath), StringComparer.OrdinalIgnoreCase)
+                        .Select(a => new HomeAttachmentViewModel
+                        {
+                            Id = a.Id,
+                            FileName = BuildAttachmentDisplayName(a.OriginalFileName, a.FilePath),
+                            DownloadUrl = a.FilePath
+                        })
+                        .ToList(),
                 };
             }
         }
@@ -299,6 +458,7 @@ namespace hOps.web.Controllers
                 .Where(p => p.PropertyId == propertyId)
                 .Include(p => p.CreatedBy)
                 .Include(p => p.UpdatedBy)
+                .Include(p => p.Attachments)
                 .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
@@ -315,6 +475,15 @@ namespace hOps.web.Controllers
                     UpdatedAt = p.UpdatedAt,
                     UpdatedByName = BuildDisplayName(p.UpdatedBy),
                     CanEdit = canManageAll || p.CreatedById == currentUser.Id,
+                    Attachments = p.Attachments
+                        .OrderBy(a => BuildAttachmentDisplayName(a.OriginalFileName, a.FilePath), StringComparer.OrdinalIgnoreCase)
+                        .Select(a => new HomeAttachmentViewModel
+                        {
+                            Id = a.Id,
+                            FileName = BuildAttachmentDisplayName(a.OriginalFileName, a.FilePath),
+                            DownloadUrl = a.FilePath
+                        })
+                        .ToList(),
                 })
                 .ToList();
         }
@@ -705,6 +874,107 @@ namespace hOps.web.Controllers
                 .AnyAsync(upa => upa.PropertyId == propertyId && upa.ApplicationUserId == user.Id);
         }
 
+        private async Task<List<FileSaveResult>> SaveFilesAsync(IEnumerable<IFormFile>? files, string folderName)
+        {
+            var results = new List<FileSaveResult>();
+            if (files == null)
+            {
+                return results;
+            }
+
+            var uploadRoot = Path.Combine(_environment.WebRootPath, "uploads", folderName);
+            Directory.CreateDirectory(uploadRoot);
+
+            foreach (var file in files)
+            {
+                if (file == null || file.Length <= 0)
+                {
+                    continue;
+                }
+
+                var originalFileName = Path.GetFileName(file.FileName);
+                var extension = Path.GetExtension(originalFileName);
+                var uniqueName = $"{Guid.NewGuid()}{extension}";
+                var physicalPath = Path.Combine(uploadRoot, uniqueName);
+
+                using (var stream = System.IO.File.Create(physicalPath))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                var relativePath = Path.Combine("/uploads", folderName, uniqueName)
+                    .Replace("\\", "/");
+
+                results.Add(new FileSaveResult
+                {
+                    PhysicalPath = physicalPath,
+                    RelativePath = relativePath,
+                    OriginalFileName = string.IsNullOrWhiteSpace(originalFileName) ? null : originalFileName
+                });
+            }
+
+            return results;
+        }
+
+        private string ResolvePhysicalPath(string? storedPath)
+        {
+            if (string.IsNullOrWhiteSpace(storedPath))
+            {
+                return string.Empty;
+            }
+
+            var trimmed = storedPath.TrimStart('/', '\\');
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                return string.Empty;
+            }
+
+            var normalized = trimmed
+                .Replace('/', Path.DirectorySeparatorChar)
+                .Replace('\\', Path.DirectorySeparatorChar);
+
+            return Path.Combine(_environment.WebRootPath, normalized);
+        }
+
+        private static void DeleteFileIfExists(string? physicalPath)
+        {
+            if (string.IsNullOrWhiteSpace(physicalPath))
+            {
+                return;
+            }
+
+            try
+            {
+                if (System.IO.File.Exists(physicalPath))
+                {
+                    System.IO.File.Delete(physicalPath);
+                }
+            }
+            catch
+            {
+                // Swallow clean-up failures; files can be removed manually if needed.
+            }
+        }
+
+        private static string BuildAttachmentDisplayName(string? originalName, string filePath)
+        {
+            if (!string.IsNullOrWhiteSpace(originalName))
+            {
+                return originalName;
+            }
+
+            return string.IsNullOrWhiteSpace(filePath)
+                ? "Attachment"
+                : Path.GetFileName(filePath);
+        }
+
+        private sealed class FileSaveResult
+        {
+            public string PhysicalPath { get; init; } = string.Empty;
+            public string RelativePath { get; init; } = string.Empty;
+            public string? OriginalFileName { get; init; }
+        }
+
         public class ManagerAnnouncementForm
         {
             [Required]
@@ -713,6 +983,10 @@ namespace hOps.web.Controllers
             [Required]
             [MaxLength(4000)]
             public string Content { get; set; } = string.Empty;
+
+            public List<IFormFile> Files { get; set; } = new();
+
+            public List<int> AttachmentsToDelete { get; set; } = new();
         }
 
         public class BulletinPostForm
@@ -725,6 +999,10 @@ namespace hOps.web.Controllers
             [Required]
             [MaxLength(2000)]
             public string Content { get; set; } = string.Empty;
+
+            public List<IFormFile> Files { get; set; } = new();
+
+            public List<int> AttachmentsToDelete { get; set; } = new();
         }
     }
 }

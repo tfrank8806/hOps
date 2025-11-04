@@ -29,5 +29,7 @@ namespace hOps.web.Models
         public ICollection<PassOnLogComment> Comments { get; set; } = new List<PassOnLogComment>();
 
         public ICollection<PassOnLogView> Views { get; set; } = new List<PassOnLogView>();
+
+        public ICollection<PassOnLogAttachment> Attachments { get; set; } = new List<PassOnLogAttachment>();
     }
 }

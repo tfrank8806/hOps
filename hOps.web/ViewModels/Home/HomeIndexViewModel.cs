@@ -32,6 +32,7 @@ namespace hOps.web.ViewModels.Home
         public string Content { get; set; } = string.Empty;
         public DateTime? UpdatedAt { get; set; }
         public string? UpdatedByName { get; set; }
+        public List<HomeAttachmentViewModel> Attachments { get; set; } = new();
     }
 
     public class BulletinPostViewModel
@@ -43,6 +44,7 @@ namespace hOps.web.ViewModels.Home
         public DateTime? UpdatedAt { get; set; }
         public string? UpdatedByName { get; set; }
         public bool CanEdit { get; set; }
+        public List<HomeAttachmentViewModel> Attachments { get; set; } = new();
     }
 
     public class RoomLayoutTileViewModel
@@ -123,5 +125,12 @@ namespace hOps.web.ViewModels.Home
         public string CreatorName { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public string DetailUrl { get; set; } = string.Empty;
+    }
+
+    public class HomeAttachmentViewModel
+    {
+        public int Id { get; set; }
+        public string FileName { get; set; } = string.Empty;
+        public string DownloadUrl { get; set; } = string.Empty;
     }
 }

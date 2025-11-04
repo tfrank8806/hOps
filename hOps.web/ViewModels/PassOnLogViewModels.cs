@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace hOps.web.ViewModels
@@ -26,6 +27,13 @@ namespace hOps.web.ViewModels
         public List<PassOnLogPropertyOptionViewModel> PropertyOptions { get; set; } = new();
 
         public bool ShowPropertySelection => PropertyOptions.Count > 1;
+
+        [Display(Name = "Attachments")]
+        public List<IFormFile> Files { get; set; } = new();
+
+        public List<PassOnLogAttachmentViewModel> ExistingAttachments { get; set; } = new();
+
+        public List<int> AttachmentsToDelete { get; set; } = new();
     }
 
     public class PassOnLogPropertyOptionViewModel
@@ -108,6 +116,7 @@ namespace hOps.web.ViewModels
         public List<PassOnLogViewerViewModel> Viewers { get; set; } = new();
         public bool CanEdit { get; set; }
         public PassOnLogCommentInputModel NewComment { get; set; } = new();
+        public List<PassOnLogAttachmentViewModel> Attachments { get; set; } = new();
     }
 
     public class PassOnLogCommentViewModel
@@ -132,5 +141,12 @@ namespace hOps.web.ViewModels
         [MaxLength(2000)]
         [Display(Name = "Comment")]
         public string Body { get; set; } = string.Empty;
+    }
+
+    public class PassOnLogAttachmentViewModel
+    {
+        public int Id { get; set; }
+        public string FileName { get; set; } = string.Empty;
+        public string DownloadUrl { get; set; } = string.Empty;
     }
 }

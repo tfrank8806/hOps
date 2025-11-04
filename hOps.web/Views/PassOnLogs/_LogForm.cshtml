@@ -41,3 +41,32 @@ else if (Model.PropertyOptions.Count == 1)
         <div class="form-control-plaintext">@Model.PropertyOptions[0].Name (@Model.PropertyOptions[0].Code)</div>
     </div>
 }
+
+@if (Model.ExistingAttachments.Any())
+{
+    <div class="mb-3">
+        <label class="form-label">Current Attachments</label>
+        <ul class="list-unstyled mb-2">
+            @foreach (var attachment in Model.ExistingAttachments)
+            {
+                var checkboxId = $"removeAttachment_{attachment.Id}";
+                var isMarked = Model.AttachmentsToDelete.Contains(attachment.Id);
+                <li class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-2">
+                    <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" name="AttachmentsToDelete" value="@attachment.Id" id="@checkboxId" @(isMarked ? "checked" : string.Empty) />
+                        <label class="form-check-label" for="@checkboxId">Remove</label>
+                    </div>
+                </li>
+            }
+        </ul>
+        <div class="form-text">Select remove to delete an existing attachment when you save.</div>
+    </div>
+}
+
+<div class="mb-3">
+    <label asp-for="Files" class="form-label"></label>
+    <input asp-for="Files" class="form-control" type="file" multiple />
+    <div class="form-text">Attach supporting files like photos or documents. You can select multiple files at once.</div>
+    <span asp-validation-for="Files" class="text-danger"></span>
+</div>

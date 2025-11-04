@@ -34,6 +34,8 @@ namespace hOps.web.Data
         public DbSet<ManagerAnnouncement> ManagerAnnouncements { get; set; }
 
         public DbSet<BulletinPost> BulletinPosts { get; set; }
+        public DbSet<ManagerAnnouncementAttachment> ManagerAnnouncementAttachments { get; set; }
+        public DbSet<BulletinPostAttachment> BulletinPostAttachments { get; set; }
 
         public DbSet<PackageLogEntry> PackageLogEntries { get; set; }
 
@@ -43,6 +45,7 @@ namespace hOps.web.Data
         public DbSet<PassOnLogProperty> PassOnLogProperties { get; set; }
         public DbSet<PassOnLogComment> PassOnLogComments { get; set; }
         public DbSet<PassOnLogView> PassOnLogViews { get; set; }
+        public DbSet<PassOnLogAttachment> PassOnLogAttachments { get; set; }
         public DbSet<DirectMessageConversation> DirectMessageConversations { get; set; }
         public DbSet<DirectMessage> DirectMessages { get; set; }
         public DbSet<UserNotification> UserNotifications { get; set; }
@@ -197,6 +200,12 @@ namespace hOps.web.Data
                 .WithMany()
                 .HasForeignKey(c => c.CreatedById);
 
+            builder.Entity<PassOnLogAttachment>()
+                .HasOne(a => a.PassOnLog)
+                .WithMany(l => l.Attachments)
+                .HasForeignKey(a => a.PassOnLogId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             builder.Entity<Bookmark>()
                 .HasOne(b => b.CreatedBy)
                 .WithMany(u => u.CreatedBookmarks)
@@ -216,6 +225,18 @@ namespace hOps.web.Data
             builder.Entity<Bookmark>()
                 .Property(b => b.Url)
                 .HasMaxLength(2048);
+
+            builder.Entity<ManagerAnnouncementAttachment>()
+                .HasOne(a => a.ManagerAnnouncement)
+                .WithMany(a => a.Attachments)
+                .HasForeignKey(a => a.ManagerAnnouncementId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<BulletinPostAttachment>()
+                .HasOne(a => a.BulletinPost)
+                .WithMany(p => p.Attachments)
+                .HasForeignKey(a => a.BulletinPostId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<Bookmark>()
                 .Property(b => b.Description)

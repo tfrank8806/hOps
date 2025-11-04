@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using hOps.web.Data;
 
@@ -10,9 +11,11 @@ using hOps.web.Data;
 namespace hOps.web.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251104154640_AddPassOnLogAttachments")]
+    partial class AddPassOnLogAttachments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.20");
@@ -334,31 +337,6 @@ namespace hOps.web.Migrations
                     b.HasIndex("UpdatedById");
 
                     b.ToTable("BulletinPosts");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.BulletinPostAttachment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("BulletinPostId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("FilePath")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("OriginalFileName")
-                        .HasMaxLength(256)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BulletinPostId");
-
-                    b.ToTable("BulletinPostAttachments");
                 });
 
             modelBuilder.Entity("hOps.web.Models.CalendarCategory", b =>
@@ -752,31 +730,6 @@ namespace hOps.web.Migrations
                     b.HasIndex("UpdatedById");
 
                     b.ToTable("ManagerAnnouncements");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.ManagerAnnouncementAttachment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("FilePath")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ManagerAnnouncementId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("OriginalFileName")
-                        .HasMaxLength(256)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ManagerAnnouncementId");
-
-                    b.ToTable("ManagerAnnouncementAttachments");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PackageLogEntry", b =>
@@ -1532,17 +1485,6 @@ namespace hOps.web.Migrations
                     b.Navigation("UpdatedBy");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.BulletinPostAttachment", b =>
-                {
-                    b.HasOne("hOps.web.Models.BulletinPost", "BulletinPost")
-                        .WithMany("Attachments")
-                        .HasForeignKey("BulletinPostId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("BulletinPost");
-                });
-
             modelBuilder.Entity("hOps.web.Models.CalendarCategory", b =>
                 {
                     b.HasOne("hOps.web.Models.Property", "Property")
@@ -1745,17 +1687,6 @@ namespace hOps.web.Migrations
                     b.Navigation("Property");
 
                     b.Navigation("UpdatedBy");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.ManagerAnnouncementAttachment", b =>
-                {
-                    b.HasOne("hOps.web.Models.ManagerAnnouncement", "ManagerAnnouncement")
-                        .WithMany("Attachments")
-                        .HasForeignKey("ManagerAnnouncementId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ManagerAnnouncement");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PackageLogEntry", b =>
@@ -2064,11 +1995,6 @@ namespace hOps.web.Migrations
                     b.Navigation("UserPropertyAccesses");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.BulletinPost", b =>
-                {
-                    b.Navigation("Attachments");
-                });
-
             modelBuilder.Entity("hOps.web.Models.CalendarCategory", b =>
                 {
                     b.Navigation("Events");
@@ -2094,11 +2020,6 @@ namespace hOps.web.Migrations
                     b.Navigation("Documents");
 
                     b.Navigation("SubFolders");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.ManagerAnnouncement", b =>
-                {
-                    b.Navigation("Attachments");
                 });
 
             modelBuilder.Entity("hOps.web.Models.PassOnLog", b =>

@@ -51,23 +51,63 @@
                     else
                     {
                         <div class="announcement-content rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(Model.Announcement.Content))</div>
-                        if (Model.Announcement.UpdatedAt.HasValue)
+                        @if (Model.Announcement.UpdatedAt.HasValue)
                         {
                             var updatedLocal = TimeZoneService.ConvertToUserTime(Model.Announcement.UpdatedAt.Value);
                             <p class="text-muted small mb-0 mt-2">Last updated @updatedLocal.ToString("g") @if (!string.IsNullOrWhiteSpace(Model.Announcement.UpdatedByName)){<text> by @Model.Announcement.UpdatedByName</text>}</p>
                         }
                     }
 
+                    @if (hasProperty && Model.Announcement.Attachments.Any())
+                    {
+                        <div class="mt-3">
+                            <h3 class="h6 mb-2">Attachments</h3>
+                            <ul class="list-unstyled mb-0">
+                                @foreach (var attachment in Model.Announcement.Attachments)
+                                {
+                                    <li class="mb-2">
+                                        <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
                     @if (Model.CanManageAnnouncements && hasProperty)
                     {
                         <div class="collapse mt-3" id="announcementEditor">
-                            <form asp-action="UpdateAnnouncement" method="post">
+                            <form asp-action="UpdateAnnouncement" method="post" enctype="multipart/form-data">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="PropertyId" value="@property!.Id" />
                                 <div class="mb-3">
                                     <label for="announcementContent" class="form-label">Announcement</label>
                                     <textarea class="form-control" id="announcementContent" name="Content" rows="6" maxlength="4000" data-enable-mentions="true" data-rich-text="true">@Model.Announcement.Content</textarea>
                                     <div class="form-text">Use the toolbar for bold, italic, underline, lists, and quotes. Markdown shortcuts also work.</div>
+                                </div>
+                                @if (Model.Announcement.Attachments.Any())
+                                {
+                                    <div class="mb-3">
+                                        <label class="form-label">Current Attachments</label>
+                                        <ul class="list-unstyled mb-2">
+                                            @foreach (var attachment in Model.Announcement.Attachments)
+                                            {
+                                                var checkboxId = $"announcementRemove_{attachment.Id}";
+                                                <li class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-2">
+                                                    <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
+                                                    <div class="form-check mb-0">
+                                                        <input class="form-check-input" type="checkbox" name="AttachmentsToDelete" value="@attachment.Id" id="@checkboxId" />
+                                                        <label class="form-check-label" for="@checkboxId">Remove</label>
+                                                    </div>
+                                                </li>
+                                            }
+                                        </ul>
+                                        <div class="form-text">Select remove to delete files when you save.</div>
+                                    </div>
+                                }
+                                <div class="mb-3">
+                                    <label class="form-label" for="announcementFiles">Add Attachments</label>
+                                    <input class="form-control" type="file" id="announcementFiles" name="Files" multiple />
+                                    <div class="form-text">Upload photos or documents to share with your team.</div>
                                 </div>
                                 <div class="d-flex justify-content-end gap-2">
                                     <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#announcementEditor">Cancel</button>
@@ -96,13 +136,18 @@
                     }
                     else
                     {
-                        <form asp-action="CreateBulletin" method="post" class="mb-4">
+                        <form asp-action="CreateBulletin" method="post" enctype="multipart/form-data" class="mb-4">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="PropertyId" value="@property!.Id" />
-                            <div class="mb-2">
+                            <div class="mb-3">
                                 <label for="newBulletinContent" class="form-label">Share an update</label>
                                 <textarea class="form-control" id="newBulletinContent" name="Content" rows="3" maxlength="2000" placeholder="Add a note for the team" required data-enable-mentions="true" data-rich-text="true"></textarea>
                                 <div class="form-text">Formatting supports bold, italic, underline, lists, and quotes to highlight key details.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="newBulletinFiles">Attachments (optional)</label>
+                                <input class="form-control" type="file" id="newBulletinFiles" name="Files" multiple />
+                                <div class="form-text">Add photos or documents to give more context.</div>
                             </div>
                             <div class="d-flex justify-content-end">
                                 <button type="submit" class="btn btn-primary">Post to Bulletin</button>
@@ -149,17 +194,56 @@
                                         </div>
                                         <div class="bulletin-content rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(post.Content))</div>
 
+                                        @if (post.Attachments.Any())
+                                        {
+                                            <div class="mt-2">
+                                                <ul class="list-unstyled small mb-0">
+                                                    @foreach (var attachment in post.Attachments)
+                                                    {
+                                                        <li class="mb-1">
+                                                            <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            </div>
+                                        }
+
                                         @if (post.CanEdit)
                                         {
                                             <div class="collapse mt-3" id="@collapseId">
-                                                <form asp-action="UpdateBulletin" method="post" class="border-top pt-3">
+                                                <form asp-action="UpdateBulletin" method="post" enctype="multipart/form-data" class="border-top pt-3">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="Id" value="@post.Id" />
                                                     <input type="hidden" name="PropertyId" value="@property!.Id" />
-                                                    <div class="mb-2">
+                                                    <div class="mb-3">
                                                         <label class="form-label" for="bulletinContent_@post.Id">Edit message</label>
                                                         <textarea class="form-control" id="bulletinContent_@post.Id" name="Content" rows="3" maxlength="2000" data-enable-mentions="true" data-rich-text="true">@post.Content</textarea>
                                                         <div class="form-text">Use the toolbar to emphasize changes before saving.</div>
+                                                    </div>
+                                                    @if (post.Attachments.Any())
+                                                    {
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Current Attachments</label>
+                                                            <ul class="list-unstyled mb-2">
+                                                                @foreach (var attachment in post.Attachments)
+                                                                {
+                                                                    var checkboxId = $"bulletinRemove_{post.Id}_{attachment.Id}";
+                                                                    <li class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-2">
+                                                                        <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
+                                                                        <div class="form-check mb-0">
+                                                                            <input class="form-check-input" type="checkbox" name="AttachmentsToDelete" value="@attachment.Id" id="@checkboxId" />
+                                                                            <label class="form-check-label" for="@checkboxId">Remove</label>
+                                                                        </div>
+                                                                    </li>
+                                                                }
+                                                            </ul>
+                                                            <div class="form-text">Select remove to delete existing files before saving.</div>
+                                                        </div>
+                                                    }
+                                                    <div class="mb-3">
+                                                        <label class="form-label" for="bulletinFiles_@post.Id">Add Attachments</label>
+                                                        <input class="form-control" type="file" id="bulletinFiles_@post.Id" name="Files" multiple />
+                                                        <div class="form-text">Attach additional files to share updated details.</div>
                                                     </div>
                                                     <div class="d-flex justify-content-end gap-2">
                                                         <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#@collapseId">Cancel</button>

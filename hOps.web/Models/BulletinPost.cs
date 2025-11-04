@@ -24,5 +24,7 @@ namespace hOps.web.Models
 
         public string? UpdatedById { get; set; }
         public ApplicationUser? UpdatedBy { get; set; }
+
+        public ICollection<BulletinPostAttachment> Attachments { get; set; } = new List<BulletinPostAttachment>();
     }
 }

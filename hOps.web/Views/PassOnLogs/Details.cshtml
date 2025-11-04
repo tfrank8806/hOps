@@ -33,6 +33,23 @@
     </div>
 </div>
 
+@if (Model.Attachments.Any())
+{
+    <div class="card mb-4">
+        <div class="card-header">Attachments (@Model.Attachments.Count)</div>
+        <div class="card-body">
+            <ul class="list-unstyled mb-0">
+                @foreach (var attachment in Model.Attachments)
+                {
+                    <li class="mb-2">
+                        <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+}
+
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="card mb-4">
