@@ -557,30 +557,52 @@ namespace hOps.web.Controllers
             {
                 var hasRoom = entry.Room != null && entry.Room.Id != 0;
                 var baseRoomNumber = hasRoom ? entry.Room!.RoomNumber : null;
-                var displayLabel = !string.IsNullOrWhiteSpace(entry.Layout.Label)
-                    ? entry.Layout.Label!.Trim()
-                    : (!string.IsNullOrWhiteSpace(baseRoomNumber) ? baseRoomNumber! : $"Tile {entry.Layout.Id}");
+                var rawShapeType = entry.Layout.ShapeType;
+                var shapeType = string.IsNullOrWhiteSpace(rawShapeType) ? "rectangle" : rawShapeType!.Trim();
+                var rawShapeData = entry.Layout.ShapeData;
+                var shapeData = string.IsNullOrWhiteSpace(rawShapeData) ? null : rawShapeData!.Trim();
+                var isConnector = string.Equals(shapeType, "connector", StringComparison.OrdinalIgnoreCase);
+                var connectorSymbol = "||";
+                var hasCustomLabel = !string.IsNullOrWhiteSpace(entry.Layout.Label);
+                var trimmedLabel = hasCustomLabel ? entry.Layout.Label!.Trim() : string.Empty;
+                if (isConnector && (string.Equals(trimmedLabel, "═", StringComparison.Ordinal) || string.Equals(trimmedLabel, "║", StringComparison.Ordinal)))
+                {
+                    hasCustomLabel = false;
+                    trimmedLabel = string.Empty;
+                }
+
+                var displayLabel = hasCustomLabel
+                    ? trimmedLabel
+                    : (isConnector
+                        ? connectorSymbol
+                        : (!string.IsNullOrWhiteSpace(baseRoomNumber) ? baseRoomNumber! : $"Tile {entry.Layout.Id}"));
 
                 var tile = new RoomLayoutTileViewModel
                 {
                     LayoutId = entry.Layout.Id,
                     RoomId = hasRoom ? entry.Room!.Id : 0,
                     RoomNumber = displayLabel,
-                    RoomType = hasRoom ? entry.Room!.RoomType : "Custom Tile",
+                    RoomType = hasRoom
+                        ? entry.Room!.RoomType
+                        : (isConnector ? "Connector" : "Custom Tile"),
                     Floor = entry.Layout.Floor,
                     X = entry.Layout.X,
                     Y = entry.Layout.Y,
                     Width = entry.Layout.Width,
                     Height = entry.Layout.Height,
-                    ShapeType = entry.Layout.ShapeType ?? "rectangle",
-                    ShapeData = entry.Layout.ShapeData,
+                    ShapeType = shapeType,
+                    ShapeData = shapeData,
                     FloorColor = floorColorMap.TryGetValue(entry.Layout.Floor, out var color)
                         ? color
                         : "#6c757d",
                     CssClass = "room-tile",
                 };
 
-                if (!hasRoom)
+                if (isConnector)
+                {
+                    tile.CssClass = AppendCss(tile.CssClass, "room-tile--connector");
+                }
+                else if (!hasRoom)
                 {
                     tile.CssClass = AppendCss(tile.CssClass, "room-tile--custom");
                 }

@@ -339,14 +339,19 @@
                                     var height = Math.Round((double)tile.Height / maxHeightAll * 100, 2);
                                     var overlayBg = $"{tile.FloorColor}33";
                                     var navigateUrl = tile.Badges.FirstOrDefault(b => !string.IsNullOrWhiteSpace(b.Url))?.Url ?? string.Empty;
+                                    var isConnector = string.Equals(tile.ShapeType, "connector", StringComparison.OrdinalIgnoreCase);
                                     var ariaLabelBase = tile.RoomId == 0
-                                        ? $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} {tile.RoomNumber}"
+                                        ? (isConnector
+                                            ? $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} connector"
+                                            : $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} {tile.RoomNumber}")
                                         : $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} room {tile.RoomNumber}";
                                     var ariaLabel = tile.Badges.Any()
                                         ? $"{ariaLabelBase} with {string.Join(", ", tile.Badges.Select(b => b.Text))}"
                                         : ariaLabelBase;
                                     <div class="@($"{tile.CssClass} room-tile-overlay")"
                                          data-floor="@tile.Floor"
+                                         data-shape-type="@tile.ShapeType"
+                                         data-shape-data="@tile.ShapeData"
                                          data-navigate-url="@navigateUrl"
                                          style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%;border-color:@tile.FloorColor;background-color:@overlayBg;"
                                          aria-label="@ariaLabel"
@@ -367,6 +372,10 @@
                                                     }
                                                 }
                                             </div>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(tile.RoomNumber))
+                                        {
+                                            <span class="tile-label">@tile.RoomNumber</span>
                                         }
                                     </div>
                                 }
@@ -400,26 +409,35 @@
                                             var top = Math.Round((double)tile.Y / maxHeight * 100, 2);
                                             var width = Math.Round((double)tile.Width / maxWidth * 100, 2);
                                             var height = Math.Round((double)tile.Height / maxHeight * 100, 2);
-                                            <div class="@tile.CssClass" style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%">
-                                                <div class="tile-header">
-                                                    <span class="tile-room">@tile.RoomNumber</span>
-                                                    <span class="tile-type">@tile.RoomType</span>
-                                                </div>
-                                                @if (tile.Badges.Any())
+                                            var isConnector = string.Equals(tile.ShapeType, "connector", StringComparison.OrdinalIgnoreCase);
+                                            var connectorDirection = string.Equals(tile.ShapeData, "horizontal", StringComparison.OrdinalIgnoreCase) ? "horizontal" : "vertical";
+                                            <div class="@tile.CssClass" data-shape-type="@tile.ShapeType" data-shape-data="@tile.ShapeData" style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%">
+                                                @if (isConnector)
                                                 {
-                                                    <div class="tile-badges">
-                                                        @foreach (var badge in tile.Badges)
-                                                        {
-                                                            if (!string.IsNullOrEmpty(badge.Url))
-                                                            {
-                                                                <a class="badge rounded-pill text-bg-@badge.Variant" href="@badge.Url">@badge.Text</a>
-                                                            }
-                                                            else
-                                                            {
-                                                                <span class="badge rounded-pill text-bg-@badge.Variant">@badge.Text</span>
-                                                            }
-                                                        }
+                                                    <span class="tile-connector-icon tile-connector-icon--@connectorDirection">@tile.RoomNumber</span>
+                                                }
+                                                else
+                                                {
+                                                    <div class="tile-header">
+                                                        <span class="tile-room">@tile.RoomNumber</span>
+                                                        <span class="tile-type">@tile.RoomType</span>
                                                     </div>
+                                                    @if (tile.Badges.Any())
+                                                    {
+                                                        <div class="tile-badges">
+                                                            @foreach (var badge in tile.Badges)
+                                                            {
+                                                                if (!string.IsNullOrEmpty(badge.Url))
+                                                                {
+                                                                    <a class="badge rounded-pill text-bg-@badge.Variant" href="@badge.Url">@badge.Text</a>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="badge rounded-pill text-bg-@badge.Variant">@badge.Text</span>
+                                                                }
+                                                            }
+                                                        </div>
+                                                    }
                                                 }
                                             </div>
                                         }
@@ -484,6 +502,28 @@
             background: linear-gradient(135deg, rgba(108, 117, 125, 0.12), rgba(255, 255, 255, 0.96));
         }
 
+        .layout-canvas .room-tile--connector {
+            border: none;
+            background: rgba(73, 80, 87, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tile-connector-icon {
+            font-weight: 700;
+            font-size: 1.6rem;
+            letter-spacing: 0.1rem;
+            color: #0f2e61;
+            line-height: 1;
+        }
+
+        .tile-connector-icon--horizontal {
+            transform: rotate(90deg);
+            display: inline-block;
+            transform-origin: center;
+        }
+
         .layout-canvas.multi-floor {
             isolation: isolate;
         }
@@ -525,6 +565,33 @@
             align-items: center;
             text-align: center;
             padding: 0.4rem;
+        }
+
+        .room-tile-overlay .tile-label {
+            display: inline-block;
+            width: 100%;
+            font-weight: 600;
+            font-size: 0.75rem;
+            color: #0f2e61;
+            margin-top: 0.25rem;
+            line-height: 1.1;
+        }
+
+        .room-tile-overlay.room-tile--connector {
+            border: none;
+            background-color: rgba(73, 80, 87, 0.08);
+            display: flex;
+        }
+
+        .room-tile-overlay.room-tile--connector .tile-label {
+            font-size: 1.1rem;
+            letter-spacing: 0.1rem;
+        }
+
+        .room-tile-overlay.room-tile--connector[data-shape-data="horizontal"] .tile-label {
+            transform: rotate(90deg);
+            display: inline-block;
+            transform-origin: center;
         }
 
         .room-tile-overlay.room-tile--custom {

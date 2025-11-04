@@ -44,6 +44,41 @@
             gap: 0.5rem;
         }
 
+        #palette.is-collapsed {
+            display: none;
+        }
+
+        .pal-shape--connector {
+            background-color: #f8f9fa;
+            border-style: dashed;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pal-shape--connector-horizontal {
+            transform: rotate(90deg);
+            transform-origin: center;
+        }
+
+        .room-box--connector {
+            background-color: transparent !important;
+            border: 1px dashed #6c757d !important;
+        }
+
+        .room-box--connector .room-label {
+            font-weight: 700;
+            font-size: 1.4rem;
+            letter-spacing: 0.1rem;
+            pointer-events: none;
+            line-height: 1;
+        }
+
+        .room-box--connector[data-connector-direction="horizontal"] .room-label {
+            transform: rotate(90deg);
+        }
+
         .room-box .box-controls {
             position: absolute;
             right: 0;
@@ -144,6 +179,9 @@
         <button id="zoomOutBtn" class="btn btn-sm btn-outline-secondary" type="button">ï¼</button>
     </div>
     <div class="control-group">
+        <button id="togglePaletteBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-controls="palette" aria-expanded="true">Hide Palette</button>
+    </div>
+    <div class="control-group">
         <button id="undoBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>Undo</button>
         <button id="redoBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>Redo</button>
     </div>
@@ -161,6 +199,16 @@
              style="width:50px; height:50px; border:1px solid #333; margin-bottom:10px;
                     display:flex; align-items:center; justify-content:center; cursor: grab;">
             Custom
+        </div>
+        <div class="pal-shape pal-shape--connector pal-shape--connector-vertical" data-room-id="0" data-room-label="||" data-shape-type="connector" data-shape-data="vertical" data-multi-use="true" draggable="true" title="Connecting rooms (vertical)" aria-label="Connecting rooms (vertical)"
+             style="width:50px; height:50px; border:1px dashed #333; margin-bottom:10px;
+                    display:flex; align-items:center; justify-content:center; cursor: grab; font-weight:600;">
+            ||
+        </div>
+        <div class="pal-shape pal-shape--connector pal-shape--connector-horizontal" data-room-id="0" data-room-label="||" data-shape-type="connector" data-shape-data="horizontal" data-multi-use="true" draggable="true" title="Connecting rooms (horizontal)" aria-label="Connecting rooms (horizontal)"
+             style="width:50px; height:50px; border:1px dashed #333; margin-bottom:10px;
+                    display:flex; align-items:center; justify-content:center; cursor: grab; font-weight:600;">
+            ||
         </div>
         @foreach (var room in Model.Rooms.Where(r => r.Floor == selFloor))
         {
@@ -307,6 +355,27 @@
 
             const initialPaletteRooms = new Map();
             const paletteRoomLabels = new Map();
+            const togglePaletteBtn = document.getElementById("togglePaletteBtn");
+            let currentDragPayload = null;
+
+            function updatePaletteToggleUi() {
+                if (!togglePaletteBtn || !palette) {
+                    return;
+                }
+                const collapsed = palette.classList.contains("is-collapsed");
+                togglePaletteBtn.textContent = collapsed ? "Show Palette" : "Hide Palette";
+                togglePaletteBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+                palette.setAttribute("aria-hidden", collapsed ? "true" : "false");
+            }
+
+            if (togglePaletteBtn && palette) {
+                togglePaletteBtn.addEventListener("click", () => {
+                    palette.classList.toggle("is-collapsed");
+                    updatePaletteToggleUi();
+                });
+                updatePaletteToggleUi();
+            }
+
             if (palette) {
                 palette.querySelectorAll(".pal-shape").forEach(tile => {
                     const rid = tile.getAttribute("data-room-id");
@@ -319,6 +388,36 @@
                     if (rid !== "0") {
                         initialPaletteRooms.set(rid, trimmedLabel);
                     }
+                });
+                palette.querySelectorAll(".pal-shape").forEach(attachPaletteDragHandlers);
+            }
+
+            function attachPaletteDragHandlers(tile) {
+                if (!(tile instanceof HTMLElement) || tile.dataset.dragBound === "true") {
+                    return;
+                }
+
+                tile.dataset.dragBound = "true";
+                tile.addEventListener("dragstart", e => {
+                    const payload = {
+                        roomId: tile.getAttribute("data-room-id") ?? "0",
+                        label: tile.getAttribute("data-room-label") ?? "",
+                        shapeType: tile.getAttribute("data-shape-type") ?? "",
+                        shapeData: tile.getAttribute("data-shape-data") ?? "",
+                        multiUse: tile.getAttribute("data-multi-use") === "true"
+                    };
+                    currentDragPayload = payload;
+                    const jsonPayload = JSON.stringify(payload);
+                    try {
+                        e.dataTransfer.setData("application/json", jsonPayload);
+                    } catch {
+                        // Some browsers may not allow custom types; ignore.
+                    }
+                    e.dataTransfer.setData("text/plain", jsonPayload);
+                });
+
+                tile.addEventListener("dragend", () => {
+                    currentDragPayload = null;
                 });
             }
 
@@ -442,12 +541,37 @@
                 element.setAttribute("data-shape-type", normalizedType);
                 element.setAttribute("data-shape-data", normalizedData);
 
-                if (normalizedData.length > 0) {
+                const isConnector = normalizedType.toLowerCase() === "connector";
+
+                if (!isConnector && normalizedData.length > 0) {
                     element.style.clipPath = normalizedData;
                     element.style.webkitClipPath = normalizedData;
                 } else {
                     element.style.removeProperty("clip-path");
                     element.style.removeProperty("-webkit-clip-path");
+                }
+
+                element.classList.toggle("room-box--connector", isConnector);
+                if (isConnector) {
+                    const direction = normalizedData.length > 0 ? normalizedData.toLowerCase() : "vertical";
+                    element.setAttribute("data-connector-direction", direction);
+
+                    const connectorSymbol = "||";
+                    const existingLabel = element.getAttribute("data-room-label") ?? "";
+                    const trimmedExisting = existingLabel.trim();
+                    if (trimmedExisting.length === 0 || trimmedExisting === "═" || trimmedExisting === "║") {
+                        element.setAttribute("data-room-label", connectorSymbol);
+                    }
+
+                    const labelSpan = element.querySelector(".room-label");
+                    if (labelSpan) {
+                        const currentText = (labelSpan.textContent ?? "").trim();
+                        if (currentText.length === 0 || currentText === "═" || currentText === "║") {
+                            labelSpan.textContent = connectorSymbol;
+                        }
+                    }
+                } else {
+                    element.removeAttribute("data-connector-direction");
                 }
             }
 
@@ -836,19 +960,10 @@
                 wrapper.style.cursor = "default";
             });
 
-            // Palette dragstart
-            document.querySelectorAll(".pal-shape").forEach(p => {
-                p.addEventListener("dragstart", e => {
-                    const rid = p.getAttribute("data-room-id");
-                    const label = p.getAttribute("data-room-label");
-                    e.dataTransfer.setData("text/plain", rid + "|" + label);
-                });
-            });
+            document.querySelectorAll(".pal-shape").forEach(attachPaletteDragHandlers);
             container.addEventListener("dragover", e => e.preventDefault());
             container.addEventListener("drop", e => {
                 e.preventDefault();
-                const data = e.dataTransfer.getData("text/plain");
-                const [rid, label] = data.split("|");
                 const rect = container.getBoundingClientRect();
                 let x = (e.clientX - rect.left) / scale;
                 let y = (e.clientY - rect.top) / scale;
@@ -858,15 +973,49 @@
                     x = Math.round(x / gridSize) * gridSize;
                     y = Math.round(y / gridSize) * gridSize;
                 }
-                addBox(rid, label, x, y);
-
-                // Remove palette tile only if it's not the custom tile
-                document.querySelectorAll(".pal-shape").forEach(p => {
-                    const rid2 = p.getAttribute("data-room-id");
-                    if (rid2 === rid && rid2 !== "0") {
-                        p.remove();
+                let payload = currentDragPayload;
+                const rawJson = e.dataTransfer.getData("application/json") || e.dataTransfer.getData("text/plain");
+                if (!payload && rawJson) {
+                    try {
+                        payload = JSON.parse(rawJson);
+                    } catch {
+                        const parts = rawJson.split("|");
+                        if (parts.length >= 2) {
+                            payload = {
+                                roomId: parts[0],
+                                label: parts[1],
+                                shapeType: parts[2] ?? "",
+                                shapeData: parts[3] ?? "",
+                                multiUse: parts[4] === "true"
+                            };
+                        }
                     }
-                });
+                }
+                if (!payload) {
+                    return;
+                }
+                const rid = payload.roomId ?? "0";
+                const label = payload.label ?? "";
+                const options = {};
+                if (payload.shapeType) {
+                    options.shapeType = payload.shapeType;
+                }
+                if (payload.shapeData) {
+                    options.shapeData = payload.shapeData;
+                }
+                addBox(rid, label, x, y, options);
+
+                const multiUse = payload.multiUse === true;
+                if (palette && !multiUse && rid !== "0") {
+                    palette.querySelectorAll(".pal-shape").forEach(p => {
+                        const rid2 = p.getAttribute("data-room-id");
+                        const tileMultiUse = p.getAttribute("data-multi-use") === "true";
+                        if (rid2 === rid && !tileMultiUse) {
+                            p.remove();
+                        }
+                    });
+                }
+                currentDragPayload = null;
             });
 
             function setupBoxInteractions(div) {
@@ -881,6 +1030,7 @@
                     div.getAttribute("data-shape-type") ?? "rectangle",
                     div.getAttribute("data-shape-data") ?? ""
                 );
+                const isConnector = (div.getAttribute("data-shape-type") ?? "").toLowerCase() === "connector";
 
                 const labelSpan = div.querySelector(".room-label");
                 if (labelSpan) {
@@ -906,11 +1056,16 @@
 
                 const customizeBtn = div.querySelector(".btn-customize-shape");
                 if (customizeBtn) {
-                    customizeBtn.addEventListener("click", evt => {
-                        evt.preventDefault();
-                        evt.stopPropagation();
-                        openShapeDialog(div);
-                    });
+                    if (isConnector) {
+                        customizeBtn.classList.add("d-none");
+                    } else {
+                        customizeBtn.classList.remove("d-none");
+                        customizeBtn.addEventListener("click", evt => {
+                            evt.preventDefault();
+                            evt.stopPropagation();
+                            openShapeDialog(div);
+                        });
+                    }
                 }
 
                 const moveBackBtn = div.querySelector(".btn-move-back");
@@ -1046,9 +1201,7 @@
                 p.style.justifyContent = "center";
                 p.style.cursor = "grab";
                 p.textContent = roomLabel;
-                p.addEventListener("dragstart", e => {
-                    e.dataTransfer.setData("text/plain", roomId + "|" + roomLabel);
-                });
+                attachPaletteDragHandlers(p);
                 pal.appendChild(p);
             }
 
