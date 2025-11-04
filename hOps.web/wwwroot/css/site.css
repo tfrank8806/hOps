@@ -63,38 +63,40 @@ button.sidebar-toggle {
     align-items: center;
     justify-content: center;
     gap: 0.35rem;
-    padding: 0.3rem 0.6rem;
+    padding: 0.25rem 0.55rem;
     border-radius: 999px;
-    border: 1px solid rgba(13, 110, 253, 0.18);
-    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(13, 110, 253, 0.16);
+    background: rgba(255, 255, 255, 0.75);
     color: #0b3d91;
-    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.12);
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.12);
     transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     cursor: pointer;
     font-weight: 600;
+    font-size: 0.85rem;
+    line-height: 1.1;
 }
 
 button.sidebar-toggle:hover,
 button.sidebar-toggle:focus {
     background: rgba(13, 110, 253, 0.08);
-    border-color: rgba(13, 110, 253, 0.35);
+    border-color: rgba(13, 110, 253, 0.32);
     transform: translateY(-1px);
-    box-shadow: 0 8px 18px rgba(13, 110, 253, 0.2);
+    box-shadow: 0 6px 14px rgba(13, 110, 253, 0.18);
     color: #063073;
 }
 
 button.sidebar-toggle:focus {
-    outline: 2px solid rgba(13, 110, 253, 0.45);
-    outline-offset: 3px;
+    outline: 2px solid rgba(13, 110, 253, 0.3);
+    outline-offset: 2px;
 }
 
 button.sidebar-toggle:active {
     transform: translateY(0);
-    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.24);
+    box-shadow: 0 3px 10px rgba(13, 110, 253, 0.2);
 }
 
 body.sidebar-collapsed button.sidebar-toggle {
-    background: linear-gradient(135deg, rgba(148, 163, 184, 0.25) 0%, rgba(148, 163, 184, 0.1) 100%);
+    background: linear-gradient(135deg, rgba(148, 163, 184, 0.2) 0%, rgba(148, 163, 184, 0.08) 100%);
     color: #1f2937;
 }
 

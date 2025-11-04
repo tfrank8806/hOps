@@ -1,20 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
-using hOps.web.ViewModels.Home;
-using hOps.web.ViewModels.WorkOrders;
 using hOps.web.Utilities;
+using hOps.web.ViewModels.Home;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.IO;
+using Microsoft.Extensions.Logging;
 
 namespace hOps.web.Controllers
 {
@@ -22,16 +24,19 @@ namespace hOps.web.Controllers
     {
         private readonly MentionService _mentionService;
         private readonly IWebHostEnvironment _environment;
+        private readonly ILogger<HomeController> _logger;
 
         public HomeController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             MentionService mentionService,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            ILogger<HomeController> logger)
             : base(context, userManager)
         {
             _mentionService = mentionService;
             _environment = environment;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index()
@@ -39,7 +44,6 @@ namespace hOps.web.Controllers
             ViewData["Title"] = "Home";
 
             var viewModel = new HomeIndexViewModel();
-
             var currentProperty = ViewBag.CurrentProperty as Property;
             viewModel.CurrentProperty = currentProperty;
 
@@ -73,10 +77,40 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public IActionResult SwitchProperty(int propertyId)
+        public IActionResult SwitchProperty(int propertyId, string? returnUrl)
         {
+            if (propertyId <= 0)
+            {
+                return BadRequest();
+            }
+
             HttpContext.Session.SetInt32("CurrentPropertyId", propertyId);
-            return RedirectToAction(nameof(Index));
+
+            string? target = returnUrl;
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                var referer = Request.Headers["Referer"].ToString();
+                if (!string.IsNullOrWhiteSpace(referer) &&
+                    Uri.TryCreate(referer, UriKind.Absolute, out var refererUri) &&
+                    string.Equals(refererUri.Host, Request.Host.Host, StringComparison.OrdinalIgnoreCase))
+                {
+                    target = refererUri.PathAndQuery;
+                }
+            }
+
+            if (!IsSafeReturnUrl(target))
+            {
+                target = Url.Action(nameof(Index)) ?? "/";
+            }
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = true, returnUrl = target });
+            }
+
+            return Url.IsLocalUrl(target)
+                ? Redirect(target)
+                : RedirectToAction(nameof(Index));
         }
 
         [HttpPost]
@@ -166,8 +200,9 @@ namespace hOps.web.Controllers
             {
                 await _context.SaveChangesAsync();
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Unable to update announcement for property {PropertyId}", form.PropertyId);
                 foreach (var file in savedAnnouncementFiles)
                 {
                     DeleteFileIfExists(file.PhysicalPath);
@@ -187,6 +222,7 @@ namespace hOps.web.Controllers
                 $"Announcement at {property?.Name ?? "your property"}",
                 Url.Action(nameof(Index), "Home", null, Request.Scheme) ?? "/",
                 announcement.Content);
+
             TempData["HomeMessage"] = "Manager announcement updated.";
             return RedirectToAction(nameof(Index));
         }
@@ -225,18 +261,14 @@ namespace hOps.web.Controllers
                 CreatedById = user.Id,
             };
 
-            var savedBulletinFiles = await SaveFilesAsync(form.Files, "bulletins");
-            var newBulletinAttachments = savedBulletinFiles
-                .Select(file => new BulletinPostAttachment
-                {
-                    FilePath = file.RelativePath,
-                    OriginalFileName = file.OriginalFileName
-                })
-                .ToList();
-
-            foreach (var attachment in newBulletinAttachments)
+            var savedFiles = await SaveFilesAsync(form.Files, "bulletins");
+            foreach (var upload in savedFiles)
             {
-                post.Attachments.Add(attachment);
+                post.Attachments.Add(new BulletinPostAttachment
+                {
+                    FilePath = upload.RelativePath,
+                    OriginalFileName = upload.OriginalFileName
+                });
             }
 
             _context.BulletinPosts.Add(post);
@@ -247,11 +279,10 @@ namespace hOps.web.Controllers
             }
             catch
             {
-                foreach (var file in savedBulletinFiles)
+                foreach (var upload in savedFiles)
                 {
-                    DeleteFileIfExists(file.PhysicalPath);
+                    DeleteFileIfExists(upload.PhysicalPath);
                 }
-
                 throw;
             }
 
@@ -314,16 +345,17 @@ namespace hOps.web.Controllers
             post.UpdatedAt = DateTime.UtcNow;
             post.UpdatedById = user.Id;
 
-            var savedBulletinFiles = await SaveFilesAsync(form.Files, "bulletins");
-            var newBulletinAttachments = savedBulletinFiles
-                .Select(file => new BulletinPostAttachment
+            var savedFiles = await SaveFilesAsync(form.Files, "bulletins");
+            foreach (var upload in savedFiles)
+            {
+                post.Attachments.Add(new BulletinPostAttachment
                 {
-                    FilePath = file.RelativePath,
-                    OriginalFileName = file.OriginalFileName
-                })
-                .ToList();
-            var removedPaths = new List<string>();
+                    FilePath = upload.RelativePath,
+                    OriginalFileName = upload.OriginalFileName
+                });
+            }
 
+            var removedPaths = new List<string>();
             if (form.AttachmentsToDelete?.Any() == true)
             {
                 var toRemove = post.Attachments
@@ -338,22 +370,16 @@ namespace hOps.web.Controllers
                 }
             }
 
-            foreach (var attachment in newBulletinAttachments)
-            {
-                post.Attachments.Add(attachment);
-            }
-
             try
             {
                 await _context.SaveChangesAsync();
             }
             catch
             {
-                foreach (var file in savedBulletinFiles)
+                foreach (var upload in savedFiles)
                 {
-                    DeleteFileIfExists(file.PhysicalPath);
+                    DeleteFileIfExists(upload.PhysicalPath);
                 }
-
                 throw;
             }
 
@@ -431,27 +457,28 @@ namespace hOps.web.Controllers
                 .AsNoTracking()
                 .FirstOrDefaultAsync(a => a.PropertyId == propertyId);
 
-            if (announcement != null)
+            if (announcement == null)
             {
-                viewModel.Announcement = new ManagerAnnouncementViewModel
-                {
-                    Id = announcement.Id,
-                    Content = announcement.Content,
-                    UpdatedAt = announcement.UpdatedAt,
-                    UpdatedByName = BuildDisplayName(announcement.UpdatedBy),
-                    Attachments = announcement.Attachments
-                        .OrderBy(a => BuildAttachmentDisplayName(a.OriginalFileName, a.FilePath), StringComparer.OrdinalIgnoreCase)
-                        .Select(a => new HomeAttachmentViewModel
-                        {
-                            Id = a.Id,
-                            FileName = BuildAttachmentDisplayName(a.OriginalFileName, a.FilePath),
-                            DownloadUrl = a.FilePath
-                        })
-                        .ToList(),
-                };
+                return;
             }
-        }
 
+            viewModel.Announcement = new ManagerAnnouncementViewModel
+            {
+                Id = announcement.Id,
+                Content = announcement.Content,
+                UpdatedAt = announcement.UpdatedAt,
+                UpdatedByName = BuildDisplayName(announcement.UpdatedBy),
+                Attachments = announcement.Attachments
+                    .OrderBy(a => BuildAttachmentDisplayName(a.OriginalFileName, a.FilePath), StringComparer.OrdinalIgnoreCase)
+                    .Select(a => new HomeAttachmentViewModel
+                    {
+                        Id = a.Id,
+                        FileName = BuildAttachmentDisplayName(a.OriginalFileName, a.FilePath),
+                        DownloadUrl = a.FilePath
+                    })
+                    .ToList()
+            };
+        }
         private async Task PopulateBulletinAsync(HomeIndexViewModel viewModel, int propertyId, ApplicationUser currentUser, HashSet<string> roleSet)
         {
             var posts = await _context.BulletinPosts
@@ -557,34 +584,21 @@ namespace hOps.web.Controllers
             {
                 var hasRoom = entry.Room != null && entry.Room.Id != 0;
                 var baseRoomNumber = hasRoom ? entry.Room!.RoomNumber : null;
-                var rawShapeType = entry.Layout.ShapeType;
-                var shapeType = string.IsNullOrWhiteSpace(rawShapeType) ? "rectangle" : rawShapeType!.Trim();
-                var rawShapeData = entry.Layout.ShapeData;
-                var shapeData = string.IsNullOrWhiteSpace(rawShapeData) ? null : rawShapeData!.Trim();
+                var shapeType = string.IsNullOrWhiteSpace(entry.Layout.ShapeType) ? "rectangle" : entry.Layout.ShapeType!.Trim();
+                var shapeData = entry.Layout.ShapeData;
                 var isConnector = string.Equals(shapeType, "connector", StringComparison.OrdinalIgnoreCase);
-                var connectorSymbol = "||";
-                var hasCustomLabel = !string.IsNullOrWhiteSpace(entry.Layout.Label);
-                var trimmedLabel = hasCustomLabel ? entry.Layout.Label!.Trim() : string.Empty;
-                if (isConnector && (string.Equals(trimmedLabel, "═", StringComparison.Ordinal) || string.Equals(trimmedLabel, "║", StringComparison.Ordinal)))
-                {
-                    hasCustomLabel = false;
-                    trimmedLabel = string.Empty;
-                }
-
-                var displayLabel = hasCustomLabel
-                    ? trimmedLabel
+                var displayLabel = !string.IsNullOrWhiteSpace(entry.Layout.Label)
+                    ? entry.Layout.Label!.Trim()
                     : (isConnector
-                        ? connectorSymbol
-                        : (!string.IsNullOrWhiteSpace(baseRoomNumber) ? baseRoomNumber! : $"Tile {entry.Layout.Id}"));
+                        ? "||"
+                        : (!string.IsNullOrWhiteSpace(baseRoomNumber) ? baseRoomNumber! : string.Empty));
 
                 var tile = new RoomLayoutTileViewModel
                 {
                     LayoutId = entry.Layout.Id,
                     RoomId = hasRoom ? entry.Room!.Id : 0,
                     RoomNumber = displayLabel,
-                    RoomType = hasRoom
-                        ? entry.Room!.RoomType
-                        : (isConnector ? "Connector" : "Custom Tile"),
+                    RoomType = hasRoom ? entry.Room!.RoomType : (isConnector ? "Connector" : string.Empty),
                     Floor = entry.Layout.Floor,
                     X = entry.Layout.X,
                     Y = entry.Layout.Y,
@@ -647,7 +661,6 @@ namespace hOps.web.Controllers
                 .ThenBy(t => t.RoomNumber, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
-
         private async Task PopulateWorkOrdersAsync(HomeIndexViewModel viewModel, int propertyId)
         {
             var recentWorkOrders = await _context.WorkOrderProperties
@@ -663,231 +676,107 @@ namespace hOps.web.Controllers
                     Issue = wo.Issue,
                     Location = wo.Location,
                     CreatedAt = wo.CreatedAt,
-                    DetailUrl = string.Empty,
+                    DetailUrl = Url.Action("Edit", "WorkOrders", new { id = wo.Id }) ?? string.Empty
                 })
                 .AsNoTracking()
                 .ToListAsync();
-
-            foreach (var workOrder in recentWorkOrders)
-            {
-                workOrder.DetailUrl = Url.Action("Index", "WorkOrders") ?? string.Empty;
-            }
 
             viewModel.WorkOrders = recentWorkOrders;
         }
 
         private async Task PopulateLostFoundAsync(HomeIndexViewModel viewModel, int propertyId)
         {
-            var recentLostFound = await _context.LostFoundEntries
+            var lostFoundEntries = await _context.LostFoundEntries
                 .Where(lf => lf.PropertyId == propertyId)
                 .OrderByDescending(lf => lf.CreatedAt)
                 .Take(8)
                 .Select(lf => new LostFoundSummaryViewModel
                 {
                     Id = lf.Id,
-                    Title = lf.Type == LostFoundType.Found ? (lf.ItemFound ?? "Found Item") : (lf.ItemLost ?? "Lost Item"),
+                    Title = !string.IsNullOrWhiteSpace(lf.ItemFound) ? lf.ItemFound! : (!string.IsNullOrWhiteSpace(lf.ItemLost) ? lf.ItemLost! : "Lost & Found Entry"),
                     Type = lf.Type,
                     Status = lf.Status,
                     CreatedAt = lf.CreatedAt,
-                    DetailUrl = string.Empty,
+                    DetailUrl = Url.Action("Details", "LostAndFound", new { id = lf.Id }) ?? string.Empty
                 })
                 .AsNoTracking()
                 .ToListAsync();
 
-            foreach (var entry in recentLostFound)
-            {
-                entry.DetailUrl = Url.Action("Index", "LostAndFound") ?? string.Empty;
-            }
-
-            viewModel.LostFoundEntries = recentLostFound;
+            viewModel.LostFoundEntries = lostFoundEntries;
         }
 
         private async Task PopulatePassOnLogsAsync(HomeIndexViewModel viewModel, int propertyId)
         {
-            var recentLogs = await _context.PassOnLogs
+            var logs = await _context.PassOnLogs
                 .Where(log => log.Properties.Any(lp => lp.PropertyId == propertyId))
-                .Include(log => log.CreatedBy)
                 .OrderByDescending(log => log.CreatedAt)
-                .Take(6)
-                .AsNoTracking()
-                .ToListAsync();
-
-            viewModel.PassOnLogs = recentLogs
+                .Take(5)
                 .Select(log => new PassOnLogSummaryViewModel
                 {
                     Id = log.Id,
                     Title = log.Title,
-                    Preview = BuildPassOnLogPreview(log.Body),
-                    CreatorName = BuildDisplayName(log.CreatedBy),
+                    Preview = string.IsNullOrWhiteSpace(log.Body) ? string.Empty : TruncatePreview(MentionMarkupFormatter.ToDisplayText(log.Body ?? string.Empty)),
+                    CreatorName = log.CreatedBy != null ? BuildDisplayName(log.CreatedBy) : "Unknown",
                     CreatedAt = log.CreatedAt,
-                    DetailUrl = Url.Action("Details", "PassOnLogs", new { id = log.Id })
-                        ?? Url.Action("Index", "PassOnLogs")
-                        ?? string.Empty,
+                    DetailUrl = Url.Action("Details", "PassOnLogs", new { id = log.Id }) ?? string.Empty
                 })
-                .ToList();
+                .AsNoTracking()
+                .ToListAsync();
+
+            viewModel.PassOnLogs = logs;
         }
 
         private async Task PopulatePackageLogAsync(HomeIndexViewModel viewModel, int propertyId)
         {
-            var recentPackages = await _context.PackageLogEntries
-                .Where(p => p.PropertyId == propertyId)
-                .OrderByDescending(p => p.LoggedAt)
+            var packages = await _context.PackageLogEntries
+                .Where(entry => entry.PropertyId == propertyId)
+                .OrderByDescending(entry => entry.LoggedAt)
                 .Take(8)
-                .Select(p => new PackageLogSummaryViewModel
+                .Select(entry => new PackageLogSummaryViewModel
                 {
-                    Id = p.Id,
-                    RecipientName = p.RecipientName,
-                    RoomNumber = p.RoomNumber,
-                    Carrier = p.Carrier,
-                    TrackingNumber = p.TrackingNumber,
-                    StorageLocation = p.StorageLocation,
-                    Delivered = p.Delivered,
-                    DeliveredAt = p.DeliveredAt,
-                    LoggedAt = p.LoggedAt,
-                    DetailUrl = string.Empty,
+                    Id = entry.Id,
+                    RecipientName = entry.RecipientName,
+                    RoomNumber = entry.RoomNumber,
+                    Carrier = entry.Carrier,
+                    TrackingNumber = entry.TrackingNumber,
+                    StorageLocation = entry.StorageLocation,
+                    Delivered = entry.Delivered,
+                    DeliveredAt = entry.DeliveredAt,
+                    LoggedAt = entry.LoggedAt,
+                    DetailUrl = Url.Action("Details", "MailLog", new { id = entry.Id }) ?? string.Empty
                 })
                 .AsNoTracking()
                 .ToListAsync();
 
-            foreach (var entry in recentPackages)
-            {
-                entry.DetailUrl = Url.Action("Index", "MailLog") ?? string.Empty;
-            }
-
-            viewModel.PackageLogs = recentPackages;
+            viewModel.PackageLogs = packages;
         }
 
         private async Task PopulateUpcomingEventsAsync(HomeIndexViewModel viewModel, int propertyId)
         {
-            var now = DateTime.Now;
-
-            var upcomingEventsQuery = _context.CalendarEventProperties
-                .Where(cep => cep.PropertyId == propertyId)
-                .Select(cep => cep.CalendarEvent)
-                .Where(e => e.EndDate >= now.Date)
-                .AsNoTracking();
-
-            var upcomingEvents = await _context.CalendarEvents
-                .Where(e => upcomingEventsQuery.Contains(e))
+            var now = DateTime.UtcNow;
+            var events = await _context.CalendarEvents
+                .Where(e => e.EventProperties.Any(ep => ep.PropertyId == propertyId))
                 .Include(e => e.Category)
+                .Where(e => e.EndDate >= now.Date)
+                .OrderBy(e => e.StartDate)
+                .Take(8)
                 .AsNoTracking()
                 .ToListAsync();
 
-            viewModel.UpcomingEvents = upcomingEvents
-                .Select(e =>
+            var summaries = events
+                .Select(e => new CalendarEventSummaryViewModel
                 {
-                    var start = CombineDateAndTime(e.StartDate, e.StartTime);
-                    var displayEnd = e.EndTime.HasValue
-                        ? CombineDateAndTime(e.EndDate, e.EndTime)
-                        : (DateTime?)null;
-                    var endBoundary = CalculateEventEndBoundary(e);
-
-                    return new
-                    {
-                        Summary = new CalendarEventSummaryViewModel
-                        {
-                            Id = e.Id,
-                            Title = e.Title,
-                            Start = start,
-                            End = displayEnd,
-                            CategoryName = e.Category?.Name ?? string.Empty,
-                            CategoryColor = string.IsNullOrWhiteSpace(e.Category?.Color)
-                                ? "#6c757d"
-                                : e.Category!.Color,
-                            DetailUrl = Url.Action("Index", "Calendar") ?? string.Empty,
-                        },
-                        Start = start,
-                        EndBoundary = endBoundary,
-                    };
+                    Id = e.Id,
+                    Title = e.Title,
+                    Start = e.StartDate,
+                    End = e.EndDate,
+                    CategoryName = e.Category?.Name ?? "Event",
+                    CategoryColor = string.IsNullOrWhiteSpace(e.Category?.Color) ? "#6c757d" : e.Category!.Color,
+                    DetailUrl = Url.Action("Index", "Calendar") ?? string.Empty,
                 })
-                .Where(x => x.EndBoundary >= now)
-                .OrderBy(x => x.Start)
-                .Take(8)
-                .Select(x => x.Summary)
                 .ToList();
-        }
 
-        private static DateTime CombineDateAndTime(DateTime date, TimeSpan? time)
-        {
-            var baseDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Unspecified);
-            return baseDate.Add(time ?? TimeSpan.Zero);
-        }
-
-        private static DateTime CalculateEventEndBoundary(CalendarEvent calendarEvent)
-        {
-            var endDate = DateTime.SpecifyKind(calendarEvent.EndDate.Date, DateTimeKind.Unspecified);
-
-            if (calendarEvent.EndTime.HasValue)
-            {
-                return endDate.Add(calendarEvent.EndTime.Value);
-            }
-
-            return endDate.AddDays(1).AddTicks(-1);
-        }
-
-        private static string BuildPassOnLogPreview(string body)
-        {
-            var preview = MentionMarkupFormatter.ToDisplayText(body ?? string.Empty)
-                .ReplaceLineEndings(" ")
-                .Trim();
-
-            if (string.IsNullOrWhiteSpace(preview))
-            {
-                return string.Empty;
-            }
-
-            return preview.Length <= 140
-                ? preview
-                : $"{preview[..140]}...";
-        }
-
-        private static string BuildDisplayName(ApplicationUser? user)
-        {
-            if (user == null)
-            {
-                return string.Empty;
-            }
-
-            if (!string.IsNullOrWhiteSpace(user.FirstName) || !string.IsNullOrWhiteSpace(user.LastName))
-            {
-                return string.Join(" ", new[] { user.FirstName, user.LastName }.Where(part => !string.IsNullOrWhiteSpace(part)));
-            }
-
-            return string.IsNullOrWhiteSpace(user.Email) ? user.UserName ?? string.Empty : user.Email;
-        }
-
-        private static string AppendCss(string existing, string cssClass)
-        {
-            if (string.IsNullOrWhiteSpace(existing))
-            {
-                return cssClass;
-            }
-
-            if (existing.Contains(cssClass, StringComparison.Ordinal))
-            {
-                return existing;
-            }
-
-            return $"{existing} {cssClass}";
-        }
-
-        private static bool MatchesRoom(string roomNumber, string? location)
-        {
-            if (string.IsNullOrWhiteSpace(roomNumber) || string.IsNullOrWhiteSpace(location))
-            {
-                return false;
-            }
-
-            var trimmedLocation = location.Trim();
-            var trimmedRoom = roomNumber.Trim();
-
-            if (trimmedLocation.Equals(trimmedRoom, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            return trimmedLocation.Contains(trimmedRoom, StringComparison.OrdinalIgnoreCase) ||
-                trimmedRoom.Contains(trimmedLocation, StringComparison.OrdinalIgnoreCase);
+            viewModel.UpcomingEvents = summaries;
         }
 
         private async Task<bool> UserHasAccessToProperty(int propertyId, ApplicationUser user)
@@ -924,8 +813,7 @@ namespace hOps.web.Controllers
                     await file.CopyToAsync(stream);
                 }
 
-                var relativePath = Path.Combine("/uploads", folderName, uniqueName)
-                    .Replace("\\", "/");
+                var relativePath = Path.Combine("/uploads", folderName, uniqueName).Replace("\\", "/");
 
                 results.Add(new FileSaveResult
                 {
@@ -951,13 +839,9 @@ namespace hOps.web.Controllers
                 return string.Empty;
             }
 
-            var normalized = trimmed
-                .Replace('/', Path.DirectorySeparatorChar)
-                .Replace('\\', Path.DirectorySeparatorChar);
-
+            var normalized = trimmed.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
             return Path.Combine(_environment.WebRootPath, normalized);
         }
-
         private static void DeleteFileIfExists(string? physicalPath)
         {
             if (string.IsNullOrWhiteSpace(physicalPath))
@@ -974,7 +858,7 @@ namespace hOps.web.Controllers
             }
             catch
             {
-                // Swallow clean-up failures; files can be removed manually if needed.
+                // swallow cleanup failures
             }
         }
 
@@ -990,11 +874,110 @@ namespace hOps.web.Controllers
                 : Path.GetFileName(filePath);
         }
 
+        private static string BuildDisplayName(ApplicationUser? user)
+        {
+            if (user == null)
+            {
+                return string.Empty;
+            }
+
+            if (!string.IsNullOrWhiteSpace(user.FirstName) || !string.IsNullOrWhiteSpace(user.LastName))
+            {
+                return string.Join(" ", new[] { user.FirstName, user.LastName }.Where(part => !string.IsNullOrWhiteSpace(part)));
+            }
+
+            return string.IsNullOrWhiteSpace(user.Email) ? user.UserName ?? string.Empty : user.Email;
+        }
+
+        private static string TruncatePreview(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return string.Empty;
+            }
+
+            var trimmed = input.Trim();
+            return trimmed.Length <= 140
+                ? trimmed
+                : string.Concat(trimmed.AsSpan(0, 140), "...");
+        }
+
         private sealed class FileSaveResult
         {
             public string PhysicalPath { get; init; } = string.Empty;
             public string RelativePath { get; init; } = string.Empty;
             public string? OriginalFileName { get; init; }
+        }
+
+        private static string AppendCss(string existing, string cssClass)
+        {
+            if (string.IsNullOrWhiteSpace(existing))
+            {
+                return cssClass;
+            }
+
+            if (existing.Contains(cssClass, StringComparison.Ordinal))
+            {
+                return existing;
+            }
+
+            return $"{existing} {cssClass}";
+        }
+
+        private static bool MatchesRoom(string roomNumber, string? location)
+        {
+            if (string.IsNullOrWhiteSpace(roomNumber) || string.IsNullOrWhiteSpace(location))
+            {
+                return false;
+            }
+
+            var trimmedLocation = location.Trim();
+            var trimmedRoom = roomNumber.Trim();
+
+            if (trimmedLocation.Equals(trimmedRoom, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return trimmedLocation.Contains(trimmedRoom, StringComparison.OrdinalIgnoreCase) ||
+                trimmedRoom.Contains(trimmedLocation, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsSafeReturnUrl(string? url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return false;
+            }
+
+            if (Url.IsLocalUrl(url))
+            {
+                return true;
+            }
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var destination))
+            {
+                return false;
+            }
+
+            var currentHost = Request.Host;
+            if (!currentHost.HasValue)
+            {
+                return false;
+            }
+
+            if (!string.Equals(destination.Host, currentHost.Host, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var currentPort = currentHost.Port;
+            if (currentPort.HasValue)
+            {
+                return destination.Port == currentPort.Value;
+            }
+
+            return destination.IsDefaultPort;
         }
 
         public class ManagerAnnouncementForm
@@ -1028,3 +1011,8 @@ namespace hOps.web.Controllers
         }
     }
 }
+
+
+
+
+

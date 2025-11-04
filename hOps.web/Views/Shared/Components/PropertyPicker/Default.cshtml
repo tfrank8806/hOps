@@ -1,9 +1,13 @@
-﻿@model List<hOps.web.Models.Property>
+@model List<hOps.web.Models.Property>
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor httpAccessor
 
 @{
-    var session = httpAccessor.HttpContext.Session;
-    int? currentId = session.GetInt32("CurrentPropertyId");
+    var httpContext = httpAccessor.HttpContext;
+    var session = httpContext?.Session;
+    int? currentId = session?.GetInt32("CurrentPropertyId");
+    var path = httpContext?.Request?.Path.Value ?? "/";
+    var query = httpContext?.Request?.QueryString.Value ?? string.Empty;
+    var currentPath = string.Concat(path, query);
 }
 
 @if (Model != null && Model.Count > 1)
@@ -19,8 +23,12 @@
             @foreach (var p in Model)
             {
                 var propertyLabel = string.IsNullOrWhiteSpace(p.Code) ? p.Name : $"{p.Name} ({p.Code})";
+                var isActive = p.Id == currentId;
                 <li>
-                    <a class="dropdown-item" asp-controller="Home" asp-action="SwitchProperty" asp-route-propertyId="@p.Id">
+                    <a class="dropdown-item@(isActive ? " active" : string.Empty)"
+                       href="javascript:void(0);"
+                       data-property-id="@p.Id"
+                       data-return-path="@currentPath">
                         @propertyLabel
                     </a>
                 </li>
@@ -28,3 +36,51 @@
         </ul>
     </li>
 }
+
+<script>
+    (() => {
+        const links = document.querySelectorAll('.dropdown-menu a[data-property-id]');
+        if (!links.length) {
+            return;
+        }
+
+        links.forEach(link => {
+            link.addEventListener('click', async event => {
+                event.preventDefault();
+
+                const propertyId = link.getAttribute('data-property-id');
+                const query = window.location.search || '';
+                const returnPath = link.getAttribute('data-return-path') || (window.location.pathname + query);
+
+                if (!propertyId) {
+                    return;
+                }
+
+                try {
+                    const url = new URL('/Home/SwitchProperty', window.location.origin);
+                    url.searchParams.set('propertyId', propertyId);
+                    url.searchParams.set('returnUrl', returnPath);
+
+                    const response = await fetch(url.toString(), {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to switch property.');
+                    }
+
+                    const result = await response.json();
+                    const target = (result && result.returnUrl) ? result.returnUrl : returnPath;
+                    window.location.assign(target);
+                } catch (err) {
+                    console.error('Unable to switch property', err);
+                }
+            });
+        });
+    })();
+</script>
+
+

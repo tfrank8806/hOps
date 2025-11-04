@@ -1,4 +1,4 @@
-@using System
+﻿@using System
 @using System.Linq
 @using System.Text.Json
 @using Microsoft.AspNetCore.Mvc.Rendering
@@ -175,8 +175,8 @@
         <label class="form-check-label" for="chkSnap">Snap to grid</label>
     </div>
     <div class="control-group">
-        <button id="zoomInBtn" class="btn btn-sm btn-outline-secondary" type="button">ï¼‹</button>
-        <button id="zoomOutBtn" class="btn btn-sm btn-outline-secondary" type="button">ï¼</button>
+        <button id="zoomInBtn" class="btn btn-sm btn-outline-secondary" type="button">Ã¯Â¼â€¹</button>
+        <button id="zoomOutBtn" class="btn btn-sm btn-outline-secondary" type="button">Ã¯Â¼Â</button>
     </div>
     <div class="control-group">
         <button id="togglePaletteBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-controls="palette" aria-expanded="true">Hide Palette</button>
@@ -550,23 +550,21 @@
                     element.style.removeProperty("clip-path");
                     element.style.removeProperty("-webkit-clip-path");
                 }
-
                 element.classList.toggle("room-box--connector", isConnector);
                 if (isConnector) {
                     const direction = normalizedData.length > 0 ? normalizedData.toLowerCase() : "vertical";
                     element.setAttribute("data-connector-direction", direction);
 
                     const connectorSymbol = "||";
-                    const existingLabel = element.getAttribute("data-room-label") ?? "";
-                    const trimmedExisting = existingLabel.trim();
-                    if (trimmedExisting.length === 0 || trimmedExisting === "═" || trimmedExisting === "║") {
+                    const existingLabel = (element.getAttribute("data-room-label") ?? "").trim();
+                    if (existingLabel.length === 0) {
                         element.setAttribute("data-room-label", connectorSymbol);
                     }
 
                     const labelSpan = element.querySelector(".room-label");
                     if (labelSpan) {
                         const currentText = (labelSpan.textContent ?? "").trim();
-                        if (currentText.length === 0 || currentText === "═" || currentText === "║") {
+                        if (currentText.length === 0) {
                             labelSpan.textContent = connectorSymbol;
                         }
                     }
@@ -1123,23 +1121,20 @@
                 controls.style.bottom = "100%";
                 controls.style.display = "flex";
                 controls.style.marginBottom = "4px";
-
                 const btnCustomize = document.createElement("button");
                 btnCustomize.classList.add("btn", "btn-sm", "btn-light", "btn-customize-shape");
                 btnCustomize.title = "Customize shape";
-                btnCustomize.innerText = "âœŽ";
+                btnCustomize.textContent = "Shape";
                 controls.appendChild(btnCustomize);
-
                 const btnMoveBack = document.createElement("button");
                 btnMoveBack.classList.add("btn", "btn-sm", "btn-light", "btn-move-back");
                 btnMoveBack.title = "Move back to palette";
-                btnMoveBack.innerText = "â®";
+                btnMoveBack.textContent = "Back";
                 controls.appendChild(btnMoveBack);
-
                 const btnDel = document.createElement("button");
                 btnDel.classList.add("btn", "btn-sm", "btn-light", "btn-delete-shape");
                 btnDel.title = "Delete shape";
-                btnDel.innerText = "âœ–";
+                btnDel.textContent = "Delete";
                 controls.appendChild(btnDel);
 
                 div.appendChild(controls);
@@ -1400,5 +1395,10 @@
         })();
     </script>
 }
+
+
+
+
+
 
 

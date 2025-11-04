@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity.UI.Services;
+﻿using System;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Net;
@@ -20,43 +21,68 @@ namespace hOps.web.Services
 
         public async Task SendEmailAsync(string email, string subject, string htmlMessage)
         {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                _logger.LogWarning("EmailSender: attempted to send email without a recipient address");
+                return;
+            }
+
             var smtpHost = _config["EmailSettings:SMTPHost"];
-            var smtpPort = int.Parse(_config["EmailSettings:SMTPPort"] ?? "587");
+            var smtpPortValue = _config["EmailSettings:SMTPPort"];
             var smtpUser = _config["EmailSettings:SMTPUser"];
             var smtpPass = _config["EmailSettings:SMTPPass"];
             var fromEmail = _config["EmailSettings:FromEmail"];
             var fromName = _config["EmailSettings:FromName"];
+            var enableSsl = _config.GetValue("EmailSettings:EnableSsl", true);
+
+            if (string.IsNullOrWhiteSpace(smtpHost) || string.IsNullOrWhiteSpace(fromEmail))
+            {
+                _logger.LogError("EmailSender: SMTP host or from email configuration is missing.");
+                return;
+            }
+
+            if (!int.TryParse(smtpPortValue, out var smtpPort))
+            {
+                smtpPort = 587;
+            }
 
             using var client = new SmtpClient(smtpHost, smtpPort)
             {
-                EnableSsl = true,
-                Credentials = new NetworkCredential(smtpUser, smtpPass)
+                EnableSsl = enableSsl
             };
 
-            if (string.IsNullOrEmpty(fromEmail) || string.IsNullOrEmpty(email))
+            if (!string.IsNullOrWhiteSpace(smtpUser))
             {
-                _logger.LogError("EmailSender: fromEmail or email is null/empty");
-                return;
+                client.Credentials = new NetworkCredential(smtpUser, smtpPass ?? string.Empty);
             }
-            var mailAddr = new MailAddress(email, fromName);
-
-            var mail = new MailMessage
+            else
             {
-                From = new MailAddress(fromEmail, fromName),
-                Subject = subject,
-                Body = htmlMessage,
+                client.UseDefaultCredentials = true;
+            }
+
+            using var mail = new MailMessage
+            {
+                From = new MailAddress(fromEmail, string.IsNullOrWhiteSpace(fromName) ? fromEmail : fromName),
+                Subject = subject ?? string.Empty,
+                Body = htmlMessage ?? string.Empty,
                 IsBodyHtml = true
             };
-            mail.To.Add(email);
+
+            mail.To.Add(new MailAddress(email));
 
             try
             {
                 await client.SendMailAsync(mail);
             }
-            catch (System.Exception ex)
+            catch (SmtpException ex)
             {
                 _logger.LogError(ex, "Failed to send email to {Email}", email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error while sending email to {Email}", email);
             }
         }
     }
 }
+

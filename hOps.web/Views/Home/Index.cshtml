@@ -341,11 +341,22 @@
                                     var navigateUrl = tile.Badges.FirstOrDefault(b => !string.IsNullOrWhiteSpace(b.Url))?.Url ?? string.Empty;
                                     var isConnector = string.Equals(tile.ShapeType, "connector", StringComparison.OrdinalIgnoreCase);
                                     var isCustom = !isConnector && tile.RoomId == 0;
+                                    var hasLabel = !string.IsNullOrWhiteSpace(tile.RoomNumber);
+                                    var connectorDirection = string.Equals(tile.ShapeData, "horizontal", StringComparison.OrdinalIgnoreCase)
+                                        ? "horizontal"
+                                        : "vertical";
+                                    var connectorDisplay = isConnector
+                                        ? (hasLabel ? tile.RoomNumber : "||")
+                                        : string.Empty;
                                     var ariaLabelBase = tile.RoomId == 0
                                         ? (isConnector
-                                            ? $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} connector"
-                                            : $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} {tile.RoomNumber}")
-                                        : $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} room {tile.RoomNumber}";
+                                            ? $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} {connectorDirection} connector"
+                                            : (hasLabel
+                                                ? $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} {tile.RoomNumber}"
+                                                : $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} custom area"))
+                                        : (hasLabel
+                                            ? $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} room {tile.RoomNumber}"
+                                            : $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} room");
                                     var ariaLabel = tile.Badges.Any()
                                         ? $"{ariaLabelBase} with {string.Join(", ", tile.Badges.Select(b => b.Text))}"
                                         : ariaLabelBase;
@@ -374,9 +385,9 @@
                                                 }
                                             </div>
                                         }
-                                        @if (isConnector && !string.IsNullOrWhiteSpace(tile.RoomNumber))
+                                        @if (isConnector)
                                         {
-                                            <span class="tile-label">@tile.RoomNumber</span>
+                                            <span class="tile-label">@connectorDisplay</span>
                                         }
                                     </div>
                                 }
@@ -412,21 +423,32 @@
                                             var height = Math.Round((double)tile.Height / maxHeight * 100, 2);
                                             var isConnector = string.Equals(tile.ShapeType, "connector", StringComparison.OrdinalIgnoreCase);
                                             var isCustom = !isConnector && tile.RoomId == 0;
+                                            var hasTileLabel = !string.IsNullOrWhiteSpace(tile.RoomNumber);
                                             var connectorDirection = string.Equals(tile.ShapeData, "horizontal", StringComparison.OrdinalIgnoreCase) ? "horizontal" : "vertical";
+                                            var connectorDisplay = isConnector
+                                                ? (hasTileLabel ? tile.RoomNumber : "||")
+                                                : string.Empty;
+                                            var headerHasContent = hasTileLabel || (!isCustom && !string.IsNullOrWhiteSpace(tile.RoomType));
                                             <div class="@tile.CssClass" data-shape-type="@tile.ShapeType" data-shape-data="@tile.ShapeData" style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%">
                                                 @if (isConnector)
                                                 {
-                                                    <span class="tile-connector-icon tile-connector-icon--@connectorDirection">@tile.RoomNumber</span>
+                                                    <span class="tile-connector-icon tile-connector-icon--@connectorDirection">@connectorDisplay</span>
                                                 }
                                                 else
                                                 {
-                                                    <div class="tile-header">
-                                                        <span class="tile-room">@tile.RoomNumber</span>
-                                                        @if (!isCustom && !string.IsNullOrWhiteSpace(tile.RoomType))
-                                                        {
-                                                            <span class="tile-type">@tile.RoomType</span>
-                                                        }
-                                                    </div>
+                                                    @if (headerHasContent)
+                                                    {
+                                                        <div class="tile-header">
+                                                            @if (hasTileLabel)
+                                                            {
+                                                                <span class="tile-room">@tile.RoomNumber</span>
+                                                            }
+                                                            @if (!isCustom && !string.IsNullOrWhiteSpace(tile.RoomType))
+                                                            {
+                                                                <span class="tile-type">@tile.RoomType</span>
+                                                            }
+                                                        </div>
+                                                    }
                                                     @if (tile.Badges.Any())
                                                     {
                                                         <div class="tile-badges">
@@ -502,9 +524,12 @@
         }
 
         .layout-canvas .room-tile--custom {
-            border: 2px dashed rgba(13, 110, 253, 0.35);
-            background: rgba(13, 110, 253, 0.12);
+            border: 2px dashed rgba(13, 110, 253, 0.45);
+            background: rgba(13, 110, 253, 0.18);
             color: #0f2e61;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
         }
 
         .layout-canvas .room-tile--connector {
@@ -518,6 +543,9 @@
         .layout-canvas .room-tile--custom .tile-room {
             font-weight: 600;
             color: #0f2e61;
+            letter-spacing: 0.08rem;
+            text-transform: uppercase;
+            font-size: 0.85rem;
         }
 
         .layout-canvas .room-tile--custom .tile-type {
@@ -609,8 +637,8 @@
         }
 
         .room-tile-overlay.room-tile--custom {
-            border: 2px dashed rgba(13, 110, 253, 0.35);
-            background-color: rgba(13, 110, 253, 0.1);
+            border: 2px dashed rgba(13, 110, 253, 0.45);
+            background-color: rgba(13, 110, 253, 0.16);
             color: #0f2e61;
         }
 
