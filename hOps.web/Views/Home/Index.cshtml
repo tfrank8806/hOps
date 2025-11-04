@@ -340,6 +340,7 @@
                                     var overlayBg = $"{tile.FloorColor}33";
                                     var navigateUrl = tile.Badges.FirstOrDefault(b => !string.IsNullOrWhiteSpace(b.Url))?.Url ?? string.Empty;
                                     var isConnector = string.Equals(tile.ShapeType, "connector", StringComparison.OrdinalIgnoreCase);
+                                    var isCustom = !isConnector && tile.RoomId == 0;
                                     var ariaLabelBase = tile.RoomId == 0
                                         ? (isConnector
                                             ? $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} connector"
@@ -373,7 +374,7 @@
                                                 }
                                             </div>
                                         }
-                                        @if (!string.IsNullOrWhiteSpace(tile.RoomNumber))
+                                        @if (isConnector && !string.IsNullOrWhiteSpace(tile.RoomNumber))
                                         {
                                             <span class="tile-label">@tile.RoomNumber</span>
                                         }
@@ -410,6 +411,7 @@
                                             var width = Math.Round((double)tile.Width / maxWidth * 100, 2);
                                             var height = Math.Round((double)tile.Height / maxHeight * 100, 2);
                                             var isConnector = string.Equals(tile.ShapeType, "connector", StringComparison.OrdinalIgnoreCase);
+                                            var isCustom = !isConnector && tile.RoomId == 0;
                                             var connectorDirection = string.Equals(tile.ShapeData, "horizontal", StringComparison.OrdinalIgnoreCase) ? "horizontal" : "vertical";
                                             <div class="@tile.CssClass" data-shape-type="@tile.ShapeType" data-shape-data="@tile.ShapeData" style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%">
                                                 @if (isConnector)
@@ -420,7 +422,10 @@
                                                 {
                                                     <div class="tile-header">
                                                         <span class="tile-room">@tile.RoomNumber</span>
-                                                        <span class="tile-type">@tile.RoomType</span>
+                                                        @if (!isCustom && !string.IsNullOrWhiteSpace(tile.RoomType))
+                                                        {
+                                                            <span class="tile-type">@tile.RoomType</span>
+                                                        }
                                                     </div>
                                                     @if (tile.Badges.Any())
                                                     {
@@ -497,9 +502,9 @@
         }
 
         .layout-canvas .room-tile--custom {
-            border-style: dashed;
-            border-color: rgba(73, 80, 87, 0.65);
-            background: linear-gradient(135deg, rgba(108, 117, 125, 0.12), rgba(255, 255, 255, 0.96));
+            border: 2px dashed rgba(13, 110, 253, 0.35);
+            background: rgba(13, 110, 253, 0.12);
+            color: #0f2e61;
         }
 
         .layout-canvas .room-tile--connector {
@@ -508,6 +513,15 @@
             display: flex;
             align-items: center;
             justify-content: center;
+        }
+
+        .layout-canvas .room-tile--custom .tile-room {
+            font-weight: 600;
+            color: #0f2e61;
+        }
+
+        .layout-canvas .room-tile--custom .tile-type {
+            display: none;
         }
 
         .tile-connector-icon {
@@ -595,7 +609,9 @@
         }
 
         .room-tile-overlay.room-tile--custom {
-            border-style: dashed;
+            border: 2px dashed rgba(13, 110, 253, 0.35);
+            background-color: rgba(13, 110, 253, 0.1);
+            color: #0f2e61;
         }
 
         .room-tile-overlay:hover {
