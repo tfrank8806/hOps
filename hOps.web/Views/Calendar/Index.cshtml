@@ -67,43 +67,57 @@
                                         {
                                             cellClasses += " calendar-day--today";
                                         }
+                                        var dayIso = day.Date.ToString("yyyy-MM-dd");
+                                        var ariaLabel = day.Date.ToString("dddd, MMMM d");
+                                        if (!day.IsCurrentMonth)
+                                        {
+                                            ariaLabel += " (outside current month)";
+                                        }
                                         <td class="@cellClasses">
-                                            <div class="d-flex justify-content-between align-items-start">
-                                                <span class="fw-semibold">@day.Date.Day</span>
-                                                @if (isToday)
-                                                {
-                                                    <span class="badge bg-primary">Today</span>
-                                                }
-                                            </div>
-                                            <div class="calendar-day-events mt-2">
-                                                @if (day.Events.Any())
-                                                {
-                                                    foreach (var calendarEvent in day.Events)
+                                            <div class="calendar-day__inner"
+                                                 data-calendar-day="@dayIso"
+                                                 data-calendar-day-current="@(day.IsCurrentMonth ? "true" : "false")"
+                                                 tabindex="0"
+                                                 role="button"
+                                                 aria-pressed="false"
+                                                 aria-label="@ariaLabel">
+                                                <div class="calendar-day__header d-flex justify-content-between align-items-start">
+                                                    <span class="fw-semibold">@day.Date.Day</span>
+                                                    @if (isToday)
                                                     {
-                                                        <button type="button"
-                                                                class="btn btn-sm text-start w-100 calendar-event"
-                                                                data-calendar-event="true"
-                                                                data-event-id="@calendarEvent.Id"
-                                                                data-event-title="@calendarEvent.Title"
-                                                                data-event-category="@calendarEvent.CategoryName"
-                                                                data-event-color="@calendarEvent.CategoryColor"
-                                                                data-event-date="@calendarEvent.DateDisplay"
-                                                                data-event-time="@(calendarEvent.TimeDisplay ?? string.Empty)"
-                                                                data-event-recurrence="@calendarEvent.RecurrenceDisplay"
-                                                                data-event-details="@(calendarEvent.Details ?? string.Empty)"
-                                                                data-event-properties="@calendarEvent.PropertiesDisplay"
-                                                                data-event-created-by="@calendarEvent.CreatedByDisplay"
-                                                                data-event-created-at="@TimeZoneService.ConvertToUserTime(calendarEvent.CreatedAtUtc).ToString("f")"
-                                                                data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = calendarEvent.Id })">
-                                                            <span class="calendar-event-indicator" style="background-color: @calendarEvent.CategoryColor"></span>
-                                                            <span class="calendar-event-title">@calendarEvent.Title</span>
-                                                        </button>
+                                                        <span class="badge bg-primary">Today</span>
                                                     }
-                                                }
-                                                else
-                                                {
-                                                    <span class="text-muted small">No events</span>
-                                                }
+                                                </div>
+                                                <div class="calendar-day-events mt-2">
+                                                    @if (day.Events.Any())
+                                                    {
+                                                        foreach (var calendarEvent in day.Events)
+                                                        {
+                                                            <button type="button"
+                                                                    class="btn btn-sm text-start w-100 calendar-event"
+                                                                    data-calendar-event="true"
+                                                                    data-event-id="@calendarEvent.Id"
+                                                                    data-event-title="@calendarEvent.Title"
+                                                                    data-event-category="@calendarEvent.CategoryName"
+                                                                    data-event-color="@calendarEvent.CategoryColor"
+                                                                    data-event-date="@calendarEvent.DateDisplay"
+                                                                    data-event-time="@(calendarEvent.TimeDisplay ?? string.Empty)"
+                                                                    data-event-recurrence="@calendarEvent.RecurrenceDisplay"
+                                                                    data-event-details="@(calendarEvent.Details ?? string.Empty)"
+                                                                    data-event-properties="@calendarEvent.PropertiesDisplay"
+                                                                    data-event-created-by="@calendarEvent.CreatedByDisplay"
+                                                                    data-event-created-at="@TimeZoneService.ConvertToUserTime(calendarEvent.CreatedAtUtc).ToString("f")"
+                                                                    data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = calendarEvent.Id })">
+                                                                <span class="calendar-event-indicator" style="background-color: @calendarEvent.CategoryColor"></span>
+                                                                <span class="calendar-event-title">@calendarEvent.Title</span>
+                                                            </button>
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted small">No events</span>
+                                                    }
+                                                </div>
                                             </div>
                                         </td>
                                     }
@@ -321,6 +335,106 @@
     </div>
 </div>
 
+@section Styles {
+    <style>
+        .calendar-table {
+            width: 100%;
+            table-layout: fixed;
+        }
+
+        .calendar-table th,
+        .calendar-table td {
+            width: calc(100% / 7);
+            min-width: 0;
+        }
+
+        .calendar-table td.calendar-day {
+            height: 11rem;
+            vertical-align: top;
+            padding: 0;
+            background-color: #fff;
+        }
+
+        .calendar-day__inner {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            padding: 0.85rem;
+            background-color: inherit;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+
+        .calendar-day__inner:hover {
+            box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.2);
+        }
+
+        .calendar-day__inner:focus-visible {
+            outline: none;
+            box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.35);
+        }
+
+        .calendar-day__inner--selected {
+            box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.5), 0 0 0 4px rgba(13, 110, 253, 0.12);
+            background-color: rgba(13, 110, 253, 0.08);
+        }
+
+        .calendar-table td.calendar-day .badge {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .calendar-table td.calendar-day .calendar-day-events {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding-right: 0.15rem;
+        }
+
+        .calendar-table td.calendar-day .calendar-day-events::-webkit-scrollbar {
+            width: 0.35rem;
+        }
+
+        .calendar-table td.calendar-day .calendar-day-events::-webkit-scrollbar-thumb {
+            background-color: rgba(13, 110, 253, 0.35);
+            border-radius: 999px;
+        }
+
+        .calendar-table td.calendar-day .calendar-event + .calendar-event {
+            margin-top: 0.35rem;
+        }
+
+        .calendar-table td.calendar-day .calendar-event {
+            white-space: normal;
+        }
+
+        .calendar-table td.calendar-day--muted {
+            background-color: #f8f9fb;
+        }
+
+        .calendar-table td.calendar-day--muted .calendar-day__inner {
+            background-color: inherit;
+        }
+
+        .calendar-table td.calendar-day--today {
+            box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.35);
+            border-color: rgba(13, 110, 253, 0.25);
+        }
+
+        @@media (max-width: 991.98px) {
+            .calendar-table td.calendar-day {
+                height: 9.5rem;
+            }
+
+            .calendar-day__inner {
+                padding: 0.75rem;
+            }
+        }
+    </style>
+}
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
@@ -397,6 +511,91 @@
             document.querySelectorAll('[data-calendar-event]').forEach(element => {
                 element.addEventListener('click', () => updateModal(element));
             });
+
+            const creationForm = document.querySelector('.calendar-page__form form');
+            const titleInput = document.getElementById('Form_Title');
+            const startDateInput = document.getElementById('Form_StartDate');
+            const endDateInput = document.getElementById('Form_EndDate');
+            const dayElements = document.querySelectorAll('[data-calendar-day]');
+            const selectedClassName = 'calendar-day__inner--selected';
+            let selectedDayElement = null;
+
+            const applySelectedState = (element) => {
+                if (selectedDayElement && selectedDayElement !== element) {
+                    selectedDayElement.classList.remove(selectedClassName);
+                    selectedDayElement.setAttribute('aria-pressed', 'false');
+                }
+
+                selectedDayElement = element;
+                if (selectedDayElement) {
+                    selectedDayElement.classList.add(selectedClassName);
+                    selectedDayElement.setAttribute('aria-pressed', 'true');
+                }
+            };
+
+            const focusCreationField = () => {
+                const focusTarget = titleInput || startDateInput;
+                if (!focusTarget) {
+                    return;
+                }
+
+                try {
+                    focusTarget.focus({ preventScroll: true });
+                } catch {
+                    focusTarget.focus();
+                }
+            };
+
+            const activateDay = (element) => {
+                if (!creationForm || !startDateInput || !endDateInput || !element) {
+                    return;
+                }
+
+                const isoDate = element.getAttribute('data-calendar-day');
+                if (!isoDate) {
+                    return;
+                }
+
+                startDateInput.value = isoDate;
+                endDateInput.value = isoDate;
+
+                applySelectedState(element);
+
+                creationForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                window.setTimeout(focusCreationField, 250);
+            };
+
+            if (creationForm && startDateInput && endDateInput) {
+                const initialIso = startDateInput.value;
+                if (initialIso) {
+                    const preselected = document.querySelector(`[data-calendar-day="${initialIso}"]`);
+                    if (preselected) {
+                        applySelectedState(preselected);
+                    }
+                }
+
+                dayElements.forEach(element => {
+                    element.addEventListener('click', event => {
+                        if (event.target.closest('[data-calendar-event]')) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        activateDay(element);
+                    });
+
+                    element.addEventListener('keydown', event => {
+                        if (event.target.closest('[data-calendar-event]')) {
+                            return;
+                        }
+
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            activateDay(element);
+                        }
+                    });
+                });
+            }
         });
     </script>
 }
