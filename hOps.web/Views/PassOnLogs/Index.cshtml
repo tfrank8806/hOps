@@ -2,14 +2,56 @@
 @{ 
     ViewData["Title"] = "Pass On Logs";
     ViewData["MainContainerClass"] = "main-inner--wide";
+    var hasActiveFilters =
+        Model.Filters.StartDate.HasValue ||
+        Model.Filters.EndDate.HasValue ||
+        (Model.Filters.CreatorIds?.Any() ?? false) ||
+        (Model.Filters.PropertyIds?.Any() ?? false) ||
+        !string.IsNullOrWhiteSpace(Model.Filters.SearchTerm) ||
+        !string.Equals(Model.Filters.SortOrder, "newest", StringComparison.OrdinalIgnoreCase);
+    var filterCollapseClass = hasActiveFilters ? "collapse show" : "collapse";
+    var filterToggleText = hasActiveFilters ? "Hide Filters" : "Show Filters";
+}
+
+@section Scripts {
+    <script>
+        (() => {
+            const collapseElement = document.getElementById('passOnLogFilters');
+            const toggleButton = document.getElementById('passOnLogFiltersToggle');
+            if (!collapseElement || !toggleButton) {
+                return;
+            }
+
+            const updateLabel = () => {
+                const isShown = collapseElement.classList.contains('show');
+                toggleButton.textContent = isShown ? 'Hide Filters' : 'Show Filters';
+                toggleButton.setAttribute('aria-expanded', isShown ? 'true' : 'false');
+            };
+
+            collapseElement.addEventListener('shown.bs.collapse', updateLabel);
+            collapseElement.addEventListener('hidden.bs.collapse', updateLabel);
+            updateLabel();
+        })();
+    </script>
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h2 class="mb-0">Pass On Logs</h2>
-    @if (Model.CanCreateLog)
-    {
-        <a asp-action="Create" class="btn btn-primary">New Log</a>
-    }
+    <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-outline-secondary"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#passOnLogFilters"
+                aria-expanded="@(hasActiveFilters ? "true" : "false")"
+                aria-controls="passOnLogFilters"
+                id="passOnLogFiltersToggle">
+            @filterToggleText
+        </button>
+        @if (Model.CanCreateLog)
+        {
+            <a asp-action="Create" class="btn btn-primary">New Log</a>
+        }
+    </div>
 </div>
 
 @if (TempData["ErrorMessage"] is string errorMessage)
@@ -17,7 +59,7 @@
     <div class="alert alert-danger">@errorMessage</div>
 }
 
-<form method="get" class="card mb-4">
+<form method="get" class="card mb-4 @filterCollapseClass" id="passOnLogFilters">
     <div class="card-body">
         <div class="row g-3 align-items-end">
             <div class="col-sm-6 col-md-3 col-lg-2">
