@@ -19,5 +19,6 @@ namespace hOps.web.ViewModels.WorkOrders
         public Dictionary<string, string> StatusColorMap { get; set; } = new();
         public int? EditingWorkOrderId { get; set; }
         public bool IsEditing => EditingWorkOrderId.HasValue;
+        public bool CanManageWorkOrders { get; set; }
     }
 }

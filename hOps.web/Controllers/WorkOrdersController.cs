@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -15,6 +16,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -24,6 +26,15 @@ namespace hOps.web.Controllers
     [Authorize]
     public class WorkOrdersController : BaseController
     {
+        private static readonly string[] StatusProgression = new[]
+        {
+            "New",
+            "In Progress",
+            "Escalated",
+            "On Hold",
+            "Completed",
+            "Cancelled"
+        };
         private readonly IWebHostEnvironment _environment;
         private readonly IConfiguration _configuration;
         private readonly ILogger<WorkOrdersController> _logger;
@@ -383,6 +394,97 @@ namespace hOps.web.Controllers
             return RedirectToAction(nameof(Index), new { highlight = workOrder.Id });
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AdvanceStatus(int id)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            var roles = user != null
+                ? await _userManager.GetRolesAsync(user)
+                : new List<string>();
+
+            if (!HasManagementPrivileges(roles))
+            {
+                return Forbid();
+            }
+
+            var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+
+            var workOrder = await _context.WorkOrders
+                .Include(w => w.Properties)
+                .FirstOrDefaultAsync(w => w.Id == id);
+
+            if (workOrder == null)
+            {
+                return NotFound();
+            }
+
+            if (!workOrder.Properties.Any(p => accessiblePropertyIds.Contains(p.PropertyId)))
+            {
+                return Forbid();
+            }
+
+            var currentIndex = Array.FindIndex(StatusProgression, status =>
+                status.Equals(workOrder.Status, StringComparison.OrdinalIgnoreCase) ||
+                (status.Equals("New", StringComparison.OrdinalIgnoreCase) && workOrder.Status.Equals("Open", StringComparison.OrdinalIgnoreCase)));
+
+            if (currentIndex < 0)
+            {
+                currentIndex = 0;
+            }
+
+            var nextStatus = StatusProgression[(currentIndex + 1) % StatusProgression.Length];
+
+            workOrder.Status = nextStatus;
+            await _context.SaveChangesAsync();
+
+            return RedirectWithFilters(workOrder.Id);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            var roles = user != null
+                ? await _userManager.GetRolesAsync(user)
+                : new List<string>();
+
+            if (!HasManagementPrivileges(roles))
+            {
+                return Forbid();
+            }
+
+            var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+
+            var workOrder = await _context.WorkOrders
+                .Include(w => w.Properties)
+                .Include(w => w.Attachments)
+                .FirstOrDefaultAsync(w => w.Id == id);
+
+            if (workOrder == null)
+            {
+                return NotFound();
+            }
+
+            if (!workOrder.Properties.Any(p => accessiblePropertyIds.Contains(p.PropertyId)))
+            {
+                return Forbid();
+            }
+
+            var attachmentPaths = workOrder.Attachments
+                .Select(a => a.FilePath)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .ToList();
+
+            _context.WorkOrders.Remove(workOrder);
+            await _context.SaveChangesAsync();
+
+            DeleteAttachmentFiles(attachmentPaths);
+
+            return RedirectWithFilters();
+        }
+
         private async Task SendDepartmentAlertEmailsAsync(WorkOrder workOrder, string workOrderLink, ApplicationUser? createdBy)
         {
             if (!workOrder.DepartmentId.HasValue)
@@ -562,6 +664,10 @@ namespace hOps.web.Controllers
             filters.Normalize();
 
             var user = await _userManager.GetUserAsync(User);
+            var userRoles = user != null
+                ? await _userManager.GetRolesAsync(user)
+                : new List<string>();
+            var canManage = HasManagementPrivileges(userRoles);
             var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
             var statuses = WorkOrderStatusOptions.All;
             var statusColorMap = statuses.ToDictionary(s => s.Key, s => s.ColorHex, StringComparer.OrdinalIgnoreCase);
@@ -777,7 +883,8 @@ namespace hOps.web.Controllers
                 CreatorOptions = creatorOptions,
                 LocationSuggestions = locationSuggestions.OrderBy(x => x).ToList(),
                 StatusColorMap = statusColorMap,
-                EditingWorkOrderId = form?.Id
+                EditingWorkOrderId = form?.Id,
+                CanManageWorkOrders = canManage
             };
 
             return viewModel;
@@ -788,7 +895,69 @@ namespace hOps.web.Controllers
             return (ViewBag.CurrentProperty as Property)?.Id;
         }
 
+        private static bool HasManagementPrivileges(IList<string> roles)
+        {
+            return roles.Any(role =>
+                role.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                role.Equals("Manager", StringComparison.OrdinalIgnoreCase));
+        }
 
+        private IActionResult RedirectWithFilters(int? highlight = null)
+        {
+            var baseUrl = Url.Action(nameof(Index)) ?? "/WorkOrders";
+            var queryBuilder = new QueryBuilder();
+
+            foreach (var kvp in HttpContext.Request.Query)
+            {
+                if (string.Equals(kvp.Key, "highlight", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
                 }
+
+                foreach (var value in kvp.Value)
+                {
+                    if (string.IsNullOrEmpty(value))
+                    {
+                        continue;
+                    }
+                    queryBuilder.Add(kvp.Key, value);
+                }
+            }
+
+            if (highlight.HasValue)
+            {
+                queryBuilder.Add("highlight", highlight.Value.ToString(CultureInfo.InvariantCulture));
+            }
+
+            return Redirect(baseUrl + queryBuilder.ToQueryString());
+        }
+
+        private void DeleteAttachmentFiles(IEnumerable<string> relativePaths)
+        {
+            foreach (var relativePath in relativePaths)
+            {
+                if (string.IsNullOrWhiteSpace(relativePath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var trimmed = relativePath.TrimStart('/', '\\');
+                    var normalized = trimmed.Replace('/', Path.DirectorySeparatorChar)
+                        .Replace('\\', Path.DirectorySeparatorChar);
+                    var fullPath = Path.Combine(_environment.WebRootPath, normalized);
+                    if (System.IO.File.Exists(fullPath))
+                    {
+                        System.IO.File.Delete(fullPath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to delete work order attachment at {Path}", relativePath);
+                }
+            }
+        }
+    }
 }
 
