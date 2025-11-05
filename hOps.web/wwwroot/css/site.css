@@ -680,3 +680,164 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     margin-top: 0.5rem;
 }
 
+.rich-text-input {
+    display: none !important;
+}
+
+.rich-text-editor-container {
+    position: relative;
+}
+
+.rich-text-editor {
+    min-height: 8rem;
+    padding: 0.75rem;
+    overflow-y: auto;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background-color: #fff;
+}
+
+.rich-text-editor:focus {
+    outline: 0;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    border-color: rgba(13, 110, 253, 0.6);
+}
+
+.rich-text-editor:empty::before {
+    content: attr(data-placeholder);
+    color: rgba(108, 117, 125, 0.85);
+    pointer-events: none;
+}
+
+.rich-text-editor ul,
+.rich-text-editor ol {
+    padding-left: 1.25rem;
+}
+
+.rich-text-editor blockquote {
+    border-left: 3px solid rgba(13, 110, 253, 0.2);
+    margin: 0.5rem 0;
+    padding-left: 0.75rem;
+    color: rgba(12, 37, 74, 0.9);
+}
+
+.rich-text-underline {
+    text-decoration: underline;
+}
+
+.rich-text-toolbar__color-group {
+    position: relative;
+}
+
+.rich-text-color-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    min-width: 10rem;
+    margin-top: 0.25rem;
+    background-color: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 0.375rem;
+    padding: 0.25rem 0;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+    display: none;
+    z-index: 2000;
+}
+
+.rich-text-color-menu.show {
+    display: block;
+}
+
+.rich-text-color-menu__item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: none;
+    border: 0;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    color: inherit;
+}
+
+.rich-text-color-menu__item:hover,
+.rich-text-color-menu__item:focus {
+    background-color: rgba(13, 110, 253, 0.1);
+    outline: none;
+}
+
+.rich-text-color-menu__item--default .rich-text-color-menu__label {
+    color: inherit;
+}
+
+.rich-text-color-menu__swatch {
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 50%;
+    border: 1px solid rgba(15, 23, 42, 0.2);
+    flex-shrink: 0;
+}
+
+.rich-text-color-menu__label {
+    flex: 1 1 auto;
+}
+
+.rich-text-output mark,
+.rich-text-editor mark {
+    background-color: #fff2a8;
+    padding: 0 0.2em;
+    border-radius: 0.2em;
+}
+
+.rich-text-output .rich-text-color,
+.rich-text-editor .rich-text-color {
+    font-weight: inherit;
+}
+
+.rich-text-output .rich-text-color.rich-text-color-red,
+.rich-text-editor .rich-text-color.rich-text-color-red {
+    color: #b42318;
+}
+
+.rich-text-output .rich-text-color.rich-text-color-orange,
+.rich-text-editor .rich-text-color.rich-text-color-orange {
+    color: #c2410c;
+}
+
+.rich-text-output .rich-text-color.rich-text-color-yellow,
+.rich-text-editor .rich-text-color.rich-text-color-yellow {
+    color: #b58105;
+}
+
+.rich-text-output .rich-text-color.rich-text-color-green,
+.rich-text-editor .rich-text-color.rich-text-color-green {
+    color: #15803d;
+}
+
+.rich-text-output .rich-text-color.rich-text-color-teal,
+.rich-text-editor .rich-text-color.rich-text-color-teal {
+    color: #0f766e;
+}
+
+.rich-text-output .rich-text-color.rich-text-color-blue,
+.rich-text-editor .rich-text-color.rich-text-color-blue {
+    color: #2563eb;
+}
+
+.rich-text-output .rich-text-color.rich-text-color-purple,
+.rich-text-editor .rich-text-color.rich-text-color-purple {
+    color: #7c3aed;
+}
+
+.rich-text-output .rich-text-color.rich-text-color-pink,
+.rich-text-editor .rich-text-color.rich-text-color-pink {
+    color: #db2777;
+}
+
+.rich-text-output .rich-text-color.rich-text-color-gray,
+.rich-text-editor .rich-text-color.rich-text-color-gray {
+    color: #334155;
+}
+
