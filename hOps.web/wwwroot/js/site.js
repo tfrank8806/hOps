@@ -206,3 +206,18 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSelections();
     });
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    const today = new Date();
+    const pad = value => value.toString().padStart(2, '0');
+    const todayValue = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+    document.querySelectorAll('input[type="date"]').forEach(input => {
+        if (!input || input.value) {
+            return;
+        }
+
+        input.value = todayValue;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+});
