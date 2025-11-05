@@ -27,6 +27,9 @@ namespace hOps.web.Models
         public int? FolderId { get; set; }
         public DocumentFolder? Folder { get; set; }
 
+        [MaxLength(2000)]
+        public string? Description { get; set; }
+
         [Required]
         public DocumentAccessScope AccessScope { get; set; }
 

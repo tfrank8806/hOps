@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using hOps.web.Models;
 
 namespace hOps.web.ViewModels.Documents
 {
@@ -12,5 +13,11 @@ namespace hOps.web.ViewModels.Documents
 
         [Display(Name = "Parent Folder")]
         public int? ParentFolderId { get; set; }
+
+        [Display(Name = "Visibility")]
+        public DocumentFolderVisibility Visibility { get; set; } = DocumentFolderVisibility.Global;
+
+        [Display(Name = "Visible To Properties")]
+        public List<int> SelectedPropertyIds { get; set; } = new();
     }
 }

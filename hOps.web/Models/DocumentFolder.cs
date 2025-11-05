@@ -19,9 +19,20 @@ namespace hOps.web.Models
         public ICollection<Document> Documents { get; set; } = new List<Document>();
 
         [Required]
+        public DocumentFolderVisibility Visibility { get; set; } = DocumentFolderVisibility.Global;
+
+        public ICollection<DocumentFolderProperty> FolderProperties { get; set; } = new List<DocumentFolderProperty>();
+
+        [Required]
         public string CreatedById { get; set; } = string.Empty;
         public ApplicationUser CreatedBy { get; set; } = null!;
 
         public DateTime CreatedAtUtc { get; set; }
+    }
+
+    public enum DocumentFolderVisibility
+    {
+        Global = 0,
+        SelectedProperties = 1
     }
 }

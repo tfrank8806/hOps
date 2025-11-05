@@ -1,4 +1,3 @@
-@using hOps.web.Models
 @using Microsoft.AspNetCore.Mvc.Rendering
 @model hOps.web.ViewModels.Documents.DocumentsIndexViewModel
 @{
@@ -29,6 +28,9 @@
 
     var selectedFolderId = Model.SelectedFolderId;
     var showingUnassignedOnly = Model.ShowingUnassignedOnly;
+    int? currentFolderRouteValue = showingUnassignedOnly ? -1 : selectedFolderId;
+    string GetNextDirection(string field) => string.Equals(Model.SortField, field, StringComparison.OrdinalIgnoreCase) && Model.SortDirection == "asc" ? "desc" : "asc";
+    string GetSortIndicator(string field) => string.Equals(Model.SortField, field, StringComparison.OrdinalIgnoreCase) ? (Model.SortDirection == "asc" ? "\u25B2" : "\u25BC") : string.Empty;
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -39,6 +41,12 @@
 {
     <div class="alert alert-success" role="alert">
         @successMessage
+    </div>
+}
+@if (TempData["DocumentError"] is string errorMessage)
+{
+    <div class="alert alert-danger" role="alert">
+        @errorMessage
     </div>
 }
 
@@ -52,11 +60,11 @@
                 </div>
                 <div class="card-body">
                     <div class="list-group list-group-flush mb-3">
-                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(selectedFolderId == null && !showingUnassignedOnly ? "active" : string.Empty)" asp-action="Index">
+                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(selectedFolderId == null && !showingUnassignedOnly ? "active" : string.Empty)" asp-action="Index" asp-route-sort="@Model.SortField" asp-route-direction="@Model.SortDirection">
                             <span>All documents</span>
                             <span class="badge bg-secondary">@Model.TotalDocumentCount</span>
                         </a>
-                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(showingUnassignedOnly ? "active" : string.Empty)" asp-action="Index" asp-route-folderId="-1">
+                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(showingUnassignedOnly ? "active" : string.Empty)" asp-action="Index" asp-route-folderId="-1" asp-route-sort="@Model.SortField" asp-route-direction="@Model.SortDirection">
                             <span>No folder</span>
                             <span class="badge bg-secondary">@Model.UnassignedDocumentCount</span>
                         </a>
@@ -73,6 +81,8 @@
                                 <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(folder.IsSelected ? "active" : string.Empty)"
                                    asp-action="Index"
                                    asp-route-folderId="@folder.Id"
+                                   asp-route-sort="@Model.SortField"
+                                   asp-route-direction="@Model.SortDirection"
                                    style="padding-left:@paddingStyle;">
                                     <span>@folder.Name</span>
                                     <span class="badge bg-secondary">@folder.DocumentCount</span>
@@ -84,6 +94,8 @@
                     <form asp-action="CreateFolder" method="post" novalidate>
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="currentFolderId" value="@(showingUnassignedOnly ? "-1" : (selectedFolderId?.ToString() ?? string.Empty))" />
+                        <input type="hidden" name="currentSort" value="@Model.SortField" />
+                        <input type="hidden" name="currentDirection" value="@Model.SortDirection" />
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                         <div class="mb-3">
                             <label asp-for="FolderForm.Name" class="form-label"></label>
@@ -94,6 +106,41 @@
                             <label asp-for="FolderForm.ParentFolderId" class="form-label"></label>
                             <select asp-for="FolderForm.ParentFolderId" class="form-select" asp-items="parentFolderSelectList"></select>
                             <span asp-validation-for="FolderForm.ParentFolderId" class="text-danger"></span>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label d-block">Visibility</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="FolderForm.Visibility" id="folderVisibilityGlobal" value="@((int)hOps.web.Models.DocumentFolderVisibility.Global)" @(Model.FolderForm.Visibility == hOps.web.Models.DocumentFolderVisibility.Global ? "checked" : string.Empty) />
+                                <label class="form-check-label" for="folderVisibilityGlobal">
+                                    All properties
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="FolderForm.Visibility" id="folderVisibilitySelected" value="@((int)hOps.web.Models.DocumentFolderVisibility.SelectedProperties)" @(Model.FolderForm.Visibility == hOps.web.Models.DocumentFolderVisibility.SelectedProperties ? "checked" : string.Empty) />
+                                <label class="form-check-label" for="folderVisibilitySelected">
+                                    Only selected properties
+                                </label>
+                            </div>
+                            <span asp-validation-for="FolderForm.Visibility" class="text-danger"></span>
+                        </div>
+                        <div class="mb-3 @(Model.FolderForm.Visibility == hOps.web.Models.DocumentFolderVisibility.SelectedProperties ? string.Empty : "d-none")" id="folderVisibilityProperties">
+                            <label class="form-label">Visible To</label>
+                            @if (!Model.FolderPropertyOptions.Any())
+                            {
+                                <p class="text-muted small mb-0">No accessible properties available.</p>
+                            }
+                            else
+                            {
+                                foreach (var option in Model.FolderPropertyOptions)
+                                {
+                                    var checkboxId = $"folderProperty_{option.Id}";
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="@option.Id" name="FolderForm.SelectedPropertyIds" id="@checkboxId" @(option.IsSelected ? "checked" : string.Empty) />
+                                        <label class="form-check-label" for="@checkboxId">@option.Name (@option.Code)</label>
+                                    </div>
+                                }
+                            }
+                            <span asp-validation-for="FolderForm.SelectedPropertyIds" class="text-danger"></span>
                         </div>
                         <button type="submit" class="btn btn-outline-primary w-100">Create Folder</button>
                     </form>
@@ -107,6 +154,8 @@
                     <form asp-action="Upload" method="post" enctype="multipart/form-data" novalidate>
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="currentFolderId" value="@(showingUnassignedOnly ? "-1" : (selectedFolderId?.ToString() ?? string.Empty))" />
+                        <input type="hidden" name="currentSort" value="@Model.SortField" />
+                        <input type="hidden" name="currentDirection" value="@Model.SortDirection" />
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
                         <div class="mb-3">
@@ -119,6 +168,12 @@
                             <label asp-for="Form.File" class="form-label">File</label>
                             <input asp-for="Form.File" class="form-control" type="file" />
                             <span asp-validation-for="Form.File" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Form.Description" class="form-label"></label>
+                            <textarea asp-for="Form.Description" class="form-control" rows="3" maxlength="2000"></textarea>
+                            <span asp-validation-for="Form.Description" class="text-danger"></span>
                         </div>
 
                         <div class="mb-3">
@@ -199,7 +254,7 @@
                 <span class="badge bg-light text-dark">@Model.Documents.Count document@(Model.Documents.Count == 1 ? string.Empty : "s")</span>
             </div>
             <div class="card-body">
-                @if (Model.Documents.Count == 0)
+                @if (Model.Documents.Count == 0 && !Model.ChildFolders.Any())
                 {
                     <p class="text-muted mb-0">No documents have been uploaded yet.</p>
                 }
@@ -209,13 +264,70 @@
                         <table class="table align-middle">
                             <thead>
                                 <tr>
-                                    <th scope="col">Document</th>
-                                    <th scope="col">Shared With</th>
-                                    <th scope="col" class="text-end">Uploaded</th>
+                                    <th scope="col">
+                                        <a asp-action="Index"
+                                           asp-route-folderId="@(showingUnassignedOnly ? -1 : selectedFolderId)"
+                                           asp-route-sort="name"
+                                           asp-route-direction="@GetNextDirection("name")"
+                                           class="text-decoration-none text-reset">
+                                            Document
+                                            <span class="ms-1 text-muted small">@GetSortIndicator("name")</span>
+                                        </a>
+                                    </th>
+                                    <th scope="col">
+                                        <a asp-action="Index"
+                                           asp-route-folderId="@(showingUnassignedOnly ? -1 : selectedFolderId)"
+                                           asp-route-sort="shared"
+                                           asp-route-direction="@GetNextDirection("shared")"
+                                           class="text-decoration-none text-reset">
+                                            Shared With
+                                            <span class="ms-1 text-muted small">@GetSortIndicator("shared")</span>
+                                        </a>
+                                    </th>
+                                    <th scope="col" class="text-end">
+                                        <a asp-action="Index"
+                                           asp-route-folderId="@(showingUnassignedOnly ? -1 : selectedFolderId)"
+                                           asp-route-sort="uploaded"
+                                           asp-route-direction="@GetNextDirection("uploaded")"
+                                           class="text-decoration-none text-reset">
+                                            Uploaded
+                                            <span class="ms-1 text-muted small">@GetSortIndicator("uploaded")</span>
+                                        </a>
+                                    </th>
                                     <th scope="col" class="text-end">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
+                                @if (Model.ChildFolders.Any())
+                                {
+                                    foreach (var child in Model.ChildFolders)
+                                    {
+                                        <tr class="table-light">
+                                            <td colspan="2">
+                                                <a asp-action="Index"
+                                                   asp-route-folderId="@child.Id"
+                                                   asp-route-sort="@Model.SortField"
+                                                   asp-route-direction="@Model.SortDirection"
+                                                   class="text-decoration-none text-reset">
+                                                    <span class="me-2" aria-hidden="true">📁</span><strong>@child.Name</strong>
+                                                </a>
+                                                <div class="text-muted small">@child.DisplayPath</div>
+                                            </td>
+                                            <td class="text-end">
+                                                <span class="badge bg-secondary">@child.DocumentCount</span>
+                                            </td>
+                                            <td class="text-end">
+                                                <a class="btn btn-outline-secondary btn-sm"
+                                                   asp-action="Index"
+                                                   asp-route-folderId="@child.Id"
+                                                   asp-route-sort="@Model.SortField"
+                                                   asp-route-direction="@Model.SortDirection">
+                                                    Open
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
                                 @foreach (var doc in Model.Documents)
                                 {
                                     <tr>
@@ -230,6 +342,10 @@
                                             else
                                             {
                                                 <div class="text-muted small">Folder: (no folder)</div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(doc.Description))
+                                            {
+                                                <div class="text-muted small">Notes: @doc.Description</div>
                                             }
                                         </td>
                                         <td>
@@ -253,6 +369,24 @@
                                         </td>
                                         <td class="text-end">
                                             <a class="btn btn-outline-primary btn-sm" asp-action="Download" asp-route-id="@doc.Id">Download</a>
+                                            <form asp-action="Move"
+                                                  method="post"
+                                                  class="d-inline-flex align-items-center gap-2 ms-2"
+                                                  style="flex-wrap: wrap;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@doc.Id" />
+                                                <input type="hidden" name="currentFolderId" value="@(currentFolderRouteValue?.ToString() ?? string.Empty)" />
+                                                <input type="hidden" name="currentSort" value="@Model.SortField" />
+                                                <input type="hidden" name="currentDirection" value="@Model.SortDirection" />
+                                                @{
+                                                    var moveFolderItems = Model.FolderOptions
+                                                        .Select(option => new SelectListItem(FormatFolderLabel(option), option.Id.ToString(), doc.FolderId == option.Id))
+                                                        .ToList();
+                                                    moveFolderItems.Insert(0, new SelectListItem("No folder", string.Empty, !doc.FolderId.HasValue));
+                                                }
+                                                @Html.DropDownList("folderId", moveFolderItems, new { @class = "form-select form-select-sm w-auto" })
+                                                <button type="submit" class="btn btn-outline-secondary btn-sm">Move</button>
+                                            </form>
                                         </td>
                                     </tr>
                                 }
@@ -271,6 +405,7 @@
         (function () {
             const propertyOnlyFields = document.getElementById('propertyOnlyFields');
             const selectedPropertiesFields = document.getElementById('selectedPropertiesFields');
+            const folderVisibilityFields = document.getElementById('folderVisibilityProperties');
 
             function updateVisibility() {
                 const selectedValue = document.querySelector('input[name="Form.AccessScope"]:checked')?.value;
@@ -294,6 +429,23 @@
             });
 
             updateVisibility();
+
+            const folderVisibilityRadios = document.querySelectorAll('input[name="FolderForm.Visibility"]');
+            function updateFolderVisibility() {
+                if (!folderVisibilityFields) {
+                    return;
+                }
+                const selectedValue = document.querySelector('input[name="FolderForm.Visibility"]:checked')?.value;
+                const visibility = parseInt(selectedValue ?? '-1');
+                if (visibility === @((int)hOps.web.Models.DocumentFolderVisibility.SelectedProperties)) {
+                    folderVisibilityFields.classList.remove('d-none');
+                } else {
+                    folderVisibilityFields.classList.add('d-none');
+                }
+            }
+
+            folderVisibilityRadios.forEach(radio => radio.addEventListener('change', updateFolderVisibility));
+            updateFolderVisibility();
         })();
     </script>
 }

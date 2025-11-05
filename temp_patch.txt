@@ -1,2 +1,15 @@
-
-
+﻿*** Update File: hOps.web/Views/Documents/Index.cshtml
+@@
+-                                                <select name="folderId" class="form-select form-select-sm w-auto">
+-                                                    <option value="" selected="@(!doc.FolderId.HasValue)">No folder</option>
+-                                                    @foreach (var option in Model.FolderOptions)
+-                                                    {
+-                                                        <option value="@option.Id" selected="@(doc.FolderId == option.Id)">@FormatFolderLabel(option)</option>
+-                                                    }
+-                                                </select>
++                                                @{ var moveFolderItems = Model.FolderOptions
++                                                    .Select(option => new SelectListItem(FormatFolderLabel(option), option.Id.ToString(), doc.FolderId == option.Id))
++                                                    .ToList();
++                                                    moveFolderItems.Insert(0, new SelectListItem("No folder", string.Empty, !doc.FolderId.HasValue)); }
++                                                @Html.DropDownList("folderId", moveFolderItems, new { @class = "form-select form-select-sm w-auto" })
+*** End Patch

@@ -53,6 +53,7 @@ namespace hOps.web.Data
         public DbSet<Document> Documents { get; set; }
         public DbSet<DocumentFolder> DocumentFolders { get; set; }
         public DbSet<DocumentProperty> DocumentProperties { get; set; }
+        public DbSet<DocumentFolderProperty> DocumentFolderProperties { get; set; }
         public DbSet<UserPropertyEmailSubscription> UserPropertyEmailSubscriptions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
@@ -358,6 +359,21 @@ namespace hOps.web.Data
                 .HasOne(dp => dp.Property)
                 .WithMany(p => p.DocumentLinks)
                 .HasForeignKey(dp => dp.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<DocumentFolderProperty>()
+                .HasKey(fp => new { fp.DocumentFolderId, fp.PropertyId });
+
+            builder.Entity<DocumentFolderProperty>()
+                .HasOne(fp => fp.DocumentFolder)
+                .WithMany(f => f.FolderProperties)
+                .HasForeignKey(fp => fp.DocumentFolderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<DocumentFolderProperty>()
+                .HasOne(fp => fp.Property)
+                .WithMany(p => p.DocumentFolderLinks)
+                .HasForeignKey(fp => fp.PropertyId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<DocumentFolder>()

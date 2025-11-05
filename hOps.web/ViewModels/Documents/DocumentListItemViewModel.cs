@@ -18,5 +18,6 @@ namespace hOps.web.ViewModels.Documents
         public IReadOnlyList<string> TargetProperties { get; set; } = Array.Empty<string>();
         public int? FolderId { get; set; }
         public string? FolderPath { get; set; }
+        public string? Description { get; set; }
     }
 }

@@ -11,6 +11,10 @@ namespace hOps.web.ViewModels.Documents
         [MaxLength(150)]
         public string? Title { get; set; }
 
+        [Display(Name = "Description / Notes")]
+        [MaxLength(2000)]
+        public string? Description { get; set; }
+
         [Required(ErrorMessage = "Please select a file to upload.")]
         public IFormFile? File { get; set; }
 
