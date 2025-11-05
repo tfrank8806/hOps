@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Reflection;
 using hOps.web.Models;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
@@ -114,7 +115,22 @@ namespace hOps.web.ViewModels
 
         public string RecurrenceDisplay => Recurrence == CalendarRecurrenceType.None
             ? "One-time event"
-            : $"Repeats {Recurrence.ToString()}";
+            : $"Repeats {GetRecurrenceLabel(Recurrence)}";
+
+        private static string GetRecurrenceLabel(CalendarRecurrenceType recurrence)
+        {
+            var member = typeof(CalendarRecurrenceType)
+                .GetMember(recurrence.ToString())
+                .FirstOrDefault();
+
+            var display = member?.GetCustomAttribute<DisplayAttribute>();
+            if (!string.IsNullOrWhiteSpace(display?.Name))
+            {
+                return display.Name;
+            }
+
+            return recurrence.ToString();
+        }
 
         public string PropertiesDisplay => PropertyNames.Count > 0
             ? string.Join(", ", PropertyNames)
