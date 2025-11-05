@@ -854,3 +854,7 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     color: #334155;
 }
 
+.phonebook-detail-card {
+    position: sticky;
+    top: 1.5rem;
+}
