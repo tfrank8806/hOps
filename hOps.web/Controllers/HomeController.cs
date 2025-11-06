@@ -720,7 +720,7 @@ namespace hOps.web.Controllers
                     CreatorName = log.CreatedBy != null ? BuildDisplayName(log.CreatedBy) : "Unknown",
                     CreatedAt = log.CreatedAt,
                     DetailUrl = Url.Action("Details", "PassOnLogs", new { id = log.Id }) ?? string.Empty,
-                    IsRead = log.Views.Any(v => v.ViewerId == currentUserId)
+                    IsRead = log.CreatedById == currentUserId || log.Views.Any(v => v.ViewerId == currentUserId)
                 })
                 .AsNoTracking()
                 .ToListAsync();
