@@ -235,6 +235,7 @@ namespace hOps.web.Controllers
             if (!ModelState.IsValid)
             {
                 TempData["HomeError"] = "Unable to add bulletin entry. Please ensure the message is provided.";
+                TempData["ShowBulletinForm"] = true;
                 return RedirectToAction(nameof(Index));
             }
 
