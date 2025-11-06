@@ -49,6 +49,7 @@ namespace hOps.web.Utilities
             var processedText = ProcessColorMarkup(text, out List<ColorToken> colorTokens);
 
             var html = Markdown.ToHtml(processedText, Pipeline);
+            html = ApplyInlineFallback(html);
 
             if (colorTokens.Count > 0)
             {
@@ -189,6 +190,34 @@ namespace hOps.web.Utilities
             {
                 IsClosed = true;
             }
+        }
+        private static string ApplyInlineFallback(string html)
+        {
+            if (string.IsNullOrEmpty(html))
+            {
+                return html;
+            }
+
+            static string Replace(string input, string pattern, Func<Match, string> replacement)
+            {
+                return Regex.Replace(
+                    input,
+                    pattern,
+                    match => replacement(match),
+                    RegexOptions.Singleline | RegexOptions.Compiled);
+            }
+
+            html = Replace(html, @"\*\*(.+?)\*\*", m => $"<strong>{m.Groups[1].Value}</strong>");
+
+            html = Replace(html, @"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", m => $"<em>{m.Groups[1].Value}</em>");
+
+            html = Replace(html, @"\+\+(.+?)\+\+", m => $"<span class=\"rich-text-underline\">{m.Groups[1].Value}</span>");
+
+            html = Replace(html, @"\~\~(.+?)\~\~", m => $"<del>{m.Groups[1].Value}</del>");
+
+            html = Replace(html, @"\=\=(.+?)\=\=", m => $"<mark>{m.Groups[1].Value}</mark>");
+
+            return html;
         }
     }
 }
