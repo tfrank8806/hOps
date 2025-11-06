@@ -189,15 +189,20 @@
                     var hasLink = !string.IsNullOrWhiteSpace(log.DetailUrl);
                     var postedLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
                     var authorName = string.IsNullOrWhiteSpace(log.CreatorName) ? "Unknown" : log.CreatorName;
+                    var statusBadgeClass = log.IsRead ? "badge rounded-pill bg-success-subtle text-success" : "badge rounded-pill bg-primary text-white";
+                    var statusText = log.IsRead ? "Read" : "Unread";
                     <li class="widget-item">
-                        @if (hasLink)
-                        {
-                            <a class="fw-semibold" href="@log.DetailUrl">@log.Title</a>
-                        }
-                        else
-                        {
-                            <span class="fw-semibold">@log.Title</span>
-                        }
+                        <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                            @if (hasLink)
+                            {
+                                <a class="fw-semibold" href="@log.DetailUrl">@log.Title</a>
+                            }
+                            else
+                            {
+                                <span class="fw-semibold">@log.Title</span>
+                            }
+                            <span class="@statusBadgeClass">@statusText</span>
+                        </div>
                         <div class="text-muted small">By @authorName</div>
                         @if (!string.IsNullOrWhiteSpace(log.Preview))
                         {

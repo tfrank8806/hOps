@@ -69,7 +69,7 @@ namespace hOps.web.Controllers
             await PopulateRoomTilesAsync(viewModel, propertyId);
             await PopulateWorkOrdersAsync(viewModel, propertyId);
             await PopulateLostFoundAsync(viewModel, propertyId);
-            await PopulatePassOnLogsAsync(viewModel, propertyId);
+            await PopulatePassOnLogsAsync(viewModel, propertyId, user.Id);
             await PopulatePackageLogAsync(viewModel, propertyId);
             await PopulateUpcomingEventsAsync(viewModel, propertyId);
 
@@ -706,7 +706,7 @@ namespace hOps.web.Controllers
             viewModel.LostFoundEntries = lostFoundEntries;
         }
 
-        private async Task PopulatePassOnLogsAsync(HomeIndexViewModel viewModel, int propertyId)
+        private async Task PopulatePassOnLogsAsync(HomeIndexViewModel viewModel, int propertyId, string currentUserId)
         {
             var logs = await _context.PassOnLogs
                 .Where(log => log.Properties.Any(lp => lp.PropertyId == propertyId))
@@ -719,7 +719,8 @@ namespace hOps.web.Controllers
                     Preview = string.IsNullOrWhiteSpace(log.Body) ? string.Empty : TruncatePreview(MentionMarkupFormatter.ToDisplayText(log.Body ?? string.Empty)),
                     CreatorName = log.CreatedBy != null ? BuildDisplayName(log.CreatedBy) : "Unknown",
                     CreatedAt = log.CreatedAt,
-                    DetailUrl = Url.Action("Details", "PassOnLogs", new { id = log.Id }) ?? string.Empty
+                    DetailUrl = Url.Action("Details", "PassOnLogs", new { id = log.Id }) ?? string.Empty,
+                    IsRead = log.Views.Any(v => v.ViewerId == currentUserId)
                 })
                 .AsNoTracking()
                 .ToListAsync();
@@ -990,7 +991,7 @@ namespace hOps.web.Controllers
             [MaxLength(4000)]
             public string Content { get; set; } = string.Empty;
 
-            public List<IFormFile> Files { get; set; } = new();
+            public List<IFormFile>? Files { get; set; } = new();
 
             public List<int> AttachmentsToDelete { get; set; } = new();
         }
@@ -1006,7 +1007,7 @@ namespace hOps.web.Controllers
             [MaxLength(2000)]
             public string Content { get; set; } = string.Empty;
 
-            public List<IFormFile> Files { get; set; } = new();
+            public List<IFormFile>? Files { get; set; } = new();
 
             public List<int> AttachmentsToDelete { get; set; } = new();
         }

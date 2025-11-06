@@ -29,7 +29,7 @@ namespace hOps.web.ViewModels
         public bool ShowPropertySelection => PropertyOptions.Count > 1;
 
         [Display(Name = "Attachments")]
-        public List<IFormFile> Files { get; set; } = new();
+        public List<IFormFile>? Files { get; set; } = new();
 
         public List<PassOnLogAttachmentViewModel> ExistingAttachments { get; set; } = new();
 

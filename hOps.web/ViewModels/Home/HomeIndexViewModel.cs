@@ -125,6 +125,7 @@ namespace hOps.web.ViewModels.Home
         public string CreatorName { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public string DetailUrl { get; set; } = string.Empty;
+        public bool IsRead { get; set; }
     }
 
     public class HomeAttachmentViewModel

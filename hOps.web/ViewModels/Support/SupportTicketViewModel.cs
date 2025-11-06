@@ -29,7 +29,7 @@ namespace hOps.web.ViewModels.Support
 
         [Display(Name = "Attachments")]
         [DataType(DataType.Upload)]
-        public List<IFormFile> Attachments { get; set; } = new();
+        public List<IFormFile>? Attachments { get; set; } = new();
 
         public IEnumerable<SelectListItem> CategoryOptions { get; set; } = BuildCategoryOptions();
 
