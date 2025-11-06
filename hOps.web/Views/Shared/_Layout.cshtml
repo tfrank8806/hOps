@@ -234,18 +234,25 @@
                                 </li>
                             }
 
-                            <li class="nav-item dropdown me-2" id="notificationsMenu">
+                            <li class="nav-item dropdown me-2" id="messagesMenu">
                                 <a class="nav-link dropdown-toggle position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     <span class="me-1">Messages</span>
-                                    <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle notification-badge d-none" id="notificationBadge">0</span>
+                                    <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle @(unreadDirectMessageCount > 0 ? string.Empty : "d-none")" id="messagesMenuTriggerBadge">@unreadDirectMessageBadgeText</span>
                                 </a>
-                                <div class="dropdown-menu dropdown-menu-end notifications-dropdown">
-                                    <div class="notification-list small" id="notificationList">
-                                        <span class="dropdown-item-text text-muted">Loading…</span>
-                                    </div>
-                                    <div class="dropdown-divider"></div>
-                                    <a class="dropdown-item text-center" asp-controller="DirectMessages" asp-action="Index">View all messages</a>
-                                </div>
+                                <ul class="dropdown-menu dropdown-menu-end messages-dropdown-menu">
+                                    <li>
+                                        <a class="dropdown-item d-flex align-items-center gap-2" asp-controller="DirectMessages" asp-action="Index" asp-route-startNew="true" id="messagesMenuCreate">
+                                            <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis">+</span>
+                                            <span>Create New Message</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item d-flex align-items-center justify-content-between" asp-controller="DirectMessages" asp-action="Index" id="messagesMenuConversations">
+                                            <span>Conversations</span>
+                                            <span class="badge rounded-pill bg-primary @(unreadDirectMessageCount > 0 ? string.Empty : "d-none")" id="messagesMenuListBadge">@unreadDirectMessageBadgeText</span>
+                                        </a>
+                                    </li>
+                                </ul>
                             </li>
 
                             <li class="nav-item me-2">
@@ -282,30 +289,6 @@
     </div>
 
     <div id="sidebarQuickMenu" class="sidebar-quick-menu" aria-hidden="true"></div>
-
-    @if (SignInManager.IsSignedIn(User))
-    {
-        <button id="messagesLauncher" class="messages-launcher btn btn-primary rounded-circle shadow" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="messagesFloatingPanel">
-            <span class="visually-hidden">Open messages</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M8 15a6.97 6.97 0 0 0 4.468-1.64c.26.04.505.09.755.15.27.07.529.14.777.22-.19-.27-.34-.55-.48-.85-.19-.41-.35-.9-.44-1.33A6.972 6.972 0 0 0 15 8a7 7 0 1 0-7 7Z" />
-                <path d="M3 5h10v1H3zm0 3h7v1H3z" />
-            </svg>
-        </button>
-
-        <div id="messagesFloatingPanel" class="messages-floating-panel shadow-lg" role="dialog" aria-modal="true" aria-hidden="true">
-            <div class="messages-floating-panel__header d-flex align-items-center justify-content-between">
-                <div>
-                    <span class="fw-semibold">Messages</span>
-                    <span class="d-block small text-muted">Chat with your team</span>
-                </div>
-                <button type="button" class="btn-close" id="messagesFloatingClose" aria-label="Close messages"></button>
-            </div>
-            <iframe id="messagesFloatingFrame" class="messages-floating-panel__frame" src="/DirectMessages/Widget" title="Direct messages" tabindex="-1"></iframe>
-        </div>
-
-        <div id="messagesFloatingBackdrop" class="messages-floating-backdrop" aria-hidden="true"></div>
-    }
 
     <script src="~/lib/jquery/dist/jquery.min.js" asp-append-version="true"></script>
     @RenderSection("Scripts", required: false)

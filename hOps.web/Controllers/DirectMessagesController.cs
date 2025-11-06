@@ -32,7 +32,7 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(int? conversationId, string? userId)
+        public async Task<IActionResult> Index(int? conversationId, string? userId, bool startNew = false)
         {
             var currentUser = await _userManager.GetUserAsync(User);
             if (currentUser == null)
@@ -40,31 +40,18 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
-            var viewModel = await BuildViewModelAsync(currentUser, conversationId, userId);
+            var viewModel = await BuildViewModelAsync(currentUser, conversationId, userId, startNew);
             return View(viewModel);
-        }
-
-        [HttpGet]
-        public async Task<IActionResult> Widget(int? conversationId, string? userId)
-        {
-            var currentUser = await _userManager.GetUserAsync(User);
-            if (currentUser == null)
-            {
-                return Challenge();
-            }
-
-            var viewModel = await BuildViewModelAsync(currentUser, conversationId, userId);
-            return View("Widget", viewModel);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Send(DirectMessageForm form, string? context)
+        public async Task<IActionResult> Send(DirectMessageForm form)
         {
             if (!ModelState.IsValid)
             {
                 TempData["DirectMessageError"] = "Please enter a message before sending.";
-                return RedirectToContext(context, new { conversationId = form.ConversationId });
+                return RedirectToAction(nameof(Index), new { conversationId = form.ConversationId });
             }
 
             var currentUser = await _userManager.GetUserAsync(User);
@@ -82,7 +69,7 @@ namespace hOps.web.Controllers
             if (conversation == null)
             {
                 TempData["DirectMessageError"] = "Conversation not found or you do not have access.";
-                return RedirectToContext(context);
+                return RedirectToAction(nameof(Index));
             }
 
             var recipientId = conversation.ParticipantAId == currentUser.Id
@@ -92,22 +79,22 @@ namespace hOps.web.Controllers
             if (!access.IsAdmin && !access.AllowedUserIds.Contains(recipientId))
             {
                 TempData["DirectMessageError"] = "You can only message teammates assigned to your properties.";
-                return RedirectToContext(context);
+                return RedirectToAction(nameof(Index));
             }
 
             await _messageService.SendMessageAsync(form.ConversationId, currentUser.Id, recipientId, form.Body);
             TempData["DirectMessageMessage"] = "Message sent.";
-            return RedirectToContext(context, new { conversationId = form.ConversationId });
+            return RedirectToAction(nameof(Index), new { conversationId = form.ConversationId });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Start(NewConversationForm form, string? context)
+        public async Task<IActionResult> Start(NewConversationForm form)
         {
             if (!ModelState.IsValid)
             {
                 TempData["DirectMessageError"] = "Select a recipient and enter a message.";
-                return RedirectToContext(context);
+                return RedirectToAction(nameof(Index));
             }
 
             var currentUser = await _userManager.GetUserAsync(User);
@@ -120,28 +107,20 @@ namespace hOps.web.Controllers
             if (!access.IsAdmin && !access.AllowedUserIds.Contains(form.RecipientUserId))
             {
                 TempData["DirectMessageError"] = "You can only message teammates assigned to your properties.";
-                return RedirectToContext(context);
+                return RedirectToAction(nameof(Index));
             }
 
             try
             {
                 var message = await _messageService.StartConversationAsync(currentUser.Id, form.RecipientUserId, form.Body);
                 TempData["DirectMessageMessage"] = "Conversation started.";
-                return RedirectToContext(context, new { conversationId = message.ConversationId });
+                return RedirectToAction(nameof(Index), new { conversationId = message.ConversationId });
             }
             catch (InvalidOperationException ex)
             {
                 TempData["DirectMessageError"] = ex.Message;
-                return RedirectToContext(context);
+                return RedirectToAction(nameof(Index));
             }
-        }
-
-        private RedirectToActionResult RedirectToContext(string? context, object? routeValues = null)
-        {
-            var target = string.Equals(context, "widget", StringComparison.OrdinalIgnoreCase)
-                ? nameof(Widget)
-                : nameof(Index);
-            return RedirectToAction(target, routeValues);
         }
 
         private async Task<MessagingAccessContext> GetMessagingAccessContextAsync(ApplicationUser user)
@@ -199,7 +178,7 @@ namespace hOps.web.Controllers
 
         private sealed record MessagingAccessContext(bool IsAdmin, HashSet<int> PropertyIds, HashSet<string> AllowedUserIds);
 
-        private async Task<DirectMessagePageViewModel> BuildViewModelAsync(ApplicationUser currentUser, int? conversationId, string? userId)
+        private async Task<DirectMessagePageViewModel> BuildViewModelAsync(ApplicationUser currentUser, int? conversationId, string? userId, bool startNew)
         {
             var access = await GetMessagingAccessContextAsync(currentUser);
 
@@ -259,7 +238,14 @@ namespace hOps.web.Controllers
                 {
                     var participantName = nameLookup.TryGetValue(summary.OtherUserId, out var value)
                         ? value
-                        : "Unknown user";
+                        : null;
+
+                    if (string.IsNullOrWhiteSpace(participantName))
+                    {
+                        participantName = emailLookup.TryGetValue(summary.OtherUserId, out var fallbackEmail) && !string.IsNullOrWhiteSpace(fallbackEmail)
+                            ? fallbackEmail!
+                            : "Teammate";
+                    }
 
                     return new ConversationListItemViewModel
                     {
@@ -388,6 +374,15 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
+            var showNewConversation = startNew || (!conversationItems.Any() && availableRecipients.Any());
+            var newConversation = new NewConversationForm
+            {
+                RecipientUserId = availableRecipients.Any(option =>
+                        string.Equals(option.UserId, userId, StringComparison.OrdinalIgnoreCase))
+                    ? userId!
+                    : string.Empty
+            };
+
             return new DirectMessagePageViewModel
             {
                 Conversations = conversationItems,
@@ -397,7 +392,9 @@ namespace hOps.web.Controllers
                     ConversationId = activeConversation?.ConversationId ?? 0
                 },
                 CurrentUserId = currentUser.Id,
-                AvailableRecipients = availableRecipients
+                AvailableRecipients = availableRecipients,
+                NewConversation = newConversation,
+                ShowNewConversation = showNewConversation
             };
         }
 

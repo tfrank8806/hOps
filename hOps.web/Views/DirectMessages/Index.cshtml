@@ -4,6 +4,7 @@
 @{
     ViewData["Title"] = "Messages";
     ViewData["MainContainerClass"] = "main-inner--wide";
+    var showNewConversation = Model.ShowNewConversation;
 }
 
 <div class="row g-4 direct-messages-page align-items-stretch flex-grow-1">
@@ -11,12 +12,12 @@
         <div class="card shadow-sm flex-fill">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h2 class="h5 mb-0">Conversations</h2>
-                <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#newConversationForm" aria-expanded="false" aria-controls="newConversationForm" @(Model.AvailableRecipients.Any() ? string.Empty : "disabled")>
+                <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#newConversationForm" aria-expanded="@(showNewConversation ? "true" : "false")" aria-controls="newConversationForm" @(Model.AvailableRecipients.Any() ? string.Empty : "disabled")>
                     New Message
                 </button>
             </div>
             <div class="card-body p-0 d-flex flex-column">
-                <div class="collapse border-bottom" id="newConversationForm" data-dm-new-conversation="true">
+                <div class="collapse border-bottom @(showNewConversation ? "show" : string.Empty)" id="newConversationForm" data-dm-new-conversation="true">
                     @if (Model.AvailableRecipients.Any())
                     {
                         <form asp-action="Start" method="post" class="p-3" data-dm-existing-url="@Url.Action("Index", "DirectMessages")">
@@ -27,7 +28,9 @@
                                     <option value="" selected disabled>Select a teammate</option>
                                     @foreach (var option in Model.AvailableRecipients)
                                     {
-                                        <option value="@option.UserId" data-conversation-id="@option.ConversationId">@option.DisplayName</option>
+                                        var isSelected = !string.IsNullOrEmpty(Model.NewConversation.RecipientUserId)
+                                            && string.Equals(Model.NewConversation.RecipientUserId, option.UserId, StringComparison.OrdinalIgnoreCase);
+                                        <option value="@option.UserId" data-conversation-id="@option.ConversationId" selected="@(isSelected ? "selected" : null)">@option.DisplayName</option>
                                     }
                                 </select>
                             </div>
@@ -48,10 +51,10 @@
                         </div>
                     }
                 </div>
-                <div class="list-group list-group-flush flex-grow-1 overflow-auto">
+                <div class="direct-messages-conversation-list flex-grow-1 overflow-auto">
                     @if (!Model.Conversations.Any())
                     {
-                        <div class="list-group-item text-muted">
+                        <div class="direct-messages-conversation-list__empty text-muted small px-3 py-4">
                             No conversations yet.
                         </div>
                     }
@@ -60,21 +63,34 @@
                         foreach (var conversation in Model.Conversations)
                         {
                             var url = Url.Action("Index", new { conversationId = conversation.ConversationId });
-                            <a href="@url" class="list-group-item list-group-item-action @(Model.ActiveConversation?.ConversationId == conversation.ConversationId ? "active" : "")">
-                                <div class="d-flex justify-content-between">
-                                    <span class="fw-semibold">@conversation.ParticipantName</span>
-                                    @if (conversation.LastMessageAt.HasValue)
-                                    {
-                                    <small class="text-muted">@TimeZoneService.ConvertToUserTime(conversation.LastMessageAt.Value).ToString("g")</small>
-                                    }
+                            var displayName = string.IsNullOrWhiteSpace(conversation.ParticipantName)
+                                ? (!string.IsNullOrWhiteSpace(conversation.ParticipantEmail) ? conversation.ParticipantEmail : "Teammate")
+                                : conversation.ParticipantName;
+                            var participantInitial = string.IsNullOrWhiteSpace(displayName)
+                                ? "?"
+                                : displayName.Trim()[0].ToString().ToUpperInvariant();
+                            var lastTimestamp = conversation.LastMessageAt.HasValue
+                                ? TimeZoneService.ConvertToUserTime(conversation.LastMessageAt.Value)
+                                : (DateTime?)null;
+                            var isActive = Model.ActiveConversation?.ConversationId == conversation.ConversationId;
+                            <a href="@url" class="direct-messages-conversation-item @(isActive ? "active" : string.Empty)">
+                                <div class="direct-messages-conversation-item__avatar">@participantInitial</div>
+                                <div class="direct-messages-conversation-item__body">
+                                    <div class="direct-messages-conversation-item__row">
+                                        <span class="direct-messages-conversation-item__name">@displayName</span>
+                                        @if (lastTimestamp.HasValue)
+                                        {
+                                            <time datetime="@lastTimestamp.Value.ToString("o")" class="direct-messages-conversation-item__time">@lastTimestamp.Value.ToString("g")</time>
+                                        }
+                                    </div>
+                                    <div class="direct-messages-conversation-item__preview @(conversation.HasUnread ? "direct-messages-conversation-item__preview--unread" : string.Empty)">
+                                        @(string.IsNullOrWhiteSpace(conversation.LastMessagePreview) ? "…" : conversation.LastMessagePreview)
+                                    </div>
                                 </div>
-                                <div class="small text-muted @(conversation.HasUnread ? "fw-semibold text-primary" : "")">
-                                    @(string.IsNullOrWhiteSpace(conversation.LastMessagePreview) ? "..." : conversation.LastMessagePreview)
-                                    @if (conversation.HasUnread)
-                                    {
-                                        <span class="badge bg-primary ms-2">@conversation.UnreadCount</span>
-                                    }
-                                </div>
+                                @if (conversation.HasUnread)
+                                {
+                                    <span class="badge rounded-pill bg-primary direct-messages-conversation-item__badge">@conversation.UnreadCount</span>
+                                }
                             </a>
                         }
                     }
@@ -185,9 +201,107 @@
 
 @section Styles {
     <style>
-        .direct-messages-page .list-group-item.active {
+        .direct-messages-conversation-list {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .direct-messages-conversation-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            text-decoration: none;
+            color: inherit;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+            transition: background-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .direct-messages-conversation-item:last-child {
+            border-bottom: none;
+        }
+
+        .direct-messages-conversation-item:hover {
+            background-color: rgba(13, 110, 253, 0.08);
+        }
+
+        .direct-messages-conversation-item.active {
             background: linear-gradient(135deg, #0d6efd 0%, #2575fc 100%);
-            border-color: #0d6efd;
+            color: #fff;
+            box-shadow: 0 8px 16px rgba(13, 110, 253, 0.25);
+        }
+
+        .direct-messages-conversation-item__avatar {
+            flex-shrink: 0;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            background: rgba(13, 110, 253, 0.12);
+            color: #0d6efd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .direct-messages-conversation-item.active .direct-messages-conversation-item__avatar {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+        }
+
+        .direct-messages-conversation-item__body {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .direct-messages-conversation-item__row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .direct-messages-conversation-item__name {
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .direct-messages-conversation-item__time {
+            margin-left: auto;
+            font-size: 0.75rem;
+            color: rgba(15, 46, 97, 0.55);
+        }
+
+        .direct-messages-conversation-item.active .direct-messages-conversation-item__time {
+            color: rgba(255, 255, 255, 0.75);
+        }
+
+        .direct-messages-conversation-item__preview {
+            font-size: 0.85rem;
+            color: rgba(15, 46, 97, 0.75);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .direct-messages-conversation-item__preview--unread {
+            font-weight: 600;
+            color: #0d6efd;
+        }
+
+        .direct-messages-conversation-item.active .direct-messages-conversation-item__preview {
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .direct-messages-conversation-item__badge {
+            margin-left: 0.5rem;
+            align-self: flex-start;
+        }
+
+        .direct-messages-conversation-list__empty {
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
         }
 
         .direct-message-thread {

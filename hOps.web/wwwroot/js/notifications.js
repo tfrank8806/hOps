@@ -1,67 +1,59 @@
 (function () {
-    const menu = document.getElementById('notificationsMenu');
-    const badge = document.getElementById('notificationBadge');
-    const list = document.getElementById('notificationList');
-    if (!menu || !badge || !list) {
+    const triggerBadge = document.getElementById('messagesMenuTriggerBadge');
+    const listBadge = document.getElementById('messagesMenuListBadge');
+    const menu = document.getElementById('messagesMenu');
+
+    if (!menu || !triggerBadge || !listBadge) {
         return;
     }
 
-    const escapeHtml = (value) => {
-        const element = document.createElement('textarea');
-        element.textContent = value ?? '';
-        return element.innerHTML;
-    };
-
-    const renderNotifications = (data) => {
-        const items = Array.isArray(data.items) ? data.items : [];
-        if (!items.length) {
-            list.innerHTML = '<span class="dropdown-item-text text-muted">No new notifications.</span>';
-        } else {
-            list.innerHTML = items.map(item => {
-                const title = item.title ?? 'Notification';
-                const content = item.content ? <div class="small text-muted"></div> : '';
-                const time = item.createdAt ? <div class="small text-muted"></div> : '';
-                const linkStart = item.linkUrl ? <a class="dropdown-item" href=""> : '<div class="dropdown-item">';
-                const linkEnd = item.linkUrl ? '</a>' : '</div>';
-                const unreadClass = item.isRead ? '' : 'fw-semibold';
-                return ${linkStart}<div class=""></div>;
-            }).join('');
+    const applyCountToBadge = (badge, count) => {
+        if (!badge) {
+            return;
         }
 
-        if (typeof data.unreadCount === 'number' && data.unreadCount > 0) {
-            badge.textContent = data.unreadCount > 9 ? '9+' : data.unreadCount;
+        if (count > 0) {
+            const displayValue = count > 99 ? '99+' : count.toString();
+            badge.textContent = displayValue;
             badge.classList.remove('d-none');
         } else {
             badge.classList.add('d-none');
         }
     };
 
-    const fetchSummary = async () => {
+    const refreshUnreadCount = async () => {
         try {
-            const response = await fetch('/Notifications/Summary', { headers: { 'Accept': 'application/json' } });
+            const response = await fetch('/Notifications/Summary', {
+                headers: {
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin'
+            });
+
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error('Failed to load message summary.');
             }
+
             const data = await response.json();
-            renderNotifications(data);
+            const unreadCount = typeof data.unreadCount === 'number' ? data.unreadCount : 0;
+            applyCountToBadge(triggerBadge, unreadCount);
+            applyCountToBadge(listBadge, unreadCount);
         } catch (error) {
-            list.innerHTML = '<span class="dropdown-item-text text-danger">Unable to load notifications.</span>';
-            badge.classList.add('d-none');
+            console.error('Unable to refresh message counts:', error);
         }
     };
 
-    fetchSummary();
-    const interval = setInterval(fetchSummary, 60000);
+    refreshUnreadCount();
+
+    const intervalId = window.setInterval(refreshUnreadCount, 60000);
 
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-            fetchSummary();
+            refreshUnreadCount();
         }
     });
 
-    menu.addEventListener('shown.bs.dropdown', () => {
-        fetchSummary();
+    window.addEventListener('unload', () => {
+        window.clearInterval(intervalId);
     });
-
-    window.addEventListener('unload', () => clearInterval(interval));
 })();

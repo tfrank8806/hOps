@@ -47,6 +47,7 @@ namespace hOps.web.ViewModels.Messages
         public string? CurrentUserId { get; set; }
         public NewConversationForm NewConversation { get; set; } = new();
         public List<MessageRecipientOptionViewModel> AvailableRecipients { get; set; } = new();
+        public bool ShowNewConversation { get; set; }
     }
 
     public class DirectMessageForm
