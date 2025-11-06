@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Reflection;
 using hOps.web.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace hOps.web.ViewModels
@@ -43,6 +44,14 @@ namespace hOps.web.ViewModels
 
         [Display(Name = "Properties")]
         public List<int> SelectedPropertyIds { get; set; } = new();
+
+        [Display(Name = "Attachments")]
+        [DataType(DataType.Upload)]
+        public List<IFormFile>? Attachments { get; set; }
+
+        public List<string> AttachmentsToRemove { get; set; } = new();
+
+        public List<CalendarEventAttachmentViewModel> ExistingAttachments { get; set; } = new();
     }
 
     public class CalendarEventDisplayViewModel
@@ -51,6 +60,7 @@ namespace hOps.web.ViewModels
         public string Title { get; set; } = string.Empty;
         public string CategoryName { get; set; } = string.Empty;
         public string CategoryColor { get; set; } = "#198754";
+        public string CategoryTextColor { get; set; } = "#ffffff";
         public DateTime StartDate { get; set; }
         public TimeSpan? StartTime { get; set; }
         public DateTime EndDate { get; set; }
@@ -60,6 +70,8 @@ namespace hOps.web.ViewModels
         public string CreatedByName { get; set; } = string.Empty;
         public DateTime CreatedAtUtc { get; set; }
         public List<string> PropertyNames { get; set; } = new();
+        public List<CalendarEventAttachmentViewModel> Attachments { get; set; } = new();
+        public bool IsContinuationSegment { get; set; }
 
         public DateTime StartDateTime => StartDate.Date.Add(StartTime ?? TimeSpan.Zero);
 
@@ -76,6 +88,10 @@ namespace hOps.web.ViewModels
                 return EndDate.Date.AddDays(1).AddTicks(-1);
             }
         }
+
+        public bool IsMultiDay => EndDate.Date > StartDate.Date;
+
+        public int SpanDays => (EndDate.Date - StartDate.Date).Days + 1;
 
         public string DateDisplay
         {
@@ -139,6 +155,35 @@ namespace hOps.web.ViewModels
         public string CreatedByDisplay => string.IsNullOrWhiteSpace(CreatedByName)
             ? "Unknown"
             : CreatedByName;
+
+        public CalendarEventDisplayViewModel CloneWithDates(DateTime startDate, DateTime endDate)
+        {
+            return new CalendarEventDisplayViewModel
+            {
+                Id = Id,
+                Title = Title,
+                CategoryName = CategoryName,
+                CategoryColor = CategoryColor,
+                CategoryTextColor = CategoryTextColor,
+                StartDate = startDate,
+                StartTime = StartTime,
+                EndDate = endDate,
+                EndTime = EndTime,
+                Recurrence = Recurrence,
+                Details = Details,
+                CreatedByName = CreatedByName,
+                CreatedAtUtc = CreatedAtUtc,
+                PropertyNames = new List<string>(PropertyNames),
+                Attachments = Attachments.Select(a => a.Clone()).ToList()
+            };
+        }
+
+        public CalendarEventDisplayViewModel CreateContinuationSegment()
+        {
+            var clone = CloneWithDates(StartDate, EndDate);
+            clone.IsContinuationSegment = true;
+            return clone;
+        }
     }
 
     public class CalendarDayViewModel
@@ -146,6 +191,8 @@ namespace hOps.web.ViewModels
         public DateTime Date { get; set; }
         public bool IsCurrentMonth { get; set; }
         public List<CalendarEventDisplayViewModel> Events { get; set; } = new();
+        public List<CalendarEventDisplayViewModel> ContinuingEvents { get; set; } = new();
+        public bool HasEvents => Events.Count > 0 || ContinuingEvents.Count > 0;
     }
 
     public class CalendarViewModel
@@ -168,5 +215,22 @@ namespace hOps.web.ViewModels
         public IEnumerable<SelectListItem> CategoryOptions { get; set; } = Enumerable.Empty<SelectListItem>();
         public List<Property> AccessibleProperties { get; set; } = new();
         public bool ShowPropertySelection { get; set; }
+    }
+
+    public class CalendarEventAttachmentViewModel
+    {
+        public string FileName { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string DownloadUrl { get; set; } = string.Empty;
+
+        public CalendarEventAttachmentViewModel Clone()
+        {
+            return new CalendarEventAttachmentViewModel
+            {
+                FileName = FileName,
+                DisplayName = DisplayName,
+                DownloadUrl = DownloadUrl
+            };
+        }
     }
 }

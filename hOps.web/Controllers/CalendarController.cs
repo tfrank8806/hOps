@@ -1,22 +1,49 @@
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace hOps.web.Controllers
 {
     public class CalendarController : BaseController
     {
-        public CalendarController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        private readonly IWebHostEnvironment _environment;
+        private readonly ILogger<CalendarController> _logger;
+
+        public CalendarController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IWebHostEnvironment environment, ILogger<CalendarController> logger)
             : base(context, userManager)
         {
+            _environment = environment;
+            _logger = logger;
         }
+
+        private const long MaxAttachmentSizeBytes = 5 * 1024 * 1024; // 5 MB
+        private const int MaxAttachmentCount = 5;
+        private static readonly HashSet<string> AllowedAttachmentContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "image/png",
+            "image/jpeg",
+            "image/jpg",
+            "image/heic",
+            "image/heif",
+            "image/gif",
+            "image/webp",
+            "image/bmp",
+            "application/pdf"
+        };
 
         [HttpGet]
         public async Task<IActionResult> Index(int? month, int? year)
@@ -103,6 +130,8 @@ namespace hOps.web.Controllers
                 ModelState.AddModelError("Form.CategoryId", "Select a valid category.");
             }
 
+            ValidateAttachments(form.Attachments, 0, "Form.Attachments");
+
             var targetMonth = ResolveTargetMonth(month, year, form.StartDate);
 
             if (!ModelState.IsValid)
@@ -135,6 +164,15 @@ namespace hOps.web.Controllers
 
             _context.CalendarEvents.Add(calendarEvent);
             await _context.SaveChangesAsync();
+
+            try
+            {
+                await SaveAttachmentsAsync(calendarEvent.Id, form.Attachments);
+            }
+            catch
+            {
+                TempData["WarningMessage"] = "Event saved, but one or more attachments could not be uploaded.";
+            }
 
             TempData["SuccessMessage"] = "Event created successfully.";
 
@@ -193,7 +231,8 @@ namespace hOps.web.Controllers
                 EndTime = calendarEvent.EndTime,
                 Recurrence = calendarEvent.Recurrence,
                 Details = calendarEvent.Details,
-                SelectedPropertyIds = selectedPropertyIds
+                SelectedPropertyIds = selectedPropertyIds,
+                ExistingAttachments = LoadAttachmentViewModels(calendarEvent.Id)
             };
 
             var viewModel = new CalendarEventManageViewModel
@@ -253,6 +292,19 @@ namespace hOps.web.Controllers
                 return NotFound();
             }
 
+            var existingAttachments = LoadAttachmentViewModels(calendarEvent.Id);
+            form.ExistingAttachments = existingAttachments;
+
+            var attachmentsToRemove = form.AttachmentsToRemove?
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => Path.GetFileName(name))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? new List<string>();
+
+            var remainingAttachmentCount = existingAttachments
+                .Count(a => !attachmentsToRemove.Contains(a.FileName, StringComparer.OrdinalIgnoreCase));
+
             form.Id = id;
             form.SelectedPropertyIds = form.SelectedPropertyIds?.Distinct().ToList() ?? new List<int>();
 
@@ -291,9 +343,13 @@ namespace hOps.web.Controllers
                 ModelState.AddModelError("Form.CategoryId", "Select a valid category.");
             }
 
+            ValidateAttachments(form.Attachments, remainingAttachmentCount, "Form.Attachments");
+
             if (!ModelState.IsValid)
             {
                 var categoryOptions = await GetCalendarCategoryOptionsAsync();
+
+                form.ExistingAttachments = existingAttachments;
 
                 var viewModel = new CalendarEventManageViewModel
                 {
@@ -351,6 +407,20 @@ namespace hOps.web.Controllers
             }
 
             await _context.SaveChangesAsync();
+
+            if (attachmentsToRemove.Any())
+            {
+                DeleteAttachments(calendarEvent.Id, attachmentsToRemove);
+            }
+
+            try
+            {
+                await SaveAttachmentsAsync(calendarEvent.Id, form.Attachments);
+            }
+            catch
+            {
+                TempData["WarningMessage"] = "Event updated, but one or more attachments could not be uploaded.";
+            }
 
             TempData["SuccessMessage"] = "Event updated successfully.";
 
@@ -421,18 +491,30 @@ namespace hOps.web.Controllers
             var days = BuildCalendarDays(gridStart, gridEnd, targetMonth);
             var dayLookup = days.ToDictionary(d => d.Date.Date);
 
-            var displayEvents = events.Select(MapToDisplayModel).ToList();
-            var relevantEvents = displayEvents
-                .Where(e => e.StartDate.Date <= gridEnd.Date && e.EndDate.Date >= gridStart.Date)
+            var displayEvents = events
+                .Select(e => MapToDisplayModel(e, LoadAttachmentViewModels(e.Id)))
                 .ToList();
 
-            foreach (var calendarEvent in relevantEvents)
+            var occurrencesInView = ExpandOccurrences(displayEvents, gridStart, gridEnd).ToList();
+
+            foreach (var occurrence in occurrencesInView)
             {
-                for (var date = calendarEvent.StartDate.Date; date <= calendarEvent.EndDate.Date; date = date.AddDays(1))
+                var startDate = occurrence.StartDate.Date;
+                var endDate = occurrence.EndDate.Date;
+                for (var date = startDate; date <= endDate; date = date.AddDays(1))
                 {
-                    if (date >= gridStart.Date && date <= gridEnd.Date && dayLookup.TryGetValue(date, out var day))
+                    if (!dayLookup.TryGetValue(date, out var day))
                     {
-                        day.Events.Add(calendarEvent);
+                        continue;
+                    }
+
+                    if (date == startDate)
+                    {
+                        day.Events.Add(occurrence);
+                    }
+                    else
+                    {
+                        day.ContinuingEvents.Add(occurrence.CreateContinuationSegment());
                     }
                 }
             }
@@ -441,15 +523,20 @@ namespace hOps.web.Controllers
             {
                 day.Events = day.Events
                     .OrderBy(e => e.StartDateTime)
-                    .ThenBy(e => e.Title)
+                    .ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                day.ContinuingEvents = day.ContinuingEvents
+                    .OrderBy(e => e.EndDateTime)
+                    .ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
                     .ToList();
             }
 
             var now = DateTime.Now;
-            var upcoming = displayEvents
+            var upcoming = ExpandOccurrences(displayEvents, now.Date, now.Date.AddMonths(6))
                 .Where(e => e.EndDateTime >= now)
                 .OrderBy(e => e.StartDateTime)
-                .ThenBy(e => e.Title)
+                .ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
                 .Take(10)
                 .ToList();
 
@@ -498,7 +585,7 @@ namespace hOps.web.Controllers
                 .ToListAsync();
         }
 
-        private static CalendarEventDisplayViewModel MapToDisplayModel(CalendarEvent calendarEvent)
+        private static CalendarEventDisplayViewModel MapToDisplayModel(CalendarEvent calendarEvent, List<CalendarEventAttachmentViewModel> attachments)
         {
             var createdByName = string.Empty;
             if (calendarEvent.CreatedBy != null)
@@ -525,6 +612,7 @@ namespace hOps.web.Controllers
                 Title = calendarEvent.Title,
                 CategoryName = calendarEvent.Category?.Name ?? "Uncategorized",
                 CategoryColor = color,
+                CategoryTextColor = GetTextColorForBackground(color),
                 StartDate = calendarEvent.StartDate,
                 StartTime = calendarEvent.StartTime,
                 EndDate = calendarEvent.EndDate,
@@ -538,8 +626,359 @@ namespace hOps.web.Controllers
                     .Where(name => !string.IsNullOrWhiteSpace(name))
                     .Distinct()
                     .OrderBy(name => name)
-                    .ToList()
+                    .ToList(),
+                Attachments = attachments.Select(a => a.Clone()).ToList()
             };
+        }
+
+        private static IEnumerable<CalendarEventDisplayViewModel> ExpandOccurrences(IEnumerable<CalendarEventDisplayViewModel> events, DateTime rangeStart, DateTime rangeEnd)
+        {
+            foreach (var calendarEvent in events)
+            {
+                foreach (var occurrence in EnumerateOccurrences(calendarEvent, rangeStart, rangeEnd))
+                {
+                    yield return occurrence;
+                }
+            }
+        }
+
+        private static IEnumerable<CalendarEventDisplayViewModel> EnumerateOccurrences(CalendarEventDisplayViewModel calendarEvent, DateTime rangeStart, DateTime rangeEnd)
+        {
+            var duration = calendarEvent.EndDate.Date - calendarEvent.StartDate.Date;
+            if (duration < TimeSpan.Zero)
+            {
+                duration = TimeSpan.Zero;
+            }
+
+            var occurrenceStart = AlignOccurrenceStart(calendarEvent, rangeStart, duration);
+            var safetyCounter = 0;
+
+            while (occurrenceStart <= rangeEnd && safetyCounter < 1000)
+            {
+                var occurrenceEnd = occurrenceStart.Add(duration);
+                if (occurrenceEnd >= rangeStart && occurrenceStart <= rangeEnd)
+                {
+                    yield return calendarEvent.CloneWithDates(occurrenceStart, occurrenceEnd);
+                }
+
+                if (calendarEvent.Recurrence == CalendarRecurrenceType.None)
+                {
+                    yield break;
+                }
+
+            occurrenceStart = GetNextOccurrenceStart(occurrenceStart, calendarEvent.Recurrence);
+                if (occurrenceStart == DateTime.MinValue)
+                {
+                    yield break;
+                }
+
+                safetyCounter++;
+            }
+        }
+
+        private static DateTime AlignOccurrenceStart(CalendarEventDisplayViewModel calendarEvent, DateTime rangeStart, TimeSpan duration)
+        {
+            var start = calendarEvent.StartDate.Date;
+            if (calendarEvent.Recurrence == CalendarRecurrenceType.None || start >= rangeStart)
+            {
+                return start;
+            }
+
+            switch (calendarEvent.Recurrence)
+            {
+                case CalendarRecurrenceType.Daily:
+                case CalendarRecurrenceType.Weekly:
+                case CalendarRecurrenceType.BiWeekly:
+                    var stepDays = calendarEvent.Recurrence == CalendarRecurrenceType.Daily
+                        ? 1
+                        : calendarEvent.Recurrence == CalendarRecurrenceType.Weekly
+                            ? 7
+                            : 14;
+                    var diff = (int)((rangeStart.Date - start).TotalDays / stepDays);
+                    if (diff > 0)
+                    {
+                        start = start.AddDays(diff * stepDays);
+                    }
+                    while (start.Add(duration) < rangeStart.Date)
+                    {
+                        start = start.AddDays(stepDays);
+                    }
+                    return start;
+
+                case CalendarRecurrenceType.Monthly:
+                    while (start.Add(duration) < rangeStart.Date)
+                    {
+                        start = start.AddMonths(1);
+                    }
+                    return start;
+
+                case CalendarRecurrenceType.Yearly:
+                    while (start.Add(duration) < rangeStart.Date)
+                    {
+                        start = start.AddYears(1);
+                    }
+                    return start;
+
+                default:
+                    return start;
+            }
+        }
+
+        private static DateTime GetNextOccurrenceStart(DateTime currentStart, CalendarRecurrenceType recurrence)
+        {
+            return recurrence switch
+            {
+                CalendarRecurrenceType.Daily => currentStart.AddDays(1),
+                CalendarRecurrenceType.Weekly => currentStart.AddDays(7),
+                CalendarRecurrenceType.BiWeekly => currentStart.AddDays(14),
+                CalendarRecurrenceType.Monthly => currentStart.AddMonths(1),
+                CalendarRecurrenceType.Yearly => currentStart.AddYears(1),
+                _ => DateTime.MinValue
+            };
+        }
+
+        private void ValidateAttachments(IEnumerable<IFormFile>? files, int existingCount, string modelStateKey)
+        {
+            if (files == null)
+            {
+                return;
+            }
+
+            var validFiles = files
+                .Where(file => file != null && file.Length > 0)
+                .ToList();
+
+            if (!validFiles.Any())
+            {
+                return;
+            }
+
+            if (existingCount + validFiles.Count > MaxAttachmentCount)
+            {
+                ModelState.AddModelError(modelStateKey, $"Please upload no more than {MaxAttachmentCount} files in total.");
+            }
+
+            foreach (var file in validFiles)
+            {
+                if (file.Length > MaxAttachmentSizeBytes)
+                {
+                    ModelState.AddModelError(modelStateKey, $"'{file.FileName}' exceeds the {MaxAttachmentSizeBytes / (1024 * 1024)} MB limit.");
+                }
+
+                var contentType = file.ContentType ?? string.Empty;
+                var extension = Path.GetExtension(file.FileName) ?? string.Empty;
+                if (!IsAllowedAttachment(contentType, extension))
+                {
+                    ModelState.AddModelError(modelStateKey, $"'{file.FileName}' is not an allowed file type. Upload images or PDF files.");
+                }
+            }
+        }
+
+        private async Task SaveAttachmentsAsync(int eventId, IEnumerable<IFormFile>? files)
+        {
+            if (files == null)
+            {
+                return;
+            }
+
+            var filesToSave = files
+                .Where(file => file != null && file.Length > 0)
+                .ToList();
+
+            if (!filesToSave.Any())
+            {
+                return;
+            }
+
+            var uploadRoot = GetAttachmentDirectoryPath(eventId);
+            Directory.CreateDirectory(uploadRoot);
+
+            foreach (var file in filesToSave)
+            {
+                var storedFileName = BuildStoredFileName(file.FileName);
+                var physicalPath = Path.Combine(uploadRoot, storedFileName);
+
+                try
+                {
+                    await using var stream = System.IO.File.Create(physicalPath);
+                    await file.CopyToAsync(stream);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Calendar: failed to save attachment '{File}' for event {EventId}", file.FileName, eventId);
+                    throw;
+                }
+            }
+        }
+
+        private void DeleteAttachments(int eventId, IEnumerable<string> storedFileNames)
+        {
+            if (storedFileNames == null)
+            {
+                return;
+            }
+
+            var directory = GetAttachmentDirectoryPath(eventId);
+            if (!Directory.Exists(directory))
+            {
+                return;
+            }
+
+            foreach (var fileName in storedFileNames)
+            {
+                if (string.IsNullOrWhiteSpace(fileName))
+                {
+                    continue;
+                }
+
+                var safeName = Path.GetFileName(fileName);
+                var physicalPath = Path.Combine(directory, safeName);
+                if (!System.IO.File.Exists(physicalPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    System.IO.File.Delete(physicalPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Calendar: failed to delete attachment '{File}' for event {EventId}", safeName, eventId);
+                }
+            }
+        }
+
+        private List<CalendarEventAttachmentViewModel> LoadAttachmentViewModels(int eventId)
+        {
+            var directory = GetAttachmentDirectoryPath(eventId);
+            if (!Directory.Exists(directory))
+            {
+                return new List<CalendarEventAttachmentViewModel>();
+            }
+
+            return Directory
+                .EnumerateFiles(directory)
+                .Select(path => Path.GetFileName(path))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => new CalendarEventAttachmentViewModel
+                {
+                    FileName = name,
+                    DisplayName = GetOriginalFileName(name),
+                    DownloadUrl = GetAttachmentRelativePath(eventId, name)
+                })
+                .OrderBy(a => a.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private string GetAttachmentDirectoryPath(int eventId)
+        {
+            return Path.Combine(_environment.WebRootPath, "uploads", "calendar", eventId.ToString());
+        }
+
+        private static string GetAttachmentRelativePath(int eventId, string storedFileName)
+        {
+            return $"/uploads/calendar/{eventId}/{storedFileName}".Replace("\\", "/");
+        }
+
+        private static string BuildStoredFileName(string originalFileName)
+        {
+            var baseName = Path.GetFileNameWithoutExtension(originalFileName);
+            var extension = Path.GetExtension(originalFileName);
+            var sanitizedBase = SanitizeBaseFileName(baseName);
+            var encoded = Uri.EscapeDataString(sanitizedBase);
+            return $"{Guid.NewGuid():N}__{encoded}{extension}";
+        }
+
+        private static string GetOriginalFileName(string storedFileName)
+        {
+            var name = Path.GetFileName(storedFileName);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return "Attachment";
+            }
+
+            var parts = name.Split(new[] { "__" }, 2, StringSplitOptions.None);
+            if (parts.Length == 2)
+            {
+                var extension = Path.GetExtension(name);
+                var encodedBase = Path.GetFileNameWithoutExtension(parts[1]);
+                var decodedBase = Uri.UnescapeDataString(encodedBase);
+                if (!string.IsNullOrWhiteSpace(extension))
+                {
+                    return decodedBase + extension;
+                }
+
+                return decodedBase;
+            }
+
+            return name;
+        }
+
+        private static string SanitizeBaseFileName(string baseName)
+        {
+            if (string.IsNullOrWhiteSpace(baseName))
+            {
+                return "attachment";
+            }
+
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var cleaned = new string(baseName.Select(ch => invalidChars.Contains(ch) ? '_' : ch).ToArray());
+            cleaned = Regex.Replace(cleaned, "_{2,}", "_").Trim('_');
+            if (cleaned.Length > 80)
+            {
+                cleaned = cleaned[..80];
+            }
+            return string.IsNullOrWhiteSpace(cleaned) ? "attachment" : cleaned;
+        }
+
+        private static bool IsAllowedAttachment(string contentType, string extension)
+        {
+            if (!string.IsNullOrWhiteSpace(contentType) && AllowedAttachmentContentTypes.Contains(contentType))
+            {
+                return true;
+            }
+
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                return false;
+            }
+
+            return extension.Equals(".png", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".gif", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".webp", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".heic", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".heif", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetTextColorForBackground(string hexColor)
+        {
+            if (string.IsNullOrWhiteSpace(hexColor))
+            {
+                return "#ffffff";
+            }
+
+            var color = hexColor.TrimStart('#');
+            if (color.Length == 3)
+            {
+                color = string.Concat(color.Select(c => $"{c}{c}"));
+            }
+
+            if (color.Length != 6 || !int.TryParse(color, System.Globalization.NumberStyles.HexNumber, null, out var rgb))
+            {
+                return "#ffffff";
+            }
+
+            var r = (rgb >> 16) & 0xFF;
+            var g = (rgb >> 8) & 0xFF;
+            var b = rgb & 0xFF;
+
+            var luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            return luminance > 0.6 ? "#212529" : "#ffffff";
         }
 
         private static List<CalendarDayViewModel> BuildCalendarDays(DateTime gridStart, DateTime gridEnd, DateTime targetMonth)

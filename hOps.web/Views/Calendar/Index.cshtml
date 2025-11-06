@@ -1,4 +1,5 @@
 @model CalendarViewModel
+@using System.Text.Json
 @{
     ViewData["Title"] = "Calendar";
     ViewData["MainContainerClass"] = "main-inner--wide";
@@ -62,10 +63,18 @@
                                     {
                                         var day = Model.Days[index + offset];
                                         var isToday = day.Date.Date == DateTime.Today;
-                                        var cellClasses = $"calendar-day {(day.IsCurrentMonth ? string.Empty : "calendar-day--muted")}";
+                                        var cellClasses = "calendar-day";
+                                        if (!day.IsCurrentMonth)
+                                        {
+                                            cellClasses += " calendar-day--muted";
+                                        }
                                         if (isToday)
                                         {
                                             cellClasses += " calendar-day--today";
+                                        }
+                                        if (day.ContinuingEvents.Any())
+                                        {
+                                            cellClasses += " calendar-day--has-continuation";
                                         }
                                         var dayIso = day.Date.ToString("yyyy-MM-dd");
                                         var ariaLabel = day.Date.ToString("dddd, MMMM d");
@@ -95,11 +104,13 @@
                                                         {
                                                             <button type="button"
                                                                     class="btn btn-sm text-start w-100 calendar-event"
+                                                                    style="background-color:@calendarEvent.CategoryColor; color:@calendarEvent.CategoryTextColor; border-color:@calendarEvent.CategoryColor;"
                                                                     data-calendar-event="true"
                                                                     data-event-id="@calendarEvent.Id"
                                                                     data-event-title="@calendarEvent.Title"
                                                                     data-event-category="@calendarEvent.CategoryName"
                                                                     data-event-color="@calendarEvent.CategoryColor"
+                                                                    data-event-text-color="@calendarEvent.CategoryTextColor"
                                                                     data-event-date="@calendarEvent.DateDisplay"
                                                                     data-event-time="@(calendarEvent.TimeDisplay ?? string.Empty)"
                                                                     data-event-recurrence="@calendarEvent.RecurrenceDisplay"
@@ -107,15 +118,41 @@
                                                                     data-event-properties="@calendarEvent.PropertiesDisplay"
                                                                     data-event-created-by="@calendarEvent.CreatedByDisplay"
                                                                     data-event-created-at="@TimeZoneService.ConvertToUserTime(calendarEvent.CreatedAtUtc).ToString("f")"
-                                                                    data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = calendarEvent.Id })">
-                                                                <span class="calendar-event-indicator" style="background-color: @calendarEvent.CategoryColor"></span>
+                                                                    data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = calendarEvent.Id })"
+                                                                    data-event-attachments='@JsonSerializer.Serialize(calendarEvent.Attachments)'>
                                                                 <span class="calendar-event-title">@calendarEvent.Title</span>
+                                                                @if (!string.IsNullOrWhiteSpace(calendarEvent.TimeDisplay))
+                                                                {
+                                                                    <span class="calendar-event-time d-block">@calendarEvent.TimeDisplay</span>
+                                                                }
+                                                                @if (calendarEvent.IsMultiDay)
+                                                                {
+                                                                    <span class="calendar-event-range d-block">@($"Ends {calendarEvent.EndDate:MMM d}")</span>
+                                                                }
                                                             </button>
                                                         }
                                                     }
-                                                    else
+                                                    else if (!day.ContinuingEvents.Any())
                                                     {
                                                         <span class="text-muted small">No events</span>
+                                                    }
+
+                                                    @if (day.ContinuingEvents.Any())
+                                                    {
+                                                        <div class="calendar-day-continuations mt-2">
+                                                            @foreach (var continuation in day.ContinuingEvents)
+                                                            {
+                                                                <div class="calendar-day-continuation"
+                                                                     style="background-color:@continuation.CategoryColor; color:@continuation.CategoryTextColor;">
+                                                                    <span class="calendar-day-continuation__badge">Continues</span>
+                                                                    <span class="calendar-day-continuation__title">@continuation.Title</span>
+                                                                    @if (continuation.EndDate.Date > day.Date.Date)
+                                                                    {
+                                                                        <span class="calendar-day-continuation__range text-white-50">through @continuation.EndDate:MMM d</span>
+                                                                    }
+                                                                </div>
+                                                            }
+                                                        </div>
                                                     }
                                                 </div>
                                             </div>
@@ -141,12 +178,14 @@
                         foreach (var upcoming in Model.UpcomingEvents)
                         {
                             <button type="button"
-                                    class="list-group-item list-group-item-action d-flex flex-column gap-1"
+                                    class="list-group-item list-group-item-action calendar-upcoming-event"
+                                    style="border-left: 4px solid @upcoming.CategoryColor;"
                                     data-calendar-event="true"
                                     data-event-id="@upcoming.Id"
                                     data-event-title="@upcoming.Title"
                                     data-event-category="@upcoming.CategoryName"
                                     data-event-color="@upcoming.CategoryColor"
+                                    data-event-text-color="@upcoming.CategoryTextColor"
                                     data-event-date="@upcoming.DateDisplay"
                                     data-event-time="@(upcoming.TimeDisplay ?? string.Empty)"
                                     data-event-recurrence="@upcoming.RecurrenceDisplay"
@@ -154,10 +193,11 @@
                                     data-event-properties="@upcoming.PropertiesDisplay"
                                     data-event-created-by="@upcoming.CreatedByDisplay"
                                     data-event-created-at="@TimeZoneService.ConvertToUserTime(upcoming.CreatedAtUtc).ToString("f")"
-                                    data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = upcoming.Id })">
+                                    data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = upcoming.Id })"
+                                    data-event-attachments='@JsonSerializer.Serialize(upcoming.Attachments)'>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="fw-semibold">@upcoming.Title</span>
-                                    <span class="badge" style="background-color: @upcoming.CategoryColor">@upcoming.CategoryName</span>
+                                    <span class="badge" style="background-color: @upcoming.CategoryColor; color: @upcoming.CategoryTextColor">@upcoming.CategoryName</span>
                                 </div>
                                 <small class="text-muted">@upcoming.DateDisplay</small>
                                 @if (!string.IsNullOrWhiteSpace(upcoming.TimeDisplay))
@@ -179,7 +219,7 @@
                     <span>Create Event</span>
                 </div>
                 <div class="card-body">
-                    <form asp-action="Create" method="post">
+                    <form asp-action="Create" method="post" enctype="multipart/form-data">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="month" value="@Model.CurrentMonth.Month" />
                         <input type="hidden" name="year" value="@Model.CurrentMonth.Year" />
@@ -236,6 +276,13 @@
                             <label asp-for="Form.Details" class="form-label"></label>
                             <textarea asp-for="Form.Details" class="form-control" rows="3" data-enable-mentions="true"></textarea>
                             <span asp-validation-for="Form.Details" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Form.Attachments" class="form-label fw-semibold"></label>
+                            <input asp-for="Form.Attachments" class="form-control" type="file" multiple accept="image/*,.pdf" />
+                            <div class="form-text">Attach up to 5 files (images or PDF, max 5&nbsp;MB each).</div>
+                            <span asp-validation-for="Form.Attachments" class="text-danger"></span>
                         </div>
 
                         @if (Model.ShowPropertySelection)
@@ -320,6 +367,9 @@
                     <dt class="col-sm-4">Details</dt>
                     <dd class="col-sm-8" data-details="details"></dd>
 
+                    <dt class="col-sm-4">Attachments</dt>
+                    <dd class="col-sm-8" data-details="attachments"></dd>
+
                     <dt class="col-sm-4">Created By</dt>
                     <dd class="col-sm-8" data-details="created-by"></dd>
 
@@ -381,6 +431,10 @@
             background-color: rgba(13, 110, 253, 0.08);
         }
 
+        .calendar-day--has-continuation .calendar-day__inner {
+            border: 1px solid rgba(13, 110, 253, 0.15);
+        }
+
         .calendar-table td.calendar-day .badge {
             font-size: 0.65rem;
             text-transform: uppercase;
@@ -408,6 +462,58 @@
 
         .calendar-table td.calendar-day .calendar-event {
             white-space: normal;
+            border-width: 1px;
+            border-style: solid;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .calendar-table td.calendar-day .calendar-event:hover,
+        .calendar-table td.calendar-day .calendar-event:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
+        }
+
+        .calendar-event-title {
+            font-weight: 600;
+        }
+
+        .calendar-event-time,
+        .calendar-event-range {
+            font-size: 0.75rem;
+            opacity: 0.85;
+        }
+
+        .calendar-day-continuations {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .calendar-day-continuation {
+            border-radius: 0.5rem;
+            padding: 0.35rem 0.5rem;
+            font-size: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+        }
+
+        .calendar-day-continuation__badge {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            opacity: 0.75;
+        }
+
+        .calendar-day-continuation__title {
+            font-weight: 600;
+        }
+
+        .calendar-day-continuation__range {
+            font-size: 0.7rem;
         }
 
         .calendar-table td.calendar-day--muted {
@@ -421,6 +527,18 @@
         .calendar-table td.calendar-day--today {
             box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.35);
             border-color: rgba(13, 110, 253, 0.25);
+        }
+
+        .calendar-upcoming-event {
+            text-align: left;
+            border: 1px solid rgba(108, 117, 125, 0.15);
+            border-left-width: 4px;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .calendar-upcoming-event:last-child {
+            margin-bottom: 0;
         }
 
         @@media (max-width: 991.98px) {
@@ -457,6 +575,7 @@
             const detailsEl = modalElement.querySelector('[data-details="details"]');
             const createdByEl = modalElement.querySelector('[data-details="created-by"]');
             const createdAtEl = modalElement.querySelector('[data-details="created-at"]');
+            const attachmentsEl = modalElement.querySelector('[data-details="attachments"]');
             const editButton = modalElement.querySelector('[data-details="edit-link"]');
 
             const getModalInstance = () => {
@@ -468,11 +587,39 @@
                 return null;
             };
 
+            const escapeHtml = (value) => {
+                if (!value) {
+                    return '';
+                }
+                return value
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            };
+
             const renderDetails = (value) => {
                 if (!value) {
                     return '<span class="text-muted">No additional details</span>';
                 }
-                return value.replace(/\n/g, '<br />');
+                return escapeHtml(value).replace(/\n/g, '<br />');
+            };
+
+            const renderAttachments = (attachments) => {
+                if (!attachments || !attachments.length) {
+                    return '<span class="text-muted">None</span>';
+                }
+
+                const items = attachments
+                    .map(att => {
+                        const name = escapeHtml(att.displayName || att.fileName || 'Attachment');
+                        const url = escapeHtml(att.downloadUrl || '#');
+                        return `<li><a href="${url}" target="_blank" rel="noopener">${name}</a></li>`;
+                    })
+                    .join('');
+
+                return `<ul class="list-unstyled mb-0">${items}</ul>`;
             };
 
             const updateModal = (element) => {
@@ -485,7 +632,7 @@
                 titleEl.textContent = dataset.eventTitle || 'Event Details';
                 categoryEl.textContent = dataset.eventCategory || 'Category';
                 categoryEl.style.backgroundColor = dataset.eventColor || '#6c757d';
-                categoryEl.style.color = '#fff';
+                categoryEl.style.color = dataset.eventTextColor || '#fff';
                 datesEl.textContent = dataset.eventDate || '';
                 timesEl.textContent = dataset.eventTime || 'All day';
                 recurrenceEl.textContent = dataset.eventRecurrence || '';
@@ -493,6 +640,18 @@
                 detailsEl.innerHTML = renderDetails(dataset.eventDetails);
                 createdByEl.textContent = dataset.eventCreatedBy || 'Unknown';
                 createdAtEl.textContent = dataset.eventCreatedAt || '';
+
+                if (attachmentsEl) {
+                    let attachmentsData = [];
+                    if (dataset.eventAttachments) {
+                        try {
+                            attachmentsData = JSON.parse(dataset.eventAttachments);
+                        } catch (err) {
+                            console.warn('Calendar: could not parse attachments payload.', err);
+                        }
+                    }
+                    attachmentsEl.innerHTML = renderAttachments(attachmentsData);
+                }
 
                 if (editButton) {
                     const editUrl = dataset.eventEditUrl;

@@ -11,7 +11,7 @@
 
 <div class="card shadow-sm">
     <div class="card-body">
-        <form asp-action="Edit" asp-route-id="@Model.Form.Id" method="post">
+        <form asp-action="Edit" asp-route-id="@Model.Form.Id" method="post" enctype="multipart/form-data">
             @Html.AntiForgeryToken()
             <input asp-for="Form.Id" type="hidden" />
 
@@ -67,6 +67,35 @@
                 <label asp-for="Form.Details" class="form-label"></label>
                 <textarea asp-for="Form.Details" class="form-control" rows="3" data-enable-mentions="true"></textarea>
                 <span asp-validation-for="Form.Details" class="text-danger"></span>
+            </div>
+
+            @if (Model.Form.ExistingAttachments.Any())
+            {
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Existing Attachments</label>
+                    <div class="list-group">
+                        @foreach (var attachment in Model.Form.ExistingAttachments)
+                        {
+                            var checkboxId = $"attachment_{attachment.FileName}";
+                            var markedForRemoval = Model.Form.AttachmentsToRemove?.Contains(attachment.FileName) ?? false;
+                            <label class="list-group-item d-flex align-items-center justify-content-between gap-2">
+                                <span class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="@checkboxId" name="Form.AttachmentsToRemove" value="@attachment.FileName" @(markedForRemoval ? "checked" : string.Empty) />
+                                    <span class="form-check-label">@attachment.DisplayName</span>
+                                </span>
+                                <a href="@attachment.DownloadUrl" class="small" target="_blank" rel="noopener">Download</a>
+                            </label>
+                        }
+                    </div>
+                    <small class="text-muted d-block mt-1">Select attachments to remove when saving.</small>
+                </div>
+            }
+
+            <div class="mb-3">
+                <label asp-for="Form.Attachments" class="form-label fw-semibold"></label>
+                <input asp-for="Form.Attachments" class="form-control" type="file" multiple accept="image/*,.pdf" />
+                <div class="form-text">Upload up to 5 files (images or PDF, max 5 MB each).</div>
+                <span asp-validation-for="Form.Attachments" class="text-danger"></span>
             </div>
 
             @if (Model.ShowPropertySelection)
