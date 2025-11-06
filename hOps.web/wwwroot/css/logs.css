@@ -1,21 +1,183 @@
 .logs-page {
     min-height: calc(100vh - 280px);
+    gap: 1.5rem;
 }
 
-.logs-page .log-list-column {
-    min-width: 260px;
+.logs-page-container {
+    max-width: none;
+    width: 100%;
 }
 
-.logs-page .log-editor-column {
-    min-width: 0;
+.logs-layout {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 1.5rem;
+    position: relative;
 }
 
-.logs-page > [class*='col-'] {
+.logs-sidebar {
+    flex: 0 0 320px;
+    max-width: 320px;
+    min-height: 0;
+    transition: transform 0.25s ease, opacity 0.25s ease, margin 0.25s ease;
     display: flex;
 }
 
-.logs-page > [class*='col-'] > .card {
+.logs-sidebar > .card {
     flex: 1 1 auto;
+}
+
+.logs-sidebar .card-header {
+    padding: 0.6rem 1rem;
+}
+
+.logs-sidebar .card-header .btn {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    line-height: 1.15;
+}
+
+.logs-sidebar #logList .list-group-item {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.88rem;
+    line-height: 1.35;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logs-sidebar #logList .log-item {
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logs-sidebar #logList .log-item-select {
+    padding: 0;
+    line-height: 1.25;
+    font-weight: 500;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-decoration: none;
+    max-width: 100%;
+    flex: 1 1 auto;
+}
+
+.logs-sidebar #logList .log-item-select:hover,
+.logs-sidebar #logList .log-item-select:focus {
+    text-decoration: underline;
+    color: inherit;
+}
+
+.logs-editor {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+}
+
+.logs-sidebar-overlay {
+    display: none;
+    pointer-events: none;
+}
+
+.logs-sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logs-sidebar-toggle .sidebar-toggle-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.logs-editor-actions {
+    align-items: center;
+}
+
+.border-control select {
+    min-width: 110px;
+}
+
+.border-control {
+    white-space: nowrap;
+}
+
+@media (min-width: 992px) {
+    .logs-sidebar {
+        position: relative;
+        transform: none !important;
+    }
+
+    .logs-sidebar-overlay {
+        display: none !important;
+    }
+
+    .logs-layout.sidebar-collapsed {
+        gap: 0;
+    }
+
+    .logs-layout.sidebar-collapsed .logs-sidebar {
+        display: none;
+    }
+
+    .logs-layout.sidebar-collapsed .logs-editor {
+        flex: 1 1 100%;
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .logs-layout {
+        gap: 1rem;
+    }
+
+    .logs-sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(100%, 320px);
+        max-width: 100%;
+        padding: 1rem;
+        transform: translateX(-100%);
+        z-index: 1050;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .logs-sidebar > .card {
+        height: 100%;
+    }
+
+    .logs-layout.sidebar-open .logs-sidebar {
+        transform: translateX(0);
+        box-shadow: 0 20px 45px rgba(15, 46, 97, 0.18);
+    }
+
+    .logs-sidebar-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.35);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.25s ease;
+        z-index: 1040;
+    }
+
+    .logs-layout.sidebar-open .logs-sidebar-overlay {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+    }
+
+    body.logs-sidebar-open {
+        overflow: hidden;
+    }
+
+    .logs-editor-actions {
+        width: 100%;
+    }
 }
 
 .logs-page .card-header {
@@ -276,10 +438,14 @@
         min-height: 0;
     }
 
-    .logs-page .card-header {
+    .logs-editor-header {
         flex-direction: column;
         align-items: flex-start;
-        gap: 0.75rem;
+        gap: 1rem;
+    }
+
+    .logs-editor-actions {
+        justify-content: flex-start;
     }
 
     .spreadsheet-table tbody td {

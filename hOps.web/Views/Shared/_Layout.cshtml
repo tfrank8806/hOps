@@ -161,7 +161,10 @@
                                                 Edit Layout
                                             </a>
                                         </li>
-                                        <li><a class="dropdown-item" asp-controller="Properties" asp-action="Index">Properties</a></li>
+                                        @if (roles.Contains("Admin"))
+                                        {
+                                            <li><a class="dropdown-item" asp-controller="Properties" asp-action="Index">Properties</a></li>
+                                        }
                                     </ul>
                                 </li>
                             }

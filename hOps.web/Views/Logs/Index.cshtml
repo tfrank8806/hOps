@@ -2,7 +2,7 @@
 
 @{
     ViewData["Title"] = "Logs";
-    ViewData["MainContainerClass"] = "main-inner--wide";
+    ViewData["MainContainerClass"] = "logs-page-container";
     var currentUserInfo = new
     {
         id = ViewBag.CurrentUserId as string ?? string.Empty,
@@ -10,157 +10,180 @@
     };
 }
 
-<div class="row g-4 logs-page align-items-stretch flex-grow-1">
-    <div class="col-lg-3 col-xl-3 col-xxl-2 d-flex log-list-column">
-        <div class="card shadow-sm flex-fill">
-            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h2 class="h5 mb-0">Logs</h2>
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <button class="btn btn-outline-primary btn-sm" type="button" id="importLogBtn">
-                        Import Log
-                    </button>
-                    <input type="file" class="d-none" id="importLogInput" accept=".xls,.xlsx,.csv" />
-                    <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#createLogFormSection" aria-expanded="false" aria-controls="createLogFormSection">
-                        Create New Log
-                    </button>
-                </div>
-            </div>
-            <div class="card-body p-0 d-flex flex-column">
-                <div class="collapse border-bottom" id="createLogFormSection">
-                    <form id="createLogForm" class="p-3">
-                        <div class="mb-3">
-                            <label for="logNameInput" class="form-label">Log Name</label>
-                            <input type="text" class="form-control" id="logNameInput" name="logName" placeholder="e.g. Housekeeping" required maxlength="100">
-                            <div class="form-text">A clear name makes it easier to find your log later.</div>
-                            <div class="invalid-feedback">Please provide a name for the log.</div>
-                        </div>
-                        <div class="d-flex justify-content-end gap-2">
-                            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#createLogFormSection" aria-expanded="true" aria-controls="createLogFormSection">Cancel</button>
-                            <button class="btn btn-primary btn-sm" type="submit">Create Log</button>
-                        </div>
-                    </form>
-                </div>
-                <div id="logList" class="list-group list-group-flush flex-grow-1 overflow-auto">
-                    <div class="list-group-item text-muted" id="logEmptyState">
-                        No logs yet. Create one to get started.
+<div class="logs-page flex-grow-1 d-flex flex-column">
+    <div id="logsLayout" class="logs-layout flex-grow-1 d-flex flex-column flex-lg-row gap-3">
+        <aside class="logs-sidebar" id="logsSidebar">
+            <div class="card shadow-sm h-100">
+                <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <h2 class="h5 mb-0">Logs</h2>
+                        <button type="button" class="btn-close d-lg-none" id="closeLogsSidebarBtn" aria-label="Close logs sidebar"></button>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-9 col-xl-9 col-xxl-10 d-flex log-editor-column">
-        <div class="card shadow-sm flex-fill">
-            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <div>
-                    <h2 class="h5 mb-0" id="logTitle">Select a log</h2>
-                    <small class="text-muted" id="logSubtitle">Choose or create a log to start editing.</small>
-                </div>
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                    <div class="btn-group" role="group">
-                        <button class="btn btn-outline-secondary btn-sm" id="addRowBtn" type="button" disabled>Add Row</button>
-                        <button class="btn btn-outline-secondary btn-sm" id="addColumnBtn" type="button" disabled>Add Column</button>
-                        <button class="btn btn-outline-secondary btn-sm" id="clearLogBtn" type="button" disabled>Clear</button>
-                        <button class="btn btn-outline-secondary btn-sm" id="undoBtn" type="button" disabled>Undo</button>
-                    </div>
-                    <div class="btn-group" role="group">
-                        <button class="btn btn-outline-secondary btn-sm" id="zoomOutBtn" type="button" disabled title="Zoom out">
-                            <span aria-hidden="true">&minus;</span>
-                            <span class="visually-hidden">Zoom out</span>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <button class="btn btn-outline-primary btn-sm" type="button" id="importLogBtn">
+                            Import Log
                         </button>
-                        <button class="btn btn-outline-secondary btn-sm" id="zoomInBtn" type="button" disabled title="Zoom in">
-                            <span aria-hidden="true">+</span>
-                            <span class="visually-hidden">Zoom in</span>
+                        <input type="file" class="d-none" id="importLogInput" accept=".xls,.xlsx,.csv" />
+                        <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#createLogFormSection" aria-expanded="false" aria-controls="createLogFormSection">
+                            Create New Log
                         </button>
                     </div>
-                    <button class="btn btn-outline-success btn-sm" id="exportExcelBtn" type="button" disabled>Export Excel</button>
-                    <button class="btn btn-outline-primary btn-sm" id="viewAuditLogBtn" type="button" disabled>View History</button>
-                    <div class="btn-group" role="group">
-                        <button class="btn btn-outline-secondary btn-sm" id="duplicateLogBtn" type="button" disabled>Duplicate</button>
-                        <button class="btn btn-outline-danger btn-sm" id="deleteLogBtn" type="button" disabled>Delete</button>
+                </div>
+                <div class="card-body p-0 d-flex flex-column">
+                    <div class="collapse border-bottom" id="createLogFormSection">
+                        <form id="createLogForm" class="p-3">
+                            <div class="mb-3">
+                                <label for="logNameInput" class="form-label">Log Name</label>
+                                <input type="text" class="form-control" id="logNameInput" name="logName" placeholder="e.g. Housekeeping" required maxlength="100">
+                                <div class="form-text">A clear name makes it easier to find your log later.</div>
+                                <div class="invalid-feedback">Please provide a name for the log.</div>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2">
+                                <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#createLogFormSection" aria-expanded="true" aria-controls="createLogFormSection">Cancel</button>
+                                <button class="btn btn-primary btn-sm" type="submit">Create Log</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div id="logList" class="list-group list-group-flush flex-grow-1 overflow-auto">
+                        <div class="list-group-item text-muted" id="logEmptyState">
+                            No logs yet. Create one to get started.
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="card-body d-flex flex-column">
-                <div class="spreadsheet-toolbar mb-3" id="spreadsheetToolbar" aria-label="Formatting toolbar">
-                    <div class="d-flex flex-wrap align-items-center gap-2">
-                        <div class="btn-group" role="group" aria-label="Font styles">
-                            <button class="btn btn-outline-secondary btn-sm" type="button" id="boldBtn" disabled title="Bold">
-                                <span class="fw-bold">B</span>
+        </aside>
+        <div class="logs-sidebar-overlay" id="logsSidebarOverlay" aria-hidden="true"></div>
+        <div class="logs-editor flex-grow-1 d-flex flex-column">
+            <div class="card shadow-sm flex-fill d-flex flex-column">
+                <div class="card-header logs-editor-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <button class="btn btn-outline-secondary btn-sm logs-sidebar-toggle" type="button" id="toggleSidebarBtn" aria-controls="logsSidebar" aria-expanded="true" data-open-label="Show Logs" data-close-label="Hide Logs">
+                            <span class="sidebar-toggle-icon" aria-hidden="true">&#9776;</span>
+                            <span data-sidebar-toggle-label>Hide Logs</span>
+                        </button>
+                        <div>
+                            <h2 class="h5 mb-0" id="logTitle">Select a log</h2>
+                            <small class="text-muted" id="logSubtitle">Choose or create a log to start editing.</small>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2 justify-content-start justify-content-lg-end logs-editor-actions">
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-outline-secondary btn-sm" id="addRowBtn" type="button" disabled>Add Row</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="addColumnBtn" type="button" disabled>Add Column</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="clearLogBtn" type="button" disabled>Clear</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="undoBtn" type="button" disabled>Undo</button>
+                        </div>
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-outline-secondary btn-sm" id="zoomOutBtn" type="button" disabled title="Zoom out">
+                                <span aria-hidden="true">&minus;</span>
+                                <span class="visually-hidden">Zoom out</span>
                             </button>
-                            <button class="btn btn-outline-secondary btn-sm" type="button" id="italicBtn" disabled title="Italic">
-                                <span class="fst-italic">I</span>
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm" type="button" id="underlineBtn" disabled title="Underline">
-                                <span class="text-decoration-underline">U</span>
+                            <button class="btn btn-outline-secondary btn-sm" id="zoomInBtn" type="button" disabled title="Zoom in">
+                                <span aria-hidden="true">+</span>
+                                <span class="visually-hidden">Zoom in</span>
                             </button>
                         </div>
-                        <div class="d-flex flex-wrap gap-2">
-                            <select class="form-select form-select-sm" id="fontFamilySelect" disabled aria-label="Font family">
-                                <option value="">Font Family</option>
-                                <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif">Segoe UI</option>
-                                <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
-                                <option value="'Times New Roman', Times, serif">Times New Roman</option>
-                                <option value="'Courier New', Courier, monospace">Courier New</option>
-                                <option value="'Roboto', sans-serif">Roboto</option>
-                            </select>
-                            <select class="form-select form-select-sm" id="fontSizeSelect" disabled aria-label="Font size">
-                                <option value="">Font Size</option>
-                                <option value="12px">12</option>
-                                <option value="14px">14</option>
-                                <option value="16px">16</option>
-                                <option value="18px">18</option>
-                                <option value="20px">20</option>
-                                <option value="24px">24</option>
-                            </select>
+                        <button class="btn btn-outline-success btn-sm" id="exportExcelBtn" type="button" disabled>Export Excel</button>
+                        <button class="btn btn-outline-primary btn-sm" id="viewAuditLogBtn" type="button" disabled>View History</button>
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-outline-secondary btn-sm" id="duplicateLogBtn" type="button" disabled>Duplicate</button>
+                            <button class="btn btn-outline-danger btn-sm" id="deleteLogBtn" type="button" disabled>Delete</button>
                         </div>
-                        <div class="btn-group" role="group" aria-label="Text alignment">
-                            <button class="btn btn-outline-secondary btn-sm" type="button" id="alignLeftBtn" disabled title="Align left">
-                                <span class="d-inline-block" aria-hidden="true">L</span>
-                                <span class="visually-hidden">Align left</span>
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm" type="button" id="alignCenterBtn" disabled title="Align center">
-                                <span class="d-inline-block" aria-hidden="true">C</span>
-                                <span class="visually-hidden">Align center</span>
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm" type="button" id="alignRightBtn" disabled title="Align right">
-                                <span class="d-inline-block" aria-hidden="true">R</span>
-                                <span class="visually-hidden">Align right</span>
-                            </button>
-                        </div>
+                    </div>
+                </div>
+                <div class="card-body d-flex flex-column">
+                    <div class="spreadsheet-toolbar mb-3" id="spreadsheetToolbar" aria-label="Formatting toolbar">
                         <div class="d-flex flex-wrap align-items-center gap-3">
-                            <div class="d-flex align-items-center gap-2 color-control">
-                                <label class="form-label form-label-sm mb-0 text-muted" for="textColorInput">Text</label>
-                                <input type="color" class="form-control form-control-color form-control-color-sm" id="textColorInput" value="#000000" data-default-color="#000000" title="Text color" disabled />
-                                <button class="btn btn-outline-secondary btn-sm" type="button" id="clearTextColorBtn" disabled>Clear</button>
+                            <div class="btn-group" role="group" aria-label="Font styles">
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="boldBtn" disabled title="Bold">
+                                    <span class="fw-bold">B</span>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="italicBtn" disabled title="Italic">
+                                    <span class="fst-italic">I</span>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="underlineBtn" disabled title="Underline">
+                                    <span class="text-decoration-underline">U</span>
+                                </button>
                             </div>
-                            <div class="d-flex align-items-center gap-2 color-control">
-                                <label class="form-label form-label-sm mb-0 text-muted" for="fillColorInput">Fill</label>
-                                <input type="color" class="form-control form-control-color form-control-color-sm" id="fillColorInput" value="#ffffff" data-default-color="#ffffff" title="Fill color" disabled />
-                                <button class="btn btn-outline-secondary btn-sm" type="button" id="clearFillColorBtn" disabled>Clear</button>
+                            <div class="d-flex flex-wrap gap-2">
+                                <select class="form-select form-select-sm" id="fontFamilySelect" disabled aria-label="Font family">
+                                    <option value="">Font Family</option>
+                                    <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif">Segoe UI</option>
+                                    <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
+                                    <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                                    <option value="'Courier New', Courier, monospace">Courier New</option>
+                                </select>
+                                <select class="form-select form-select-sm" id="fontSizeSelect" disabled aria-label="Font size">
+                                    <option value="">Font Size</option>
+                                    <option value="12px">12</option>
+                                    <option value="14px">14</option>
+                                    <option value="16px">16</option>
+                                    <option value="18px">18</option>
+                                    <option value="20px">20</option>
+                                    <option value="24px">24</option>
+                                </select>
+                            </div>
+                            <div class="btn-group" role="group" aria-label="Alignment">
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="alignLeftBtn" disabled title="Align left">
+                                    <span aria-hidden="true">L</span>
+                                    <span class="visually-hidden">Align left</span>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="alignCenterBtn" disabled title="Align center">
+                                    <span aria-hidden="true">C</span>
+                                    <span class="visually-hidden">Align center</span>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="alignRightBtn" disabled title="Align right">
+                                    <span aria-hidden="true">R</span>
+                                    <span class="visually-hidden">Align right</span>
+                                </button>
+                            </div>
+                            <div class="d-flex flex-wrap align-items-center gap-3">
+                                <div class="d-flex align-items-center gap-2 color-control">
+                                    <label class="form-label form-label-sm mb-0 text-muted" for="textColorInput">Text</label>
+                                    <input type="color" class="form-control form-control-color form-control-color-sm" id="textColorInput" value="#000000" data-default-color="#000000" title="Text color" disabled />
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="clearTextColorBtn" disabled>Clear</button>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 color-control">
+                                    <label class="form-label form-label-sm mb-0 text-muted" for="fillColorInput">Fill</label>
+                                    <input type="color" class="form-control form-control-color form-control-color-sm" id="fillColorInput" value="#ffffff" data-default-color="#ffffff" title="Fill color" disabled />
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="clearFillColorBtn" disabled>Clear</button>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 border-control">
+                                    <label class="form-label form-label-sm mb-0 text-muted" for="borderStyleSelect">Border</label>
+                                    <select class="form-select form-select-sm w-auto" id="borderStyleSelect" disabled aria-label="Border style">
+                                        <option value="">None</option>
+                                        <option value="thin">Thin</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="thick">Thick</option>
+                                        <option value="dashed">Dashed</option>
+                                    </select>
+                                    <input type="color" class="form-control form-control-color form-control-color-sm" id="borderColorInput" value="#000000" data-default-color="#000000" title="Border color" disabled />
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="clearBorderBtn" disabled>Clear</button>
+                                </div>
+                            </div>
+                            <div class="btn-group" role="group" aria-label="Cell merging">
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="mergeCellsBtn" disabled title="Merge cells">
+                                    <span aria-hidden="true">Merge</span>
+                                    <span class="visually-hidden">Merge cells</span>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="unmergeCellsBtn" disabled title="Unmerge cells">
+                                    <span aria-hidden="true">Split</span>
+                                    <span class="visually-hidden">Unmerge cells</span>
+                                </button>
                             </div>
                         </div>
-                        <div class="btn-group" role="group" aria-label="Cell merging">
-                            <button class="btn btn-outline-secondary btn-sm" type="button" id="mergeCellsBtn" disabled title="Merge cells">
-                                <span aria-hidden="true">Merge</span>
-                                <span class="visually-hidden">Merge cells</span>
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm" type="button" id="unmergeCellsBtn" disabled title="Unmerge cells">
-                                <span aria-hidden="true">Split</span>
-                                <span class="visually-hidden">Unmerge cells</span>
-                            </button>
+                    </div>
+                    <div id="spreadsheetContainer" class="spreadsheet-container">
+                        <div class="text-center text-muted" id="spreadsheetPlaceholder">
+                            <p class="mb-1 fw-semibold">No log selected</p>
+                            <p class="mb-0">Pick a log from the list or create a new one to start tracking.</p>
                         </div>
-                    </div>
-                </div>
-                <div id="spreadsheetContainer" class="spreadsheet-container">
-                    <div class="text-center text-muted" id="spreadsheetPlaceholder">
-                        <p class="mb-1 fw-semibold">No log selected</p>
-                        <p class="mb-0">Pick a log from the list or create a new one to start tracking.</p>
-                    </div>
-                    <div class="table-responsive d-none" id="spreadsheetWrapper">
-                        <table class="table table-bordered spreadsheet-table" id="spreadsheetTable">
-                            <thead></thead>
-                            <tbody></tbody>
-                        </table>
+                        <div class="table-responsive d-none" id="spreadsheetWrapper">
+                            <table class="table table-bordered spreadsheet-table" id="spreadsheetTable">
+                                <thead></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -186,7 +209,7 @@
 </div>
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/logs.css" />
+    <link rel="stylesheet" href="~/css/logs.css" asp-append-version="true" />
 }
 
 @section Scripts {
@@ -195,5 +218,5 @@
         window.hOps.currentUser = @Html.Raw(JsonSerializer.Serialize(currentUserInfo));
     </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
-    <script src="~/js/logs.js"></script>
+    <script src="~/js/logs.js" asp-append-version="true"></script>
 }

@@ -24,6 +24,11 @@
     const auditLogModalElement = document.getElementById('auditLogModal');
     const auditLogListElement = document.getElementById('auditLogList');
     const auditLogEmptyStateElement = document.getElementById('auditLogEmptyState');
+    const toggleSidebarButton = document.getElementById('toggleSidebarBtn');
+    const sidebarToggleLabel = toggleSidebarButton?.querySelector('[data-sidebar-toggle-label]') ?? null;
+    const closeSidebarButton = document.getElementById('closeLogsSidebarBtn');
+    const logsLayoutElement = document.getElementById('logsLayout');
+    const logsSidebarOverlayElement = document.getElementById('logsSidebarOverlay');
 
     const boldButton = document.getElementById('boldBtn');
     const italicButton = document.getElementById('italicBtn');
@@ -39,6 +44,9 @@
     const fillColorInput = document.getElementById('fillColorInput');
     const clearTextColorButton = document.getElementById('clearTextColorBtn');
     const clearFillColorButton = document.getElementById('clearFillColorBtn');
+    const borderStyleSelect = document.getElementById('borderStyleSelect');
+    const borderColorInput = document.getElementById('borderColorInput');
+    const clearBorderButton = document.getElementById('clearBorderBtn');
     const exportExcelButton = document.getElementById('exportExcelBtn');
     const undoButton = document.getElementById('undoBtn');
     const zoomInButton = document.getElementById('zoomInBtn');
@@ -69,6 +77,17 @@
     const ZOOM_STEP = 0.1;
     const MAX_AUDIT_ENTRIES = 500;
     const DEFAULT_USER_NAME = 'Unknown user';
+    const BORDER_STYLE_CONFIG = {
+        thin: { width: '1px', style: 'solid' },
+        medium: { width: '2px', style: 'solid' },
+        thick: { width: '3px', style: 'solid' },
+        dashed: { width: '2px', style: 'dashed' }
+    };
+    const BORDER_STYLE_LOOKUP = Object.entries(BORDER_STYLE_CONFIG).reduce((lookup, [key, config]) => {
+        lookup[`${config.width} ${config.style}`] = key;
+        return lookup;
+    }, {});
+    const LG_BREAKPOINT = 992;
 
     if (!logListEl) {
         return;
@@ -99,7 +118,9 @@
         fontSize: '',
         fontFamily: '',
         textColor: '#000000',
-        fillColor: '#FFFFFF'
+        fillColor: '#FFFFFF',
+        borderStyle: '',
+        borderColor: '#000000'
     };
 
     function clamp(value, min, max) {
@@ -303,6 +324,9 @@
         }
         if (isValidHexColor(format.fillColor)) {
             normalized.fillColor = normalizeHexColor(format.fillColor);
+        }
+        if (typeof format.border === 'string' && format.border.trim().length) {
+            normalized.border = format.border.trim();
         }
         if (format.merge && typeof format.merge === 'object') {
             const rowSpan = Number(format.merge.rowSpan);
@@ -685,7 +709,7 @@
         logs.forEach((log) => {
             const isActive = log.id === currentLogId;
             const item = document.createElement('div');
-            item.className = 'list-group-item list-group-item-action log-item';
+            item.className = 'list-group-item list-group-item-action log-item py-2 px-3';
             if (isActive) {
                 item.classList.add('active');
             }
@@ -694,7 +718,7 @@
 
             const selectButton = document.createElement('button');
             selectButton.type = 'button';
-            selectButton.className = 'log-item-select';
+            selectButton.className = 'log-item-select btn btn-link btn-sm px-0 py-0 text-start text-truncate';
             selectButton.textContent = log.name;
             selectButton.addEventListener('click', (event) => {
                 event.stopPropagation();
@@ -1610,6 +1634,11 @@
                 }
             });
         }
+        if (!shouldRefresh && !activeEditingCell && selectionRange) {
+            requestAnimationFrame(() => {
+                focusSelectionCell(selectionRange, { checkVisibility: true });
+            });
+        }
     }
 
     function handleCellDoubleClick(event) {
@@ -1792,6 +1821,76 @@
             ensureCellExists(log, targetRow, targetColumn);
             anchorCell = { row: targetRow, column: targetColumn };
             setSelection(targetRow, targetColumn, targetRow, targetColumn);
+        }
+    }
+
+    function isSpreadsheetNavigationTarget(target) {
+        if (target === document || target === document.body || target === document.documentElement) {
+            return true;
+        }
+        if (!(target instanceof HTMLElement)) {
+            return false;
+        }
+        if (target.isContentEditable) {
+            return false;
+        }
+        const tagName = target.tagName;
+        if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || tagName === 'BUTTON') {
+            return false;
+        }
+        return !!target.closest('#spreadsheetContainer');
+    }
+
+    function handleGlobalSpreadsheetKeyDown(event) {
+        if (!selectionRange) {
+            return;
+        }
+        if (activeEditingCell) {
+            return;
+        }
+        const key = event.key;
+        if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'ArrowLeft' && key !== 'ArrowRight') {
+            return;
+        }
+        if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) {
+            return;
+        }
+        if (!isSpreadsheetNavigationTarget(event.target)) {
+            return;
+        }
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        let rowIndex = selectionRange.endRow;
+        let columnIndex = selectionRange.endColumn;
+        if (document.activeElement instanceof HTMLElement) {
+            const activeCell = document.activeElement.closest('#spreadsheetTable tbody td[data-row][data-column]');
+            if (activeCell) {
+                const activeRow = Number(activeCell.dataset.row ?? '-1');
+                const activeColumn = Number(activeCell.dataset.column ?? '-1');
+                if (!Number.isNaN(activeRow) && !Number.isNaN(activeColumn)) {
+                    rowIndex = activeRow;
+                    columnIndex = activeColumn;
+                }
+            }
+        }
+        event.preventDefault();
+        switch (key) {
+            case 'ArrowUp':
+                navigateSelection(rowIndex, columnIndex, -1, 0, event.shiftKey);
+                break;
+            case 'ArrowDown':
+                navigateSelection(rowIndex, columnIndex, 1, 0, event.shiftKey);
+                break;
+            case 'ArrowLeft':
+                navigateSelection(rowIndex, columnIndex, 0, -1, event.shiftKey);
+                break;
+            case 'ArrowRight':
+                navigateSelection(rowIndex, columnIndex, 0, 1, event.shiftKey);
+                break;
+            default:
+                break;
         }
     }
 
@@ -2057,6 +2156,35 @@
         }
     }
 
+    function focusCellElement(cell) {
+        if (!cell || typeof cell.focus !== 'function') {
+            return;
+        }
+        try {
+            cell.focus({ preventScroll: true });
+        } catch (error) {
+            cell.focus();
+        }
+    }
+
+    function focusSelectionCell(range = selectionRange, options = {}) {
+        if (!range) {
+            return;
+        }
+        const target = getCellElement(range.endRow, range.endColumn) ||
+            getCellElement(range.startRow, range.startColumn);
+        if (!target) {
+            return;
+        }
+        if (options.checkVisibility) {
+            const rect = target.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) {
+                return;
+            }
+        }
+        focusCellElement(target);
+    }
+
     function setSelection(startRow, startColumn, endRow, endColumn, options = {}) {
         const log = getCurrentLog();
         if (!log) {
@@ -2076,9 +2204,7 @@
         updateToolbarState();
 
         if (options.focus !== false) {
-            const focusCell = getCellElement(normalized.endRow, normalized.endColumn) ||
-                getCellElement(normalized.startRow, normalized.startColumn);
-            focusCell?.focus();
+            focusSelectionCell(normalized);
         }
     }
 
@@ -2111,6 +2237,7 @@
         }
         highlightSelection();
         updateToolbarState();
+        focusSelectionCell(selectionRange, { checkVisibility: true });
     }
 
     function setFillPreview(range) {
@@ -2545,7 +2672,10 @@
             textColorInput,
             fillColorInput,
             clearTextColorButton,
-            clearFillColorButton
+            clearFillColorButton,
+            borderStyleSelect,
+            borderColorInput,
+            clearBorderButton
         ];
         controls.forEach((control) => {
             if (!control) {
@@ -2574,6 +2704,7 @@
         const fontFamilyState = getUniformFormatValue('fontFamily');
         const textColorState = getUniformFormatValue('textColor');
         const fillColorState = getUniformFormatValue('fillColor');
+        const borderState = getUniformFormatValue('border');
 
         const boldActive = boldState === null ? !!formattingMemory.bold : boldState === undefined ? false : !!boldState;
         const italicActive = italicState === null ? !!formattingMemory.italic : italicState === undefined ? false : !!italicState;
@@ -2645,6 +2776,34 @@
 
         updateColorInputState(textColorInput, clearTextColorButton, appliedTextColor, '#000000');
         updateColorInputState(fillColorInput, clearFillColorButton, appliedFillColor, '#ffffff');
+
+        let borderStyleValue = '';
+        let borderColorValue = formattingMemory.borderColor;
+        if (typeof borderState === 'string' && borderState.length) {
+            const parsedBorder = parseBorderValue(borderState);
+            if (parsedBorder?.styleKey) {
+                borderStyleValue = parsedBorder.styleKey;
+                formattingMemory.borderStyle = parsedBorder.styleKey;
+            }
+            if (parsedBorder?.color) {
+                borderColorValue = parsedBorder.color;
+                formattingMemory.borderColor = parsedBorder.color;
+            }
+        } else if (borderState === null) {
+            borderStyleValue = formattingMemory.borderStyle;
+            borderColorValue = formattingMemory.borderColor;
+        } else {
+            borderColorValue = formattingMemory.borderColor;
+            borderStyleValue = '';
+        }
+
+        if (borderStyleSelect) {
+            borderStyleSelect.value = borderStyleValue || '';
+        }
+        updateColorInputState(borderColorInput, clearBorderButton, borderColorValue, '#000000');
+        if (clearBorderButton) {
+            clearBorderButton.disabled = !(typeof borderState === 'string' && borderState.length);
+        }
 
         const selectionInfo = getSelectionInfo();
         if (mergeCellsButton) {
@@ -2732,6 +2891,11 @@
         td.style.textAlign = format.align ?? '';
         td.style.color = format.textColor ?? '';
         td.style.backgroundColor = format.fillColor ?? '';
+        if (format.border) {
+            td.style.border = format.border;
+        } else {
+            td.style.removeProperty('border');
+        }
     }
 
     function getCellElement(row, column) {
@@ -3028,6 +3192,220 @@
         applyColorToSelection('fillColor', null);
     }
 
+    function resolveBorderColor(colorCandidate) {
+        if (isValidHexColor(colorCandidate)) {
+            return normalizeHexColor(colorCandidate);
+        }
+        const fallback = borderColorInput ? getDefaultColorValue(borderColorInput, '#000000') : '#000000';
+        if (isValidHexColor(fallback)) {
+            return normalizeHexColor(fallback);
+        }
+        return '#000000';
+    }
+
+    function parseBorderValue(borderValue) {
+        if (typeof borderValue !== 'string') {
+            return null;
+        }
+        const parts = borderValue.trim().split(/\s+/);
+        if (parts.length < 3) {
+            return null;
+        }
+        const [width, style, colorPart] = parts;
+        const styleKey = BORDER_STYLE_LOOKUP[`${width} ${style}`] ?? '';
+        if (!styleKey) {
+            return null;
+        }
+        const normalizedColor = normalizeHexColor(colorPart);
+        if (!normalizedColor) {
+            return { styleKey, color: formattingMemory.borderColor };
+        }
+        return { styleKey, color: normalizedColor };
+    }
+
+    function applyBorderStyle(styleKey, options = {}) {
+        if (!styleKey) {
+            formattingMemory.borderStyle = '';
+        }
+        if (!selectionRange) {
+            if (styleKey) {
+                formattingMemory.borderStyle = styleKey;
+                const resolvedColor = resolveBorderColor(options.color ?? borderColorInput?.value ?? formattingMemory.borderColor);
+                formattingMemory.borderColor = resolvedColor;
+            }
+            updateToolbarState();
+            return;
+        }
+
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+
+        pushUndoState();
+        const styleConfig = styleKey ? BORDER_STYLE_CONFIG[styleKey] : null;
+        const colorValue = styleConfig ? resolveBorderColor(options.color ?? borderColorInput?.value ?? formattingMemory.borderColor) : '';
+        const borderValue = styleConfig ? `${styleConfig.width} ${styleConfig.style} ${colorValue}` : '';
+        let changed = false;
+
+        forEachCellInSelection(selectionRange, ({ cellData }) => {
+            cellData.format = cellData.format || {};
+            const currentValue = cellData.format.border;
+            if (styleConfig) {
+                if (currentValue !== borderValue) {
+                    cellData.format.border = borderValue;
+                    changed = true;
+                }
+            } else if (currentValue !== undefined) {
+                delete cellData.format.border;
+                changed = true;
+            }
+        });
+
+        if (!changed) {
+            const history = logHistory.get(log.id);
+            history?.pop();
+            updateUndoButtonState();
+            return;
+        }
+
+        const actionTitle = styleConfig ? `Applied ${styleKey} border` : 'Cleared borders';
+        recordAudit(log, actionTitle, `${actionTitle} for ${describeSelection(selectionRange)}.`);
+        persistLogs();
+        if (styleConfig) {
+            formattingMemory.borderStyle = styleKey;
+            formattingMemory.borderColor = colorValue;
+        } else {
+            formattingMemory.borderStyle = '';
+        }
+        updateSelectedCellStyles();
+        updateToolbarState();
+    }
+
+    function clearBorder() {
+        applyBorderStyle('');
+    }
+
+    function handleBorderStyleChange(event) {
+        const target = event.target;
+        if (!(target instanceof HTMLSelectElement)) {
+            return;
+        }
+        const styleKey = target.value;
+        applyBorderStyle(styleKey);
+    }
+
+    function handleBorderColorPreview(event) {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement)) {
+            return;
+        }
+        if (isValidHexColor(target.value)) {
+            formattingMemory.borderColor = normalizeHexColor(target.value);
+        }
+    }
+
+    function handleBorderColorChange(event) {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement)) {
+            return;
+        }
+        const normalizedColor = resolveBorderColor(target.value || formattingMemory.borderColor);
+        formattingMemory.borderColor = normalizedColor;
+        const styleKey = borderStyleSelect?.value || formattingMemory.borderStyle;
+        if (styleKey) {
+            applyBorderStyle(styleKey, { color: normalizedColor });
+        } else {
+            updateToolbarState();
+        }
+    }
+
+    function handleClearBorderClick() {
+        clearBorder();
+    }
+
+    function isLargeViewport() {
+        return window.innerWidth >= LG_BREAKPOINT;
+    }
+
+    function handleSidebarToggle() {
+        if (!logsLayoutElement) {
+            return;
+        }
+        if (isLargeViewport()) {
+            const willCollapse = !logsLayoutElement.classList.contains('sidebar-collapsed');
+            logsLayoutElement.classList.toggle('sidebar-collapsed', willCollapse);
+            logsLayoutElement.classList.remove('sidebar-open');
+            if (document.body) {
+                document.body.classList.remove('logs-sidebar-open');
+            }
+        } else {
+            const isOpen = logsLayoutElement.classList.toggle('sidebar-open');
+            if (document.body) {
+                document.body.classList.toggle('logs-sidebar-open', isOpen);
+            }
+            logsLayoutElement.classList.remove('sidebar-collapsed');
+        }
+        syncSidebarToggleState();
+    }
+
+    function closeSidebar() {
+        if (!logsLayoutElement) {
+            return;
+        }
+        if (isLargeViewport()) {
+            logsLayoutElement.classList.add('sidebar-collapsed');
+        } else {
+            logsLayoutElement.classList.remove('sidebar-open');
+            if (document.body) {
+                document.body.classList.remove('logs-sidebar-open');
+            }
+        }
+        if (logsSidebarOverlayElement) {
+            logsSidebarOverlayElement.classList.remove('active');
+        }
+        syncSidebarToggleState();
+    }
+
+    function handleSidebarResize() {
+        if (!logsLayoutElement) {
+            return;
+        }
+        if (isLargeViewport()) {
+            logsLayoutElement.classList.remove('sidebar-open');
+            if (document.body) {
+                document.body.classList.remove('logs-sidebar-open');
+            }
+        } else {
+            logsLayoutElement.classList.remove('sidebar-collapsed');
+        }
+        if (logsSidebarOverlayElement) {
+            logsSidebarOverlayElement.classList.remove('active');
+        }
+        syncSidebarToggleState();
+    }
+
+    function syncSidebarToggleState() {
+        if (!toggleSidebarButton) {
+            return;
+        }
+        const isExpanded = isLargeViewport()
+            ? !logsLayoutElement?.classList.contains('sidebar-collapsed')
+            : !!logsLayoutElement?.classList.contains('sidebar-open');
+        toggleSidebarButton.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        const openLabel = toggleSidebarButton.dataset.openLabel ?? toggleSidebarButton.textContent ?? '';
+        const closeLabel = toggleSidebarButton.dataset.closeLabel ?? toggleSidebarButton.textContent ?? '';
+        const appliedLabel = isExpanded ? closeLabel : openLabel;
+        if (sidebarToggleLabel) {
+            sidebarToggleLabel.textContent = appliedLabel;
+        } else if (toggleSidebarButton.textContent) {
+            toggleSidebarButton.textContent = appliedLabel;
+        }
+        if (appliedLabel) {
+            toggleSidebarButton.setAttribute('aria-label', appliedLabel);
+        }
+    }
+
     function exportCurrentLogToExcel() {
         const log = getCurrentLog();
         if (!log || typeof XLSX === 'undefined') {
@@ -3296,6 +3674,11 @@
 
     clearTextColorButton?.addEventListener('click', clearTextColor);
     clearFillColorButton?.addEventListener('click', clearFillColor);
+    clearBorderButton?.addEventListener('click', handleClearBorderClick);
+
+    borderStyleSelect?.addEventListener('change', handleBorderStyleChange);
+    borderColorInput?.addEventListener('input', handleBorderColorPreview);
+    borderColorInput?.addEventListener('change', handleBorderColorChange);
 
     mergeCellsButton?.addEventListener('click', mergeSelectedCells);
     unmergeCellsButton?.addEventListener('click', unmergeSelectedCells);
@@ -3316,9 +3699,17 @@
     duplicateLogButton?.addEventListener('click', () => duplicateLog());
     deleteLogButton?.addEventListener('click', () => deleteLog());
     viewAuditLogButton?.addEventListener('click', openAuditLogModal);
+    toggleSidebarButton?.addEventListener('click', handleSidebarToggle);
+    closeSidebarButton?.addEventListener('click', closeSidebar);
+    logsSidebarOverlayElement?.addEventListener('click', closeSidebar);
 
     document.addEventListener('copy', handleCopyEvent);
     document.addEventListener('paste', handlePasteEvent);
+    document.addEventListener('keydown', handleGlobalSpreadsheetKeyDown);
+    window.addEventListener('resize', handleSidebarResize);
+
+    handleSidebarResize();
+    syncSidebarToggleState();
 
     ensureFillHandleElement();
     if (spreadsheetWrapperEl) {
