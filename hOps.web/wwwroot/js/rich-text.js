@@ -302,6 +302,13 @@
     }
 
     function handleKeydown(event, context) {
+        if (event.key === 'Enter' && !event.shiftKey && !event.altKey && !event.metaKey) {
+            event.preventDefault();
+            insertParagraph(context);
+            syncToTextarea(context);
+            return;
+        }
+
         if (!(event.ctrlKey || event.metaKey)) {
             return;
         }
@@ -317,6 +324,40 @@
             event.preventDefault();
             applyInlineCommand(context, 'underline');
         }
+    }
+
+    function insertParagraph(context) {
+        const editor = context.editor;
+
+        if (typeof document.execCommand === 'function' && document.queryCommandSupported('insertParagraph')) {
+            document.execCommand('insertParagraph', false, null);
+            editor.dispatchEvent(new InputEvent('input', { bubbles: true }));
+            return;
+        }
+
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) {
+            const block = document.createElement('div');
+            block.appendChild(document.createElement('br'));
+            editor.appendChild(block);
+            editor.dispatchEvent(new InputEvent('input', { bubbles: true }));
+            return;
+        }
+
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+
+        const block = document.createElement('div');
+        block.appendChild(document.createElement('br'));
+
+        range.insertNode(block);
+
+        range.setStart(block, block.childNodes.length);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        editor.dispatchEvent(new InputEvent('input', { bubbles: true }));
     }
 
     function focusEditor(context) {
