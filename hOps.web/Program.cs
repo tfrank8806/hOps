@@ -35,7 +35,9 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
 // Register email sender
-builder.Services.AddTransient<IEmailSender, EmailSender>();
+builder.Services.AddTransient<EmailSender>();
+builder.Services.AddTransient<IEmailSender>(sp => sp.GetRequiredService<EmailSender>());
+builder.Services.AddTransient<IExtendedEmailSender>(sp => sp.GetRequiredService<EmailSender>());
 builder.Services.AddScoped<DirectMessageService>();
 builder.Services.AddScoped<MentionService>();
 builder.Services.AddHostedService<DailySummaryEmailService>();

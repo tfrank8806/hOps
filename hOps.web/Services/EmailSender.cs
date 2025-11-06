@@ -5,10 +5,13 @@ using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Net.Mail;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.IO;
+using hOps.web.Models;
 
 namespace hOps.web.Services
 {
-    public class EmailSender : IEmailSender
+    public class EmailSender : IEmailSender, IExtendedEmailSender
     {
         private readonly IConfiguration _config;
         private readonly ILogger<EmailSender> _logger;
@@ -20,6 +23,17 @@ namespace hOps.web.Services
         }
 
         public async Task SendEmailAsync(string email, string subject, string htmlMessage)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                _logger.LogWarning("EmailSender: attempted to send email without a recipient address");
+                return;
+            }
+
+            await SendEmailAsync(email, subject, htmlMessage, attachments: null);
+        }
+
+        public async Task SendEmailAsync(string email, string subject, string htmlMessage, IEnumerable<EmailAttachment>? attachments)
         {
             if (string.IsNullOrWhiteSpace(email))
             {
@@ -69,6 +83,28 @@ namespace hOps.web.Services
             };
 
             mail.To.Add(new MailAddress(email));
+
+            if (attachments != null)
+            {
+                foreach (var attachment in attachments)
+                {
+                    if (attachment == null || attachment.Content.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    var stream = new MemoryStream(attachment.Content);
+                    var mailAttachment = new Attachment(stream, attachment.ContentType)
+                    {
+                        Name = attachment.FileName
+                    };
+                    if (mailAttachment.ContentDisposition != null)
+                    {
+                        mailAttachment.ContentDisposition.FileName = attachment.FileName;
+                    }
+                    mail.Attachments.Add(mailAttachment);
+            }
+            }
 
             try
             {

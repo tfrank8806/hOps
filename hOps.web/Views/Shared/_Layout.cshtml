@@ -124,13 +124,23 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link @(currentController == "Reports" ? "active" : string.Empty)" asp-controller="Reports" asp-action="Index">
-                                    <span class="sidebar-text">Reports</span>
-                                </a>
-                            </li>
+                            <a class="nav-link @(currentController == "Reports" ? "active" : string.Empty)" asp-controller="Reports" asp-action="Index">
+                                <span class="sidebar-text">Reports</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link @((currentController == "Support" && string.Equals(currentAction, "Index", System.StringComparison.OrdinalIgnoreCase)) ? "active" : string.Empty)" asp-controller="Support" asp-action="Index">
+                                <span class="sidebar-text">Support</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link @((currentController == "Support" && string.Equals(currentAction, "Tips", System.StringComparison.OrdinalIgnoreCase)) ? "active" : string.Empty)" asp-controller="Support" asp-action="Tips">
+                                <span class="sidebar-text">Tips &amp; Tricks</span>
+                            </a>
+                        </li>
 
-                            if (roles.Contains("Manager") || roles.Contains("Admin"))
-                            {
+                        if (roles.Contains("Manager") || roles.Contains("Admin"))
+                        {
                                 <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle @(currentController == "Admin" || currentController == "Settings" || currentController == "Properties" ? "active" : string.Empty)" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                         <span class="sidebar-text">Admin</span>
