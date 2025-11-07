@@ -32,6 +32,16 @@ body {
     z-index: 1060;
 }
 
+@media (min-width: 992px) {
+    body:not(.sidebar-collapsed) .sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        max-height: 100vh;
+        align-self: flex-start;
+    }
+}
+
 .sidebar-toggle-icon {
     display: inline-flex;
     align-items: center;
