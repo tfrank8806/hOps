@@ -190,6 +190,61 @@ namespace hOps.web.Controllers
             return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
         }
 
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var accessiblePropertyIds = await _context.UserPropertyAccesses
+                .Where(upa => upa.ApplicationUserId == currentUser.Id)
+                .Select(upa => upa.PropertyId)
+                .ToListAsync();
+
+            var entry = await _context.LostFoundEntries
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (entry == null)
+            {
+                return NotFound();
+            }
+
+            if (!accessiblePropertyIds.Contains(entry.PropertyId))
+            {
+                return Forbid();
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.PhotoPath))
+            {
+                try
+                {
+                    var trimmed = entry.PhotoPath.TrimStart('/', '\\');
+                    var normalized = trimmed.Replace('/', Path.DirectorySeparatorChar)
+                        .Replace('\\', Path.DirectorySeparatorChar);
+                    var fullPath = Path.Combine(_environment.WebRootPath, normalized);
+                    if (System.IO.File.Exists(fullPath))
+                    {
+                        System.IO.File.Delete(fullPath);
+                    }
+                }
+                catch
+                {
+                    // ignored - failure to delete photo shouldn't block entry removal
+                }
+            }
+
+            _context.LostFoundEntries.Remove(entry);
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "Lost & Found entry deleted.";
+            return RedirectToAction(nameof(Index));
+        }
+
         private async Task<LostAndFoundIndexViewModel> BuildIndexViewModel(LostFoundFilterInput filters, LostFoundSubmissionViewModel? submission)
         {
             var currentUser = await _userManager.GetUserAsync(User);
@@ -298,6 +353,12 @@ namespace hOps.web.Controllers
                     (e.ItemFound?.Contains(filters.Keyword!, StringComparison.OrdinalIgnoreCase) ?? false) ||
                     (e.ItemLost?.Contains(filters.Keyword!, StringComparison.OrdinalIgnoreCase) ?? false) ||
                     (e.Stored?.Contains(filters.Keyword!, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            if (filters.Statuses.Any())
+            {
+                var statusSet = new HashSet<LostFoundStatus>(filters.Statuses);
+                filteredEntries = filteredEntries.Where(e => statusSet.Contains(e.Status));
             }
 
             filteredEntries = filters.SortOrder == "oldest"

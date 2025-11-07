@@ -29,6 +29,8 @@ namespace hOps.web.ViewModels
 
         public List<int> PropertyIds { get; set; } = new();
 
+        public List<LostFoundStatus> Statuses { get; set; } = new();
+
         public void Normalize()
         {
             SortOrder = string.IsNullOrWhiteSpace(SortOrder) ? "newest" : SortOrder.Trim().ToLowerInvariant();
@@ -40,6 +42,10 @@ namespace hOps.web.ViewModels
 
             PropertyIds = PropertyIds
                 .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+
+            Statuses = Statuses
                 .Distinct()
                 .ToList();
         }

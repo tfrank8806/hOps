@@ -23,7 +23,10 @@
         !string.IsNullOrWhiteSpace(Model.Filters.FoundBy) ||
         !string.IsNullOrWhiteSpace(Model.Filters.Creator) ||
         !string.IsNullOrWhiteSpace(Model.Filters.Keyword) ||
-        Model.Filters.PropertyIds.Count > 0;
+        Model.Filters.PropertyIds.Count > 0 ||
+        Model.Filters.Statuses.Count > 0;
+    var actionOptions = Enum.GetValues(typeof(LostFoundStatus)).Cast<LostFoundStatus>().ToList();
+    var isAdmin = User.IsInRole("Admin");
 }
 
 <div class="lost-found-page d-flex flex-column flex-grow-1">
@@ -217,6 +220,23 @@
                     <div class="col-md-3">
                         <label class="form-label" for="keyword">Keyword</label>
                         <input type="text" id="keyword" name="Keyword" class="form-control" value="@Model.Filters.Keyword" placeholder="Search notes, items, storage..." />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="statusFilter">Action</label>
+                        <select id="statusFilter" name="Statuses" class="form-select" multiple size="@actionOptions.Count">
+                            @foreach (var status in actionOptions)
+                            {
+                                var selected = Model.Filters.Statuses.Contains(status);
+                                var label = status switch
+                                {
+                                    LostFoundStatus.ReturnedToGuest => "Returned to Guest",
+                                    LostFoundStatus.DisposedOf => "Disposed of",
+                                    _ => "Logged"
+                                };
+                                <option value="@status" selected="@(selected ? "selected" : null)">@label</option>
+                            }
+                        </select>
+                        <div class="form-text">Use Ctrl/Cmd-click to select multiple actions.</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label" for="filterPropertyIds">Property</label>
@@ -428,7 +448,7 @@
                         }
                     </div>
                     <div class="modal-footer d-flex justify-content-between">
-                        <div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
                             <form asp-action="UpdateStatus" method="post" class="d-inline">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="id" value="@entry.Id" />
@@ -441,6 +461,14 @@
                                 <input type="hidden" name="status" value="@LostFoundStatus.DisposedOf" />
                                 <button type="submit" class="btn btn-outline-danger btn-sm">Disposed of</button>
                             </form>
+                            @if (isAdmin)
+                            {
+                                <form asp-action="Delete" method="post" class="d-inline ms-2" onsubmit="return confirm('Delete this lost &amp; found entry?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@entry.Id" />
+                                    <button type="submit" class="btn btn-danger btn-sm">Delete Entry</button>
+                                </form>
+                            }
                         </div>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
