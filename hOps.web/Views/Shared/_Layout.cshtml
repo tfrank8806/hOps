@@ -143,7 +143,10 @@
                         {
                                 <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle @(currentController == "Admin" || currentController == "Settings" || currentController == "Properties" ? "active" : string.Empty)" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <span class="sidebar-text">Admin</span>
+                                        <span class="sidebar-text position-relative">
+                                            Admin
+                                            <span id="adminMenuBadge" class="badge bg-danger ms-1 d-none"></span>
+                                        </span>
                                     </a>
                                     <ul class="dropdown-menu">
                                         <li><a class="dropdown-item" asp-controller="Admin" asp-action="Dashboard">Dashboard</a></li>
@@ -486,6 +489,28 @@
                             badge.textContent = count;
                         } else {
                             badge.style.display = 'none';
+                        }
+                    }
+
+                    const adminMenuBadge = document.getElementById('adminMenuBadge');
+                    if (adminMenuBadge) {
+                        if (count > 0) {
+                            adminMenuBadge.classList.remove('d-none');
+                            adminMenuBadge.textContent = count;
+                        } else {
+                            adminMenuBadge.classList.add('d-none');
+                            adminMenuBadge.textContent = '';
+                        }
+                    }
+
+                    const dashboardBadge = document.getElementById('adminAccessRequestsBadge');
+                    if (dashboardBadge) {
+                        if (count > 0) {
+                            dashboardBadge.classList.remove('d-none');
+                            dashboardBadge.textContent = count;
+                        } else {
+                            dashboardBadge.classList.add('d-none');
+                            dashboardBadge.textContent = '';
                         }
                     }
                 } catch (err) {
