@@ -424,18 +424,41 @@
                     {
                         var tilesByFloor = Model.RoomTiles.GroupBy(t => t.Floor).OrderBy(g => g.Key).ToList();
                         var floorLegend = tilesByFloor
-                            .Select(g => new { Floor = g.Key, Color = g.First().FloorColor })
+                            .Select(g => new
+                            {
+                                Floor = g.Key,
+                                Color = g.First().FloorColor,
+                                AlertCount = g.Sum(tile => tile.Badges?.Count ?? 0)
+                            })
                             .ToList();
+                        var totalAlerts = floorLegend.Sum(f => f.AlertCount);
                         var maxWidthAll = Math.Max(1, tilesByFloor.SelectMany(g => g).Max(t => t.X + t.Width));
                         var maxHeightAll = Math.Max(1, tilesByFloor.SelectMany(g => g).Max(t => t.Y + t.Height));
                         var defaultFloor = tilesByFloor.First().Key;
 
                         <div class="layout-controls d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-3">
                             <div class="btn-group btn-group-sm layout-view-toggle" role="group" aria-label="Layout view mode">
-                                <input class="btn-check" type="radio" name="layoutViewMode" id="layoutViewOverlay" value="overlay" checked autocomplete="off">
-                                <label class="btn btn-outline-primary" for="layoutViewOverlay">All Floors</label>
-                                <input class="btn-check" type="radio" name="layoutViewMode" id="layoutViewSingle" value="single" autocomplete="off">
-                                <label class="btn btn-outline-primary" for="layoutViewSingle">Individual Floor</label>
+                                <input class="btn-check" type="radio" name="layoutViewMode" id="layoutView_all" value="all" checked autocomplete="off">
+                                <label class="btn btn-outline-primary layout-view-toggle__btn" for="layoutView_all">
+                                    All Floors
+                                    @if (totalAlerts > 0)
+                                    {
+                                        <span class="layout-floor-badge">@totalAlerts</span>
+                                    }
+                                </label>
+                                @foreach (var floorInfo in floorLegend)
+                                {
+                                    var floorId = floorInfo.Floor;
+                                    var badgeCount = floorInfo.AlertCount;
+                                    <input class="btn-check" type="radio" name="layoutViewMode" id="layoutView_@floorId" value="@floorId" autocomplete="off">
+                                    <label class="btn btn-outline-primary layout-view-toggle__btn" for="layoutView_@floorId">
+                                        Floor @floorId
+                                        @if (badgeCount > 0)
+                                        {
+                                            <span class="layout-floor-badge">@badgeCount</span>
+                                        }
+                                    </label>
+                                }
                             </div>
                             <div class="layout-legends d-flex flex-column flex-lg-row gap-3 text-muted small">
                                 <div class="d-flex align-items-center gap-3">
@@ -522,15 +545,6 @@
                         </div>
 
                         <div id="layoutPerFloorView" class="layout-view d-none">
-                            <div class="btn-group btn-group-sm layout-floor-selector mb-3" role="group" aria-label="Select floor">
-                                @foreach (var floorGroup in tilesByFloor)
-                                {
-                                    var isActive = floorGroup.Key == defaultFloor;
-                                    <input class="btn-check" type="radio" name="singleFloorOption" id="singleFloor_@floorGroup.Key" value="@floorGroup.Key" autocomplete="off" @(isActive ? "checked" : null)>
-                                    <label class="btn btn-outline-secondary" for="singleFloor_@floorGroup.Key">Floor @floorGroup.Key</label>
-                                }
-                            </div>
-
                             @foreach (var floorGroup in tilesByFloor)
                             {
                                 var maxWidth = Math.Max(1, floorGroup.Max(t => t.X + t.Width));
@@ -738,6 +752,29 @@
             background-color: var(--floor-color, rgba(148, 163, 184, 0.7));
         }
 
+        .layout-view-toggle__btn {
+            position: relative;
+            padding-right: 2.5rem;
+        }
+
+        .layout-floor-badge {
+            position: absolute;
+            top: 50%;
+            right: 0.6rem;
+            transform: translateY(-50%);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.6rem;
+            padding: 0.1rem 0.35rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: #dc3545;
+            color: #fff;
+            box-shadow: 0 2px 6px rgba(220, 53, 69, 0.35);
+        }
+
         .room-tile-overlay {
             border-width: 2px;
             transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -943,40 +980,13 @@
     <script>
         (() => {
             const overlayView = document.getElementById('layoutOverlayView');
-            const singleView = document.getElementById('layoutPerFloorView');
+            const perFloorView = document.getElementById('layoutPerFloorView');
             const viewRadios = document.querySelectorAll('input[name="layoutViewMode"]');
 
-            if (!overlayView && !singleView) {
+            if (!overlayView && !perFloorView) {
                 return;
             }
 
-            const updateViewMode = () => {
-                const selected = document.querySelector('input[name="layoutViewMode"]:checked');
-                if (!selected) {
-                    return;
-                }
-
-                if (selected.value === 'overlay') {
-                    if (overlayView) {
-                        overlayView.classList.remove('d-none');
-                    }
-                    if (singleView) {
-                        singleView.classList.add('d-none');
-                    }
-                } else {
-                    if (overlayView) {
-                        overlayView.classList.add('d-none');
-                    }
-                    if (singleView) {
-                        singleView.classList.remove('d-none');
-                    }
-                }
-            };
-
-            viewRadios.forEach(radio => radio.addEventListener('change', updateViewMode));
-            updateViewMode();
-
-            const floorRadios = document.querySelectorAll('input[name="singleFloorOption"]');
             const floorSections = document.querySelectorAll('.layout-floor-section');
 
             const setActiveFloor = (floorValue) => {
@@ -990,18 +1000,31 @@
                 });
             };
 
-            const initialFloor = document.querySelector('input[name="singleFloorOption"]:checked');
-            if (initialFloor) {
-                setActiveFloor(initialFloor.value);
-            }
+            const applySelectedView = () => {
+                const selected = document.querySelector('input[name="layoutViewMode"]:checked');
+                if (!selected) {
+                    return;
+                }
 
-            floorRadios.forEach(radio => {
+                if (selected.value === 'all') {
+                    overlayView?.classList.remove('d-none');
+                    perFloorView?.classList.add('d-none');
+                } else {
+                    overlayView?.classList.add('d-none');
+                    perFloorView?.classList.remove('d-none');
+                    setActiveFloor(selected.value);
+                }
+            };
+
+            viewRadios.forEach(radio => {
                 radio.addEventListener('change', () => {
                     if (radio.checked) {
-                        setActiveFloor(radio.value);
+                        applySelectedView();
                     }
                 });
             });
+
+            applySelectedView();
 
             const clickableTiles = document.querySelectorAll('.room-tile-overlay, .layout-floor-section .room-tile');
             const layoutWidget = document.getElementById('layoutWidget');
