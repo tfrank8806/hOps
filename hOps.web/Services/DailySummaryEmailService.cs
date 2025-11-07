@@ -19,6 +19,8 @@ namespace hOps.web.Services
 {
     public class DailySummaryEmailService : BackgroundService
     {
+        private const int PreviewCharacterLimit = 350;
+
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DailySummaryEmailService> _logger;
 
@@ -183,14 +185,18 @@ namespace hOps.web.Services
                     var propertiesText = properties.Any()
                         ? $"<span style=\"color:#555;\">{string.Join(", ", properties)}</span><br/>"
                         : string.Empty;
-                    var preview = MentionMarkupFormatter.ToDisplayText(log.Body);
-                    if (!string.IsNullOrWhiteSpace(preview) && preview.Length > 350)
-                    {
-                        preview = $"{preview[..350]}…";
-                    }
-                    var safePreview = WebUtility.HtmlEncode(preview ?? string.Empty).Replace("\r\n", "\n").Replace("\n", "<br/>");
+                    var previewHtml = BuildRichTextPreview(log.Body, PreviewCharacterLimit);
                     var link = $"/PassOnLogs/Details/{log.Id}";
-                    builder.AppendLine($@"<li><strong>{logTitle}</strong><br/>{propertiesText}<span style=""color:#555;"">{safeCreated}</span><br/>{safePreview}<br/><a href=""{link}"">View log</a></li>");
+                    builder.Append($@"<li><strong>{logTitle}</strong><br/>{propertiesText}<span style=""color:#555;"">{safeCreated}</span>");
+                    if (!string.IsNullOrEmpty(previewHtml))
+                    {
+                        builder.Append($@"<div style=""margin:0.5rem 0;"">{previewHtml}</div>");
+                    }
+                    else
+                    {
+                        builder.Append("<br/>");
+                    }
+                    builder.AppendLine($@"<a href=""{link}"">View log</a></li>");
                 }
                 builder.AppendLine("</ul>");
             }
@@ -205,13 +211,17 @@ namespace hOps.web.Services
                     var safeProperty = WebUtility.HtmlEncode(propertyName);
                     var createdAtLocal = FormatUserLocal(post.CreatedAt, userTimeZone, "MMM d, yyyy h:mm tt");
                     var safeCreated = WebUtility.HtmlEncode(createdAtLocal);
-                    var content = MentionMarkupFormatter.ToDisplayText(post.Content);
-                    if (!string.IsNullOrWhiteSpace(content) && content.Length > 350)
+                    var contentHtml = BuildRichTextPreview(post.Content, PreviewCharacterLimit);
+                    builder.Append($@"<li><strong>{safeProperty}</strong><br/><span style=""color:#555;"">{safeCreated}</span>");
+                    if (!string.IsNullOrEmpty(contentHtml))
                     {
-                        content = $"{content[..350]}…";
+                        builder.Append($@"<div style=""margin:0.5rem 0;"">{contentHtml}</div>");
                     }
-                    var safeContent = WebUtility.HtmlEncode(content ?? string.Empty).Replace("\r\n", "\n").Replace("\n", "<br/>");
-                    builder.AppendLine($@"<li><strong>{safeProperty}</strong><br/><span style=""color:#555;"">{safeCreated}</span><br/>{safeContent}<br/><a href=""/Home"">View post</a></li>");
+                    else
+                    {
+                        builder.Append("<br/>");
+                    }
+                    builder.AppendLine(@"<a href=""/Home"">View post</a></li>");
                 }
                 builder.AppendLine("</ul>");
             }
@@ -256,6 +266,33 @@ namespace hOps.web.Services
             }
 
             return target.ToUniversalTime();
+        }
+
+        private static string BuildRichTextPreview(string? content, int maxCharacters)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return string.Empty;
+            }
+
+            var displayText = MentionMarkupFormatter.ToDisplayText(content);
+            if (string.IsNullOrWhiteSpace(displayText))
+            {
+                return string.Empty;
+            }
+
+            if (maxCharacters <= 0 || displayText.Length <= maxCharacters)
+            {
+                return RichTextRenderer.ToHtml(content);
+            }
+
+            var truncated = displayText[..Math.Min(maxCharacters, displayText.Length)].TrimEnd();
+            if (truncated.Length < displayText.Length)
+            {
+                truncated = $"{truncated}...";
+            }
+
+            return RichTextRenderer.ToHtml(truncated);
         }
 
         private static TimeZoneInfo ResolveUserTimeZone(ApplicationUser user)
