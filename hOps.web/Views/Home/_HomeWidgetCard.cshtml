@@ -153,9 +153,15 @@
         }
         else if (items.First() is CalendarEventSummaryViewModel)
         {
-            var events = items.OfType<CalendarEventSummaryViewModel>();
+            var events = items.OfType<CalendarEventSummaryViewModel>().ToList();
+            var todayLocal = TimeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
+            var todaysEventCount = events.Count(calendarEvent =>
+                TimeZoneService.ConvertToUserTime(calendarEvent.Start).Date == todayLocal);
+            var showMoreTodayButton = todaysEventCount > 5;
+            var displayedEvents = events.Take(5).ToList();
+
             <ul class="list-unstyled mb-0 widget-list">
-                @foreach (var calendarEvent in events)
+                @foreach (var calendarEvent in displayedEvents)
                 {
                     var hasLink = !string.IsNullOrWhiteSpace(calendarEvent.DetailUrl);
                     <li class="widget-item">
@@ -179,6 +185,13 @@
                     </li>
                 }
             </ul>
+
+            @if (showMoreTodayButton)
+            {
+                <div class="text-end mt-2">
+                    <a class="btn btn-sm btn-outline-primary" asp-controller="Calendar" asp-action="Index">More Events Today</a>
+                </div>
+            }
         }
         else if (items.First() is PassOnLogSummaryViewModel)
         {
