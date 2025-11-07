@@ -1,4 +1,4 @@
-﻿@using System
+@using System
 @using System.Linq
 @using System.Text.Json
 @using Microsoft.AspNetCore.Mvc.Rendering
@@ -42,6 +42,29 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
+        }
+
+        .layout-editor-stage {
+            display: flex;
+            height: 650px;
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        .layout-editor-palette {
+            flex: 0 0 220px;
+            max-width: 220px;
+            border: 1px solid #ccc;
+            padding: 5px;
+            overflow-y: auto;
+        }
+
+        .layout-editor-wrapper {
+            position: relative;
+            overflow: auto;
+            border: 1px solid #333;
+            flex: 1 1 auto;
+            min-width: 0;
         }
 
         #palette.is-collapsed {
@@ -92,13 +115,14 @@
             border: 1px solid #333;
             border-radius: 4px;
             transition: opacity 0.2s;
-            pointer-events: auto;
+            pointer-events: none;
             z-index: 5;
         }
 
         .room-box:hover .box-controls,
         .room-box:focus-within .box-controls {
             opacity: 1;
+            pointer-events: auto;
         }
 
         .room-box .box-controls button {
@@ -175,8 +199,8 @@
         <label class="form-check-label" for="chkSnap">Snap to grid</label>
     </div>
     <div class="control-group">
-        <button id="zoomInBtn" class="btn btn-sm btn-outline-secondary" type="button">Ã¯Â¼â€¹</button>
-        <button id="zoomOutBtn" class="btn btn-sm btn-outline-secondary" type="button">Ã¯Â¼Â</button>
+        <button id="zoomInBtn" class="btn btn-sm btn-outline-secondary" type="button">+</button>
+        <button id="zoomOutBtn" class="btn btn-sm btn-outline-secondary" type="button">-</button>
     </div>
     <div class="control-group">
         <button id="togglePaletteBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-controls="palette" aria-expanded="true">Hide Palette</button>
@@ -190,9 +214,9 @@
     </div>
 </div>
 
-<div style="display:flex; height:650px;">
+<div class="layout-editor-stage">
     <!-- Palette sidebar -->
-    <div id="palette" style="width:200px; border:1px solid #ccc; padding:5px; overflow-y: auto;">
+    <div id="palette" class="layout-editor-palette">
         <h4>Palette</h4>
         <!-- Always include custom tile -->
         <div class="pal-shape" data-room-id="0" data-room-label="Custom" draggable="true"
@@ -224,7 +248,7 @@
     </div>
 
     <!-- Editor container wrapper for pan/zoom -->
-    <div id="editor-wrapper" style="position: relative; overflow: auto; border:1px solid #333; flex-grow:1;">
+    <div id="editor-wrapper" class="layout-editor-wrapper">
         <div id="editor-container" style="
             position: relative;
             width:1600px; height:1200px;
@@ -1395,6 +1419,7 @@
         })();
     </script>
 }
+
 
 
 
