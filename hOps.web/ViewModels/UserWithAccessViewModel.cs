@@ -11,6 +11,7 @@ namespace hOps.web.Models
         public IList<string> Roles { get; set; } = new List<string>();
         public IList<int> PropertyIds { get; set; } = new List<int>();
         public bool CanDelete { get; set; }
+        public bool CanResetPassword { get; set; }
         // Optionally, you can include a list of property names or full Property objects
     }
 }

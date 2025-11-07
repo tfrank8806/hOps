@@ -1,10 +1,22 @@
-﻿@model IEnumerable<hOps.web.Models.UserWithAccessViewModel>
+@model hOps.web.ViewModels.Admin.AdminUsersPageViewModel
 
 @{
     ViewData["Title"] = "Manage Users";
+    var propertyLookup = Model.PropertyNameLookup ?? new Dictionary<int, string>();
+    var selectedPropertyIds = new HashSet<int>(Model.CreateUser.PropertyIds ?? new List<int>());
+    var selectedRoles = new HashSet<string>(Model.CreateUser.SelectedRoles ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+    var showCreateErrors = !ViewData.ModelState.IsValid && ViewData.ModelState.Keys.Any(k => k.StartsWith("CreateUser", StringComparison.OrdinalIgnoreCase));
 }
 
-<h2>Users</h2>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Users</h2>
+    <button type="button"
+            class="btn btn-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#createUserModal">
+        Create User
+    </button>
+</div>
 
 @if (TempData["AdminUsersMessage"] is string successMessage)
 {
@@ -22,59 +34,215 @@
     </div>
 }
 
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Email</th>
-            <th>First Name</th>
-            <th>Last Name</th>
-            <th>Roles</th>
-            <th>Properties</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var user in Model)
-        {
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead>
             <tr>
-                <td>@user.Email</td>
-                <td>@user.FirstName</td>
-                <td>@user.LastName</td>
-                <td>@string.Join(", ", user.Roles)</td>
-                <td>
-                    @if (user.PropertyIds != null && user.PropertyIds.Any())
-                    {
-                        @string.Join(", ", user.PropertyIds)
-                    }
-                    else
-                    {
-                        <em>None</em>
-                    }
-                </td>
-                <td>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a asp-action="EditUserProperties" asp-controller="Admin" asp-route-userId="@user.Id" class="btn btn-sm btn-info">
-                            Assign Properties
-                        </a>
-                        @if (user.CanDelete)
+                <th>Email</th>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>Roles</th>
+                <th>Properties</th>
+                <th class="text-nowrap">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Users.Any())
+            {
+                <tr>
+                    <td colspan="6" class="text-center py-4">No users found.</td>
+                </tr>
+            }
+            else
+            {
+                foreach (var user in Model.Users)
+                {
+                    var propertyNames = user.PropertyIds != null && user.PropertyIds.Any()
+                        ? user.PropertyIds
+                            .Select(pid => propertyLookup.TryGetValue(pid, out var name)
+                                ? name
+                                : pid.ToString())
+                            .ToList()
+                        : new List<string>();
+                    <tr>
+                        <td>@user.Email</td>
+                        <td>@user.FirstName</td>
+                        <td>@user.LastName</td>
+                        <td>@string.Join(", ", user.Roles)</td>
+                        <td>
+                            @if (propertyNames.Any())
+                            {
+                                @string.Join(", ", propertyNames)
+                            }
+                            else
+                            {
+                                <em>None</em>
+                            }
+                        </td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a asp-action="EditUserProperties"
+                                   asp-controller="Admin"
+                                   asp-route-userId="@user.Id"
+                                   class="btn btn-sm btn-info">
+                                    Assign Properties
+                                </a>
+                                @if (user.CanResetPassword)
+                                {
+                                    <form asp-action="ResetUserPassword" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="userId" value="@user.Id" />
+                                        <button type="submit"
+                                                class="btn btn-sm btn-warning"
+                                                onclick="return confirm('Send a new temporary password to @user.Email?');">
+                                            Reset Password
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-warning" disabled>
+                                        Reset Password
+                                    </button>
+                                }
+                                @if (user.CanDelete)
+                                {
+                                    <form asp-action="DeleteUser" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="userId" value="@user.Id" />
+                                        <button type="submit"
+                                                class="btn btn-sm btn-danger"
+                                                onclick="return confirm('Delete user @user.Email? This action cannot be undone.');">
+                                            Delete
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-danger" disabled>
+                                        Delete
+                                    </button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="modal fade"
+     id="createUserModal"
+     tabindex="-1"
+     aria-labelledby="createUserModalLabel"
+     aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createUserModalLabel">Create User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="CreateUser" method="post" autocomplete="off">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="CreateUser.FirstName" class="form-label"></label>
+                            <input asp-for="CreateUser.FirstName" class="form-control" />
+                            <span asp-validation-for="CreateUser.FirstName" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="CreateUser.LastName" class="form-label"></label>
+                            <input asp-for="CreateUser.LastName" class="form-control" />
+                            <span asp-validation-for="CreateUser.LastName" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="CreateUser.Email" class="form-label"></label>
+                            <input asp-for="CreateUser.Email" class="form-control" type="email" />
+                            <span asp-validation-for="CreateUser.Email" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="CreateUser.MobilePhone" class="form-label"></label>
+                            <input asp-for="CreateUser.MobilePhone" class="form-control" />
+                            <span asp-validation-for="CreateUser.MobilePhone" class="text-danger"></span>
+                        </div>
+                        @if (Model.AvailableRoles.Any())
                         {
-                            <form asp-action="DeleteUser" method="post" class="d-inline">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="userId" value="@user.Id" />
-                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete user @user.Email? This action cannot be undone.');">
-                                    Delete
-                                </button>
-                            </form>
+                            <div class="col-12">
+                                <label asp-for="CreateUser.SelectedRoles" class="form-label">Roles</label>
+                                <select asp-for="CreateUser.SelectedRoles"
+                                        class="form-select"
+                                        multiple
+                                        size="@(Math.Min(Model.AvailableRoles.Count, 6))">
+                                    @foreach (var role in Model.AvailableRoles)
+                                    {
+                                        <option value="@role" selected="@(selectedRoles.Contains(role) ? "selected" : null)">
+                                            @role
+                                        </option>
+                                    }
+                                </select>
+                                <div class="form-text">Leave blank to assign the default User role.</div>
+                                <span asp-validation-for="CreateUser.SelectedRoles" class="text-danger"></span>
+                            </div>
+                        }
+                        @if (Model.AvailableProperties.Any())
+                        {
+                            <div class="col-12">
+                                <label class="form-label">Properties</label>
+                                <div class="row g-2">
+                                    @foreach (var property in Model.AvailableProperties)
+                                    {
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input"
+                                                       type="checkbox"
+                                                       name="CreateUser.PropertyIds"
+                                                       value="@property.Id"
+                                                       id="createUserProperty_@property.Id"
+                                                       @(selectedPropertyIds.Contains(property.Id) ? "checked" : null) />
+                                                <label class="form-check-label" for="createUserProperty_@property.Id">
+                                                    @property.DisplayLabel
+                                                </label>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                                <span asp-validation-for="CreateUser.PropertyIds" class="text-danger"></span>
+                            </div>
                         }
                         else
                         {
-                            <button type="button" class="btn btn-sm btn-danger" disabled title="You do not have permission to delete this user.">
-                                Delete
-                            </button>
+                            <div class="col-12">
+                                <div class="alert alert-warning mb-0">
+                                    You currently do not have property access to assign. You can still create the user without properties.
+                                </div>
+                            </div>
                         }
                     </div>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    @if (showCreateErrors)
+    {
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var modalElement = document.getElementById('createUserModal');
+                if (modalElement) {
+                    var modal = new bootstrap.Modal(modalElement);
+                    modal.show();
+                }
+            });
+        </script>
+    }
+}

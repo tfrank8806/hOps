@@ -1,15 +1,17 @@
-﻿using hOps.web.Data;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Threading.Tasks;
+using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
+using hOps.web.ViewModels.Admin;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Security.Cryptography;
 
 
 namespace hOps.web.Controllers
@@ -45,75 +47,186 @@ namespace hOps.web.Controllers
                 return Challenge();
 
             var currentRoles = await _userManager.GetRolesAsync(currentUser);
+            var vm = await BuildAdminUsersViewModelAsync(currentUser, currentRoles, null);
+
+            return View(vm);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateUser(AdminCreateUserInputModel? input)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var currentRoles = await _userManager.GetRolesAsync(currentUser);
             var isAdmin = currentRoles.Contains("Admin");
-            HashSet<int> accessiblePropertyIds = new();
+            input ??= new AdminCreateUserInputModel();
+
+            input.Email = input.Email?.Trim();
+            input.FirstName = input.FirstName?.Trim();
+            input.LastName = input.LastName?.Trim();
+
+            if (string.IsNullOrWhiteSpace(input.Email))
+            {
+                ModelState.AddModelError("CreateUser.Email", "Email is required.");
+            }
+            if (string.IsNullOrWhiteSpace(input.FirstName))
+            {
+                ModelState.AddModelError("CreateUser.FirstName", "First name is required.");
+            }
+            if (string.IsNullOrWhiteSpace(input.LastName))
+            {
+                ModelState.AddModelError("CreateUser.LastName", "Last name is required.");
+            }
+
+            if (!isAdmin && (input.SelectedRoles?.Any(r => string.Equals(r, "Admin", StringComparison.OrdinalIgnoreCase)) ?? false))
+            {
+                ModelState.AddModelError("CreateUser.SelectedRoles", "Managers cannot assign the Admin role.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                var invalidVm = await BuildAdminUsersViewModelAsync(currentUser, currentRoles, input);
+                return View(nameof(Users), invalidVm);
+            }
+
+            var existingUser = await _userManager.FindByEmailAsync(input.Email!);
+            if (existingUser != null)
+            {
+                ModelState.AddModelError("CreateUser.Email", "An account with this email already exists.");
+                var duplicateVm = await BuildAdminUsersViewModelAsync(currentUser, currentRoles, input);
+                return View(nameof(Users), duplicateVm);
+            }
+
+            var requestedRoles = (input.SelectedRoles ?? new List<string>())
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Select(r => r.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var validRoles = await _roleManager.Roles
+                .Where(r => r.Name != null)
+                .Select(r => r.Name!)
+                .ToListAsync();
+            var validRoleSet = new HashSet<string>(validRoles, StringComparer.OrdinalIgnoreCase);
+
+            requestedRoles = requestedRoles
+                .Where(r => validRoleSet.Contains(r))
+                .ToList();
+
+            if (!requestedRoles.Any())
+            {
+                requestedRoles.Add("User");
+            }
+
+            if (!isAdmin && requestedRoles.Any(r => string.Equals(r, "Admin", StringComparison.OrdinalIgnoreCase)))
+            {
+                ModelState.AddModelError("CreateUser.SelectedRoles", "Managers cannot assign the Admin role.");
+            }
+
+            var selectedPropertyIds = (input.PropertyIds ?? new List<int>())
+                .Distinct()
+                .ToList();
+
+            if (selectedPropertyIds.Any())
+            {
+                var validPropertyIds = await _context.Properties
+                    .Where(p => selectedPropertyIds.Contains(p.Id))
+                    .Select(p => p.Id)
+                    .ToListAsync();
+                var validPropertySet = validPropertyIds.ToHashSet();
+                var invalidSelection = selectedPropertyIds.Count != validPropertySet.Count;
+                selectedPropertyIds = selectedPropertyIds
+                    .Where(validPropertySet.Contains)
+                    .ToList();
+
+                if (invalidSelection)
+                {
+                    ModelState.AddModelError("CreateUser.PropertyIds", "One or more selected properties were invalid.");
+                }
+            }
 
             if (!isAdmin)
             {
-                accessiblePropertyIds = (await _context.UserPropertyAccesses
-                        .Where(upa => upa.ApplicationUserId == currentUser.Id)
-                        .Select(upa => upa.PropertyId)
-                        .Distinct()
-                        .ToListAsync())
-                    .ToHashSet();
+                var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(currentUser.Id);
+                var unauthorizedSelection = selectedPropertyIds.Any(pid => !accessiblePropertyIds.Contains(pid));
+                selectedPropertyIds = selectedPropertyIds
+                    .Where(accessiblePropertyIds.Contains)
+                    .ToList();
+
+                if (unauthorizedSelection)
+                {
+                    ModelState.AddModelError("CreateUser.PropertyIds", "You can only assign properties that you manage.");
+                }
             }
 
-            var users = await _userManager.Users.ToListAsync();
-            var vmList = new List<UserWithAccessViewModel>();
+            input.PropertyIds = selectedPropertyIds;
+            input.SelectedRoles = requestedRoles;
 
-            foreach (var u in users)
+            if (!ModelState.IsValid)
             {
-                var propertyIds = await _context.UserPropertyAccesses
-                    .Where(upa => upa.ApplicationUserId == u.Id)
-                    .Select(upa => upa.PropertyId)
-                    .ToListAsync();
-                var userRoles = (await _userManager.GetRolesAsync(u)).ToList();
-
-                if (!isAdmin)
-                {
-                    if (userRoles.Contains("Admin"))
-                    {
-                        continue;
-                    }
-
-                    var canView = u.Id == currentUser.Id
-                                  || propertyIds.Count == 0
-                                  || accessiblePropertyIds.Overlaps(propertyIds);
-
-                    if (!canView)
-                    {
-                        continue;
-                    }
-                }
-
-                var canDelete = false;
-                if (isAdmin)
-                {
-                    canDelete = u.Id != currentUser.Id;
-                }
-                else
-                {
-                    if (u.Id != currentUser.Id && propertyIds.Any())
-                    {
-                        canDelete = propertyIds.All(pid => accessiblePropertyIds.Contains(pid));
-                    }
-                }
-
-                var vm = new UserWithAccessViewModel
-                {
-                    Id = u.Id,
-                    Email = u.Email ?? "",
-                    FirstName = u.FirstName,
-                    LastName = u.LastName,
-                    Roles = userRoles,
-                    PropertyIds = propertyIds,
-                    CanDelete = canDelete
-                };
-
-                vmList.Add(vm);
+                var invalidVm = await BuildAdminUsersViewModelAsync(currentUser, currentRoles, input);
+                return View(nameof(Users), invalidVm);
             }
 
-            return View(vmList);
+            var user = new ApplicationUser
+            {
+                UserName = input.Email!,
+                Email = input.Email!,
+                FirstName = input.FirstName!,
+                LastName = input.LastName!,
+                MobilePhone = input.MobilePhone,
+                PhoneNumber = input.MobilePhone,
+                MustChangePassword = true
+            };
+
+            var tempPassword = GenerateTemporaryPassword();
+            var result = await _userManager.CreateAsync(user, tempPassword);
+            if (!result.Succeeded)
+            {
+                foreach (var error in result.Errors)
+                {
+                    ModelState.AddModelError(string.Empty, error.Description);
+                }
+
+                var failedVm = await BuildAdminUsersViewModelAsync(currentUser, currentRoles, input);
+                return View(nameof(Users), failedVm);
+            }
+
+            foreach (var role in requestedRoles)
+            {
+                await _userManager.AddToRoleAsync(user, role);
+            }
+
+            if (selectedPropertyIds.Any())
+            {
+                var newAccesses = selectedPropertyIds.Select(pid => new UserPropertyAccess
+                {
+                    ApplicationUserId = user.Id,
+                    PropertyId = pid
+                });
+                _context.UserPropertyAccesses.AddRange(newAccesses);
+                await _context.SaveChangesAsync();
+            }
+
+            var loginUrl = Url.Page("/Account/Login", pageHandler: null, values: null, protocol: Request.Scheme) ?? string.Empty;
+            var message = $@"
+Hi {user.FirstName},<br/><br/>
+An account has been created for you on HotelOps.<br/>
+Use your email and the temporary password below to log in:<br/>
+<strong>Password:</strong> {tempPassword}<br/><br/>
+<a href=""{loginUrl}"">Log in to HotelOps</a><br/><br/>
+Please change your password after logging in.<br/><br/>
+HotelOps Admin Team
+";
+            await _emailSender.SendEmailAsync(user.Email!, "Your HotelOps account is ready", message);
+
+            TempData["AdminUsersMessage"] = $"Created user {user.Email} and sent a temporary password.";
+            return RedirectToAction(nameof(Users));
         }
 
         [HttpPost]
@@ -189,6 +302,95 @@ namespace hOps.web.Controllers
                 TempData["AdminUsersMessage"] = $"Deleted user {label}.";
             }
 
+            return RedirectToAction(nameof(Users));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetUserPassword(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                TempData["AdminUsersError"] = "Invalid user.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            if (string.Equals(currentUser.Id, userId, StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["AdminUsersError"] = "Use the Forgot Password option to reset your own password.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var targetUser = await _userManager.FindByIdAsync(userId);
+            if (targetUser == null)
+            {
+                TempData["AdminUsersError"] = "User not found.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var currentRoles = await _userManager.GetRolesAsync(currentUser);
+            var isAdmin = currentRoles.Contains("Admin");
+            var targetRoles = await _userManager.GetRolesAsync(targetUser);
+
+            if (!isAdmin)
+            {
+                if (targetRoles.Contains("Admin"))
+                {
+                    TempData["AdminUsersError"] = "You do not have permission to reset this user's password.";
+                    return RedirectToAction(nameof(Users));
+                }
+
+                var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(currentUser.Id);
+                var targetPropertyIds = await _context.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == targetUser.Id)
+                    .Select(upa => upa.PropertyId)
+                    .Distinct()
+                    .ToListAsync();
+
+                var canReset = targetPropertyIds.Count == 0 || accessiblePropertyIds.Overlaps(targetPropertyIds);
+                if (!canReset)
+                {
+                    TempData["AdminUsersError"] = "You do not have permission to reset this user's password.";
+                    return RedirectToAction(nameof(Users));
+                }
+            }
+
+            var tempPassword = GenerateTemporaryPassword();
+            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(targetUser);
+            var resetResult = await _userManager.ResetPasswordAsync(targetUser, resetToken, tempPassword);
+            if (!resetResult.Succeeded)
+            {
+                var error = resetResult.Errors.Select(e => e.Description).FirstOrDefault() ?? "Unable to reset password.";
+                TempData["AdminUsersError"] = error;
+                return RedirectToAction(nameof(Users));
+            }
+
+            targetUser.MustChangePassword = true;
+            await _userManager.UpdateAsync(targetUser);
+
+            var loginUrl = Url.Page("/Account/Login", pageHandler: null, values: null, protocol: Request.Scheme) ?? string.Empty;
+            var message = $@"
+Hi {targetUser.FirstName},<br/><br/>
+Your HotelOps password was reset by an administrator.<br/>
+Use this temporary password to sign in:<br/>
+<strong>Password:</strong> {tempPassword}<br/><br/>
+<a href=""{loginUrl}"">Log in to HotelOps</a><br/><br/>
+Please change your password after logging in. If you did not expect this update, contact your administrator immediately.<br/><br/>
+HotelOps Admin Team
+";
+            if (!string.IsNullOrWhiteSpace(targetUser.Email))
+            {
+                await _emailSender.SendEmailAsync(targetUser.Email, "HotelOps password reset", message);
+            }
+
+            var targetLabel = targetUser.Email ?? targetUser.UserName ?? "user";
+            TempData["AdminUsersMessage"] = $"Password reset and email sent to {targetLabel}.";
             return RedirectToAction(nameof(Users));
         }
 
@@ -386,6 +588,148 @@ namespace hOps.web.Controllers
             }
 
             return RedirectToAction(nameof(Users));
+        }
+
+        private async Task<AdminUsersPageViewModel> BuildAdminUsersViewModelAsync(
+            ApplicationUser currentUser,
+            IList<string> currentRoles,
+            AdminCreateUserInputModel? formInput)
+        {
+            var isAdmin = currentRoles.Contains("Admin");
+            HashSet<int> accessiblePropertyIds = new();
+            if (!isAdmin)
+            {
+                accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(currentUser.Id);
+            }
+
+            var users = await _userManager.Users
+                .OrderBy(u => u.Email)
+                .ToListAsync();
+            var userIds = users.Select(u => u.Id).ToList();
+
+            var propertyAccesses = await _context.UserPropertyAccesses
+                .Where(upa => userIds.Contains(upa.ApplicationUserId))
+                .ToListAsync();
+
+            var propertiesByUser = propertyAccesses
+                .GroupBy(upa => upa.ApplicationUserId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.PropertyId).ToList());
+
+            var userViewModels = new List<UserWithAccessViewModel>();
+
+            foreach (var u in users)
+            {
+                var propertyIds = propertiesByUser.TryGetValue(u.Id, out var ids)
+                    ? ids
+                    : new List<int>();
+                var roles = (await _userManager.GetRolesAsync(u)).ToList();
+
+                if (!isAdmin)
+                {
+                    if (roles.Contains("Admin"))
+                    {
+                        continue;
+                    }
+
+                    var canView = u.Id == currentUser.Id
+                                  || propertyIds.Count == 0
+                                  || accessiblePropertyIds.Overlaps(propertyIds);
+                    if (!canView)
+                    {
+                        continue;
+                    }
+                }
+
+                var canDelete = false;
+                if (isAdmin)
+                {
+                    canDelete = u.Id != currentUser.Id;
+                }
+                else if (u.Id != currentUser.Id && propertyIds.Any())
+                {
+                    canDelete = propertyIds.All(pid => accessiblePropertyIds.Contains(pid));
+                }
+
+                var canReset = false;
+                if (isAdmin)
+                {
+                    canReset = u.Id != currentUser.Id;
+                }
+                else if (u.Id != currentUser.Id && !roles.Contains("Admin"))
+                {
+                    canReset = propertyIds.Count == 0 || accessiblePropertyIds.Overlaps(propertyIds);
+                }
+
+                userViewModels.Add(new UserWithAccessViewModel
+                {
+                    Id = u.Id,
+                    Email = u.Email ?? string.Empty,
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+                    Roles = roles,
+                    PropertyIds = propertyIds,
+                    CanDelete = canDelete,
+                    CanResetPassword = canReset
+                });
+            }
+
+            var propertyQuery = _context.Properties.AsQueryable();
+            if (!isAdmin)
+            {
+                if (accessiblePropertyIds.Count == 0)
+                {
+                    propertyQuery = propertyQuery.Where(p => false);
+                }
+                else
+                {
+                    propertyQuery = propertyQuery.Where(p => accessiblePropertyIds.Contains(p.Id));
+                }
+            }
+
+            var propertyOptions = await propertyQuery
+                .OrderBy(p => p.Name)
+                .Select(p => new AdminPropertyOptionViewModel
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Code = p.Code
+                })
+                .ToListAsync();
+
+            var propertyNameLookup = propertyOptions.ToDictionary(p => p.Id, p => p.DisplayLabel);
+
+            var availableRoles = await _roleManager.Roles
+                .Where(r => r.Name != null)
+                .Select(r => r.Name!)
+                .OrderBy(r => r)
+                .ToListAsync();
+
+            if (!isAdmin)
+            {
+                availableRoles = availableRoles
+                    .Where(r => !string.Equals(r, "Admin", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            return new AdminUsersPageViewModel
+            {
+                Users = userViewModels,
+                CreateUser = formInput ?? new AdminCreateUserInputModel(),
+                AvailableProperties = propertyOptions,
+                AvailableRoles = availableRoles,
+                PropertyNameLookup = propertyNameLookup,
+                CanManageRoles = isAdmin || currentRoles.Contains("Manager")
+            };
+        }
+
+        private async Task<HashSet<int>> GetAccessiblePropertyIdsAsync(string applicationUserId)
+        {
+            return (await _context.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == applicationUserId)
+                    .Select(upa => upa.PropertyId)
+                    .Distinct()
+                    .ToListAsync())
+                .ToHashSet();
         }
 
         public async Task<IActionResult> AccessRequests()
