@@ -885,6 +885,8 @@
             padding: 1rem;
             display: none;
             z-index: 1300;
+            max-height: min(70vh, 480px);
+            overflow-y: auto;
         }
 
         .layout-room-menu.show {
@@ -1130,13 +1132,27 @@
                 const rect = tile.getBoundingClientRect();
                 const menuWidth = roomMenu.offsetWidth || 320;
                 const viewportWidth = document.documentElement.clientWidth;
-                const top = window.scrollY + rect.bottom + 8;
-                let left = window.scrollX + rect.left;
-                if (left + menuWidth > window.scrollX + viewportWidth - 16) {
-                    left = Math.max(16, window.scrollX + viewportWidth - menuWidth - 16);
+                const viewportHeight = document.documentElement.clientHeight;
+                const scrollX = window.scrollX || window.pageXOffset || 0;
+                const scrollY = window.scrollY || window.pageYOffset || 0;
+                const gutter = 16;
+                const menuHeight = roomMenu.offsetHeight || 0;
+                const spaceBelow = viewportHeight - rect.bottom;
+                const spaceAbove = rect.top;
+                let top = scrollY + rect.bottom + 8;
+                if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+                    top = scrollY + rect.top - menuHeight - 8;
+                }
+                const maxTop = scrollY + viewportHeight - menuHeight - gutter;
+                const minTop = scrollY + gutter;
+                top = Math.min(Math.max(top, minTop), Math.max(minTop, maxTop));
+                let left = scrollX + rect.left;
+                if (left + menuWidth > scrollX + viewportWidth - gutter) {
+                    left = Math.max(gutter, scrollX + viewportWidth - menuWidth - gutter);
                 }
                 roomMenu.style.top = `${top}px`;
                 roomMenu.style.left = `${left}px`;
+                roomMenu.style.maxHeight = `${Math.max(260, viewportHeight - gutter * 2)}px`;
             };
 
             const renderWorkOrders = (items) => {
