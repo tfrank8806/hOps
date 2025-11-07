@@ -1306,20 +1306,21 @@
                 if (!modalInstance || !workOrderForm || !currentRoom?.roomNumber) {
                     return;
                 }
-                closeRoomMenu();
+
+                const selectedRoom = { ...currentRoom };
                 workOrderForm.reset();
                 if (propertyInput && propertyId > 0) {
                     propertyInput.value = propertyId.toString();
                 }
                 if (roomNumberInput) {
-                    roomNumberInput.value = currentRoom.roomNumber;
+                    roomNumberInput.value = selectedRoom.roomNumber;
                 }
                 if (roomLabelInput) {
-                    roomLabelInput.value = currentRoom.roomLabel ?? currentRoom.roomNumber;
+                    roomLabelInput.value = selectedRoom.roomLabel ?? selectedRoom.roomNumber;
                 }
                 if (roomDisplay) {
-                    const label = currentRoom.roomLabel ?? currentRoom.roomNumber ?? 'Selected Room';
-                    const floor = currentRoom.floor ? `Floor ${currentRoom.floor}` : '';
+                    const label = selectedRoom.roomLabel ?? selectedRoom.roomNumber ?? 'Selected Room';
+                    const floor = selectedRoom.floor ? `Floor ${selectedRoom.floor}` : '';
                     roomDisplay.textContent = floor ? `${label} · ${floor}` : label;
                 }
                 if (dueDateInput) {
@@ -1330,6 +1331,7 @@
                     formStatus.textContent = '';
                     formStatus.classList.remove('alert-success', 'alert-danger');
                 }
+                closeRoomMenu();
                 modalInstance.show();
                 issueInput?.focus();
             });
