@@ -67,9 +67,16 @@
                         </div>
                     </div>
                     <div class="d-flex flex-wrap align-items-center gap-2 justify-content-start justify-content-lg-end logs-editor-actions">
-                        <div class="btn-group" role="group">
+                        <div class="btn-group" role="group" aria-label="Row actions">
                             <button class="btn btn-outline-secondary btn-sm" id="addRowBtn" type="button" disabled>Add Row</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="insertRowBtn" type="button" disabled>Insert Row</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="deleteRowBtn" type="button" disabled>Delete Row</button>
+                        </div>
+                        <div class="btn-group" role="group" aria-label="Column actions">
                             <button class="btn btn-outline-secondary btn-sm" id="addColumnBtn" type="button" disabled>Add Column</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="deleteColumnBtn" type="button" disabled>Delete Column</button>
+                        </div>
+                        <div class="btn-group" role="group" aria-label="Log actions">
                             <button class="btn btn-outline-secondary btn-sm" id="clearLogBtn" type="button" disabled>Clear</button>
                             <button class="btn btn-outline-secondary btn-sm" id="undoBtn" type="button" disabled>Undo</button>
                         </div>
@@ -86,6 +93,7 @@
                         <button class="btn btn-outline-success btn-sm" id="exportExcelBtn" type="button" disabled>Export Excel</button>
                         <button class="btn btn-outline-primary btn-sm" id="viewAuditLogBtn" type="button" disabled>View History</button>
                         <div class="btn-group" role="group">
+                            <button class="btn btn-outline-secondary btn-sm" id="renameLogBtn" type="button" disabled>Rename</button>
                             <button class="btn btn-outline-secondary btn-sm" id="duplicateLogBtn" type="button" disabled>Duplicate</button>
                             <button class="btn btn-outline-danger btn-sm" id="deleteLogBtn" type="button" disabled>Delete</button>
                         </div>
@@ -122,6 +130,16 @@
                                     <option value="20px">20</option>
                                     <option value="24px">24</option>
                                 </select>
+                                <div class="d-flex align-items-center gap-2 number-format-control">
+                                    <label class="form-label form-label-sm mb-0 text-muted" for="numberFormatSelect">Format</label>
+                                    <select class="form-select form-select-sm" id="numberFormatSelect" disabled aria-label="Number format">
+                                        <option value="" disabled hidden>Mixed Selection</option>
+                                        <option value="general" selected>General</option>
+                                        <option value="number">Number</option>
+                                        <option value="currency">Currency</option>
+                                        <option value="percent">Percentage</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="btn-group" role="group" aria-label="Alignment">
                                 <button class="btn btn-outline-secondary btn-sm" type="button" id="alignLeftBtn" disabled title="Align left">

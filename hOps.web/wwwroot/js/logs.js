@@ -12,7 +12,10 @@
     const spreadsheetTableEl = document.getElementById('spreadsheetTable');
     const spreadsheetPlaceholderEl = document.getElementById('spreadsheetPlaceholder');
     const addRowButton = document.getElementById('addRowBtn');
+    const insertRowButton = document.getElementById('insertRowBtn');
+    const deleteRowButton = document.getElementById('deleteRowBtn');
     const addColumnButton = document.getElementById('addColumnBtn');
+    const deleteColumnButton = document.getElementById('deleteColumnBtn');
     const clearLogButton = document.getElementById('clearLogBtn');
     const createLogForm = document.getElementById('createLogForm');
     const logNameInput = document.getElementById('logNameInput');
@@ -20,6 +23,7 @@
     const importLogInput = document.getElementById('importLogInput');
     const duplicateLogButton = document.getElementById('duplicateLogBtn');
     const deleteLogButton = document.getElementById('deleteLogBtn');
+    const renameLogButton = document.getElementById('renameLogBtn');
     const viewAuditLogButton = document.getElementById('viewAuditLogBtn');
     const auditLogModalElement = document.getElementById('auditLogModal');
     const auditLogListElement = document.getElementById('auditLogList');
@@ -47,6 +51,7 @@
     const borderStyleSelect = document.getElementById('borderStyleSelect');
     const borderColorInput = document.getElementById('borderColorInput');
     const clearBorderButton = document.getElementById('clearBorderBtn');
+    const numberFormatSelect = document.getElementById('numberFormatSelect');
     const exportExcelButton = document.getElementById('exportExcelBtn');
     const undoButton = document.getElementById('undoBtn');
     const zoomInButton = document.getElementById('zoomInBtn');
@@ -87,6 +92,8 @@
         lookup[`${config.width} ${config.style}`] = key;
         return lookup;
     }, {});
+    const DEFAULT_CURRENCY_CODE = getDefaultCurrencyCode();
+    const numberFormatterCache = new Map();
     const LG_BREAKPOINT = 992;
 
     if (!logListEl) {
@@ -117,6 +124,7 @@
         align: '',
         fontSize: '',
         fontFamily: '',
+        numberFormat: 'general',
         textColor: '#000000',
         fillColor: '#FFFFFF',
         borderStyle: '',
@@ -138,6 +146,24 @@
             return 0;
         }
         return ((value % modulus) + modulus) % modulus;
+    }
+
+    function getDefaultCurrencyCode() {
+        const candidates = [];
+        if (typeof window !== 'undefined' && window.hOps && typeof window.hOps.currencyCode === 'string') {
+            candidates.push(window.hOps.currencyCode);
+        }
+        const docCurrency = document.documentElement?.dataset?.currency;
+        if (typeof docCurrency === 'string') {
+            candidates.push(docCurrency);
+        }
+        for (const candidate of candidates) {
+            const code = candidate.trim().toUpperCase();
+            if (/^[A-Z]{3}$/.test(code)) {
+                return code;
+            }
+        }
+        return 'USD';
     }
 
     function cloneFormat(format) {
@@ -315,6 +341,12 @@
         }
         if (typeof format.fontFamily === 'string' && format.fontFamily.trim().length) {
             normalized.fontFamily = format.fontFamily.trim();
+        }
+        if (typeof format.numberFormat === 'string') {
+            const formatKey = format.numberFormat.trim().toLowerCase();
+            if (['number', 'currency', 'percent'].includes(formatKey)) {
+                normalized.numberFormat = formatKey;
+            }
         }
         if (typeof format.align === 'string' && ['left', 'center', 'right'].includes(format.align)) {
             normalized.align = format.align;
@@ -679,6 +711,10 @@
             deleteLogButton.disabled = !hasLog;
         }
 
+        if (renameLogButton) {
+            renameLogButton.disabled = !hasLog;
+        }
+
         if (viewAuditLogButton) {
             if (!hasLog) {
                 viewAuditLogButton.disabled = true;
@@ -760,7 +796,10 @@
         logTitleEl.textContent = log.name;
         logSubtitleEl.textContent = 'Changes are saved automatically in this browser.';
         addRowButton.disabled = false;
+        insertRowButton.disabled = false;
+        deleteRowButton.disabled = false;
         addColumnButton.disabled = false;
+        deleteColumnButton.disabled = false;
         clearLogButton.disabled = false;
         if (exportExcelButton) {
             exportExcelButton.disabled = typeof XLSX === 'undefined';
@@ -778,7 +817,10 @@
         logTitleEl.textContent = 'Select a log';
         logSubtitleEl.textContent = 'Choose or create a log to start editing.';
         addRowButton.disabled = true;
+        insertRowButton.disabled = true;
+        deleteRowButton.disabled = true;
         addColumnButton.disabled = true;
+        deleteColumnButton.disabled = true;
         clearLogButton.disabled = true;
         if (exportExcelButton) {
             exportExcelButton.disabled = true;
@@ -1296,14 +1338,86 @@
 
     function getCellDisplayValue(log, row, column) {
         const value = evaluateCellValue(log, row, column, new Set());
+        const cellFormat = log.data[row]?.[column]?.format;
+        return formatDisplayValue(value, cellFormat);
+    }
+
+    function formatDisplayValue(value, format = {}) {
         if (value == null) {
             return '';
         }
+        const numberFormat = typeof format?.numberFormat === 'string' ? format.numberFormat : '';
+        if (numberFormat && numberFormat !== 'general') {
+            const formatted = formatNumericValue(value, numberFormat);
+            if (formatted !== null) {
+                return formatted;
+            }
+        }
         if (typeof value === 'number') {
-            const rounded = Number(value.toPrecision(12));
-            return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+            return formatGeneralNumber(value);
         }
         return value;
+    }
+
+    function formatNumericValue(value, formatKey) {
+        const numericValue = typeof value === 'number' ? value : Number(value);
+        if (!Number.isFinite(numericValue)) {
+            return typeof value === 'string' ? value : null;
+        }
+        switch (formatKey) {
+            case 'number':
+                return getNumberFormatter('number').format(numericValue);
+            case 'currency':
+                return getNumberFormatter('currency').format(numericValue);
+            case 'percent':
+                return getNumberFormatter('percent').format(numericValue);
+            default:
+                return formatGeneralNumber(numericValue);
+        }
+    }
+
+    function formatGeneralNumber(value) {
+        if (!Number.isFinite(value)) {
+            return '';
+        }
+        const rounded = Number(value.toPrecision(12));
+        return String(rounded);
+    }
+
+    function getNumberFormatter(key) {
+        if (numberFormatterCache.has(key)) {
+            return numberFormatterCache.get(key);
+        }
+        let formatter;
+        switch (key) {
+            case 'number':
+                formatter = new Intl.NumberFormat(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 4,
+                    useGrouping: true
+                });
+                break;
+            case 'currency':
+                formatter = new Intl.NumberFormat(undefined, {
+                    style: 'currency',
+                    currency: DEFAULT_CURRENCY_CODE,
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+                break;
+            case 'percent':
+                formatter = new Intl.NumberFormat(undefined, {
+                    style: 'percent',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2
+                });
+                break;
+            default:
+                formatter = new Intl.NumberFormat();
+                break;
+        }
+        numberFormatterCache.set(key, formatter);
+        return formatter;
     }
 
     function renderSpreadsheet(log) {
@@ -1380,6 +1494,112 @@
         }
         if (!log.data[row][column]) {
             log.data[row][column] = createCell();
+        }
+    }
+
+    function getActiveRowRange(log) {
+        if (selectionRange) {
+            return {
+                startRow: clamp(selectionRange.startRow, 0, Math.max(0, log.data.length - 1)),
+                endRow: clamp(selectionRange.endRow, 0, Math.max(0, log.data.length - 1))
+            };
+        }
+        const totalRows = Math.max(log.data.length, 1);
+        const lastRow = totalRows - 1;
+        return { startRow: lastRow, endRow: lastRow };
+    }
+
+    function getActiveColumnRange(log) {
+        const totalColumns = Math.max(log.data[0]?.length ?? 0, 1);
+        if (selectionRange) {
+            return {
+                startColumn: clamp(selectionRange.startColumn, 0, totalColumns - 1),
+                endColumn: clamp(selectionRange.endColumn, 0, totalColumns - 1)
+            };
+        }
+        const lastColumn = totalColumns - 1;
+        return { startColumn: lastColumn, endColumn: lastColumn };
+    }
+
+    function removeMergesIntersectingRows(log, startRow, endRow) {
+        if (!log) {
+            return;
+        }
+        for (let row = 0; row < log.data.length; row++) {
+            const rowData = log.data[row];
+            if (!Array.isArray(rowData)) {
+                continue;
+            }
+            for (let column = 0; column < rowData.length; column++) {
+                const cell = rowData[column];
+                if (!cell?.format?.merge) {
+                    continue;
+                }
+                const mergeEndRow = row + cell.format.merge.rowSpan - 1;
+                if (mergeEndRow < startRow || row > endRow) {
+                    continue;
+                }
+                unmergeCell(row, column);
+            }
+        }
+    }
+
+    function removeMergesIntersectingColumns(log, startColumn, endColumn) {
+        if (!log) {
+            return;
+        }
+        for (let row = 0; row < log.data.length; row++) {
+            const rowData = log.data[row];
+            if (!Array.isArray(rowData)) {
+                continue;
+            }
+            for (let column = 0; column < rowData.length; column++) {
+                const cell = rowData[column];
+                if (!cell?.format?.merge) {
+                    continue;
+                }
+                const mergeEndColumn = column + cell.format.merge.colSpan - 1;
+                if (mergeEndColumn < startColumn || column > endColumn) {
+                    continue;
+                }
+                unmergeCell(row, column);
+            }
+        }
+    }
+
+    function shiftMergedIntoRows(log, startIndex, delta) {
+        if (!log || !Number.isInteger(delta) || delta === 0) {
+            return;
+        }
+        for (let row = 0; row < log.data.length; row++) {
+            const rowData = log.data[row];
+            if (!Array.isArray(rowData)) {
+                continue;
+            }
+            for (let column = 0; column < rowData.length; column++) {
+                const cell = rowData[column];
+                if (cell?.format?.mergedInto && cell.format.mergedInto.row >= startIndex) {
+                    cell.format.mergedInto.row = Math.max(0, cell.format.mergedInto.row + delta);
+                }
+            }
+        }
+    }
+
+    function shiftMergedIntoColumns(log, startIndex, delta) {
+        if (!log || !Number.isInteger(delta) || delta === 0) {
+            return;
+        }
+        for (let row = 0; row < log.data.length; row++) {
+            const rowData = log.data[row];
+            if (!Array.isArray(rowData)) {
+                continue;
+            }
+            for (let column = 0; column < rowData.length; column++) {
+                const cell = rowData[column];
+                if (cell?.format?.mergedInto && cell.format.mergedInto.column >= startIndex) {
+                    cell.format.mergedInto.column = Math.max(0, cell.format.mergedInto.column + delta);
+                }
+            }
         }
     }
 
@@ -1938,6 +2158,61 @@
         renderSpreadsheet(log);
     }
 
+    function insertRow() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        pushUndoState();
+        const columnCount = log.data[0]?.length ?? defaultColumns;
+        const selectionColumn = selectionRange ? selectionRange.startColumn : 0;
+        const targetRange = getActiveRowRange(log);
+        const insertIndex = targetRange.startRow;
+        const newRow = Array.from({ length: columnCount }, () => createCell());
+        log.data.splice(insertIndex, 0, newRow);
+        shiftMergedIntoRows(log, insertIndex, 1);
+        recordAudit(log, 'Inserted row', `Inserted row ${insertIndex + 1}.`);
+        persistLogs();
+        renderSpreadsheet(log);
+        const maxColumn = Math.max((log.data[0]?.length ?? 1) - 1, 0);
+        const nextColumn = clamp(selectionColumn, 0, maxColumn);
+        anchorCell = { row: insertIndex, column: nextColumn };
+        setSelection(insertIndex, nextColumn, insertIndex, nextColumn);
+    }
+
+    function deleteSelectedRows() {
+        const log = getCurrentLog();
+        if (!log || !log.data.length) {
+            return;
+        }
+        const targetRange = getActiveRowRange(log);
+        const rowCount = targetRange.endRow - targetRange.startRow + 1;
+        if (rowCount <= 0) {
+            return;
+        }
+        pushUndoState();
+        const selectionColumn = selectionRange ? selectionRange.startColumn : 0;
+        removeMergesIntersectingRows(log, targetRange.startRow, targetRange.endRow);
+        for (let row = targetRange.endRow; row >= targetRange.startRow; row--) {
+            log.data.splice(row, 1);
+        }
+        if (!log.data.length) {
+            log.data = createEmptyData();
+        }
+        shiftMergedIntoRows(log, targetRange.endRow + 1, -rowCount);
+        const detail = rowCount === 1
+            ? `Deleted row ${targetRange.startRow + 1}.`
+            : `Deleted rows ${targetRange.startRow + 1}-${targetRange.endRow + 1}.`;
+        recordAudit(log, 'Deleted rows', detail);
+        persistLogs();
+        renderSpreadsheet(log);
+        const nextRow = Math.max(0, Math.min(targetRange.startRow, log.data.length - 1));
+        const maxColumn = Math.max((log.data[0]?.length ?? 1) - 1, 0);
+        const nextColumn = clamp(selectionColumn, 0, maxColumn);
+        anchorCell = { row: nextRow, column: nextColumn };
+        setSelection(nextRow, nextColumn, nextRow, nextColumn);
+    }
+
     function addColumn() {
         const log = getCurrentLog();
         if (!log) {
@@ -1961,6 +2236,47 @@
         recordAudit(log, 'Added column', `Added column ${columnLabel(newColumnIndex)}.`);
         persistLogs();
         renderSpreadsheet(log);
+    }
+
+    function deleteSelectedColumns() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const columnCount = log.data[0]?.length ?? 0;
+        if (!columnCount) {
+            return;
+        }
+        const targetRange = getActiveColumnRange(log);
+        const removeCount = targetRange.endColumn - targetRange.startColumn + 1;
+        if (removeCount <= 0) {
+            return;
+        }
+        pushUndoState();
+        const selectionRow = selectionRange ? selectionRange.startRow : 0;
+        removeMergesIntersectingColumns(log, targetRange.startColumn, targetRange.endColumn);
+        for (let row = 0; row < log.data.length; row++) {
+            const rowData = log.data[row] ?? [];
+            for (let column = targetRange.endColumn; column >= targetRange.startColumn; column--) {
+                if (column < rowData.length) {
+                    rowData.splice(column, 1);
+                }
+            }
+            if (!rowData.length) {
+                rowData.push(createCell());
+            }
+        }
+        shiftMergedIntoColumns(log, targetRange.endColumn + 1, -removeCount);
+        const detail = removeCount === 1
+            ? `Deleted column ${columnLabel(targetRange.startColumn)}.`
+            : `Deleted columns ${columnLabel(targetRange.startColumn)}-${columnLabel(targetRange.endColumn)}.`;
+        recordAudit(log, 'Deleted columns', detail);
+        persistLogs();
+        renderSpreadsheet(log);
+        const nextRow = clamp(selectionRow, 0, Math.max(log.data.length - 1, 0));
+        const nextColumn = clamp(targetRange.startColumn, 0, Math.max((log.data[0]?.length ?? 1) - 1, 0));
+        anchorCell = { row: nextRow, column: nextColumn };
+        setSelection(nextRow, nextColumn, nextRow, nextColumn);
     }
 
     function clearCurrentLog() {
@@ -2068,6 +2384,26 @@
         } finally {
             target.value = '';
         }
+    }
+
+    function renameLog(logId = currentLogId) {
+        const log = logs.find((entry) => entry.id === logId);
+        if (!log) {
+            return;
+        }
+        const currentName = log.name ?? 'Untitled Log';
+        const nextName = window.prompt('Rename log', currentName);
+        if (nextName == null) {
+            return;
+        }
+        const trimmed = nextName.trim();
+        if (!trimmed || trimmed === currentName) {
+            return;
+        }
+        log.name = trimmed;
+        recordAudit(log, 'Log renamed', `Renamed to "${trimmed}".`);
+        persistLogs();
+        selectLog(log.id);
     }
 
     function duplicateLog(logId = currentLogId) {
@@ -2664,6 +3000,7 @@
             underlineButton,
             fontSizeSelect,
             fontFamilySelect,
+            numberFormatSelect,
             alignLeftButton,
             alignCenterButton,
             alignRightButton,
@@ -2704,6 +3041,7 @@
         const fontFamilyState = getUniformFormatValue('fontFamily');
         const textColorState = getUniformFormatValue('textColor');
         const fillColorState = getUniformFormatValue('fillColor');
+        const numberFormatState = getUniformFormatValue('numberFormat');
         const borderState = getUniformFormatValue('border');
 
         const boldActive = boldState === null ? !!formattingMemory.bold : boldState === undefined ? false : !!boldState;
@@ -2744,6 +3082,20 @@
         }
         if (fontFamilySelect) {
             fontFamilySelect.value = fontFamilyValue || '';
+        }
+
+        let numberFormatValue = '';
+        if (typeof numberFormatState === 'string' && numberFormatState.length) {
+            numberFormatValue = numberFormatState;
+            formattingMemory.numberFormat = numberFormatState;
+        } else if (numberFormatState === null) {
+            numberFormatValue = 'general';
+            formattingMemory.numberFormat = 'general';
+        } else {
+            numberFormatValue = '';
+        }
+        if (numberFormatSelect) {
+            numberFormatSelect.value = numberFormatValue;
         }
 
         let alignValue = '';
@@ -2978,6 +3330,22 @@
         });
     }
 
+    function refreshSelectionDisplayValues(range) {
+        if (!range) {
+            return;
+        }
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        forEachCellInSelection(range, ({ row, column }) => {
+            const cellEl = getCellElement(row, column);
+            if (cellEl && cellEl.dataset.editing !== 'true') {
+                cellEl.textContent = getCellDisplayValue(log, row, column);
+            }
+        }, { includeHidden: true });
+    }
+
     function toggleFormat(key) {
         if (!selectionRange) {
             return;
@@ -3129,6 +3497,54 @@
         recordAudit(log, actionTitle, `${actionTitle} for ${describeSelection(selectionRange)}.`);
         persistLogs();
         formattingMemory.fontFamily = normalizedFamily;
+        updateSelectedCellStyles();
+        updateToolbarState();
+    }
+
+    function setNumberFormat(formatKey) {
+        if (!selectionRange) {
+            return;
+        }
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const normalizedKey = (formatKey || '').toLowerCase();
+        const allowed = new Set(['number', 'currency', 'percent']);
+        const appliedKey = allowed.has(normalizedKey) ? normalizedKey : 'general';
+        pushUndoState();
+        let changed = false;
+        forEachCellInSelection(selectionRange, ({ cellData }) => {
+            cellData.format = cellData.format || {};
+            const current = cellData.format.numberFormat || '';
+            if (appliedKey === 'general') {
+                if (current) {
+                    delete cellData.format.numberFormat;
+                    changed = true;
+                }
+            } else if (current !== appliedKey) {
+                cellData.format.numberFormat = appliedKey;
+                changed = true;
+            }
+        });
+        if (!changed) {
+            const history = logHistory.get(log.id);
+            history?.pop();
+            updateUndoButtonState();
+            return;
+        }
+        const labelMap = {
+            number: 'number format',
+            currency: 'currency format',
+            percent: 'percentage format'
+        };
+        const actionTitle = appliedKey === 'general'
+            ? 'Cleared number format'
+            : `Applied ${labelMap[appliedKey] ?? appliedKey}`;
+        recordAudit(log, 'Updated number format', `${actionTitle} for ${describeSelection(selectionRange)}.`);
+        persistLogs();
+        formattingMemory.numberFormat = appliedKey;
+        refreshSelectionDisplayValues(selectionRange);
         updateSelectedCellStyles();
         updateToolbarState();
     }
@@ -3620,7 +4036,10 @@
     }
 
     addRowButton?.addEventListener('click', addRow);
+    insertRowButton?.addEventListener('click', insertRow);
+    deleteRowButton?.addEventListener('click', deleteSelectedRows);
     addColumnButton?.addEventListener('click', addColumn);
+    deleteColumnButton?.addEventListener('click', deleteSelectedColumns);
     clearLogButton?.addEventListener('click', clearCurrentLog);
 
     boldButton?.addEventListener('click', () => toggleFormat('bold'));
@@ -3641,6 +4060,12 @@
         const target = event.target;
         if (target instanceof HTMLSelectElement) {
             setFontFamily(target.value);
+        }
+    });
+    numberFormatSelect?.addEventListener('change', (event) => {
+        const target = event.target;
+        if (target instanceof HTMLSelectElement) {
+            setNumberFormat(target.value);
         }
     });
 
@@ -3698,6 +4123,7 @@
 
     duplicateLogButton?.addEventListener('click', () => duplicateLog());
     deleteLogButton?.addEventListener('click', () => deleteLog());
+    renameLogButton?.addEventListener('click', () => renameLog());
     viewAuditLogButton?.addEventListener('click', openAuditLogModal);
     toggleSidebarButton?.addEventListener('click', handleSidebarToggle);
     closeSidebarButton?.addEventListener('click', closeSidebar);

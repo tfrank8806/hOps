@@ -104,6 +104,10 @@
     white-space: nowrap;
 }
 
+.number-format-control select {
+    min-width: 140px;
+}
+
 @media (min-width: 992px) {
     .logs-sidebar {
         position: relative;
@@ -350,6 +354,14 @@
     min-width: calc(120px * var(--spreadsheet-zoom-scale));
     max-width: calc(200px * var(--spreadsheet-zoom-scale));
     overflow-wrap: anywhere;
+}
+
+.spreadsheet-table tbody tr:nth-child(odd) td {
+    background-color: #ffffff;
+}
+
+.spreadsheet-table tbody tr:nth-child(even) td {
+    background-color: #f9fbff;
 }
 
 .spreadsheet-table tbody td:focus {
