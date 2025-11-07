@@ -1,6 +1,48 @@
-﻿@{
+@using System.Linq
+@using hOps.web.Models
+@{
     ViewData["Title"] = "Admin Dashboard";
-}
-<h2>Admin Dashboard</h2>
+    var currentProperty = ViewBag.CurrentProperty as Property;
+    var propertyId = currentProperty?.Id;
 
-<p>Welcome to the admin control panel. Use the dropdown above to manage users, access requests, and settings.</p>
+    var roomsUrl = propertyId.HasValue
+        ? Url.Action("Rooms", "Settings", new { propertyId = propertyId.Value })
+        : Url.Action("Rooms", "Settings");
+
+    var layoutUrl = propertyId.HasValue
+        ? Url.Action("LayoutEditor", "Settings", new { propertyId = propertyId.Value, floor = 1 })
+        : Url.Action("LayoutEditor", "Settings");
+
+    var links = new[]
+    {
+        new { Title = "Access Requests", Description = "Review and approve pending property access requests.", Url = Url.Action("AccessRequests", "Admin") },
+        new { Title = "Manage Users", Description = "Invite, edit, and deactivate user accounts.", Url = Url.Action("Users", "Admin") },
+        new { Title = "Departments", Description = "Configure departments for routing work orders and tasks.", Url = Url.Action("Departments", "Settings") },
+        new { Title = "Work Order Types", Description = "Add or edit work order issue types and categories.", Url = Url.Action("WorkOrderTypes", "Settings") },
+        new { Title = "Rooms Editor", Description = "Maintain the list of rooms for the selected property.", Url = roomsUrl },
+        new { Title = "Phonebook Types", Description = "Customize phonebook categories and labels.", Url = Url.Action("PhonebookTypes", "Settings") },
+        new { Title = "Calendar Categories", Description = "Manage calendar event labels and colors.", Url = Url.Action("CalendarCategories", "Settings") },
+        new { Title = "Layout Editor", Description = "Design the property layout for use across dashboards.", Url = layoutUrl },
+        new { Title = "Properties", Description = "Create or edit properties and global settings.", Url = Url.Action("Index", "Properties") }
+    }.Where(link => !string.IsNullOrWhiteSpace(link.Url)).ToList();
+}
+<h2 class="mb-4">Admin Dashboard</h2>
+
+<p class="text-muted">Quick links to the most common admin tools.</p>
+
+<div class="row g-4">
+    @foreach (var link in links)
+    {
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body d-flex flex-column">
+                    <h3 class="h5">@link.Title</h3>
+                    <p class="text-muted flex-grow-1 mb-3">@link.Description</p>
+                    <a class="btn btn-primary align-self-start" href="@link.Url">Open</a>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+
