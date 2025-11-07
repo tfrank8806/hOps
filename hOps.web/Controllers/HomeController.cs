@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace hOps.web.Controllers
@@ -25,18 +26,21 @@ namespace hOps.web.Controllers
         private readonly MentionService _mentionService;
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<HomeController> _logger;
+        private readonly IConfiguration _configuration;
 
         public HomeController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             MentionService mentionService,
             IWebHostEnvironment environment,
+            IConfiguration configuration,
             ILogger<HomeController> logger)
             : base(context, userManager)
         {
             _mentionService = mentionService;
             _environment = environment;
             _logger = logger;
+            _configuration = configuration;
         }
 
         public async Task<IActionResult> Index()
@@ -72,6 +76,7 @@ namespace hOps.web.Controllers
             await PopulatePassOnLogsAsync(viewModel, propertyId, user.Id);
             await PopulatePackageLogAsync(viewModel, propertyId);
             await PopulateUpcomingEventsAsync(viewModel, propertyId);
+            await PopulateQuickWorkOrderOptionsAsync(viewModel, propertyId);
 
             return View(viewModel);
         }
@@ -599,6 +604,7 @@ namespace hOps.web.Controllers
                     LayoutId = entry.Layout.Id,
                     RoomId = hasRoom ? entry.Room!.Id : 0,
                     RoomNumber = displayLabel,
+                    LocationKey = hasRoom ? entry.Room!.RoomNumber : null,
                     RoomType = hasRoom ? entry.Room!.RoomType : (isConnector ? "Connector" : string.Empty),
                     Floor = entry.Layout.Floor,
                     X = entry.Layout.X,
@@ -661,6 +667,30 @@ namespace hOps.web.Controllers
                 .OrderBy(t => t.Floor)
                 .ThenBy(t => t.RoomNumber, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        private async Task PopulateQuickWorkOrderOptionsAsync(HomeIndexViewModel viewModel, int propertyId)
+        {
+            viewModel.WorkOrderTypeOptions = await _context.WorkOrderTypes
+                .Where(t => !t.PropertyId.HasValue || t.PropertyId.Value == propertyId)
+                .OrderBy(t => t.Name)
+                .Select(t => new QuickSelectOptionViewModel
+                {
+                    Id = t.Id,
+                    Name = t.Name
+                })
+                .ToListAsync();
+
+            viewModel.DepartmentOptions = await _context.Departments
+                .OrderBy(d => d.Name)
+                .Select(d => new QuickSelectOptionViewModel
+                {
+                    Id = d.Id,
+                    Name = d.Name
+                })
+                .ToListAsync();
+
+            viewModel.DefaultWorkOrderStatus = _configuration.GetValue<string>("WorkOrders:DefaultStatus") ?? "New";
         }
         private async Task PopulateWorkOrdersAsync(HomeIndexViewModel viewModel, int propertyId)
         {

@@ -24,6 +24,10 @@ namespace hOps.web.ViewModels.Home
         public List<CalendarEventSummaryViewModel> UpcomingEvents { get; set; } = new();
 
         public List<PassOnLogSummaryViewModel> PassOnLogs { get; set; } = new();
+
+        public List<QuickSelectOptionViewModel> WorkOrderTypeOptions { get; set; } = new();
+        public List<QuickSelectOptionViewModel> DepartmentOptions { get; set; } = new();
+        public string DefaultWorkOrderStatus { get; set; } = "New";
     }
 
     public class ManagerAnnouncementViewModel
@@ -52,6 +56,7 @@ namespace hOps.web.ViewModels.Home
         public int LayoutId { get; set; }
         public int RoomId { get; set; }
         public string RoomNumber { get; set; } = string.Empty;
+        public string? LocationKey { get; set; }
         public string RoomType { get; set; } = string.Empty;
         public int Floor { get; set; }
         public int X { get; set; }
@@ -133,5 +138,11 @@ namespace hOps.web.ViewModels.Home
         public int Id { get; set; }
         public string FileName { get; set; } = string.Empty;
         public string DownloadUrl { get; set; } = string.Empty;
+    }
+
+    public class QuickSelectOptionViewModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
     }
 }

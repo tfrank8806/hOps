@@ -210,74 +210,124 @@ namespace hOps.web.Controllers
                 return View("Index", invalidModel);
             }
 
-            var workOrder = new WorkOrder
+            await CreateWorkOrderAsync(form, user!, selectedPropertyIds);
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetRoomWorkOrders(int propertyId, string roomNumber)
+        {
+            if (propertyId <= 0 || string.IsNullOrWhiteSpace(roomNumber))
             {
-                Status = form.Status,
-                Location = form.Location ?? string.Empty,
-                WorkOrderTypeId = form.WorkOrderTypeId,
-                Issue = form.Issue,
-                Details = form.Details,
-                DueDate = form.DueDate,
-                DepartmentId = form.DepartmentId,
-                CreatedAt = DateTime.UtcNow,
-                CreatedById = user?.Id
+                return BadRequest(new { message = "Property and room information are required." });
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+            if (!accessiblePropertyIds.Contains(propertyId))
+            {
+                return Forbid();
+            }
+
+            var trimmedRoom = roomNumber.Trim();
+
+            var openOrders = await _context.WorkOrders
+                .Where(wo => (wo.Status == "New" || wo.Status == "In Progress") &&
+                             wo.Properties.Any(p => p.PropertyId == propertyId))
+                .OrderByDescending(wo => wo.CreatedAt)
+                .Select(wo => new
+                {
+                    wo.Id,
+                    wo.Status,
+                    wo.Issue,
+                    wo.Location,
+                    wo.CreatedAt
+                })
+                .AsNoTracking()
+                .ToListAsync();
+
+            var matchingOrders = openOrders
+                .Where(wo => MatchesRoom(trimmedRoom, wo.Location))
+                .Select(wo => new
+                {
+                    wo.Id,
+                    wo.Status,
+                    wo.Issue,
+                    CreatedAt = _timeZoneService.ConvertToUserTime(wo.CreatedAt)
+                        .ToString("MMM d, yyyy h:mm tt", CultureInfo.CurrentCulture),
+                    DetailUrl = Url.Action(nameof(Edit), new { id = wo.Id }) ?? Url.Action(nameof(Index))
+                })
+                .ToList();
+
+            return Json(new
+            {
+                workOrders = matchingOrders
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateFromLayout([FromBody] LayoutWorkOrderRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState
+                    .Where(kvp => kvp.Value?.Errors?.Any() == true)
+                    .Select(kvp => new
+                    {
+                        field = kvp.Key,
+                        message = kvp.Value!.Errors.First().ErrorMessage
+                    })
+                    .ToList();
+
+                return BadRequest(new { message = "Please correct the highlighted fields.", errors });
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+            if (!accessiblePropertyIds.Contains(request.PropertyId))
+            {
+                return Forbid();
+            }
+
+            var issue = request.Issue?.Trim();
+            if (string.IsNullOrWhiteSpace(issue))
+            {
+                return BadRequest(new { message = "Issue description is required." });
+            }
+
+            var defaultStatus = _configuration.GetValue<string>("WorkOrders:DefaultStatus") ?? WorkOrderStatusOptions.All.First().Key;
+
+            var form = new WorkOrderFormViewModel
+            {
+                Status = defaultStatus,
+                Location = string.IsNullOrWhiteSpace(request.RoomLabel) ? request.RoomNumber.Trim() : request.RoomLabel!.Trim(),
+                WorkOrderTypeId = request.WorkOrderTypeId,
+                Issue = issue,
+                Details = string.IsNullOrWhiteSpace(request.Details) ? null : request.Details.Trim(),
+                DueDate = (request.DueDate ?? DateTime.UtcNow.Date).Date,
+                DepartmentId = request.DepartmentId,
+                SelectedPropertyIds = new List<int> { request.PropertyId }
             };
 
-            foreach (var propertyId in selectedPropertyIds)
+            var workOrder = await CreateWorkOrderAsync(form, user, form.SelectedPropertyIds);
+
+            return Ok(new
             {
-                workOrder.Properties.Add(new WorkOrderProperty
-                {
-                    PropertyId = propertyId
-                });
-            }
-
-            if (form.Photos != null && form.Photos.Count > 0)
-            {
-                var uploadPath = Path.Combine(_environment.WebRootPath, "uploads", "workorders");
-                Directory.CreateDirectory(uploadPath);
-
-                foreach (var file in form.Photos)
-                {
-                    if (file.Length <= 0) continue;
-
-                    var extension = Path.GetExtension(file.FileName);
-                    var fileName = $"{Guid.NewGuid()}{extension}";
-                    var fullPath = Path.Combine(uploadPath, fileName);
-
-                    using (var stream = System.IO.File.Create(fullPath))
-                    {
-                        await file.CopyToAsync(stream);
-                    }
-
-                    workOrder.Attachments.Add(new WorkOrderAttachment
-                    {
-                        FilePath = Path.Combine("/uploads/workorders", fileName).Replace("\\", "/"),
-                        OriginalFileName = file.FileName
-                    });
-                }
-            }
-
-            _context.WorkOrders.Add(workOrder);
-            await _context.SaveChangesAsync();
-
-            var workOrderLink = Url.Action(nameof(Index), "WorkOrders", new { highlight = workOrder.Id }, Request.Scheme)
-                ?? Url.Action(nameof(Index), "WorkOrders") ?? "/WorkOrders";
-
-            await _mentionService.CreateMentionNotificationsAsync(
-                $"{workOrder.Issue}\n{workOrder.Details}",
-                user!,
-                $"Work Order #{workOrder.Id}",
-                workOrderLink,
-                workOrder.Issue);
-
-            await SendDepartmentAlertEmailsAsync(workOrder, workOrderLink, user);
-
-            if (form.DepartmentId.HasValue)
-            {
-                _logger.LogInformation("Work order {WorkOrderId} assigned to department {DepartmentId}", workOrder.Id, form.DepartmentId);
-            }
-
-            return RedirectToAction(nameof(Index));
+                workOrder.Id,
+                workOrder.Status,
+                workOrder.Issue
+            });
         }
 
         [HttpPost]
@@ -483,6 +533,83 @@ namespace hOps.web.Controllers
             DeleteAttachmentFiles(attachmentPaths);
 
             return RedirectWithFilters();
+        }
+
+        private async Task<WorkOrder> CreateWorkOrderAsync(
+            WorkOrderFormViewModel form,
+            ApplicationUser user,
+            IReadOnlyCollection<int> propertyIds)
+        {
+            var workOrder = new WorkOrder
+            {
+                Status = form.Status,
+                Location = form.Location ?? string.Empty,
+                WorkOrderTypeId = form.WorkOrderTypeId,
+                Issue = form.Issue,
+                Details = form.Details,
+                DueDate = form.DueDate,
+                DepartmentId = form.DepartmentId,
+                CreatedAt = DateTime.UtcNow,
+                CreatedById = user.Id
+            };
+
+            foreach (var propertyId in propertyIds)
+            {
+                workOrder.Properties.Add(new WorkOrderProperty
+                {
+                    PropertyId = propertyId
+                });
+            }
+
+            if (form.Photos != null && form.Photos.Count > 0)
+            {
+                var uploadPath = Path.Combine(_environment.WebRootPath, "uploads", "workorders");
+                Directory.CreateDirectory(uploadPath);
+
+                foreach (var file in form.Photos)
+                {
+                    if (file.Length <= 0)
+                    {
+                        continue;
+                    }
+
+                    var extension = Path.GetExtension(file.FileName);
+                    var fileName = $"{Guid.NewGuid()}{extension}";
+                    var fullPath = Path.Combine(uploadPath, fileName);
+
+                    using var stream = System.IO.File.Create(fullPath);
+                    await file.CopyToAsync(stream);
+
+                    workOrder.Attachments.Add(new WorkOrderAttachment
+                    {
+                        FilePath = Path.Combine("/uploads/workorders", fileName).Replace("\\", "/"),
+                        OriginalFileName = file.FileName
+                    });
+                }
+            }
+
+            _context.WorkOrders.Add(workOrder);
+            await _context.SaveChangesAsync();
+
+            var workOrderLink = Url.Action(nameof(Index), "WorkOrders", new { highlight = workOrder.Id }, Request.Scheme)
+                ?? Url.Action(nameof(Index), "WorkOrders")
+                ?? "/WorkOrders";
+
+            await _mentionService.CreateMentionNotificationsAsync(
+                $"{workOrder.Issue}\n{workOrder.Details}",
+                user,
+                $"Work Order #{workOrder.Id}",
+                workOrderLink,
+                workOrder.Issue);
+
+            await SendDepartmentAlertEmailsAsync(workOrder, workOrderLink, user);
+
+            if (form.DepartmentId.HasValue)
+            {
+                _logger.LogInformation("Work order {WorkOrderId} assigned to department {DepartmentId}", workOrder.Id, form.DepartmentId);
+            }
+
+            return workOrder;
         }
 
         private async Task SendDepartmentAlertEmailsAsync(WorkOrder workOrder, string workOrderLink, ApplicationUser? createdBy)
@@ -957,6 +1084,25 @@ namespace hOps.web.Controllers
                     _logger.LogWarning(ex, "Failed to delete work order attachment at {Path}", relativePath);
                 }
             }
+        }
+
+        private static bool MatchesRoom(string roomNumber, string? location)
+        {
+            if (string.IsNullOrWhiteSpace(roomNumber) || string.IsNullOrWhiteSpace(location))
+            {
+                return false;
+            }
+
+            var trimmedLocation = location.Trim();
+            var trimmedRoom = roomNumber.Trim();
+
+            if (trimmedLocation.Equals(trimmedRoom, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return trimmedLocation.Contains(trimmedRoom, StringComparison.OrdinalIgnoreCase) ||
+                trimmedRoom.Contains(trimmedLocation, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

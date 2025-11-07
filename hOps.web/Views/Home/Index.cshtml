@@ -1,5 +1,6 @@
 @using System.Globalization
 @using System.Linq
+@using System.Text.Json
 @using hOps.web.Utilities
 @model hOps.web.ViewModels.Home.HomeIndexViewModel
 
@@ -116,6 +117,107 @@
                             </form>
                         </div>
                     }
+
+                    <div id="layoutRoomMenu" class="layout-room-menu shadow" aria-hidden="true">
+                        <div class="layout-room-menu__header d-flex align-items-start justify-content-between">
+                            <div>
+                                <div class="layout-room-menu__title" data-room-name>Select a room</div>
+                                <div class="layout-room-menu__meta text-muted small" data-room-floor></div>
+                            </div>
+                            <button type="button" class="btn-close" aria-label="Close room menu" data-close-room-menu></button>
+                        </div>
+                        <div class="layout-room-menu__body">
+                            <div class="layout-room-menu__section">
+                                <h6 class="layout-room-menu__section-title">Open Work Orders</h6>
+                                <div class="layout-room-menu__workorders text-muted small" data-room-workorders>
+                                    Select a room to review open work orders.
+                                </div>
+                            </div>
+                            <div class="layout-room-menu__actions d-flex flex-column flex-sm-row gap-2">
+                                <a class="btn btn-outline-primary btn-sm"
+                                   href="@((Url.Action("Index", "WorkOrders") ?? "/WorkOrders"))"
+                                   target="_blank"
+                                   rel="noopener"
+                                   data-view-workorders>
+                                    View in Work Orders
+                                </a>
+                                <button type="button" class="btn btn-primary btn-sm" data-create-workorder disabled>
+                                    Create Work Order
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal fade" id="layoutWorkOrderModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Create Work Order</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <form id="layoutWorkOrderForm" method="post" novalidate>
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="PropertyId" value="@(property?.Id ?? 0)" />
+                                        <input type="hidden" name="RoomNumber" />
+                                        <input type="hidden" name="RoomLabel" />
+                                        <div class="mb-3">
+                                            <label class="form-label">Room</label>
+                                            <div class="form-control-plaintext fw-semibold" data-room-display>
+                                                Select a room from the layout.
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" for="layoutWorkOrderIssue">Issue<span class="text-danger">*</span></label>
+                                            <textarea class="form-control" id="layoutWorkOrderIssue" name="Issue" rows="3" required></textarea>
+                                        </div>
+                                        <div class="row g-3">
+                                            <div class="col-sm-6">
+                                                <label class="form-label" for="layoutWorkOrderType">Work Order Type</label>
+                                                <select class="form-select" id="layoutWorkOrderType" name="WorkOrderTypeId">
+                                                    <option value="">Unspecified</option>
+                                                    @foreach (var type in Model.WorkOrderTypeOptions)
+                                                    {
+                                                        <option value="@type.Id">@type.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="col-sm-6">
+                                                <label class="form-label" for="layoutWorkOrderDepartment">Assign To</label>
+                                                <select class="form-select" id="layoutWorkOrderDepartment" name="DepartmentId">
+                                                    <option value="">Unassigned</option>
+                                                    @foreach (var department in Model.DepartmentOptions)
+                                                    {
+                                                        <option value="@department.Id">@department.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="row g-3 mt-0">
+                                            <div class="col-sm-6">
+                                                <label class="form-label" for="layoutWorkOrderDueDate">Due Date</label>
+                                                <input type="date"
+                                                       class="form-control"
+                                                       id="layoutWorkOrderDueDate"
+                                                       name="DueDate"
+                                                       value="@DateTime.Today.ToString("yyyy-MM-dd")"
+                                                       data-default-value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" for="layoutWorkOrderDetails">Details</label>
+                                            <textarea class="form-control" id="layoutWorkOrderDetails" name="Details" rows="3"></textarea>
+                                        </div>
+                                        <div class="alert d-none" role="alert" data-form-status></div>
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-primary">Submit Work Order</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -139,7 +241,12 @@
                         <span>New Bulletin</span>
                     </button>
                 </div>
-                <div class="card-body">
+                <div class="card-body"
+                     id="layoutWidget"
+                     data-property-id="@(property?.Id ?? 0)"
+                     data-room-summary-url="@Url.Action("GetRoomWorkOrders", "WorkOrders")"
+                     data-room-create-url="@Url.Action("CreateFromLayout", "WorkOrders")"
+                     data-workorders-url="@Url.Action("Index", "WorkOrders")">
                     @if (!hasProperty)
                     {
                         <p class="text-muted mb-0">Select a property to collaborate with your team.</p>
@@ -375,15 +482,20 @@
                                     var ariaLabel = tile.Badges.Any()
                                         ? $"{ariaLabelBase} with {string.Join(", ", tile.Badges.Select(b => b.Text))}"
                                         : ariaLabelBase;
-                                    <div class="@($"{tile.CssClass} room-tile-overlay")"
+                                    var isInteractiveRoom = tile.RoomId > 0 && !string.IsNullOrWhiteSpace(tile.LocationKey);
+                                    <div class="@($"{tile.CssClass} room-tile-overlay{(isInteractiveRoom ? " room-tile-overlay--actionable" : string.Empty)}")"
                                          data-floor="@tile.Floor"
                                          data-shape-type="@tile.ShapeType"
                                          data-shape-data="@tile.ShapeData"
+                                         data-room-id="@tile.RoomId"
+                                         data-room-label="@tile.RoomNumber"
+                                         data-room-number="@tile.LocationKey"
+                                         data-room-floor="@tile.Floor"
                                          data-navigate-url="@navigateUrl"
                                          style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%;border-color:@tile.FloorColor;background-color:@overlayBg;"
                                          aria-label="@ariaLabel"
-                                         tabindex="@(string.IsNullOrWhiteSpace(navigateUrl) ? "-1" : "0")"
-                                         @(string.IsNullOrWhiteSpace(navigateUrl) ? null : "role=\"link\"")>
+                                         tabindex="@(isInteractiveRoom || !string.IsNullOrWhiteSpace(navigateUrl) ? "0" : "-1")"
+                                         @(isInteractiveRoom ? "role=\"button\" aria-haspopup=\"dialog\"" : (string.IsNullOrWhiteSpace(navigateUrl) ? null : "role=\"link\""))>
                                         @if (tile.Badges.Any())
                                         {
                                             <div class="tile-badges tile-badges--overlay">
@@ -436,15 +548,26 @@
                                             var top = Math.Round((double)tile.Y / maxHeight * 100, 2);
                                             var width = Math.Round((double)tile.Width / maxWidth * 100, 2);
                                             var height = Math.Round((double)tile.Height / maxHeight * 100, 2);
-                                            var isConnector = string.Equals(tile.ShapeType, "connector", StringComparison.OrdinalIgnoreCase);
-                                            var isCustom = !isConnector && tile.RoomId == 0;
-                                            var hasTileLabel = !string.IsNullOrWhiteSpace(tile.RoomNumber);
-                                            var connectorDirection = string.Equals(tile.ShapeData, "horizontal", StringComparison.OrdinalIgnoreCase) ? "horizontal" : "vertical";
-                                            var connectorDisplay = isConnector
-                                                ? (hasTileLabel ? tile.RoomNumber : "||")
-                                                : string.Empty;
-                                            var headerHasContent = hasTileLabel || (!isCustom && !string.IsNullOrWhiteSpace(tile.RoomType));
-                                            <div class="@tile.CssClass" data-shape-type="@tile.ShapeType" data-shape-data="@tile.ShapeData" style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%">
+                                        var isConnector = string.Equals(tile.ShapeType, "connector", StringComparison.OrdinalIgnoreCase);
+                                        var isCustom = !isConnector && tile.RoomId == 0;
+                                        var hasTileLabel = !string.IsNullOrWhiteSpace(tile.RoomNumber);
+                                        var connectorDirection = string.Equals(tile.ShapeData, "horizontal", StringComparison.OrdinalIgnoreCase) ? "horizontal" : "vertical";
+                                        var connectorDisplay = isConnector
+                                            ? (hasTileLabel ? tile.RoomNumber : "||")
+                                            : string.Empty;
+                                        var headerHasContent = hasTileLabel || (!isCustom && !string.IsNullOrWhiteSpace(tile.RoomType));
+                                        var isInteractiveRoom = !isConnector && tile.RoomId > 0 && !string.IsNullOrWhiteSpace(tile.LocationKey);
+                                        var tileClasses = isInteractiveRoom ? $"{tile.CssClass} room-tile--actionable" : tile.CssClass;
+                                            <div class="@tileClasses"
+                                                 data-shape-type="@tile.ShapeType"
+                                                 data-shape-data="@tile.ShapeData"
+                                                 data-room-id="@tile.RoomId"
+                                                 data-room-label="@tile.RoomNumber"
+                                                 data-room-number="@tile.LocationKey"
+                                                 data-room-floor="@tile.Floor"
+                                                 tabindex="@(isInteractiveRoom ? "0" : "-1")"
+                                                 @(isInteractiveRoom ? "role=\"button\" aria-haspopup=\"dialog\"" : null)
+                                                 style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%">
                                                 @if (isConnector)
                                                 {
                                                     <span class="tile-connector-icon tile-connector-icon--@connectorDirection">@connectorDisplay</span>
@@ -703,6 +826,85 @@
             flex-wrap: wrap;
         }
 
+        .room-tile-overlay--actionable,
+        .room-tile--actionable {
+            cursor: pointer;
+        }
+
+        .room-tile-overlay--active,
+        .room-tile--active {
+            outline: 3px solid rgba(13, 110, 253, 0.35);
+            box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.15);
+        }
+
+        .layout-room-menu {
+            position: absolute;
+            min-width: 300px;
+            max-width: 360px;
+            background: #fff;
+            border-radius: 0.85rem;
+            border: 1px solid rgba(15, 46, 97, 0.12);
+            box-shadow: 0 24px 50px rgba(15, 46, 97, 0.2);
+            padding: 1rem;
+            display: none;
+            z-index: 1300;
+        }
+
+        .layout-room-menu.show {
+            display: block;
+        }
+
+        .layout-room-menu__title {
+            font-weight: 600;
+            font-size: 1.05rem;
+        }
+
+        .layout-room-menu__section {
+            margin-bottom: 0.85rem;
+        }
+
+        .layout-room-menu__section-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #0f2e61;
+            margin-bottom: 0.35rem;
+        }
+
+        .layout-room-menu__workorder-list li + li {
+            margin-top: 0.6rem;
+            padding-top: 0.55rem;
+            border-top: 1px dashed rgba(148, 163, 184, 0.35);
+        }
+
+        .layout-room-menu__workorder-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .layout-room-menu__workorder-link:hover,
+        .layout-room-menu__workorder-link:focus {
+            color: #0d6efd;
+            text-decoration: none;
+        }
+
+        .layout-room-menu__workorder-link small {
+            font-size: 0.75rem;
+        }
+
+        .layout-room-menu__actions .btn {
+            flex: 1 1 auto;
+        }
+
+        @@media (max-width: 575.98px) {
+            .layout-room-menu {
+                width: calc(100% - 2rem);
+                left: 1rem !important;
+                right: 1rem;
+            }
+        }
+
         .legend-swatch {
             display: inline-block;
             width: 12px;
@@ -801,32 +1003,405 @@
                 });
             });
 
-            const clickableTiles = document.querySelectorAll('.room-tile-overlay');
-            clickableTiles.forEach(tile => {
+            const clickableTiles = document.querySelectorAll('.room-tile-overlay, .layout-floor-section .room-tile');
+            const layoutWidget = document.getElementById('layoutWidget');
+            const propertyId = Number(layoutWidget?.dataset.propertyId || '0');
+            const summaryUrl = layoutWidget?.dataset.roomSummaryUrl || '';
+            const createUrl = layoutWidget?.dataset.roomCreateUrl || '';
+            const workOrdersUrl = layoutWidget?.dataset.workordersUrl || '';
+            const roomMenu = document.getElementById('layoutRoomMenu');
+            if (roomMenu && roomMenu.parentElement !== document.body) {
+                document.body.appendChild(roomMenu);
+            }
+
+            const roomMenuTitle = roomMenu?.querySelector('[data-room-name]');
+            const roomMenuFloor = roomMenu?.querySelector('[data-room-floor]');
+            const roomMenuList = roomMenu?.querySelector('[data-room-workorders]');
+            const viewOrdersLink = roomMenu?.querySelector('[data-view-workorders]');
+            const createWorkOrderButton = roomMenu?.querySelector('[data-create-workorder]');
+            const closeMenuButton = roomMenu?.querySelector('[data-close-room-menu]');
+
+            const workOrderForm = document.getElementById('layoutWorkOrderForm');
+            const formStatus = workOrderForm?.querySelector('[data-form-status]');
+            const roomDisplay = workOrderForm?.querySelector('[data-room-display]');
+            const dueDateInput = workOrderForm?.querySelector('input[name="DueDate"]');
+            const issueInput = workOrderForm?.querySelector('textarea[name="Issue"]');
+            const detailsInput = workOrderForm?.querySelector('textarea[name="Details"]');
+            const propertyInput = workOrderForm?.querySelector('input[name="PropertyId"]');
+            const roomNumberInput = workOrderForm?.querySelector('input[name="RoomNumber"]');
+            const roomLabelInput = workOrderForm?.querySelector('input[name="RoomLabel"]');
+            const tokenInput = workOrderForm?.querySelector('input[name="__RequestVerificationToken"]');
+            const modalEl = document.getElementById('layoutWorkOrderModal');
+
+            const resolveBootstrap = () => {
+                if (typeof window !== 'undefined' && window.bootstrap) {
+                    return window.bootstrap;
+                }
+                if (typeof bootstrap !== 'undefined') {
+                    return bootstrap;
+                }
+                return null;
+            };
+
+            let layoutModalInstance = null;
+            const getLayoutModal = () => {
+                if (!modalEl) {
+                    return null;
+                }
+                if (layoutModalInstance) {
+                    return layoutModalInstance;
+                }
+                const bootstrapLib = resolveBootstrap();
+                if (!bootstrapLib?.Modal) {
+                    return null;
+                }
+                layoutModalInstance = bootstrapLib.Modal.getOrCreateInstance(modalEl);
+                return layoutModalInstance;
+            };
+
+            let activeTile;
+            let currentRoom;
+
+            const setActiveTile = (tile) => {
+                if (activeTile) {
+                    activeTile.classList.remove('room-tile-overlay--active', 'room-tile--active');
+                }
+                activeTile = tile;
+                if (!activeTile) {
+                    return;
+                }
+                if (activeTile.classList.contains('room-tile-overlay')) {
+                    activeTile.classList.add('room-tile-overlay--active');
+                } else {
+                    activeTile.classList.add('room-tile--active');
+                }
+            };
+
+            const closeRoomMenu = () => {
+                if (roomMenu) {
+                    roomMenu.classList.remove('show');
+                    roomMenu.style.top = '';
+                    roomMenu.style.left = '';
+                }
+                setActiveTile(null);
+                currentRoom = undefined;
+            };
+
+            const buildWorkOrdersLink = (roomNumber) => {
+                if (!roomNumber) {
+                    return '';
+                }
+                const base = new URL(workOrdersUrl || '/WorkOrders', window.location.origin);
+                base.searchParams.set('RoomNumber', roomNumber);
+                if (propertyId > 0) {
+                    base.searchParams.append('PropertyIds', propertyId.toString());
+                }
+                ['New', 'In Progress'].forEach(status => base.searchParams.append('Statuses', status));
+                return base.toString();
+            };
+
+            const positionMenu = (tile) => {
+                if (!roomMenu || !(tile instanceof HTMLElement)) {
+                    return;
+                }
+                const rect = tile.getBoundingClientRect();
+                const menuWidth = roomMenu.offsetWidth || 320;
+                const viewportWidth = document.documentElement.clientWidth;
+                const top = window.scrollY + rect.bottom + 8;
+                let left = window.scrollX + rect.left;
+                if (left + menuWidth > window.scrollX + viewportWidth - 16) {
+                    left = Math.max(16, window.scrollX + viewportWidth - menuWidth - 16);
+                }
+                roomMenu.style.top = `${top}px`;
+                roomMenu.style.left = `${left}px`;
+            };
+
+            const renderWorkOrders = (items) => {
+                if (!roomMenuList) {
+                    return;
+                }
+                if (!items.length) {
+                    roomMenuList.innerHTML = '<p class="text-muted small mb-0">No open work orders for this room.</p>';
+                    return;
+                }
+
+                const list = document.createElement('ul');
+                list.className = 'list-unstyled mb-0 layout-room-menu__workorder-list';
+
+                items.forEach(order => {
+                    const li = document.createElement('li');
+                    const link = document.createElement('a');
+                    link.className = 'layout-room-menu__workorder-link';
+                    link.href = order.detailUrl || workOrdersUrl || '#';
+                    link.target = '_blank';
+                    link.rel = 'noopener';
+
+                    const statusSpan = document.createElement('span');
+                    statusSpan.className = 'fw-semibold me-2';
+                    statusSpan.textContent = order.status ?? 'Work Order';
+
+                    const issueSpan = document.createElement('span');
+                    issueSpan.className = 'layout-room-menu__workorder-issue';
+                    issueSpan.textContent = order.issue ?? 'Details unavailable';
+
+                    const meta = document.createElement('small');
+                    meta.className = 'text-muted d-block';
+                    meta.textContent = order.createdAt ?? '';
+
+                    link.appendChild(statusSpan);
+                    link.appendChild(issueSpan);
+                    link.appendChild(meta);
+                    li.appendChild(link);
+                    list.appendChild(li);
+                });
+
+                roomMenuList.innerHTML = '';
+                roomMenuList.appendChild(list);
+            };
+
+            const fetchRoomWorkOrders = async (roomNumber) => {
+                if (!roomMenuList || !summaryUrl || !roomNumber) {
+                    return;
+                }
+                roomMenuList.innerHTML = '<div class="text-muted small py-2">Loading open work orders...</div>';
+                try {
+                    const params = new URLSearchParams({
+                        propertyId: propertyId.toString(),
+                        roomNumber
+                    });
+                    const response = await fetch(`${summaryUrl}?${params.toString()}`);
+                    if (!response.ok) {
+                        throw new Error('Request failed');
+                    }
+                    const data = await response.json();
+                    const orders = Array.isArray(data?.workOrders) ? data.workOrders : [];
+                    renderWorkOrders(orders);
+                } catch (error) {
+                    roomMenuList.innerHTML = '<p class="text-danger small mb-0">Unable to load work orders.</p>';
+                }
+            };
+
+            const openRoomMenu = (tile) => {
+                if (!roomMenu || !(tile instanceof HTMLElement)) {
+                    return;
+                }
+
+                const roomNumber = tile.dataset.roomNumber?.trim();
+                const roomLabel = tile.dataset.roomLabel?.trim() || roomNumber || 'Room';
+                const floorLabel = tile.dataset.roomFloor ? `Floor ${tile.dataset.roomFloor}` : '';
+
+                currentRoom = {
+                    roomNumber,
+                    roomLabel,
+                    floor: tile.dataset.roomFloor
+                };
+
+                if (roomMenuTitle && roomLabel) {
+                    roomMenuTitle.textContent = roomLabel;
+                }
+                if (roomMenuFloor) {
+                    roomMenuFloor.textContent = floorLabel;
+                    roomMenuFloor.classList.toggle('d-none', !floorLabel);
+                }
+                if (viewOrdersLink) {
+                    const viewUrl = buildWorkOrdersLink(roomNumber || '');
+                    viewOrdersLink.href = viewUrl || (workOrdersUrl || '#');
+                    const disabled = !roomNumber;
+                    viewOrdersLink.classList.toggle('disabled', disabled);
+                    viewOrdersLink.setAttribute('aria-disabled', disabled.toString());
+                }
+
+                if (createWorkOrderButton) {
+                    createWorkOrderButton.disabled = !(createUrl && currentRoom?.roomNumber && getLayoutModal());
+                }
+
+                setActiveTile(tile);
+                roomMenu.classList.add('show');
+                positionMenu(tile);
+                fetchRoomWorkOrders(roomNumber);
+            };
+
+            const handleTileActivation = (tile, event) => {
                 if (!(tile instanceof HTMLElement)) {
+                    return;
+                }
+                const target = event.target;
+                if (target instanceof HTMLElement && target.closest('a')) {
+                    return;
+                }
+
+                const hasRoomContext = propertyId > 0 &&
+                    Number(tile.dataset.roomId || '0') > 0 &&
+                    tile.dataset.roomNumber;
+
+                if (hasRoomContext && summaryUrl) {
+                    event.preventDefault();
+                    openRoomMenu(tile);
                     return;
                 }
 
                 const url = tile.dataset.navigateUrl;
-                if (!url) {
+                if (url) {
+                    event.preventDefault();
+                    window.location.href = url;
+                }
+            };
+
+            clickableTiles.forEach(tile => {
+                if (!(tile instanceof HTMLElement)) {
                     return;
                 }
-
-                tile.addEventListener('click', (event) => {
-                    const target = event.target;
-                    if (target instanceof HTMLElement && target.closest('a')) {
-                        return;
-                    }
-
-                    window.location.href = url;
-                });
-
+                tile.addEventListener('click', (event) => handleTileActivation(tile, event));
                 tile.addEventListener('keydown', (event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
-                        window.location.href = url;
+                        handleTileActivation(tile, event);
                     }
                 });
+            });
+
+            closeMenuButton?.addEventListener('click', closeRoomMenu);
+            document.addEventListener('click', (event) => {
+                if (!roomMenu) {
+                    return;
+                }
+                if (roomMenu.contains(event.target) || (activeTile && activeTile.contains(event.target))) {
+                    return;
+                }
+                closeRoomMenu();
+            });
+            window.addEventListener('scroll', () => closeRoomMenu(), true);
+            window.addEventListener('resize', () => closeRoomMenu());
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    closeRoomMenu();
+                }
+            });
+
+            createWorkOrderButton?.addEventListener('click', () => {
+                const modalInstance = getLayoutModal();
+                if (!modalInstance || !workOrderForm || !currentRoom?.roomNumber) {
+                    return;
+                }
+                closeRoomMenu();
+                workOrderForm.reset();
+                if (propertyInput && propertyId > 0) {
+                    propertyInput.value = propertyId.toString();
+                }
+                if (roomNumberInput) {
+                    roomNumberInput.value = currentRoom.roomNumber;
+                }
+                if (roomLabelInput) {
+                    roomLabelInput.value = currentRoom.roomLabel ?? currentRoom.roomNumber;
+                }
+                if (roomDisplay) {
+                    const label = currentRoom.roomLabel ?? currentRoom.roomNumber ?? 'Selected Room';
+                    const floor = currentRoom.floor ? `Floor ${currentRoom.floor}` : '';
+                    roomDisplay.textContent = floor ? `${label} · ${floor}` : label;
+                }
+                if (dueDateInput) {
+                    dueDateInput.value = dueDateInput.dataset.defaultValue || '';
+                }
+                if (formStatus) {
+                    formStatus.classList.add('d-none');
+                    formStatus.textContent = '';
+                    formStatus.classList.remove('alert-success', 'alert-danger');
+                }
+                modalInstance.show();
+                issueInput?.focus();
+            });
+
+            modalEl?.addEventListener('hidden.bs.modal', () => {
+                if (formStatus) {
+                    formStatus.classList.add('d-none');
+                    formStatus.textContent = '';
+                    formStatus.classList.remove('alert-success', 'alert-danger');
+                }
+            });
+
+            const showFormStatus = (variant, message) => {
+                if (!formStatus) {
+                    return;
+                }
+                formStatus.classList.remove('d-none', 'alert-success', 'alert-danger');
+                formStatus.classList.add(variant === 'success' ? 'alert-success' : 'alert-danger');
+                formStatus.textContent = message;
+            };
+
+            workOrderForm?.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (!createUrl || !tokenInput) {
+                    return;
+                }
+                const submitButton = workOrderForm.querySelector('button[type="submit"]');
+                submitButton?.setAttribute('disabled', 'disabled');
+
+                const payload = {
+                    propertyId: Number(propertyInput?.value || propertyId),
+                    roomNumber: roomNumberInput?.value?.trim(),
+                    roomLabel: roomLabelInput?.value?.trim(),
+                    issue: issueInput?.value?.trim() || '',
+                    details: detailsInput?.value?.trim() || null,
+                    workOrderTypeId: parseInt(workOrderForm.querySelector('select[name="WorkOrderTypeId"]')?.value || '', 10) || null,
+                    departmentId: parseInt(workOrderForm.querySelector('select[name="DepartmentId"]')?.value || '', 10) || null,
+                    dueDate: dueDateInput?.value || null
+                };
+
+                if (!payload.roomNumber) {
+                    showFormStatus('danger', 'Select a room before submitting.');
+                    submitButton?.removeAttribute('disabled');
+                    return;
+                }
+
+                if (!payload.issue) {
+                    showFormStatus('danger', 'Issue description is required.');
+                    submitButton?.removeAttribute('disabled');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(createUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': tokenInput.value
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        const message = result?.message ?? 'Unable to create work order. Please try again.';
+                        showFormStatus('danger', message);
+                        submitButton?.removeAttribute('disabled');
+                        return;
+                    }
+
+                    showFormStatus('success', 'Work order created successfully.');
+                    if (issueInput) {
+                        issueInput.value = '';
+                    }
+                    if (detailsInput) {
+                        detailsInput.value = '';
+                    }
+                    if (dueDateInput) {
+                        dueDateInput.value = dueDateInput.dataset.defaultValue || '';
+                    }
+
+                    if (currentRoom?.roomNumber) {
+                        fetchRoomWorkOrders(currentRoom.roomNumber);
+                    }
+
+                    setTimeout(() => {
+                        const modalInstance = getLayoutModal();
+                        modalInstance?.hide();
+                    }, 900);
+                } catch (error) {
+                    showFormStatus('danger', 'Something went wrong while creating the work order.');
+                } finally {
+                    submitButton?.removeAttribute('disabled');
+                }
             });
         })();
     </script>
