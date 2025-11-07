@@ -1,12 +1,15 @@
 @using System
 @using System.Globalization
 @using System.Linq
+@using Microsoft.AspNetCore.Html
 @using Microsoft.AspNetCore.Http.Extensions
 @using hOps.web.Utilities
 @model hOps.web.ViewModels.WorkOrders.WorkOrdersViewModel
-@{ 
+
+@{
     ViewData["Title"] = "Work Orders";
     ViewData["MainContainerClass"] = "main-inner--wide";
+
     bool showPropertySelector = Model.PropertyOptions.Count > 1;
     var formAction = Model.IsEditing ? "Edit" : "Create";
     var formRouteId = Model.IsEditing && Model.EditingWorkOrderId.HasValue
@@ -53,9 +56,68 @@
         filterQuery.Add("PropertyIds", propertyId.ToString(CultureInfo.InvariantCulture));
     }
 
+    if (Model.Filters.HideCompleted)
+    {
+        filterQuery.Add("HideCompleted", "true");
+    }
+
     var filterQueryString = filterQuery.ToQueryString().ToString();
     var exportUrl = $"{Url.Action("Export")}{filterQueryString}";
     var indexUrlWithFilters = $"{Url.Action("Index")}{filterQueryString}";
+}
+
+@functions {
+    private IHtmlContent SortableHeader(string label, string key)
+    {
+        var isAsc = string.Equals(Model.Filters.SortOrder, key, StringComparison.OrdinalIgnoreCase);
+        var isDesc = string.Equals(Model.Filters.SortOrder, $"{key}_desc", StringComparison.OrdinalIgnoreCase);
+        var nextSort = isAsc ? $"{key}_desc" : key;
+
+        var builder = new QueryBuilder
+        {
+            { "SortOrder", nextSort }
+        };
+
+        if (!string.IsNullOrWhiteSpace(Model.Filters.RoomNumber))
+        {
+            builder.Add("RoomNumber", Model.Filters.RoomNumber);
+        }
+        if (!string.IsNullOrWhiteSpace(Model.Filters.Search))
+        {
+            builder.Add("Search", Model.Filters.Search);
+        }
+        foreach (var id in Model.Filters.DepartmentIds)
+        {
+            builder.Add("DepartmentIds", id.ToString(CultureInfo.InvariantCulture));
+        }
+        foreach (var id in Model.Filters.WorkOrderTypeIds)
+        {
+            builder.Add("WorkOrderTypeIds", id.ToString(CultureInfo.InvariantCulture));
+        }
+        foreach (var status in Model.Filters.Statuses)
+        {
+            builder.Add("Statuses", status);
+        }
+        foreach (var creatorId in Model.Filters.CreatorIds)
+        {
+            builder.Add("CreatorIds", creatorId);
+        }
+        foreach (var propertyId in Model.Filters.PropertyIds)
+        {
+            builder.Add("PropertyIds", propertyId.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (Model.Filters.HideCompleted)
+        {
+            builder.Add("HideCompleted", "true");
+        }
+
+        var url = Url.Action("Index") + builder.ToQueryString();
+        var indicator = isAsc ? "↑" : isDesc ? "↓" : "·";
+        var classes = $"sortable-header {(isAsc || isDesc ? "active" : string.Empty)}";
+
+        return new HtmlString($"<a class=\"{classes}\" href=\"{url}\">{label}<span class=\"sort-indicator\">{indicator}</span></a>");
+    }
 }
 
 @section Styles {
@@ -204,6 +266,24 @@
         .workorder-details p {
             margin-bottom: 0;
         }
+
+        .sortable-header {
+            color: inherit;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-weight: 600;
+        }
+
+        .sortable-header.active {
+            color: #0d6efd;
+        }
+
+        .sort-indicator {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
     </style>
 }
 
@@ -225,8 +305,9 @@
             <div id="workOrdersFiltersCollapse" class="collapse">
                 <div class="card-body">
                     <form method="get" class="row g-3">
+                        <input type="hidden" name="HideCompleted" value="@(Model.Filters.HideCompleted ? "true" : "false")" />
                         <div class="col-md-4">
-                            <label for="SortOrder" class="form-label">Sort</label>
+                            <label for="SortOrder" class="form-label">Default Sort</label>
                             <select class="form-select" id="SortOrder" name="SortOrder">
                                 <option value="newest" selected="@(Model.Filters.SortOrder == "newest" ? "selected" : null)">Newest First</option>
                                 <option value="oldest" selected="@(Model.Filters.SortOrder == "oldest" ? "selected" : null)">Oldest First</option>
@@ -295,7 +376,6 @@
                                     {
                                         continue;
                                     }
-
                                     var isSelected = Model.Filters.CreatorIds.Any(id => string.Equals(id, creator.Value, StringComparison.OrdinalIgnoreCase));
                                     <option value="@creator.Value" selected="@(isSelected ? "selected" : null)">@creator.Text</option>
                                 }
@@ -334,17 +414,53 @@
                 </div>
             </div>
         </div>
-
         <div id="workorders-print-area">
             <div class="card shadow-sm">
                 <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
-                    <h5 class="mb-0">Work Orders (@Model.WorkOrders.Count)</h5>
+                    <div class="d-flex align-items-center gap-3">
+                        <h5 class="mb-0">Work Orders (@Model.WorkOrders.Count)</h5>
+                        <form method="get" class="d-flex align-items-center gap-2 hide-completed-form">
+                            <input type="hidden" name="SortOrder" value="@Model.Filters.SortOrder" />
+                            @if (!string.IsNullOrWhiteSpace(Model.Filters.RoomNumber))
+                            {
+                                <input type="hidden" name="RoomNumber" value="@Model.Filters.RoomNumber" />
+                            }
+                            @if (!string.IsNullOrWhiteSpace(Model.Filters.Search))
+                            {
+                                <input type="hidden" name="Search" value="@Model.Filters.Search" />
+                            }
+                            @foreach (var departmentId in Model.Filters.DepartmentIds)
+                            {
+                                <input type="hidden" name="DepartmentIds" value="@departmentId" />
+                            }
+                            @foreach (var workOrderTypeId in Model.Filters.WorkOrderTypeIds)
+                            {
+                                <input type="hidden" name="WorkOrderTypeIds" value="@workOrderTypeId" />
+                            }
+                            @foreach (var status in Model.Filters.Statuses)
+                            {
+                                <input type="hidden" name="Statuses" value="@status" />
+                            }
+                            @foreach (var creatorId in Model.Filters.CreatorIds)
+                            {
+                                <input type="hidden" name="CreatorIds" value="@creatorId" />
+                            }
+                            @foreach (var propertyId in Model.Filters.PropertyIds)
+                            {
+                                <input type="hidden" name="PropertyIds" value="@propertyId" />
+                            }
+                            <input type="hidden" name="HideCompleted" value="false" />
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" id="hideCompletedToggle" name="HideCompleted" value="true" @(Model.Filters.HideCompleted ? "checked" : null) onchange="this.form.submit()" />
+                                <label class="form-check-label" for="hideCompletedToggle">Hide completed</label>
+                            </div>
+                        </form>
+                    </div>
                     <div class="d-flex align-items-center gap-2">
                         <button type="button" class="btn btn-outline-secondary btn-sm" id="printWorkOrdersButton">
                             Print Current List
                         </button>
-                        <a href="@exportUrl"
-                           class="btn btn-outline-success btn-sm">
+                        <a href="@exportUrl" class="btn btn-outline-success btn-sm">
                             Export to Excel
                         </a>
                     </div>
@@ -366,14 +482,14 @@
                         <thead class="table-light">
                             <tr>
                                 <th scope="col" class="text-center">Actions</th>
-                                <th scope="col">Status</th>
-                                <th scope="col">Location</th>
-                                <th scope="col">Department</th>
-                                <th scope="col">Type</th>
-                                <th scope="col">Issue</th>
-                                <th scope="col">Due</th>
-                                <th scope="col">Created</th>
-                                <th scope="col">Creator</th>
+                                <th scope="col">@SortableHeader("Status", "status")</th>
+                                <th scope="col">@SortableHeader("Location", "location")</th>
+                                <th scope="col">@SortableHeader("Department", "department")</th>
+                                <th scope="col">@SortableHeader("Type", "type")</th>
+                                <th scope="col">@SortableHeader("Issue", "issue")</th>
+                                <th scope="col">@SortableHeader("Due", "due")</th>
+                                <th scope="col">@SortableHeader("Created", "created")</th>
+                                <th scope="col">@SortableHeader("Creator", "creator")</th>
                                 <th scope="col" class="text-center" aria-label="Attachments">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                                         <path fill="currentColor" d="M6.354 13.657a3.5 3.5 0 0 1-4.95-4.95l6.718-6.718a2.5 2.5 0 0 1 3.536 3.536L5.621 11.612a1.5 1.5 0 1 1-2.121-2.121l5.303-5.304a.5.5 0 1 1 .708.708L4.208 10.2a.5.5 0 0 0 .707.707l5.303-5.303a1.5 1.5 0 1 0-2.121-2.121L1.379 10.5a2.5 2.5 0 1 0 3.536 3.536l5.657-5.657a.5.5 0 0 1 .707.708l-5.657 5.657Z" />
@@ -450,9 +566,7 @@
                                             <div class="workorder-issue">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Issue))</div>
                                         </td>
                                         <td class="col-due @(isPastDue ? "fw-bold text-danger" : string.Empty)">@order.DueDate.ToString("MMM dd, yyyy")</td>
-                                        @{
-                                            var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
-                                        }
+                                        @{ var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt); }
                                         <td class="col-created">@createdLocal.ToString("MMM dd, yyyy")</td>
                                         <td class="col-creator">@(string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator)</td>
                                         <td class="col-attachments text-center">
@@ -475,7 +589,7 @@
                                             }
                                             else
                                             {
-                                                <span class="text-muted small">N/A</span>
+                                                <span></span>
                                             }
                                         </td>
                                     </tr>
@@ -487,7 +601,6 @@
             </div>
         </div>
     </div>
-
     <div class="col-12 col-xl-4 col-xxl-3">
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
@@ -495,19 +608,14 @@
                 @if (Model.IsEditing)
                 {
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <a class="btn btn-sm btn-light"
-                           href="@indexUrlWithFilters">
-                            Cancel
-                        </a>
+                        <a class="btn btn-sm btn-light" href="@indexUrlWithFilters">Cancel</a>
                         @if (Model.CanManageWorkOrders && Model.Form != null && Model.Form.Id.HasValue)
                         {
                             var deleteId = Model.Form!.Id!.Value;
                             var deleteUrl = $"{Url.Action("Delete", new { id = deleteId })}{filterQueryString}";
                             <form method="post" action="@deleteUrl" onsubmit="return confirm('Are you sure you want to delete this work order?');">
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-danger">
-                                    Delete
-                                </button>
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                             </form>
                         }
                     </div>
@@ -518,7 +626,6 @@
                     @Html.AntiForgeryToken()
                     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                     <input type="hidden" asp-for="Form.Id" />
-
                     <div class="mb-3">
                         <label asp-for="Form.Status" class="form-label"></label>
                         <select asp-for="Form.Status" class="form-select">
@@ -529,7 +636,6 @@
                         </select>
                         <span asp-validation-for="Form.Status" class="text-danger"></span>
                     </div>
-
                     <div class="mb-3">
                         <label asp-for="Form.Location" class="form-label"></label>
                         <input asp-for="Form.Location" class="form-control" list="locationSuggestions" placeholder="Room number or location" />
@@ -541,7 +647,6 @@
                         </datalist>
                         <span asp-validation-for="Form.Location" class="text-danger"></span>
                     </div>
-
                     <div class="mb-3">
                         <label asp-for="Form.WorkOrderTypeId" class="form-label"></label>
                         <select asp-for="Form.WorkOrderTypeId" class="form-select">
@@ -553,19 +658,16 @@
                         </select>
                         <span asp-validation-for="Form.WorkOrderTypeId" class="text-danger"></span>
                     </div>
-
                     <div class="mb-3">
                         <label asp-for="Form.Issue" class="form-label"></label>
                         <input asp-for="Form.Issue" class="form-control" placeholder="Short description" />
                         <span asp-validation-for="Form.Issue" class="text-danger"></span>
                     </div>
-
                     <div class="mb-3">
                         <label asp-for="Form.Details" class="form-label"></label>
                         <textarea asp-for="Form.Details" class="form-control" rows="3" placeholder="Additional details" data-enable-mentions="true"></textarea>
                         <span asp-validation-for="Form.Details" class="text-danger"></span>
                     </div>
-
                     <div class="row g-3">
                         <div class="col-sm-6">
                             <label asp-for="Form.DueDate" class="form-label"></label>
@@ -584,7 +686,6 @@
                             <span asp-validation-for="Form.DepartmentId" class="text-danger"></span>
                         </div>
                     </div>
-
                     <div class="mb-3 mt-3">
                         <label asp-for="Form.Photos" class="form-label"></label>
                         <input asp-for="Form.Photos" class="form-control" type="file" accept="image/*" multiple />
@@ -600,7 +701,6 @@
                         </span>
                         <span asp-validation-for="Form.Photos" class="text-danger"></span>
                     </div>
-
                     @if (showPropertySelector)
                     {
                         <fieldset class="mb-3">
@@ -623,7 +723,6 @@
                             Work order will be created for <strong>@soleProperty.Name (@soleProperty.Code)</strong>.
                         </div>
                     }
-
                     <button type="submit" class="btn btn-primary w-100">@submitLabel</button>
                 </form>
             </div>
@@ -644,13 +743,11 @@
 
             const filtersCollapse = document.getElementById('workOrdersFiltersCollapse');
             const filtersToggleButton = document.getElementById('toggleFiltersButton');
-
             if (filtersCollapse && filtersToggleButton) {
                 const updateToggleText = () => {
                     const isExpanded = filtersCollapse.classList.contains('show');
                     filtersToggleButton.textContent = isExpanded ? 'Hide Filters' : 'Show Filters';
                 };
-
                 filtersCollapse.addEventListener('shown.bs.collapse', updateToggleText);
                 filtersCollapse.addEventListener('hidden.bs.collapse', updateToggleText);
                 updateToggleText();

@@ -1,0 +1,44 @@
+﻿@model EditUserPropertiesViewModel
+
+@{
+    ViewData["Title"] = "Edit User Properties & Roles";
+}
+
+<h2>Edit Properties & Roles for @Model.Email</h2>
+
+<form asp-action="EditUserProperties" method="post">
+    <input type="hidden" asp-for="UserId" />
+
+    <div class="form-group">
+        <label>Properties</label>
+        <div>
+            @foreach (var prop in Model.PropertyList)
+            {
+                bool selected = Model.SelectedPropertyIds?.Contains(prop.Id) ?? false;
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="SelectedPropertyIds"
+                           value="@prop.Id" id="prop_@prop.Id" @(selected ? "checked" : "") />
+                    <label class="form-check-label" for="prop_@prop.Id">@prop.Name (@prop.Code)</label>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="form-group mt-3">
+        <label>Roles</label>
+        <div>
+            @foreach (var role in Model.AllRoles)
+            {
+                bool selected = Model.SelectedRoles?.Contains(role) ?? false;
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="SelectedRoles"
+                           value="@role" id="role_@role" @(selected ? "checked" : "") />
+                    <label class="form-check-label" for="role_@role">@role</label>
+                </div>
+            }
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-4">Save</button>
+    <a asp-action="Users" class="btn btn-secondary">Cancel</a>
+</form>

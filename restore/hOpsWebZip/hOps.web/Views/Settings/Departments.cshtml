@@ -1,0 +1,32 @@
+﻿@model List<hOps.web.Models.Department>
+@{
+    ViewData["Title"] = "Departments";
+}
+<h2>Departments</h2>
+
+<p><a class="btn btn-primary" asp-action="CreateDepartment">Add Department</a></p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Color</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var d in Model)
+        {
+            <tr>
+                <td>@d.Name</td>
+                <td><span style="background:@d.Color; padding:4px 12px; color:white">@d.Color</span></td>
+                <td>
+                    <a asp-action="EditDepartment" asp-route-id="@d.Id" class="btn btn-sm btn-warning">Edit</a>
+                    <form method="post" asp-action="DeleteDepartment" asp-route-id="@d.Id" style="display:inline">
+                        <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this department?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

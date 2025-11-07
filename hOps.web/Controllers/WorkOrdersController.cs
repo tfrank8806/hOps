@@ -875,9 +875,33 @@ namespace hOps.web.Controllers
 
             query = filters.SortOrder switch
             {
+                "status" => query.OrderBy(w => w.Status ?? string.Empty).ThenByDescending(w => w.CreatedAt),
+                "status_desc" => query.OrderByDescending(w => w.Status ?? string.Empty).ThenByDescending(w => w.CreatedAt),
+                "location" => query.OrderBy(w => w.Location ?? string.Empty).ThenByDescending(w => w.CreatedAt),
+                "location_desc" => query.OrderByDescending(w => w.Location ?? string.Empty).ThenByDescending(w => w.CreatedAt),
+                "department" => query.OrderBy(w => w.Department != null ? w.Department.Name : string.Empty).ThenByDescending(w => w.CreatedAt),
+                "department_desc" => query.OrderByDescending(w => w.Department != null ? w.Department.Name : string.Empty).ThenByDescending(w => w.CreatedAt),
+                "type" => query.OrderBy(w => w.WorkOrderType != null ? w.WorkOrderType.Name : string.Empty).ThenByDescending(w => w.CreatedAt),
+                "type_desc" => query.OrderByDescending(w => w.WorkOrderType != null ? w.WorkOrderType.Name : string.Empty).ThenByDescending(w => w.CreatedAt),
+                "issue" => query.OrderBy(w => w.Issue ?? string.Empty).ThenByDescending(w => w.CreatedAt),
+                "issue_desc" => query.OrderByDescending(w => w.Issue ?? string.Empty).ThenByDescending(w => w.CreatedAt),
+                "due" => query.OrderBy(w => w.DueDate).ThenByDescending(w => w.CreatedAt),
+                "due_desc" => query.OrderByDescending(w => w.DueDate).ThenByDescending(w => w.CreatedAt),
+                "created" => query.OrderBy(w => w.CreatedAt),
+                "created_desc" => query.OrderByDescending(w => w.CreatedAt),
+                "creator" => query.OrderBy(w => w.CreatedBy != null ? w.CreatedBy.LastName : string.Empty)
+                                  .ThenBy(w => w.CreatedBy != null ? w.CreatedBy.FirstName : string.Empty),
+                "creator_desc" => query.OrderByDescending(w => w.CreatedBy != null ? w.CreatedBy.LastName : string.Empty)
+                                       .ThenByDescending(w => w.CreatedBy != null ? w.CreatedBy.FirstName : string.Empty),
                 "oldest" => query.OrderBy(w => w.CreatedAt),
+                "newest" => query.OrderByDescending(w => w.CreatedAt),
                 _ => query.OrderByDescending(w => w.CreatedAt)
             };
+
+            if (filters.HideCompleted)
+            {
+                query = query.Where(w => !string.Equals(w.Status, "Completed", StringComparison.OrdinalIgnoreCase));
+            }
 
             var workOrders = await query.ToListAsync();
 
