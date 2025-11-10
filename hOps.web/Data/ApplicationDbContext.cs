@@ -79,6 +79,12 @@ namespace hOps.web.Data
                 .WithMany(u => u.UserPropertyAccesses)
                 .HasForeignKey(upa => upa.ApplicationUserId);
 
+            builder.Entity<LostFoundEntry>()
+                .HasOne(e => e.MatchedEntry)
+                .WithMany()
+                .HasForeignKey(e => e.MatchedEntryId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             builder.Entity<UserPropertyAccess>()
                 .HasOne(upa => upa.Property)
                 .WithMany(p => p.UserAccesses)

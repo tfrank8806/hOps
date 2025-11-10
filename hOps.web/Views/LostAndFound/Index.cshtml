@@ -1,5 +1,6 @@
 @using System
 @using System.Linq
+@using hOps.web.Models
 @using hOps.web.Utilities
 @model LostAndFoundIndexViewModel
 
@@ -9,6 +10,28 @@
         LostFoundStatus.ReturnedToGuest => "bg-success",
         LostFoundStatus.DisposedOf => "bg-danger",
         _ => "bg-secondary"
+    };
+    Func<LostFoundEntry, string> matchLabel = entry =>
+    {
+        if (entry == null)
+        {
+            return string.Empty;
+        }
+
+        if (entry.MatchedEntry != null)
+        {
+            return entry.MatchedEntry.Type == LostFoundType.Found
+                ? (!string.IsNullOrWhiteSpace(entry.MatchedEntry.ItemFound)
+                    ? entry.MatchedEntry.ItemFound
+                    : $"Found Entry #{entry.MatchedEntry.Id}")
+                : (!string.IsNullOrWhiteSpace(entry.MatchedEntry.ItemLost)
+                    ? entry.MatchedEntry.ItemLost
+                    : $"Lost Entry #{entry.MatchedEntry.Id}");
+        }
+
+        return entry.MatchedEntryId.HasValue
+            ? $"Entry #{entry.MatchedEntryId}"
+            : string.Empty;
     };
 }
 @{
@@ -36,6 +59,13 @@
     {
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             @successMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    @if (TempData["Error"] is string errorMessage)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
@@ -106,6 +136,11 @@
                     <div class="col-sm-6 col-lg-3 type-field type-lost">
                         <label asp-for="Submission.GuestName" class="form-label">Guest Name</label>
                         <input asp-for="Submission.GuestName" class="form-control" />
+                    </div>
+                    <div class="col-sm-6 col-lg-3 type-field type-lost">
+                        <label asp-for="Submission.GuestEmail" class="form-label">Guest Email</label>
+                        <input asp-for="Submission.GuestEmail" class="form-control" type="email" />
+                        <span asp-validation-for="Submission.GuestEmail" class="text-danger"></span>
                     </div>
                     <div class="col-sm-6 col-lg-3 type-field type-lost">
                         <label asp-for="Submission.GuestPhone" class="form-label">Guest Phone</label>
@@ -282,7 +317,7 @@
                             @foreach (var entry in Model.FoundEntries)
                             {
                                 <div class="list-group-item">
-                                    <div class="d-flex justify-content-between align-items-start">
+                                    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                                         <div>
                                             <button class="btn btn-link p-0 text-start" type="button" data-bs-toggle="modal" data-bs-target="#entryModal-@entry.Id">
                                                 <span class="fw-semibold">@(!string.IsNullOrWhiteSpace(entry.ItemFound) ? entry.ItemFound : "Found Item")</span>
@@ -298,7 +333,24 @@
                                                 }
                                             </div>
                                         </div>
-                                        <span class="badge @statusBadge(entry.Status)">@entry.Status</span>
+                                        <div class="text-end">
+                                            <div>
+                                                <span class="badge @statusBadge(entry.Status)">@entry.Status</span>
+                                            </div>
+                                            @if (entry.MatchedEntryId.HasValue)
+                                            {
+                                                <div class="small text-info mt-1">Matched to @matchLabel(entry)</div>
+                                            }
+                                            <div class="d-flex gap-1 flex-wrap justify-content-end mt-2">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editEntryModal-@entry.Id">Edit</button>
+                                                @if (entry.Status == LostFoundStatus.Logged)
+                                                {
+                                                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#matchEntryModal-@entry.Id">
+                                                        @(entry.MatchedEntryId.HasValue ? "Update Match" : "Match")
+                                                    </button>
+                                                }
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             }
@@ -323,7 +375,7 @@
                             @foreach (var entry in Model.LostEntries)
                             {
                                 <div class="list-group-item">
-                                    <div class="d-flex justify-content-between align-items-start">
+                                    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                                         <div>
                                             <button class="btn btn-link p-0 text-start" type="button" data-bs-toggle="modal" data-bs-target="#entryModal-@entry.Id">
                                                 <span class="fw-semibold">@(!string.IsNullOrWhiteSpace(entry.ItemLost) ? entry.ItemLost : "Lost Item")</span>
@@ -339,7 +391,24 @@
                                                 }
                                             </div>
                                         </div>
-                                        <span class="badge @statusBadge(entry.Status)">@entry.Status</span>
+                                        <div class="text-end">
+                                            <div>
+                                                <span class="badge @statusBadge(entry.Status)">@entry.Status</span>
+                                            </div>
+                                            @if (entry.MatchedEntryId.HasValue)
+                                            {
+                                                <div class="small text-info mt-1">Matched to @matchLabel(entry)</div>
+                                            }
+                                            <div class="d-flex gap-1 flex-wrap justify-content-end mt-2">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editEntryModal-@entry.Id">Edit</button>
+                                                @if (entry.Status == LostFoundStatus.Logged)
+                                                {
+                                                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#matchEntryModal-@entry.Id">
+                                                        @(entry.MatchedEntryId.HasValue ? "Update Match" : "Match")
+                                                    </button>
+                                                }
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             }
@@ -420,6 +489,13 @@
                                     <dt class="col-sm-4">Guest Phone</dt>
                                     <dd class="col-sm-8">@entry.GuestPhone</dd>
                                 }
+                                @if (!string.IsNullOrWhiteSpace(entry.GuestEmail))
+                                {
+                                    <dt class="col-sm-4">Guest Email</dt>
+                                    <dd class="col-sm-8">
+                                        <a href="mailto:@entry.GuestEmail">@entry.GuestEmail</a>
+                                    </dd>
+                                }
                                 @if (!string.IsNullOrWhiteSpace(entry.GuestAddress))
                                 {
                                     <dt class="col-sm-4">Guest Address</dt>
@@ -431,6 +507,12 @@
                                     <dt class="col-sm-4">Item Lost</dt>
                                     <dd class="col-sm-8">@entry.ItemLost</dd>
                                 }
+                            }
+
+                            @if (entry.MatchedEntryId.HasValue)
+                            {
+                                <dt class="col-sm-4">Matched With</dt>
+                                <dd class="col-sm-8">@matchLabel(entry)</dd>
                             }
 
                             @if (!string.IsNullOrWhiteSpace(entry.Notes))
@@ -470,6 +552,153 @@
                                 </form>
                             }
                         </div>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade lost-found-modal" id="editEntryModal-@entry.Id" tabindex="-1" aria-labelledby="editEntryModalLabel-@entry.Id" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <form asp-action="EditEntry" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="Id" value="@entry.Id" />
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="editEntryModalLabel-@entry.Id">Edit @(entry.Type == LostFoundType.Found ? "Found" : "Lost") Entry</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-3">
+                                @if (entry.Type == LostFoundType.Found)
+                                {
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="edit-datefound-@entry.Id">Date Found</label>
+                                        <input type="date" class="form-control" id="edit-datefound-@entry.Id" name="DateFound" value="@entry.DateFound?.ToString("yyyy-MM-dd")" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="edit-foundby-@entry.Id">Found By</label>
+                                        <input type="text" class="form-control" id="edit-foundby-@entry.Id" name="FoundBy" value="@entry.FoundBy" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="edit-itemfound-@entry.Id">Item Found</label>
+                                        <input type="text" class="form-control" id="edit-itemfound-@entry.Id" name="ItemFound" value="@entry.ItemFound" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="edit-stored-@entry.Id">Stored</label>
+                                        <input type="text" class="form-control" id="edit-stored-@entry.Id" name="Stored" value="@entry.Stored" />
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="edit-datelost-@entry.Id">Date Reported Lost</label>
+                                        <input type="date" class="form-control" id="edit-datelost-@entry.Id" name="DateReportedLost" value="@entry.DateReportedLost?.ToString("yyyy-MM-dd")" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="edit-guestname-@entry.Id">Guest Name</label>
+                                        <input type="text" class="form-control" id="edit-guestname-@entry.Id" name="GuestName" value="@entry.GuestName" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="edit-guestemail-@entry.Id">Guest Email</label>
+                                        <input type="email" class="form-control" id="edit-guestemail-@entry.Id" name="GuestEmail" value="@entry.GuestEmail" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="edit-guestphone-@entry.Id">Guest Phone</label>
+                                        <input type="text" class="form-control" id="edit-guestphone-@entry.Id" name="GuestPhone" value="@entry.GuestPhone" />
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="edit-guestaddress-@entry.Id">Guest Address</label>
+                                        <input type="text" class="form-control" id="edit-guestaddress-@entry.Id" name="GuestAddress" value="@entry.GuestAddress" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="edit-itemlost-@entry.Id">Item Lost</label>
+                                        <input type="text" class="form-control" id="edit-itemlost-@entry.Id" name="ItemLost" value="@entry.ItemLost" />
+                                    </div>
+                                }
+                                <div class="col-md-6">
+                                    <label class="form-label" for="edit-location-@entry.Id">Location</label>
+                                    <input type="text" class="form-control" id="edit-location-@entry.Id" name="Location" value="@entry.Location" />
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <label class="form-label" for="edit-notes-@entry.Id">Notes</label>
+                                <textarea class="form-control" id="edit-notes-@entry.Id" name="Notes" rows="3" data-enable-mentions="true">@entry.Notes</textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade lost-found-modal" id="matchEntryModal-@entry.Id" tabindex="-1" aria-labelledby="matchEntryModalLabel-@entry.Id" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="matchEntryModalLabel-@entry.Id">Match @(entry.Type == LostFoundType.Found ? "Found" : "Lost") Entry</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (entry.Status != LostFoundStatus.Logged)
+                        {
+                            <div class="alert alert-warning mb-0">Only logged entries can be matched.</div>
+                        }
+                        else
+                        {
+                            var isFoundEntry = entry.Type == LostFoundType.Found;
+                            var potentialMatches = (isFoundEntry ? Model.MatchableLostEntries : Model.MatchableFoundEntries)
+                                .Where(e => e.PropertyId == entry.PropertyId && (!e.MatchedEntryId.HasValue || e.MatchedEntryId == entry.Id))
+                                .OrderByDescending(e => e.CreatedAt)
+                                .ToList();
+
+                            if (entry.MatchedEntryId.HasValue)
+                            {
+                                <div class="alert alert-info">
+                                    Currently matched to <strong>@matchLabel(entry)</strong>.
+                                </div>
+                            }
+
+                            if (!potentialMatches.Any())
+                            {
+                                <div class="alert alert-info mb-0">No @(isFoundEntry ? "lost" : "found") items are available to match for this property.</div>
+                            }
+                            else
+                            {
+                                <form asp-action="MatchEntries" method="post">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="entryId" value="@entry.Id" />
+                                    <div class="mb-3">
+                                        <label class="form-label" for="match-select-@entry.Id">@(isFoundEntry ? "Lost Item" : "Found Item")</label>
+                                        <select class="form-select" id="match-select-@entry.Id" name="matchId" required>
+                                            <option value="">Select an item</option>
+                                            @foreach (var option in potentialMatches)
+                                            {
+                                                var description = option.Type == LostFoundType.Found
+                                                    ? (!string.IsNullOrWhiteSpace(option.ItemFound) ? option.ItemFound : $"Found Entry #{option.Id}")
+                                                    : (!string.IsNullOrWhiteSpace(option.ItemLost) ? option.ItemLost : $"Lost Entry #{option.Id}");
+                                                var loggedAt = TimeZoneService.ConvertToUserTime(option.CreatedAt).ToString("g");
+                                                <option value="@option.Id">@description (Logged @loggedAt)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <p class="text-muted small mb-3">Matching links this entry with the selected @((isFoundEntry ? "lost" : "found")) record.</p>
+                                    <button type="submit" class="btn btn-primary">Save Match</button>
+                                </form>
+                            }
+
+                            @if (entry.MatchedEntryId.HasValue)
+                            {
+                                <form asp-action="UnmatchEntry" method="post" class="mt-3">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@entry.Id" />
+                                    <button type="submit" class="btn btn-outline-danger">Remove Match</button>
+                                </form>
+                            }
+                        }
+                    </div>
+                    <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>

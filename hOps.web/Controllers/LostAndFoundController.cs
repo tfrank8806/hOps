@@ -128,6 +128,7 @@ namespace hOps.web.Controllers
                     FoundBy = submission.Type == LostFoundType.Found ? submission.FoundBy?.Trim() : null,
                     GuestName = submission.Type == LostFoundType.Lost ? submission.GuestName?.Trim() : null,
                     GuestPhone = submission.Type == LostFoundType.Lost ? submission.GuestPhone?.Trim() : null,
+                    GuestEmail = submission.Type == LostFoundType.Lost ? submission.GuestEmail?.Trim() : null,
                     GuestAddress = submission.Type == LostFoundType.Lost ? submission.GuestAddress?.Trim() : null,
                     Location = submission.Location?.Trim(),
                     ItemFound = submission.Type == LostFoundType.Found ? submission.ItemFound?.Trim() : null,
@@ -164,12 +165,8 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
-            var accessiblePropertyIds = await _context.UserPropertyAccesses
-                .Where(upa => upa.ApplicationUserId == currentUser.Id)
-                .Select(upa => upa.PropertyId)
-                .ToListAsync();
-
             var entry = await _context.LostFoundEntries
+                .Include(e => e.MatchedEntry)
                 .FirstOrDefaultAsync(e => e.Id == id);
 
             if (entry == null)
@@ -177,12 +174,18 @@ namespace hOps.web.Controllers
                 return NotFound();
             }
 
-            if (!accessiblePropertyIds.Contains(entry.PropertyId))
+            if (!await HasPropertyAccessAsync(currentUser.Id, entry.PropertyId))
             {
                 return Forbid();
             }
 
             entry.Status = status;
+
+            if (status != LostFoundStatus.Logged)
+            {
+                await ClearExistingMatchAsync(entry);
+            }
+
             _context.LostFoundEntries.Update(entry);
             await _context.SaveChangesAsync();
 
@@ -201,12 +204,8 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
-            var accessiblePropertyIds = await _context.UserPropertyAccesses
-                .Where(upa => upa.ApplicationUserId == currentUser.Id)
-                .Select(upa => upa.PropertyId)
-                .ToListAsync();
-
             var entry = await _context.LostFoundEntries
+                .Include(e => e.MatchedEntry)
                 .FirstOrDefaultAsync(e => e.Id == id);
 
             if (entry == null)
@@ -214,7 +213,7 @@ namespace hOps.web.Controllers
                 return NotFound();
             }
 
-            if (!accessiblePropertyIds.Contains(entry.PropertyId))
+            if (!await HasPropertyAccessAsync(currentUser.Id, entry.PropertyId))
             {
                 return Forbid();
             }
@@ -238,11 +237,208 @@ namespace hOps.web.Controllers
                 }
             }
 
+            await ClearExistingMatchAsync(entry);
+
             _context.LostFoundEntries.Remove(entry);
             await _context.SaveChangesAsync();
 
             TempData["Success"] = "Lost & Found entry deleted.";
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditEntry(LostFoundEditInput input)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var entry = await _context.LostFoundEntries
+                .FirstOrDefaultAsync(e => e.Id == input.Id);
+
+            if (entry == null)
+            {
+                return NotFound();
+            }
+
+            if (!await HasPropertyAccessAsync(currentUser.Id, entry.PropertyId))
+            {
+                return Forbid();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                TempData["Error"] = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m))
+                    ?? "Unable to update entry. Please verify the information and try again.";
+                return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
+            }
+
+            if (entry.Type == LostFoundType.Found)
+            {
+                if (!input.DateFound.HasValue)
+                {
+                    TempData["Error"] = "Date Found is required for found items.";
+                    return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
+                }
+                if (string.IsNullOrWhiteSpace(input.ItemFound))
+                {
+                    TempData["Error"] = "Please provide a description of the found item.";
+                    return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
+                }
+
+                entry.DateFound = input.DateFound;
+                entry.ItemFound = input.ItemFound?.Trim();
+                entry.FoundBy = string.IsNullOrWhiteSpace(input.FoundBy) ? null : input.FoundBy.Trim();
+                entry.Stored = string.IsNullOrWhiteSpace(input.Stored) ? null : input.Stored.Trim();
+                entry.DateReportedLost = null;
+                entry.ItemLost = null;
+                entry.GuestName = null;
+                entry.GuestPhone = null;
+                entry.GuestAddress = null;
+                entry.GuestEmail = null;
+            }
+            else
+            {
+                if (!input.DateReportedLost.HasValue)
+                {
+                    TempData["Error"] = "Date Reported Lost is required for lost items.";
+                    return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
+                }
+                if (string.IsNullOrWhiteSpace(input.ItemLost))
+                {
+                    TempData["Error"] = "Please provide a description of the lost item.";
+                    return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
+                }
+
+                entry.DateReportedLost = input.DateReportedLost;
+                entry.ItemLost = input.ItemLost?.Trim();
+                entry.GuestName = string.IsNullOrWhiteSpace(input.GuestName) ? null : input.GuestName.Trim();
+                entry.GuestPhone = string.IsNullOrWhiteSpace(input.GuestPhone) ? null : input.GuestPhone.Trim();
+                entry.GuestAddress = string.IsNullOrWhiteSpace(input.GuestAddress) ? null : input.GuestAddress.Trim();
+                entry.GuestEmail = string.IsNullOrWhiteSpace(input.GuestEmail) ? null : input.GuestEmail.Trim();
+                entry.Stored = null;
+                entry.FoundBy = null;
+                entry.DateFound = null;
+                entry.ItemFound = null;
+            }
+
+            entry.Location = string.IsNullOrWhiteSpace(input.Location) ? null : input.Location.Trim();
+            entry.Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim();
+
+            _context.LostFoundEntries.Update(entry);
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "Lost & Found entry updated.";
+            return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MatchEntries(int entryId, int matchId)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            if (entryId == matchId)
+            {
+                TempData["Error"] = "Please select a different entry to match.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var entry = await _context.LostFoundEntries
+                .Include(e => e.MatchedEntry)
+                .FirstOrDefaultAsync(e => e.Id == entryId);
+            var match = await _context.LostFoundEntries
+                .Include(e => e.MatchedEntry)
+                .FirstOrDefaultAsync(e => e.Id == matchId);
+
+            if (entry == null || match == null)
+            {
+                return NotFound();
+            }
+
+            if (entry.PropertyId != match.PropertyId)
+            {
+                TempData["Error"] = "Entries must belong to the same property.";
+                return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
+            }
+
+            if (!await HasPropertyAccessAsync(currentUser.Id, entry.PropertyId))
+            {
+                return Forbid();
+            }
+
+            if (entry.Type == match.Type)
+            {
+                TempData["Error"] = "Lost items can only be matched with found items.";
+                return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
+            }
+
+            if (entry.Status != LostFoundStatus.Logged || match.Status != LostFoundStatus.Logged)
+            {
+                TempData["Error"] = "Only logged entries can be matched.";
+                return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
+            }
+
+            await ClearExistingMatchAsync(entry);
+            await ClearExistingMatchAsync(match);
+
+            entry.MatchedEntryId = match.Id;
+            match.MatchedEntryId = entry.Id;
+
+            _context.LostFoundEntries.Update(entry);
+            _context.LostFoundEntries.Update(match);
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "Entries matched successfully.";
+            return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UnmatchEntry(int id)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var entry = await _context.LostFoundEntries
+                .Include(e => e.MatchedEntry)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (entry == null)
+            {
+                return NotFound();
+            }
+
+            if (!await HasPropertyAccessAsync(currentUser.Id, entry.PropertyId))
+            {
+                return Forbid();
+            }
+
+            if (!entry.MatchedEntryId.HasValue)
+            {
+                TempData["Success"] = "Entry already unmatched.";
+                return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
+            }
+
+            await ClearExistingMatchAsync(entry);
+            _context.LostFoundEntries.Update(entry);
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "Entries unmatched.";
+            return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
         }
 
         private async Task<LostAndFoundIndexViewModel> BuildIndexViewModel(LostFoundFilterInput filters, LostFoundSubmissionViewModel? submission)
@@ -288,6 +484,7 @@ namespace hOps.web.Controllers
             var entriesQuery = _context.LostFoundEntries
                 .Include(e => e.Property)
                 .Include(e => e.CreatedByUser)
+                .Include(e => e.MatchedEntry)
                 .Where(e => accessiblePropertyIds.Contains(e.PropertyId));
 
             if (normalizedPropertyFilters.Any())
@@ -450,11 +647,48 @@ namespace hOps.web.Controllers
                 Submission = submission,
                 FoundEntries = foundEntries,
                 LostEntries = lostEntries,
+                MatchableFoundEntries = entries
+                    .Where(e => e.Type == LostFoundType.Found && e.Status == LostFoundStatus.Logged)
+                    .OrderByDescending(e => e.CreatedAt)
+                    .ToList(),
+                MatchableLostEntries = entries
+                    .Where(e => e.Type == LostFoundType.Lost && e.Status == LostFoundStatus.Logged)
+                    .OrderByDescending(e => e.CreatedAt)
+                    .ToList(),
                 AccessibleProperties = accessibleProperties,
                 LocationOptions = locationOptions.OrderBy(x => x).ToList(),
                 FoundByOptions = foundByOptions.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x).ToList(),
                 CreatorOptions = creatorOptions
             };
+        }
+
+        private Task<bool> HasPropertyAccessAsync(string userId, int propertyId)
+        {
+            return _context.UserPropertyAccesses
+                .AnyAsync(upa => upa.ApplicationUserId == userId && upa.PropertyId == propertyId);
+        }
+
+        private async Task ClearExistingMatchAsync(LostFoundEntry entry)
+        {
+            if (!entry.MatchedEntryId.HasValue)
+            {
+                return;
+            }
+
+            var counterpart = entry.MatchedEntry;
+            if (counterpart == null)
+            {
+                counterpart = await _context.LostFoundEntries
+                    .FirstOrDefaultAsync(e => e.Id == entry.MatchedEntryId.Value);
+            }
+
+            entry.MatchedEntryId = null;
+
+            if (counterpart != null)
+            {
+                counterpart.MatchedEntryId = null;
+                _context.LostFoundEntries.Update(counterpart);
+            }
         }
     }
 }

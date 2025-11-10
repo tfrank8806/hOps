@@ -71,6 +71,9 @@ namespace hOps.web.ViewModels
 
         public string? GuestAddress { get; set; }
 
+        [EmailAddress]
+        public string? GuestEmail { get; set; }
+
         public string? Location { get; set; }
 
         public string? ItemFound { get; set; }
@@ -84,6 +87,39 @@ namespace hOps.web.ViewModels
         public IFormFile? Photo { get; set; }
     }
 
+    public class LostFoundEditInput
+    {
+        [Required]
+        public int Id { get; set; }
+
+        [DataType(DataType.Date)]
+        public DateTime? DateFound { get; set; }
+
+        [DataType(DataType.Date)]
+        public DateTime? DateReportedLost { get; set; }
+
+        public string? FoundBy { get; set; }
+
+        public string? GuestName { get; set; }
+
+        public string? GuestPhone { get; set; }
+
+        [EmailAddress]
+        public string? GuestEmail { get; set; }
+
+        public string? GuestAddress { get; set; }
+
+        public string? Location { get; set; }
+
+        public string? ItemFound { get; set; }
+
+        public string? ItemLost { get; set; }
+
+        public string? Notes { get; set; }
+
+        public string? Stored { get; set; }
+    }
+
     public class LostAndFoundIndexViewModel
     {
         public LostFoundFilterInput Filters { get; set; } = new();
@@ -93,6 +129,10 @@ namespace hOps.web.ViewModels
         public List<LostFoundEntry> FoundEntries { get; set; } = new();
 
         public List<LostFoundEntry> LostEntries { get; set; } = new();
+
+        public List<LostFoundEntry> MatchableFoundEntries { get; set; } = new();
+
+        public List<LostFoundEntry> MatchableLostEntries { get; set; } = new();
 
         public List<Property> AccessibleProperties { get; set; } = new();
 

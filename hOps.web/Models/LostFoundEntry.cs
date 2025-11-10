@@ -48,6 +48,10 @@ namespace hOps.web.Models
         public string? GuestAddress { get; set; }
 
         [MaxLength(256)]
+        [EmailAddress]
+        public string? GuestEmail { get; set; }
+
+        [MaxLength(256)]
         public string? Location { get; set; }
 
         [MaxLength(256)]
@@ -75,5 +79,9 @@ namespace hOps.web.Models
 
         [MaxLength(256)]
         public string CreatedByDisplayName { get; set; } = string.Empty;
+
+        public int? MatchedEntryId { get; set; }
+
+        public LostFoundEntry? MatchedEntry { get; set; }
     }
 }
