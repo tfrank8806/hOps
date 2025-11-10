@@ -5,6 +5,7 @@
     ViewData["MainContainerClass"] = "main-inner--wide";
     var dayHeaders = new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
     var disableForm = !Model.AccessibleProperties.Any();
+    var today = DateTime.Today;
 }
 
 <div class="calendar-page">
@@ -23,6 +24,13 @@
                asp-route-year="@Model.NextMonth.Year"
                asp-route-month="@Model.NextMonth.Month">
                 @Model.NextMonth.ToString("MMM yyyy") &raquo;
+            </a>
+            <a class="btn btn-primary btn-sm"
+               asp-action="Index"
+               asp-route-year="@today.Year"
+               asp-route-month="@today.Month"
+               title="Jump back to the current month">
+                Today
             </a>
         </div>
     </div>

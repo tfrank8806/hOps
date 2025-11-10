@@ -795,16 +795,55 @@ namespace hOps.web.Controllers
                 .AsNoTracking()
                 .ToListAsync();
 
-            var summaries = events
-                .Select(e => new CalendarEventSummaryViewModel
+            static string BuildDateLabel(DateTime start, DateTime end)
+            {
+                return start.Date == end.Date
+                    ? start.ToString("D")
+                    : $"{start:MMM d, yyyy} - {end:MMM d, yyyy}";
+            }
+
+            static string? BuildTimeLabel(TimeSpan? startTime, TimeSpan? endTime)
+            {
+                string Format(TimeSpan time) => DateTime.Today.Add(time).ToString("t");
+
+                if (startTime.HasValue && endTime.HasValue)
                 {
-                    Id = e.Id,
-                    Title = e.Title,
-                    Start = e.StartDate,
-                    End = e.EndDate,
-                    CategoryName = e.Category?.Name ?? "Event",
-                    CategoryColor = string.IsNullOrWhiteSpace(e.Category?.Color) ? "#6c757d" : e.Category!.Color,
-                    DetailUrl = Url.Action("Index", "Calendar") ?? string.Empty,
+                    return $"{Format(startTime.Value)} - {Format(endTime.Value)}";
+                }
+
+                if (startTime.HasValue)
+                {
+                    return Format(startTime.Value);
+                }
+
+                if (endTime.HasValue)
+                {
+                    return $"Until {Format(endTime.Value)}";
+                }
+
+                return null;
+            }
+
+            var summaries = events
+                .Select(e =>
+                {
+                    var dateLabel = BuildDateLabel(e.StartDate, e.EndDate);
+                    var timeLabel = BuildTimeLabel(e.StartTime, e.EndTime);
+
+                    return new CalendarEventSummaryViewModel
+                    {
+                        Id = e.Id,
+                        Title = e.Title,
+                        StartDate = e.StartDate,
+                        EndDate = e.EndDate,
+                        StartTime = e.StartTime,
+                        EndTime = e.EndTime,
+                        CategoryName = e.Category?.Name ?? "Event",
+                        CategoryColor = string.IsNullOrWhiteSpace(e.Category?.Color) ? "#6c757d" : e.Category!.Color,
+                        DetailUrl = Url.Action("Index", "Calendar") ?? string.Empty,
+                        DateDisplay = dateLabel,
+                        TimeDisplay = timeLabel
+                    };
                 })
                 .ToList();
 

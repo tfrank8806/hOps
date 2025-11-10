@@ -154,11 +154,23 @@
         else if (items.First() is CalendarEventSummaryViewModel)
         {
             var events = items.OfType<CalendarEventSummaryViewModel>().ToList();
-            var todayLocal = TimeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
+            var todayLocalDate = TimeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
             var todaysEventCount = events.Count(calendarEvent =>
-                TimeZoneService.ConvertToUserTime(calendarEvent.Start).Date == todayLocal);
+                calendarEvent.StartDate.Date == todayLocalDate);
             var showMoreTodayButton = todaysEventCount > 5;
             var displayedEvents = events.Take(5).ToList();
+            string GetEventBadgeColor(DateTime eventDate)
+            {
+                if (eventDate.Date >= todayLocalDate)
+                {
+                    return "#198754";
+                }
+                if (eventDate.Date == todayLocalDate.AddDays(-1))
+                {
+                    return "#fd7e14";
+                }
+                return "#dc3545";
+            }
 
             <ul class="list-unstyled mb-0 widget-list">
                 @foreach (var calendarEvent in displayedEvents)
@@ -173,11 +185,11 @@
                         {
                             <span class="fw-semibold">@calendarEvent.Title</span>
                         }
-                        @{
-                            var startLocal = TimeZoneService.ConvertToUserTime(calendarEvent.Start);
-                            var endLocal = calendarEvent.End.HasValue ? TimeZoneService.ConvertToUserTime(calendarEvent.End.Value) : (DateTime?)null;
+                        <div class="small" style="color:@GetEventBadgeColor(calendarEvent.StartDate)">@calendarEvent.DateDisplay</div>
+                        @if (!string.IsNullOrWhiteSpace(calendarEvent.TimeDisplay))
+                        {
+                            <div class="small text-muted">@calendarEvent.TimeDisplay</div>
                         }
-                        <div class="small" style="color:@GetDateColor(calendarEvent.Start);">@startLocal.ToString("g") @if (endLocal.HasValue){<text>- @endLocal.Value.ToString("g")</text>}</div>
                         @if (!string.IsNullOrWhiteSpace(calendarEvent.CategoryName))
                         {
                             <span class="badge rounded-pill" style="background-color:@(calendarEvent.CategoryColor ?? "#0d6efd");">@calendarEvent.CategoryName</span>

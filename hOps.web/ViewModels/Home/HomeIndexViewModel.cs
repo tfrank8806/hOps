@@ -1,4 +1,5 @@
 using System;
+using System;
 using System.Collections.Generic;
 using hOps.web.Models;
 
@@ -115,11 +116,16 @@ namespace hOps.web.ViewModels.Home
     {
         public int Id { get; set; }
         public string Title { get; set; } = string.Empty;
-        public DateTime Start { get; set; }
-        public DateTime? End { get; set; }
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public TimeSpan? StartTime { get; set; }
+        public TimeSpan? EndTime { get; set; }
         public string CategoryName { get; set; } = string.Empty;
         public string? CategoryColor { get; set; }
         public string DetailUrl { get; set; } = string.Empty;
+        public string DateDisplay { get; set; } = string.Empty;
+        public string? TimeDisplay { get; set; }
+        public bool HasTime => !string.IsNullOrWhiteSpace(TimeDisplay);
     }
 
     public class PassOnLogSummaryViewModel
