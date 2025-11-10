@@ -1,6 +1,7 @@
 @using Microsoft.AspNetCore.Identity
 @using hOps.web.Models
 @using hOps.web.Utilities
+@using hOps.web.ViewModels.WorkOrders
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
 @{
@@ -32,13 +33,17 @@
             latestMessageSnippet = latestMessageSnippet.Substring(0, 80) + "...";
         }
     }
+    var toDoData = ViewBag.ToDoSidebarData as ToDoSidebarViewModel ?? new ToDoSidebarViewModel();
+    var toDoMessage = TempData["ToDoMessage"] as string;
+    var toDoError = TempData["ToDoError"] as string;
+    var showTodoSidebar = SignInManager.IsSignedIn(User);
 }
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8" />
     <title>@ViewData["Title"] - hOps</title>
-    <link rel="stylesheet" href="~/css/site.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
     @RenderSection("Styles", required: false)
 </head>
@@ -187,6 +192,14 @@
             </div>
         </aside>
         <div class="sidebar-backdrop d-lg-none" id="sidebarBackdrop"></div>
+        <button type="button"
+                id="sidebarFabToggle"
+                class="sidebar-fab-toggle"
+                aria-controls="sidebar"
+                aria-expanded="true"
+                aria-label="Collapse navigation sidebar">
+            <span class="sidebar-fab-toggle__icon" aria-hidden="true"></span>
+        </button>
         <div class="main-content flex-grow-1 d-flex flex-column">
             <header class="main-header">
                 <div class="container-fluid py-2 d-flex align-items-center justify-content-between">
@@ -289,9 +302,151 @@
                 </div>
             </main>
         </div>
+        @if (showTodoSidebar)
+        {
+            <button type="button"
+                    id="todoSidebarRailToggle"
+                    class="todo-sidebar-rail-toggle"
+                    aria-controls="todoSidebar"
+                    aria-expanded="true"
+                    aria-label="Collapse to-do sidebar">
+                <span class="todo-sidebar-rail-icon" aria-hidden="true"></span>
+            </button>
+            <aside id="todoSidebar" class="todo-sidebar bg-white border-start" aria-label="To-do sidebar">
+                <div class="todo-sidebar-inner">
+                    <div class="todo-sidebar-header">
+                        <h6 class="mb-0">To-Do</h6>
+                        <small class="text-muted">Your assignments &amp; reminders</small>
+                    </div>
+                    <div class="todo-sidebar-body">
+                        @if (!string.IsNullOrWhiteSpace(toDoMessage))
+                        {
+                            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                @toDoMessage
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(toDoError))
+                        {
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                @toDoError
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        }
+                        <section class="todo-section">
+                            <div class="section-heading d-flex justify-content-between align-items-center">
+                                <span class="fw-semibold">Department Work Orders</span>
+                                <span class="badge bg-light text-dark">@toDoData.DepartmentTasks.Count</span>
+                            </div>
+                            <div class="todo-list mt-3">
+                                @if (toDoData.DepartmentTasks.Any())
+                                {
+                                    foreach (var task in toDoData.DepartmentTasks)
+                                    {
+                                        var dueDateText = task.HasDueDate
+                                            ? TimeZoneService.ConvertToUserTime(task.DueDate).ToString("MMM d, yyyy")
+                                            : "No due date";
+                                        <div class="todo-card">
+                                            <div class="w-100">
+                                                <div class="fw-semibold">@task.Issue</div>
+                                                <div class="small text-muted">
+                                                    @task.DepartmentName
+                                                    @if (!string.IsNullOrWhiteSpace(task.PropertyName))
+                                                    {
+                                                        <span>&middot; @task.PropertyName</span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(task.Location))
+                                                    {
+                                                        <span>&middot; @task.Location</span>
+                                                    }
+                                                </div>
+                                                <div class="small text-muted">Due: @dueDateText</div>
+                                            </div>
+                                            <div class="d-flex gap-2 flex-wrap">
+                                                <a class="btn btn-outline-secondary btn-sm" asp-controller="WorkOrders" asp-action="Edit" asp-route-id="@task.WorkOrderId">View</a>
+                                                <form asp-controller="WorkOrders" asp-action="CompleteDepartmentWorkOrder" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@task.WorkOrderId" />
+                                                    <button type="submit" class="btn btn-success btn-sm">Complete</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    if (!toDoData.HasDepartmentAssignments)
+                                    {
+                                        <p class="text-muted small mb-0">
+                                            Assign yourself to departments on <a asp-controller="Profile" asp-action="Index">My Profile</a> to receive shared tasks.
+                                        </p>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted small mb-0">No open work orders are currently assigned to your departments.</p>
+                                    }
+                                }
+                            </div>
+                        </section>
+                        <section class="todo-section mt-4">
+                            <div class="section-heading d-flex justify-content-between align-items-center">
+                                <span class="fw-semibold">My Personal To-Dos</span>
+                                <span class="badge bg-light text-dark">@toDoData.PersonalToDos.Count</span>
+                            </div>
+                            <div class="todo-list mt-3">
+                                @if (toDoData.PersonalToDos.Any())
+                                {
+                                    foreach (var todo in toDoData.PersonalToDos)
+                                    {
+                                        var createdText = TimeZoneService.ConvertToUserTime(todo.CreatedAtUtc).ToString("MMM d, h:mm tt");
+                                        <div class="todo-card align-items-start">
+                                            <form asp-controller="WorkOrders" asp-action="TogglePersonalTodo" method="post" class="todo-checkbox-form">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@todo.Id" />
+                                                <input class="form-check-input" type="checkbox" value="true" @(todo.IsCompleted ? "checked" : null) onchange="this.form.submit()" />
+                                            </form>
+                                            <div class="flex-grow-1">
+                                                <div class="@(todo.IsCompleted ? "text-decoration-line-through text-muted" : "fw-semibold")">@todo.Title</div>
+                                                <div class="small text-muted">Added @createdText</div>
+                                                @if (todo.IsCompleted && todo.CompletedAtUtc.HasValue)
+                                                {
+                                                    var completedText = TimeZoneService.ConvertToUserTime(todo.CompletedAtUtc.Value).ToString("MMM d, h:mm tt");
+                                                    <div class="small text-muted">Completed @completedText</div>
+                                                }
+                                            </div>
+                                            <form asp-controller="WorkOrders" asp-action="DeletePersonalTodo" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@todo.Id" />
+                                                <button type="submit" class="btn btn-link text-danger btn-sm p-0">Delete</button>
+                                            </form>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <p class="text-muted small mb-0">Add personal reminders to stay organized.</p>
+                                }
+                            </div>
+                            <form asp-controller="WorkOrders" asp-action="AddPersonalTodo" method="post" class="mt-3">
+                                @Html.AntiForgeryToken()
+                                <label class="form-label">Add a new item</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" name="title" class="form-control" maxlength="256" placeholder="e.g., Call vendor" required />
+                                    <button type="submit" class="btn btn-primary">Add</button>
+                                </div>
+                            </form>
+                        </section>
+                    </div>
+                </div>
+            </aside>
+        }
     </div>
 
     <div id="sidebarQuickMenu" class="sidebar-quick-menu" aria-hidden="true"></div>
+    @if (showTodoSidebar)
+    {
+        <div class="todo-sidebar-backdrop d-lg-none" id="todoSidebarBackdrop"></div>
+    }
 
     <script src="~/lib/jquery/dist/jquery.min.js" asp-append-version="true"></script>
     @RenderSection("Scripts", required: false)
@@ -304,31 +459,41 @@
     <script>
         (function () {
             const body = document.body;
+
             const sidebar = document.getElementById('sidebar');
-            const toggles = document.querySelectorAll('.sidebar-toggle');
-            const backdrop = document.getElementById('sidebarBackdrop');
-            const mediaQuery = window.matchMedia('(max-width: 991.98px)');
+            const sidebarFabToggle = document.getElementById('sidebarFabToggle');
+            const sidebarToggles = Array.from(document.querySelectorAll('.sidebar-toggle'));
+            if (sidebarFabToggle) {
+                sidebarToggles.push(sidebarFabToggle);
+            }
+            const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+            const sidebarMediaQuery = window.matchMedia('(max-width: 991.98px)');
             const quickMenu = document.getElementById('sidebarQuickMenu');
             const sidebarMenu = document.querySelector('.sidebar-menu');
             const QUICK_MENU_WIDTH = 240;
             let quickMenuHideTimer;
             const SIDEBAR_STORAGE_KEY = 'sidebarCollapsed';
 
-            function updateAria() {
+            function updateSidebarAria() {
                 const expanded = !body.classList.contains('sidebar-collapsed');
-                toggles.forEach(btn => btn.setAttribute('aria-expanded', expanded.toString()));
+                sidebarToggles.forEach(btn => {
+                    btn.setAttribute('aria-expanded', expanded.toString());
+                    if (btn === sidebarFabToggle) {
+                        btn.setAttribute('aria-label', expanded ? 'Collapse navigation sidebar' : 'Expand navigation sidebar');
+                        btn.classList.toggle('collapsed', !expanded);
+                    }
+                });
                 if (sidebar) {
                     sidebar.setAttribute('aria-hidden', (!expanded).toString());
                 }
             }
 
-            function syncBackdrop() {
-                if (!backdrop) {
+            function syncSidebarBackdrop() {
+                if (!sidebarBackdrop) {
                     return;
                 }
-
-                const isCollapsed = body.classList.contains('sidebar-collapsed');
-                backdrop.classList.toggle('show', !isCollapsed);
+                const collapsed = body.classList.contains('sidebar-collapsed');
+                sidebarBackdrop.classList.toggle('show', !collapsed);
             }
 
             function hideQuickMenu(immediate = true) {
@@ -336,8 +501,6 @@
                     return;
                 }
                 if (immediate) {
-                    quickMenu.classList.remove('show');
-                } else {
                     quickMenu.classList.remove('show');
                 }
                 quickMenu.setAttribute('aria-hidden', 'true');
@@ -359,10 +522,7 @@
             }
 
             function showQuickMenu(trigger) {
-                if (!quickMenu || !sidebarMenu) {
-                    return;
-                }
-                if (!body.classList.contains('sidebar-collapsed')) {
+                if (!quickMenu || !sidebarMenu || !body.classList.contains('sidebar-collapsed')) {
                     return;
                 }
 
@@ -381,18 +541,17 @@
                 quickMenu.setAttribute('aria-hidden', 'false');
             }
 
-            function setSidebarCollapsed(collapsed, options) {
-                const persist = options?.persist ?? true;
+            function setSidebarCollapsed(collapsed, options = { persist: true }) {
                 body.classList.toggle('sidebar-collapsed', collapsed);
-                if (persist) {
+                if (options.persist) {
                     try {
                         localStorage.setItem(SIDEBAR_STORAGE_KEY, collapsed ? 'true' : 'false');
                     } catch (err) {
                         console.warn('Failed to store sidebar state:', err);
                     }
                 }
-                updateAria();
-                syncBackdrop();
+                updateSidebarAria();
+                syncSidebarBackdrop();
                 if (!collapsed) {
                     hideQuickMenu(true);
                 }
@@ -403,9 +562,9 @@
                 setSidebarCollapsed(!currentlyCollapsed);
             }
 
-            toggles.forEach(btn => {
+            sidebarToggles.forEach(btn => {
                 btn.addEventListener('click', toggleSidebar);
-                if (quickMenu) {
+                if (quickMenu && btn !== sidebarFabToggle) {
                     btn.addEventListener('mouseenter', () => {
                         cancelHideQuickMenu();
                         showQuickMenu(btn);
@@ -419,20 +578,18 @@
                 }
             });
 
-            if (backdrop) {
-                backdrop.addEventListener('click', () => {
-                    setSidebarCollapsed(true);
-                });
+            if (sidebarBackdrop) {
+                sidebarBackdrop.addEventListener('click', () => setSidebarCollapsed(true));
             }
 
-            function handleScreenChange(e) {
+            function handleSidebarScreenChange(e) {
                 if (e.matches) {
                     setSidebarCollapsed(true, { persist: false });
                 } else {
                     let collapsedPreference = false;
                     try {
                         collapsedPreference = localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
-                    } catch (err) {
+                    } catch {
                         collapsedPreference = false;
                     }
                     setSidebarCollapsed(collapsedPreference, { persist: false });
@@ -440,22 +597,21 @@
             }
 
             (function initialiseSidebarState() {
-                let initialCollapsed = mediaQuery.matches;
-                if (!mediaQuery.matches) {
+                let initialCollapsed = sidebarMediaQuery.matches;
+                if (!sidebarMediaQuery.matches) {
                     try {
                         initialCollapsed = localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
-                    } catch (err) {
+                    } catch {
                         initialCollapsed = false;
                     }
                 }
                 setSidebarCollapsed(initialCollapsed, { persist: false });
             })();
 
-            handleScreenChange(mediaQuery);
-            if (mediaQuery.addEventListener) {
-                mediaQuery.addEventListener('change', handleScreenChange);
-            } else if (mediaQuery.addListener) {
-                mediaQuery.addListener(handleScreenChange);
+            if (sidebarMediaQuery.addEventListener) {
+                sidebarMediaQuery.addEventListener('change', handleSidebarScreenChange);
+            } else if (sidebarMediaQuery.addListener) {
+                sidebarMediaQuery.addListener(handleSidebarScreenChange);
             }
 
             if (quickMenu) {
@@ -472,11 +628,116 @@
 
             window.addEventListener('scroll', () => hideQuickMenu(true));
             window.addEventListener('resize', () => hideQuickMenu(true));
+
             document.addEventListener('keydown', evt => {
                 if (evt.key === 'Escape') {
                     hideQuickMenu(true);
+                    if (todoSidebar && !body.classList.contains('todo-sidebar-collapsed')) {
+                        setTodoSidebarCollapsed(true);
+                    }
                 }
             });
+
+            const todoSidebar = document.getElementById('todoSidebar');
+            const todoRailToggle = document.getElementById('todoSidebarRailToggle');
+            const todoBackdrop = document.getElementById('todoSidebarBackdrop');
+            const todoMediaQuery = window.matchMedia('(max-width: 991.98px)');
+            const TODO_SIDEBAR_STORAGE_KEY = 'todoSidebarCollapsed';
+            const todoToggleButtons = [];
+            if (todoRailToggle) {
+                todoToggleButtons.push(todoRailToggle);
+            }
+
+            function updateTodoAria() {
+                if (!todoSidebar) {
+                    return;
+                }
+                const expanded = !body.classList.contains('todo-sidebar-collapsed');
+                todoToggleButtons.forEach(btn => {
+                    btn.setAttribute('aria-expanded', expanded.toString());
+                    btn.setAttribute('aria-label', expanded ? 'Collapse to-do sidebar' : 'Expand to-do sidebar');
+                    btn.classList.toggle('collapsed', !expanded);
+                });
+                todoSidebar.setAttribute('aria-hidden', (!expanded).toString());
+            }
+
+            function syncTodoBackdrop() {
+                if (!todoBackdrop) {
+                    return;
+                }
+                const collapsed = body.classList.contains('todo-sidebar-collapsed');
+                todoBackdrop.classList.toggle('show', !collapsed && todoMediaQuery.matches);
+            }
+
+            function setTodoSidebarCollapsed(collapsed, options = { persist: true }) {
+                if (!todoSidebar) {
+                    return;
+                }
+                body.classList.toggle('todo-sidebar-collapsed', collapsed);
+                if (options.persist) {
+                    try {
+                        localStorage.setItem(TODO_SIDEBAR_STORAGE_KEY, collapsed ? 'true' : 'false');
+                    } catch {
+                        console.warn('Unable to persist to-do sidebar state');
+                    }
+                }
+                updateTodoAria();
+                syncTodoBackdrop();
+            }
+
+            function initialiseTodoSidebar() {
+                if (!todoSidebar) {
+                    return;
+                }
+                let collapsedPreference = false;
+                try {
+                    collapsedPreference = localStorage.getItem(TODO_SIDEBAR_STORAGE_KEY) === 'true';
+                } catch {
+                    collapsedPreference = false;
+                }
+
+                const initialCollapsed = todoMediaQuery.matches ? true : collapsedPreference;
+                setTodoSidebarCollapsed(initialCollapsed, { persist: false });
+            }
+
+            function handleTodoScreenChange(e) {
+                if (e.matches) {
+                    setTodoSidebarCollapsed(true, { persist: false });
+                } else {
+                    let collapsedPreference = false;
+                    try {
+                        collapsedPreference = localStorage.getItem(TODO_SIDEBAR_STORAGE_KEY) === 'true';
+                    } catch {
+                        collapsedPreference = false;
+                    }
+                    setTodoSidebarCollapsed(collapsedPreference, { persist: false });
+                }
+            }
+
+            function toggleTodoSidebar(forceValue) {
+                const shouldCollapse = typeof forceValue === 'boolean'
+                    ? forceValue
+                    : !body.classList.contains('todo-sidebar-collapsed');
+                setTodoSidebarCollapsed(shouldCollapse);
+            }
+
+            if (todoSidebar) {
+                todoToggleButtons.forEach(btn => {
+                    btn.addEventListener('click', () => toggleTodoSidebar());
+                });
+
+                if (todoBackdrop) {
+                    todoBackdrop.addEventListener('click', () => toggleTodoSidebar(true));
+                }
+
+                initialiseTodoSidebar();
+
+                if (todoMediaQuery.addEventListener) {
+                    todoMediaQuery.addEventListener('change', handleTodoScreenChange);
+                } else if (todoMediaQuery.addListener) {
+                    todoMediaQuery.addListener(handleTodoScreenChange);
+                }
+            }
 
             async function fetchAccessRequestCount() {
                 try {
@@ -484,11 +745,9 @@
                     const count = await res.json();
                     const badge = document.getElementById('accessRequestBadge');
                     if (badge) {
+                        badge.style.display = count > 0 ? 'inline-block' : 'none';
                         if (count > 0) {
-                            badge.style.display = 'inline-block';
                             badge.textContent = count;
-                        } else {
-                            badge.style.display = 'none';
                         }
                     }
 
@@ -522,8 +781,11 @@
             setInterval(fetchAccessRequestCount, 30000);
         })();
     </script>
+
+    
 </body>
 </html>
+
 
 
 

@@ -27,6 +27,7 @@ C:\hOps\hOps.web.Tests\bin\Debug\net8.0\DocumentFormat.OpenXml.Framework.dll
 C:\hOps\hOps.web.Tests\bin\Debug\net8.0\ExcelNumberFormat.dll
 C:\hOps\hOps.web.Tests\bin\Debug\net8.0\Humanizer.dll
 C:\hOps\hOps.web.Tests\bin\Debug\net8.0\MailKit.dll
+C:\hOps\hOps.web.Tests\bin\Debug\net8.0\Markdig.dll
 C:\hOps\hOps.web.Tests\bin\Debug\net8.0\Microsoft.AspNetCore.Cryptography.Internal.dll
 C:\hOps\hOps.web.Tests\bin\Debug\net8.0\Microsoft.AspNetCore.Cryptography.KeyDerivation.dll
 C:\hOps\hOps.web.Tests\bin\Debug\net8.0\Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore.dll
@@ -382,4 +383,3 @@ C:\hOps\hOps.web.Tests\obj\Debug\net8.0\refint\hOps.web.Tests.dll
 C:\hOps\hOps.web.Tests\obj\Debug\net8.0\hOps.web.Tests.pdb
 C:\hOps\hOps.web.Tests\obj\Debug\net8.0\hOps.web.Tests.genruntimeconfig.cache
 C:\hOps\hOps.web.Tests\obj\Debug\net8.0\ref\hOps.web.Tests.dll
-C:\hops\hOps.web.Tests\bin\Debug\net8.0\Markdig.dll

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Utilities;
+using hOps.web.ViewModels.WorkOrders;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -39,26 +40,31 @@ public class BaseController : Controller
                 .Select(upa => upa.Property)
                 .ToListAsync();
 
-            ViewBag.UserProperties = props;
+            var userProperties = props
+                .Where(p => p != null)
+                .Select(p => p!)
+                .ToList();
+
+            ViewBag.UserProperties = userProperties;
             ViewBag.CurrentUserId = user.Id;
 
             int? currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
             Property? currentProperty = currentPropertyId.HasValue
-                ? props.FirstOrDefault(p => p.Id == currentPropertyId.Value)
+                ? userProperties.FirstOrDefault(p => p.Id == currentPropertyId.Value)
                 : null;
 
             if (currentProperty == null && user.DefaultPropertyId.HasValue)
             {
-                currentProperty = props.FirstOrDefault(p => p.Id == user.DefaultPropertyId.Value);
+                currentProperty = userProperties.FirstOrDefault(p => p.Id == user.DefaultPropertyId.Value);
                 if (currentProperty != null)
                 {
                     HttpContext.Session.SetInt32("CurrentPropertyId", currentProperty.Id);
                 }
             }
 
-            if (currentProperty == null && props.Any())
+            if (currentProperty == null && userProperties.Any())
             {
-                currentProperty = props.First();
+                currentProperty = userProperties.First();
                 HttpContext.Session.SetInt32("CurrentPropertyId", currentProperty.Id);
             }
             else if (currentProperty == null)
@@ -124,9 +130,90 @@ public class BaseController : Controller
                 ViewBag.LatestDirectMessageSentAt = latestMessage.SentAt;
                 ViewBag.LatestDirectMessageConversationId = latestMessage.ConversationId;
             }
+
+            ViewBag.ToDoSidebarData = await BuildToDoSidebarAsync(user, userProperties);
         }
 
         await next();
+    }
+
+    private async Task<ToDoSidebarViewModel?> BuildToDoSidebarAsync(ApplicationUser? user, List<Property>? accessibleProperties)
+    {
+        if (user == null)
+        {
+            return null;
+        }
+
+        var propertyIds = accessibleProperties?
+            .Select(p => p.Id)
+            .Where(id => id > 0)
+            .ToList() ?? new List<int>();
+
+        var departmentIds = await _context.UserDepartmentSubscriptions
+            .Where(s => s.UserId == user.Id)
+            .Select(s => s.DepartmentId)
+            .ToListAsync();
+
+        var model = new ToDoSidebarViewModel
+        {
+            HasDepartmentAssignments = departmentIds.Any()
+        };
+
+        if (departmentIds.Any())
+        {
+            var departmentWorkOrders = await _context.WorkOrders
+                .Where(w => w.DepartmentId.HasValue && departmentIds.Contains(w.DepartmentId.Value))
+                .Where(w => w.Status != "Completed" && w.Status != "Cancelled")
+                .Where(w => w.Properties.Any(p => propertyIds.Contains(p.PropertyId)))
+                .Include(w => w.Department)
+                .Include(w => w.Properties).ThenInclude(p => p.Property)
+                .OrderBy(w => w.DueDate == default ? DateTime.MaxValue : w.DueDate)
+                .ThenByDescending(w => w.CreatedAt)
+                .Take(10)
+                .AsNoTracking()
+                .ToListAsync();
+
+            model.DepartmentTasks = departmentWorkOrders.Select(w =>
+            {
+                var propertyLabel = w.Properties
+                    .Select(p => p.Property != null
+                        ? (string.IsNullOrWhiteSpace(p.Property.Code)
+                            ? p.Property.Name
+                            : $"{p.Property.Name} ({p.Property.Code})")
+                        : $"Property #{p.PropertyId}")
+                    .FirstOrDefault();
+
+                return new DepartmentWorkOrderTaskViewModel
+                {
+                    WorkOrderId = w.Id,
+                    Issue = string.IsNullOrWhiteSpace(w.Issue) ? $"Work Order #{w.Id}" : w.Issue,
+                    DepartmentName = w.Department?.Name ?? "Department",
+                    PropertyName = propertyLabel,
+                    Status = string.IsNullOrWhiteSpace(w.Status) ? "New" : w.Status,
+                    DueDate = w.DueDate,
+                    HasDueDate = w.DueDate != default,
+                    Location = string.IsNullOrWhiteSpace(w.Location) ? null : w.Location
+                };
+            }).ToList();
+        }
+
+        model.PersonalToDos = await _context.UserToDoItems
+            .Where(t => t.UserId == user.Id)
+            .OrderBy(t => t.IsCompleted)
+            .ThenByDescending(t => t.CreatedAtUtc)
+            .Take(25)
+            .AsNoTracking()
+            .Select(t => new UserToDoItemViewModel
+            {
+                Id = t.Id,
+                Title = t.Title,
+                IsCompleted = t.IsCompleted,
+                CreatedAtUtc = t.CreatedAtUtc,
+                CompletedAtUtc = t.CompletedAtUtc
+            })
+            .ToListAsync();
+
+        return model;
     }
 }
 

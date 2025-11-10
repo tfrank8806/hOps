@@ -1204,74 +1204,6 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
-            var departmentTasks = new List<DepartmentWorkOrderTaskViewModel>();
-            var personalToDos = new List<UserToDoItemViewModel>();
-
-            if (user != null)
-            {
-                var userDepartmentIds = await _context.UserDepartmentSubscriptions
-                    .Where(s => s.UserId == user.Id)
-                    .Select(s => s.DepartmentId)
-                    .ToListAsync();
-                var departmentIdSet = new HashSet<int>(userDepartmentIds);
-
-                if (departmentIdSet.Any())
-                {
-                    var departmentWorkOrders = await _context.WorkOrders
-                        .Where(w => w.DepartmentId.HasValue && departmentIdSet.Contains(w.DepartmentId.Value))
-                        .Where(w =>
-                            !string.Equals(w.Status, "Completed", StringComparison.OrdinalIgnoreCase) &&
-                            !string.Equals(w.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
-                        .Where(w => w.Properties.Any(p => targetPropertySet.Contains(p.PropertyId)))
-                        .Include(w => w.Department)
-                        .Include(w => w.Properties).ThenInclude(p => p.Property)
-                        .AsNoTracking()
-                        .ToListAsync();
-
-                    departmentTasks = departmentWorkOrders
-                        .Select(w =>
-                        {
-                            var propertyLabel = w.Properties
-                                .Select(p => p.Property != null
-                                    ? (string.IsNullOrWhiteSpace(p.Property.Code)
-                                        ? p.Property.Name
-                                        : $"{p.Property.Name} ({p.Property.Code})")
-                                    : $"Property #{p.PropertyId}")
-                                .FirstOrDefault();
-
-                            return new DepartmentWorkOrderTaskViewModel
-                            {
-                                WorkOrderId = w.Id,
-                                Issue = string.IsNullOrWhiteSpace(w.Issue) ? $"Work Order #{w.Id}" : w.Issue,
-                                DepartmentName = w.Department?.Name ?? "Department",
-                                PropertyName = propertyLabel,
-                                Status = string.IsNullOrWhiteSpace(w.Status) ? "New" : w.Status,
-                                DueDate = w.DueDate,
-                                HasDueDate = w.DueDate != default,
-                                Location = string.IsNullOrWhiteSpace(w.Location) ? null : w.Location
-                            };
-                        })
-                        .OrderBy(t => t.HasDueDate ? t.DueDate : DateTime.MaxValue)
-                        .ThenBy(t => t.WorkOrderId)
-                        .ToList();
-                }
-
-                personalToDos = await _context.UserToDoItems
-                    .Where(t => t.UserId == user.Id)
-                    .OrderBy(t => t.IsCompleted)
-                    .ThenByDescending(t => t.CreatedAtUtc)
-                    .AsNoTracking()
-                    .Select(t => new UserToDoItemViewModel
-                    {
-                        Id = t.Id,
-                        Title = t.Title,
-                        IsCompleted = t.IsCompleted,
-                        CreatedAtUtc = t.CreatedAtUtc,
-                        CompletedAtUtc = t.CompletedAtUtc
-                    })
-                    .ToListAsync();
-            }
-
             var viewModel = new WorkOrdersViewModel
             {
                 WorkOrders = listItems,
@@ -1286,9 +1218,7 @@ namespace hOps.web.Controllers
                 LocationSuggestions = locationSuggestions.OrderBy(x => x).ToList(),
                 StatusColorMap = statusColorMap,
                 EditingWorkOrderId = form?.Id,
-                CanManageWorkOrders = canManage,
-                DepartmentTasks = departmentTasks,
-                PersonalToDos = personalToDos
+                CanManageWorkOrders = canManage
             };
 
             return viewModel;
