@@ -27,8 +27,9 @@ namespace hOps.web.ViewModels.WorkOrders
     public class ToDoSidebarViewModel
     {
         public List<DepartmentWorkOrderTaskViewModel> DepartmentTasks { get; set; } = new();
-        public List<UserToDoItemViewModel> PersonalToDos { get; set; } = new();
+        public List<UserToDoItemViewModel> ActivePersonalToDos { get; set; } = new();
+        public List<UserToDoItemViewModel> CompletedPersonalToDos { get; set; } = new();
         public bool HasDepartmentAssignments { get; set; }
-        public bool HasItems => DepartmentTasks.Count > 0 || PersonalToDos.Count > 0;
+        public bool HasItems => DepartmentTasks.Count > 0 || ActivePersonalToDos.Count > 0 || CompletedPersonalToDos.Count > 0;
     }
 }

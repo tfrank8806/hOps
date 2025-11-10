@@ -197,11 +197,10 @@ public class BaseController : Controller
             }).ToList();
         }
 
-        model.PersonalToDos = await _context.UserToDoItems
+        var personalToDos = await _context.UserToDoItems
             .Where(t => t.UserId == user.Id)
             .OrderBy(t => t.IsCompleted)
             .ThenByDescending(t => t.CreatedAtUtc)
-            .Take(25)
             .AsNoTracking()
             .Select(t => new UserToDoItemViewModel
             {
@@ -212,6 +211,16 @@ public class BaseController : Controller
                 CompletedAtUtc = t.CompletedAtUtc
             })
             .ToListAsync();
+
+        model.ActivePersonalToDos = personalToDos
+            .Where(t => !t.IsCompleted)
+            .Take(25)
+            .ToList();
+
+        model.CompletedPersonalToDos = personalToDos
+            .Where(t => t.IsCompleted)
+            .Take(25)
+            .ToList();
 
         return model;
     }

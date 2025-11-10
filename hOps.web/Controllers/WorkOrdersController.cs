@@ -537,7 +537,7 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CompleteDepartmentWorkOrder(int id)
+        public async Task<IActionResult> CompleteDepartmentWorkOrder(int id, string? returnUrl)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -554,7 +554,7 @@ namespace hOps.web.Controllers
             if (!departmentIds.Any())
             {
                 TempData["ToDoError"] = "You are not assigned to any departments.";
-                return RedirectToAction(nameof(Index));
+                return RedirectBack(returnUrl);
             }
 
             var workOrder = await _context.WorkOrders
@@ -587,12 +587,12 @@ namespace hOps.web.Controllers
                 TempData["ToDoMessage"] = $"Work order #{id} is already completed.";
             }
 
-            return RedirectToAction(nameof(Index), new { highlight = id });
+            return RedirectBack(returnUrl, new { highlight = id });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AddPersonalTodo(string title)
+        public async Task<IActionResult> AddPersonalTodo(string title, string? returnUrl)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -603,7 +603,7 @@ namespace hOps.web.Controllers
             if (string.IsNullOrWhiteSpace(title))
             {
                 TempData["ToDoError"] = "Please enter a description for your to-do item.";
-                return RedirectToAction(nameof(Index));
+                return RedirectBack(returnUrl);
             }
 
             var trimmed = title.Trim();
@@ -620,12 +620,12 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
 
             TempData["ToDoMessage"] = "Added a new to-do item.";
-            return RedirectToAction(nameof(Index));
+            return RedirectBack(returnUrl);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> TogglePersonalTodo(int id)
+        public async Task<IActionResult> TogglePersonalTodo(int id, string? returnUrl)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -648,12 +648,12 @@ namespace hOps.web.Controllers
             TempData["ToDoMessage"] = todo.IsCompleted
                 ? "Marked to-do item complete."
                 : "Reopened to-do item.";
-            return RedirectToAction(nameof(Index));
+            return RedirectBack(returnUrl);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeletePersonalTodo(int id)
+        public async Task<IActionResult> DeletePersonalTodo(int id, string? returnUrl)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -673,7 +673,7 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
 
             TempData["ToDoMessage"] = "Removed the to-do item.";
-            return RedirectToAction(nameof(Index));
+            return RedirectBack(returnUrl);
         }
 
         private async Task<WorkOrder> CreateWorkOrderAsync(
@@ -1222,6 +1222,18 @@ namespace hOps.web.Controllers
             };
 
             return viewModel;
+        }
+
+        private IActionResult RedirectBack(string? returnUrl, object? fallbackRouteValues = null)
+        {
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return fallbackRouteValues == null
+                ? RedirectToAction(nameof(Index))
+                : RedirectToAction(nameof(Index), fallbackRouteValues);
         }
 
         private int? GetCurrentPropertyId()
