@@ -166,6 +166,17 @@
                                     <input type="color" class="form-control form-control-color form-control-color-sm" id="fillColorInput" value="#ffffff" data-default-color="#ffffff" title="Fill color" disabled />
                                     <button class="btn btn-outline-secondary btn-sm" type="button" id="clearFillColorBtn" disabled>Clear</button>
                                 </div>
+                                <div class="d-flex align-items-center gap-2 alternating-control">
+                                    <label class="form-label form-label-sm mb-0 text-muted" for="alternateRowFormatSelect">Rows</label>
+                                    <select class="form-select form-select-sm" id="alternateRowFormatSelect" disabled aria-label="Alternating rows">
+                                        <option value="" selected>Alternating Rows</option>
+                                        <option value="blue">Cool Blue</option>
+                                        <option value="gray">Soft Gray</option>
+                                        <option value="green">Mint Green</option>
+                                        <option value="gold">Warm Gold</option>
+                                        <option value="clear">Remove Pattern</option>
+                                    </select>
+                                </div>
                                 <div class="d-flex align-items-center gap-2 border-control">
                                     <label class="form-label form-label-sm mb-0 text-muted" for="borderStyleSelect">Border</label>
                                     <select class="form-select form-select-sm w-auto" id="borderStyleSelect" disabled aria-label="Border style">
@@ -174,6 +185,13 @@
                                         <option value="medium">Medium</option>
                                         <option value="thick">Thick</option>
                                         <option value="dashed">Dashed</option>
+                                    </select>
+                                    <select class="form-select form-select-sm w-auto" id="borderPlacementSelect" disabled aria-label="Border placement">
+                                        <option value="all" selected>All Borders</option>
+                                        <option value="top">Top Only</option>
+                                        <option value="right">Right Only</option>
+                                        <option value="bottom">Bottom Only</option>
+                                        <option value="left">Left Only</option>
                                     </select>
                                     <input type="color" class="form-control form-control-color form-control-color-sm" id="borderColorInput" value="#000000" data-default-color="#000000" title="Border color" disabled />
                                     <button class="btn btn-outline-secondary btn-sm" type="button" id="clearBorderBtn" disabled>Clear</button>

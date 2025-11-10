@@ -104,6 +104,10 @@
     white-space: nowrap;
 }
 
+.alternating-control select {
+    min-width: 150px;
+}
+
 .number-format-control select {
     min-width: 140px;
 }
@@ -412,6 +416,11 @@
 
 .spreadsheet-table tbody td.fill-preview {
     outline: 2px dashed rgba(13, 110, 253, 0.6);
+    outline-offset: -2px;
+}
+
+.spreadsheet-table tbody td.formula-reference-target {
+    outline: 2px dashed #f0ad4e;
     outline-offset: -2px;
 }
 

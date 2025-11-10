@@ -46,9 +46,11 @@
     const unmergeCellsButton = document.getElementById('unmergeCellsBtn');
     const textColorInput = document.getElementById('textColorInput');
     const fillColorInput = document.getElementById('fillColorInput');
+    const alternateRowFormatSelect = document.getElementById('alternateRowFormatSelect');
     const clearTextColorButton = document.getElementById('clearTextColorBtn');
     const clearFillColorButton = document.getElementById('clearFillColorBtn');
     const borderStyleSelect = document.getElementById('borderStyleSelect');
+    const borderPlacementSelect = document.getElementById('borderPlacementSelect');
     const borderColorInput = document.getElementById('borderColorInput');
     const clearBorderButton = document.getElementById('clearBorderBtn');
     const numberFormatSelect = document.getElementById('numberFormatSelect');
@@ -92,6 +94,28 @@
         lookup[`${config.width} ${config.style}`] = key;
         return lookup;
     }, {});
+    const BORDER_SIDE_KEYS = ['borderTop', 'borderRight', 'borderBottom', 'borderLeft'];
+    const BORDER_PLACEMENT_SIDES = {
+        all: [...BORDER_SIDE_KEYS],
+        top: ['borderTop'],
+        right: ['borderRight'],
+        bottom: ['borderBottom'],
+        left: ['borderLeft']
+    };
+    const BORDER_PLACEMENT_LABELS = {
+        all: 'all borders',
+        top: 'top border',
+        right: 'right border',
+        bottom: 'bottom border',
+        left: 'left border'
+    };
+    const ALTERNATING_ROW_THEMES = {
+        blue: { label: 'Cool Blue', odd: '#ffffff', even: '#edf2ff' },
+        gray: { label: 'Soft Gray', odd: '#ffffff', even: '#f5f6f8' },
+        green: { label: 'Mint Green', odd: '#ffffff', even: '#e9f8ef' },
+        gold: { label: 'Warm Gold', odd: '#ffffff', even: '#fff4e0' }
+    };
+    const CELL_REFERENCE_REGEX = /([A-Za-z]+)(\d+)/g;
     const DEFAULT_CURRENCY_CODE = getDefaultCurrencyCode();
     const numberFormatterCache = new Map();
     const LG_BREAKPOINT = 992;
@@ -115,6 +139,8 @@
     let fillDragTargetRange = null;
     let fillPreviewCells = [];
     let lastClipboardSnapshot = null;
+    let formulaReferenceCursor = null;
+    let formulaReferenceHighlightCell = null;
 
     const logHistory = new Map();
     const formattingMemory = {
@@ -128,7 +154,8 @@
         textColor: '#000000',
         fillColor: '#FFFFFF',
         borderStyle: '',
-        borderColor: '#000000'
+        borderColor: '#000000',
+        borderPlacement: 'all'
     };
 
     function clamp(value, min, max) {
@@ -360,6 +387,11 @@
         if (typeof format.border === 'string' && format.border.trim().length) {
             normalized.border = format.border.trim();
         }
+        BORDER_SIDE_KEYS.forEach((key) => {
+            if (typeof format[key] === 'string' && format[key].trim().length) {
+                normalized[key] = format[key].trim();
+            }
+        });
         if (format.merge && typeof format.merge === 'object') {
             const rowSpan = Number(format.merge.rowSpan);
             const colSpan = Number(format.merge.colSpan);
@@ -1246,6 +1278,30 @@
         return values;
     }
 
+    function adjustFormulaReferences(formula, rowDelta, columnDelta) {
+        if (typeof formula !== 'string' || !formula.startsWith('=')) {
+            return formula;
+        }
+        if (!rowDelta && !columnDelta) {
+            return formula;
+        }
+        const body = formula.slice(1);
+        const replaced = body.replace(CELL_REFERENCE_REGEX, (match) => {
+            const normalized = match.toUpperCase();
+            const coordinates = parseCellReference(normalized);
+            if (!coordinates) {
+                return match;
+            }
+            const nextRow = coordinates.row + rowDelta;
+            const nextColumn = coordinates.column + columnDelta;
+            if (nextRow < 0 || nextColumn < 0) {
+                return match;
+            }
+            return formatCellLabel(nextRow, nextColumn);
+        });
+        return `=${replaced}`;
+    }
+
     function isErrorValue(value) {
         return typeof value === 'string' && value.startsWith('#');
     }
@@ -1618,6 +1674,13 @@
         return `${columnLabel(column)}${row + 1}`;
     }
 
+    function isFormulaValue(text) {
+        if (typeof text !== 'string') {
+            return false;
+        }
+        return text.trim().startsWith('=');
+    }
+
     function describeSelection(range) {
         if (!range) {
             return 'selected cells';
@@ -1642,12 +1705,39 @@
     }
 
     function handleCellInput(event) {
-        void event;
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+        if (target.dataset.editing === 'true') {
+            if (isFormulaValue(target.textContent ?? '')) {
+                ensureFormulaReferenceCursorInitialized();
+            } else {
+                resetFormulaReferenceState();
+            }
+        }
     }
 
     function handleCellMouseDown(event) {
         const target = event.target;
         if (!(target instanceof HTMLElement)) {
+            return;
+        }
+        if (activeEditingCell &&
+            activeEditingCell !== target &&
+            activeEditingCell.dataset.editing === 'true' &&
+            isFormulaValue(activeEditingCell.textContent ?? '')) {
+            event.preventDefault();
+            const rowIndex = Number(target.dataset.row ?? '-1');
+            const columnIndex = Number(target.dataset.column ?? '-1');
+            if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
+                return;
+            }
+            const displayCoords = getDisplayCellCoordinates(rowIndex, columnIndex);
+            if (!displayCoords) {
+                return;
+            }
+            setFormulaReferenceFromClick(displayCoords.row, displayCoords.column);
             return;
         }
         if (target.dataset.editing === 'true') {
@@ -1752,6 +1842,7 @@
         }
         const selectionMode = options.selectionMode === 'end' ? 'end' : 'all';
         stopEditingActiveCell({ commit: true });
+        resetFormulaReferenceState();
         const rowIndex = Number(cell.dataset.row ?? '-1');
         const columnIndex = Number(cell.dataset.column ?? '-1');
         let originalValue = cell.textContent ?? '';
@@ -1796,6 +1887,130 @@
         selection.addRange(range);
     }
 
+    function insertTextAtCursor(text) {
+        if (!activeEditingCell) {
+            return false;
+        }
+        const selection = typeof window.getSelection === 'function' ? window.getSelection() : null;
+        if (!selection) {
+            activeEditingCell.textContent = (activeEditingCell.textContent ?? '') + text;
+            selectCellContents(activeEditingCell, 'end');
+            return true;
+        }
+        if (!selection.rangeCount || !activeEditingCell.contains(selection.anchorNode)) {
+            selectCellContents(activeEditingCell, 'end');
+        }
+        if (!selection.rangeCount) {
+            return false;
+        }
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        const textNode = document.createTextNode(text);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return true;
+    }
+
+    function clearFormulaReferenceHighlight() {
+        if (formulaReferenceHighlightCell) {
+            formulaReferenceHighlightCell.classList.remove('formula-reference-target');
+            formulaReferenceHighlightCell = null;
+        }
+    }
+
+    function highlightFormulaReferenceCell(row, column) {
+        const cellEl = getCellElement(row, column);
+        clearFormulaReferenceHighlight();
+        if (cellEl) {
+            cellEl.classList.add('formula-reference-target');
+            formulaReferenceHighlightCell = cellEl;
+        }
+    }
+
+    function resetFormulaReferenceState() {
+        formulaReferenceCursor = null;
+        clearFormulaReferenceHighlight();
+    }
+
+    function getEditingCellCoordinates() {
+        if (!activeEditingCell) {
+            return null;
+        }
+        const rowIndex = Number(activeEditingCell.dataset.row ?? '-1');
+        const columnIndex = Number(activeEditingCell.dataset.column ?? '-1');
+        if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
+            return null;
+        }
+        return { row: rowIndex, column: columnIndex };
+    }
+
+    function ensureFormulaReferenceCursorInitialized() {
+        if (formulaReferenceCursor) {
+            return;
+        }
+        const coords = getEditingCellCoordinates();
+        if (coords) {
+            formulaReferenceCursor = { ...coords };
+        }
+    }
+
+    function insertFormulaReference(row, column) {
+        if (!activeEditingCell) {
+            return;
+        }
+        insertTextAtCursor(formatCellLabel(row, column));
+        focusCellElement(activeEditingCell);
+    }
+
+    function setFormulaReferenceFromClick(row, column) {
+        formulaReferenceCursor = { row, column };
+        insertFormulaReference(row, column);
+        highlightFormulaReferenceCell(row, column);
+    }
+
+    function handleFormulaReferenceNavigation(directionKey) {
+        const log = getCurrentLog();
+        if (!log || !activeEditingCell) {
+            return;
+        }
+        ensureFormulaReferenceCursorInitialized();
+        const rowCount = log.data.length;
+        const columnCount = log.data[0]?.length ?? 0;
+        if (!rowCount || !columnCount) {
+            return;
+        }
+        const coords = formulaReferenceCursor ?? getEditingCellCoordinates();
+        if (!coords) {
+            return;
+        }
+        let nextRow = coords.row;
+        let nextColumn = coords.column;
+        switch (directionKey) {
+            case 'ArrowUp':
+                nextRow -= 1;
+                break;
+            case 'ArrowDown':
+                nextRow += 1;
+                break;
+            case 'ArrowLeft':
+                nextColumn -= 1;
+                break;
+            case 'ArrowRight':
+                nextColumn += 1;
+                break;
+            default:
+                break;
+        }
+        nextRow = clamp(nextRow, 0, rowCount - 1);
+        nextColumn = clamp(nextColumn, 0, columnCount - 1);
+        formulaReferenceCursor = { row: nextRow, column: nextColumn };
+        insertFormulaReference(nextRow, nextColumn);
+        highlightFormulaReferenceCell(nextRow, nextColumn);
+    }
+
     function stopEditingActiveCell(options = {}) {
         if (!activeEditingCell) {
             return;
@@ -1836,6 +2051,7 @@
         if (activeEditingCell === cell) {
             activeEditingCell = null;
         }
+        resetFormulaReferenceState();
 
         if (shouldRefresh && log) {
             const targetRow = rowIndex;
@@ -1908,6 +2124,13 @@
 
         const isEditing = target.dataset.editing === 'true';
         if (isEditing) {
+            if (isFormulaValue(target.textContent ?? '') &&
+                (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
+                !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+                event.preventDefault();
+                handleFormulaReferenceNavigation(event.key);
+                return;
+            }
             switch (event.key) {
                 case 'Enter':
                     event.preventDefault();
@@ -2793,7 +3016,12 @@
                 const targetCell = log.data[row][column];
                 const previousValue = targetCell.value ?? '';
                 const previousFormat = JSON.stringify(targetCell.format ?? {});
+                const rowDelta = row - mappedRow;
+                const columnDelta = column - mappedColumn;
                 const cloned = cloneCellData(sourceCell);
+                if (typeof cloned.value === 'string' && cloned.value.startsWith('=')) {
+                    cloned.value = adjustFormulaReferences(cloned.value, rowDelta, columnDelta);
+                }
                 targetCell.value = cloned.value ?? '';
                 if (cloned.format) {
                     targetCell.format = cloneFormat(cloned.format) || {};
@@ -3008,9 +3236,11 @@
             unmergeCellsButton,
             textColorInput,
             fillColorInput,
+            alternateRowFormatSelect,
             clearTextColorButton,
             clearFillColorButton,
             borderStyleSelect,
+            borderPlacementSelect,
             borderColorInput,
             clearBorderButton
         ];
@@ -3042,7 +3272,7 @@
         const textColorState = getUniformFormatValue('textColor');
         const fillColorState = getUniformFormatValue('fillColor');
         const numberFormatState = getUniformFormatValue('numberFormat');
-        const borderState = getUniformFormatValue('border');
+        const borderState = getUniformBorderSample();
 
         const boldActive = boldState === null ? !!formattingMemory.bold : boldState === undefined ? false : !!boldState;
         const italicActive = italicState === null ? !!formattingMemory.italic : italicState === undefined ? false : !!italicState;
@@ -3142,19 +3372,25 @@
                 formattingMemory.borderColor = parsedBorder.color;
             }
         } else if (borderState === null) {
-            borderStyleValue = formattingMemory.borderStyle;
+            borderStyleValue = '';
+            borderColorValue = formattingMemory.borderColor;
+        } else if (borderState === undefined) {
+            borderStyleValue = '';
             borderColorValue = formattingMemory.borderColor;
         } else {
+            borderStyleValue = formattingMemory.borderStyle;
             borderColorValue = formattingMemory.borderColor;
-            borderStyleValue = '';
         }
 
         if (borderStyleSelect) {
             borderStyleSelect.value = borderStyleValue || '';
         }
+        if (borderPlacementSelect) {
+            borderPlacementSelect.value = formattingMemory.borderPlacement || 'all';
+        }
         updateColorInputState(borderColorInput, clearBorderButton, borderColorValue, '#000000');
         if (clearBorderButton) {
-            clearBorderButton.disabled = !(typeof borderState === 'string' && borderState.length);
+            clearBorderButton.disabled = !selectionHasBorders();
         }
 
         const selectionInfo = getSelectionInfo();
@@ -3234,6 +3470,75 @@
         return initialValue;
     }
 
+    function getCellBorderSample(format) {
+        if (!format) {
+            return '';
+        }
+        for (const key of BORDER_SIDE_KEYS) {
+            const value = typeof format[key] === 'string' ? format[key].trim() : '';
+            if (value.length) {
+                return value;
+            }
+        }
+        if (typeof format.border === 'string' && format.border.trim().length) {
+            return format.border.trim();
+        }
+        return '';
+    }
+
+    function cellHasAnyBorder(format) {
+        if (!format) {
+            return false;
+        }
+        if (typeof format.border === 'string' && format.border.trim().length) {
+            return true;
+        }
+        return BORDER_SIDE_KEYS.some((key) => typeof format[key] === 'string' && format[key].trim().length);
+    }
+
+    function selectionHasBorders() {
+        if (!selectionRange) {
+            return false;
+        }
+        let hasBorder = false;
+        forEachCellInSelection(selectionRange, ({ cellData }) => {
+            if (cellHasAnyBorder(cellData.format)) {
+                hasBorder = true;
+            }
+        });
+        return hasBorder;
+    }
+
+    function getUniformBorderSample() {
+        if (!selectionRange) {
+            return undefined;
+        }
+        let sample;
+        let hasAny = false;
+        let mixed = false;
+        forEachCellInSelection(selectionRange, ({ cellData }) => {
+            const candidate = getCellBorderSample(cellData.format);
+            if (!candidate) {
+                return;
+            }
+            hasAny = true;
+            if (!sample) {
+                sample = candidate;
+                return;
+            }
+            if (sample !== candidate) {
+                mixed = true;
+            }
+        });
+        if (mixed) {
+            return undefined;
+        }
+        if (!hasAny) {
+            return null;
+        }
+        return sample;
+    }
+
     function applyCellFormatting(td, format = {}) {
         td.style.fontWeight = format.bold ? '700' : '';
         td.style.fontStyle = format.italic ? 'italic' : '';
@@ -3243,10 +3548,12 @@
         td.style.textAlign = format.align ?? '';
         td.style.color = format.textColor ?? '';
         td.style.backgroundColor = format.fillColor ?? '';
-        if (format.border) {
+        td.style.border = '';
+        BORDER_SIDE_KEYS.forEach((sideKey) => {
+            td.style[sideKey] = format[sideKey] ?? '';
+        });
+        if (format.border && !BORDER_SIDE_KEYS.some((key) => typeof format[key] === 'string' && format[key].trim().length)) {
             td.style.border = format.border;
-        } else {
-            td.style.removeProperty('border');
         }
     }
 
@@ -3608,6 +3915,83 @@
         applyColorToSelection('fillColor', null);
     }
 
+    function applyAlternatingRows(themeKey) {
+        if (!selectionRange || !ALTERNATING_ROW_THEMES[themeKey]) {
+            return;
+        }
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const theme = ALTERNATING_ROW_THEMES[themeKey];
+        pushUndoState();
+        let changed = false;
+        forEachCellInSelection(selectionRange, ({ row, cellData }) => {
+            cellData.format = cellData.format || {};
+            const stripeIndex = Math.abs(row - selectionRange.startRow) % 2 === 0 ? 'odd' : 'even';
+            const targetColor = theme[stripeIndex];
+            if (cellData.format.fillColor !== targetColor) {
+                cellData.format.fillColor = targetColor;
+                changed = true;
+            }
+        });
+        if (!changed) {
+            const history = logHistory.get(log.id);
+            history?.pop();
+            updateUndoButtonState();
+            return;
+        }
+        recordAudit(log, 'Applied alternating rows', `Applied ${theme.label} alternating rows to ${describeSelection(selectionRange)}.`);
+        persistLogs();
+        updateSelectedCellStyles();
+        updateToolbarState();
+    }
+
+    function clearAlternatingRows() {
+        if (!selectionRange) {
+            return;
+        }
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        pushUndoState();
+        let changed = false;
+        forEachCellInSelection(selectionRange, ({ cellData }) => {
+            if (cellData.format?.fillColor) {
+                delete cellData.format.fillColor;
+                changed = true;
+            }
+        });
+        if (!changed) {
+            const history = logHistory.get(log.id);
+            history?.pop();
+            updateUndoButtonState();
+            return;
+        }
+        recordAudit(log, 'Cleared alternating rows', `Removed alternating row fills from ${describeSelection(selectionRange)}.`);
+        persistLogs();
+        updateSelectedCellStyles();
+        updateToolbarState();
+    }
+
+    function handleAlternateRowFormatChange(event) {
+        const target = event.target;
+        if (!(target instanceof HTMLSelectElement)) {
+            return;
+        }
+        const value = target.value;
+        if (!value) {
+            return;
+        }
+        if (value === 'clear') {
+            clearAlternatingRows();
+        } else if (ALTERNATING_ROW_THEMES[value]) {
+            applyAlternatingRows(value);
+        }
+        target.selectedIndex = 0;
+    }
+
     function resolveBorderColor(colorCandidate) {
         if (isValidHexColor(colorCandidate)) {
             return normalizeHexColor(colorCandidate);
@@ -3639,13 +4023,46 @@
         return { styleKey, color: normalizedColor };
     }
 
+    function getSelectedBorderPlacement() {
+        const selectValue = borderPlacementSelect?.value;
+        if (selectValue && BORDER_PLACEMENT_SIDES[selectValue]) {
+            return selectValue;
+        }
+        const memoryValue = formattingMemory.borderPlacement || 'all';
+        return BORDER_PLACEMENT_SIDES[memoryValue] ? memoryValue : 'all';
+    }
+
+    function getBorderSidesForPlacement(placement) {
+        return BORDER_PLACEMENT_SIDES[placement] ?? BORDER_PLACEMENT_SIDES.all;
+    }
+
+    function clearAllBorderStyles(format) {
+        if (!format) {
+            return false;
+        }
+        let removed = false;
+        if (format.border) {
+            delete format.border;
+            removed = true;
+        }
+        BORDER_SIDE_KEYS.forEach((key) => {
+            if (format[key]) {
+                delete format[key];
+                removed = true;
+            }
+        });
+        return removed;
+    }
+
     function applyBorderStyle(styleKey, options = {}) {
+        const placement = options.placement || getSelectedBorderPlacement();
         if (!styleKey) {
             formattingMemory.borderStyle = '';
         }
         if (!selectionRange) {
             if (styleKey) {
                 formattingMemory.borderStyle = styleKey;
+                formattingMemory.borderPlacement = placement;
                 const resolvedColor = resolveBorderColor(options.color ?? borderColorInput?.value ?? formattingMemory.borderColor);
                 formattingMemory.borderColor = resolvedColor;
             }
@@ -3662,18 +4079,36 @@
         const styleConfig = styleKey ? BORDER_STYLE_CONFIG[styleKey] : null;
         const colorValue = styleConfig ? resolveBorderColor(options.color ?? borderColorInput?.value ?? formattingMemory.borderColor) : '';
         const borderValue = styleConfig ? `${styleConfig.width} ${styleConfig.style} ${colorValue}` : '';
+        const placementSides = getBorderSidesForPlacement(placement);
         let changed = false;
 
         forEachCellInSelection(selectionRange, ({ cellData }) => {
             cellData.format = cellData.format || {};
-            const currentValue = cellData.format.border;
             if (styleConfig) {
-                if (currentValue !== borderValue) {
-                    cellData.format.border = borderValue;
-                    changed = true;
+                if (placement === 'all') {
+                    if (cellData.format.border !== borderValue) {
+                        cellData.format.border = borderValue;
+                        changed = true;
+                    }
+                    BORDER_SIDE_KEYS.forEach((key) => {
+                        if (cellData.format[key]) {
+                            delete cellData.format[key];
+                            changed = true;
+                        }
+                    });
+                } else {
+                    if (cellData.format.border) {
+                        delete cellData.format.border;
+                        changed = true;
+                    }
+                    placementSides.forEach((sideKey) => {
+                        if (cellData.format[sideKey] !== borderValue) {
+                            cellData.format[sideKey] = borderValue;
+                            changed = true;
+                        }
+                    });
                 }
-            } else if (currentValue !== undefined) {
-                delete cellData.format.border;
+            } else if (clearAllBorderStyles(cellData.format)) {
                 changed = true;
             }
         });
@@ -3682,15 +4117,18 @@
             const history = logHistory.get(log.id);
             history?.pop();
             updateUndoButtonState();
+            updateFillHandlePosition();
             return;
         }
 
-        const actionTitle = styleConfig ? `Applied ${styleKey} border` : 'Cleared borders';
-        recordAudit(log, actionTitle, `${actionTitle} for ${describeSelection(selectionRange)}.`);
+        const placementLabel = BORDER_PLACEMENT_LABELS[placement] ?? 'borders';
+        const description = styleConfig ? `Applied ${styleKey} ${placementLabel}` : 'Cleared borders';
+        recordAudit(log, styleConfig ? 'Applied borders' : 'Cleared borders', `${description} for ${describeSelection(selectionRange)}.`);
         persistLogs();
         if (styleConfig) {
             formattingMemory.borderStyle = styleKey;
             formattingMemory.borderColor = colorValue;
+            formattingMemory.borderPlacement = placement;
         } else {
             formattingMemory.borderStyle = '';
         }
@@ -3709,6 +4147,15 @@
         }
         const styleKey = target.value;
         applyBorderStyle(styleKey);
+    }
+
+    function handleBorderPlacementChange(event) {
+        const target = event.target;
+        if (!(target instanceof HTMLSelectElement)) {
+            return;
+        }
+        const placement = BORDER_PLACEMENT_SIDES[target.value] ? target.value : 'all';
+        formattingMemory.borderPlacement = placement;
     }
 
     function handleBorderColorPreview(event) {
@@ -3730,7 +4177,7 @@
         formattingMemory.borderColor = normalizedColor;
         const styleKey = borderStyleSelect?.value || formattingMemory.borderStyle;
         if (styleKey) {
-            applyBorderStyle(styleKey, { color: normalizedColor });
+            applyBorderStyle(styleKey, { color: normalizedColor, placement: getSelectedBorderPlacement() });
         } else {
             updateToolbarState();
         }
@@ -4099,9 +4546,11 @@
 
     clearTextColorButton?.addEventListener('click', clearTextColor);
     clearFillColorButton?.addEventListener('click', clearFillColor);
+    alternateRowFormatSelect?.addEventListener('change', handleAlternateRowFormatChange);
     clearBorderButton?.addEventListener('click', handleClearBorderClick);
 
     borderStyleSelect?.addEventListener('change', handleBorderStyleChange);
+    borderPlacementSelect?.addEventListener('change', handleBorderPlacementChange);
     borderColorInput?.addEventListener('input', handleBorderColorPreview);
     borderColorInput?.addEventListener('change', handleBorderColorChange);
 
