@@ -18,6 +18,10 @@
 {
     <div class="alert alert-success">Your email alert preferences have been updated.</div>
 }
+@if (TempData["DepartmentAssignmentsUpdated"] != null)
+{
+    <div class="alert alert-success">Your department assignments have been updated.</div>
+}
 
 <div class="row">
     <div class="col-lg-7">
@@ -99,6 +103,64 @@
                     </div>
                     <div class="text-end">
                         <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="card mb-4">
+            <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+                <span>Department Assignments</span>
+                <span class="text-muted small">Control work order alerts &amp; to-do items</span>
+            </div>
+            <div class="card-body">
+                <form asp-action="UpdateDepartments" method="post">
+                    @Html.AntiForgeryToken()
+                    @{
+                        var departmentOptions = Model.DepartmentAssignments?.Options ?? new List<hOps.web.ViewModels.DepartmentAssignmentOption>();
+                        var groupedOptions = departmentOptions
+                            .Select((option, index) => new { option, index })
+                            .GroupBy(x => string.IsNullOrWhiteSpace(x.option.PropertyLabel) ? "General" : x.option.PropertyLabel)
+                            .OrderBy(g => g.Key);
+                    }
+                    @if (departmentOptions.Any())
+                    {
+                        <p class="text-muted small">
+                            Select every department you belong to. Work orders for these departments will appear in your to-do list and trigger alerts.
+                        </p>
+                        @foreach (var group in groupedOptions)
+                        {
+                            <div class="mb-3">
+                                <div class="fw-semibold text-muted">@group.Key</div>
+                                <div class="d-flex flex-column gap-1">
+                                    @foreach (var item in group)
+                                    {
+                                        var option = item.option;
+                                        var checkboxId = $"dept_assign_{option.Id}";
+                                        var fieldPrefix = $"DepartmentAssignments.Options[{item.index}]";
+                                        <div class="form-check">
+                                            <input type="hidden" name="@($"{fieldPrefix}.Id")" value="@option.Id" />
+                                            <input type="hidden" name="@($"{fieldPrefix}.Name")" value="@option.Name" />
+                                            <input type="hidden" name="@($"{fieldPrefix}.PropertyLabel")" value="@option.PropertyLabel" />
+                                            <input type="hidden" name="@($"{fieldPrefix}.Selected")" value="false" />
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   name="@($"{fieldPrefix}.Selected")"
+                                                   value="true"
+                                                   id="@checkboxId"
+                                                   @(option.Selected ? "checked" : null) />
+                                            <label class="form-check-label" for="@checkboxId">@option.Name</label>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">No departments are available for your properties.</p>
+                    }
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-outline-primary">Save Departments</button>
                     </div>
                 </form>
             </div>

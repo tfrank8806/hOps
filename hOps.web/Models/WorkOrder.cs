@@ -37,5 +37,7 @@ namespace hOps.web.Models
         public ICollection<WorkOrderProperty> Properties { get; set; } = new List<WorkOrderProperty>();
 
         public ICollection<WorkOrderAttachment> Attachments { get; set; } = new List<WorkOrderAttachment>();
+
+        public ICollection<UserToDoItem> ToDoItems { get; set; } = new List<UserToDoItem>();
     }
 }

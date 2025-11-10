@@ -36,6 +36,7 @@ namespace hOps.web.Models
         public ICollection<Document> UploadedDocuments { get; set; } = new List<Document>();
         public ICollection<DocumentFolder> CreatedDocumentFolders { get; set; } = new List<DocumentFolder>();
         public ICollection<UserPropertyEmailSubscription> EmailPropertySubscriptions { get; set; } = new List<UserPropertyEmailSubscription>();
+        public ICollection<UserToDoItem> ToDoItems { get; set; } = new List<UserToDoItem>();
 
         public string TimeZoneId { get; set; } = DefaultTimeZoneProvider.NormalizeForStorage(null);
     }

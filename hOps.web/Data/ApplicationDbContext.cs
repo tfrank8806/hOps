@@ -55,6 +55,7 @@ namespace hOps.web.Data
         public DbSet<DocumentProperty> DocumentProperties { get; set; }
         public DbSet<DocumentFolderProperty> DocumentFolderProperties { get; set; }
         public DbSet<UserPropertyEmailSubscription> UserPropertyEmailSubscriptions { get; set; }
+        public DbSet<UserToDoItem> UserToDoItems { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -294,6 +295,18 @@ namespace hOps.web.Data
                 .WithMany()
                 .HasForeignKey(n => n.DirectMessageId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<UserToDoItem>()
+                .HasOne(t => t.User)
+                .WithMany(u => u.ToDoItems)
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<UserToDoItem>()
+                .HasOne(t => t.WorkOrder)
+                .WithMany(w => w.ToDoItems)
+                .HasForeignKey(t => t.WorkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             builder.Entity<UserDepartmentSubscription>()
                 .HasKey(s => new { s.UserId, s.DepartmentId });

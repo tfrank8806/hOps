@@ -20,5 +20,8 @@ namespace hOps.web.ViewModels.WorkOrders
         public int? EditingWorkOrderId { get; set; }
         public bool IsEditing => EditingWorkOrderId.HasValue;
         public bool CanManageWorkOrders { get; set; }
+        public List<DepartmentWorkOrderTaskViewModel> DepartmentTasks { get; set; } = new();
+        public List<UserToDoItemViewModel> PersonalToDos { get; set; } = new();
+        public bool HasToDoItems => DepartmentTasks.Count > 0 || PersonalToDos.Count > 0;
     }
 }

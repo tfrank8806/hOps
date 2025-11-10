@@ -376,6 +376,72 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateDepartments([Bind(Prefix = "DepartmentAssignments")] DepartmentAssignmentsViewModel model)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return RedirectToAction("Login", "Account", new { area = "Identity" });
+            }
+
+            var accessiblePropertyIds = await _context.UserPropertyAccesses
+                .Where(upa => upa.ApplicationUserId == user.Id)
+                .Select(upa => upa.PropertyId)
+                .Distinct()
+                .ToListAsync();
+
+            var accessibleDepartments = await _context.Departments
+                .Where(d => d.PropertyId.HasValue && accessiblePropertyIds.Contains(d.PropertyId.Value))
+                .OrderBy(d => d.Name)
+                .ToListAsync();
+
+            var validDepartmentIds = accessibleDepartments
+                .Select(d => d.Id)
+                .ToHashSet();
+
+            var selectedIds = model.Options?
+                .Where(o => o.Selected && validDepartmentIds.Contains(o.Id))
+                .Select(o => o.Id)
+                .Distinct()
+                .ToList() ?? new List<int>();
+
+            var existingSubscriptions = await _context.UserDepartmentSubscriptions
+                .Where(s => s.UserId == user.Id)
+                .ToListAsync();
+
+            var toRemove = existingSubscriptions
+                .Where(s => !selectedIds.Contains(s.DepartmentId))
+                .ToList();
+
+            if (toRemove.Any())
+            {
+                _context.UserDepartmentSubscriptions.RemoveRange(toRemove);
+            }
+
+            var existingIds = existingSubscriptions
+                .Select(s => s.DepartmentId)
+                .ToHashSet();
+
+            foreach (var departmentId in selectedIds)
+            {
+                if (!existingIds.Contains(departmentId))
+                {
+                    _context.UserDepartmentSubscriptions.Add(new UserDepartmentSubscription
+                    {
+                        UserId = user.Id,
+                        DepartmentId = departmentId
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["DepartmentAssignmentsUpdated"] = true;
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ChangePassword([Bind(Prefix = "ChangePassword")] ChangePasswordFormViewModel model)
         {
             var user = await _userManager.GetUserAsync(User);
@@ -430,7 +496,8 @@ namespace hOps.web.Controllers
             ApplicationUser user,
             ProfileFormViewModel? profile = null,
             ChangePasswordFormViewModel? changePassword = null,
-            EmailPreferencesViewModel? emailPreferences = null)
+            EmailPreferencesViewModel? emailPreferences = null,
+            DepartmentAssignmentsViewModel? departmentAssignments = null)
         {
             var profileVm = profile ?? new ProfileFormViewModel
             {
@@ -489,6 +556,44 @@ namespace hOps.web.Controllers
             var departmentsByProperty = departmentEntities
                 .GroupBy(d => d.PropertyId!.Value)
                 .ToDictionary(g => g.Key, g => g.ToList());
+
+            var assignmentOptions = departmentEntities
+                .Select(d =>
+                {
+                    var property = accessibleProperties.FirstOrDefault(p => p.Id == d.PropertyId);
+                    var propertyLabel = property == null
+                        ? "General"
+                        : string.IsNullOrWhiteSpace(property.Code)
+                            ? property.Name
+                            : $"{property.Name} ({property.Code})";
+
+                    return new DepartmentAssignmentOption
+                    {
+                        Id = d.Id,
+                        Name = d.Name ?? "Unnamed Department",
+                        PropertyLabel = propertyLabel,
+                        Selected = userDepartmentSet.Contains(d.Id)
+                    };
+                })
+                .OrderBy(o => o.PropertyLabel)
+                .ThenBy(o => o.Name)
+                .ToList();
+
+            if (departmentAssignments?.Options?.Any() == true)
+            {
+                var postedSelections = departmentAssignments.Options
+                    .Where(o => o.Selected)
+                    .Select(o => o.Id)
+                    .ToHashSet();
+
+                foreach (var option in assignmentOptions)
+                {
+                    option.Selected = postedSelections.Contains(option.Id);
+                }
+            }
+
+            var assignmentsVm = departmentAssignments ?? new DepartmentAssignmentsViewModel();
+            assignmentsVm.Options = assignmentOptions;
 
             var propertyPreferenceOptions = new List<EmailPreferencePropertyOption>();
             foreach (var property in accessibleProperties)
@@ -588,7 +693,8 @@ namespace hOps.web.Controllers
                 ChangePassword = changePasswordVm,
                 PropertyOptions = propertyOptions,
                 TimeZoneOptions = timeZoneOptions,
-                EmailPreferences = emailPreferencesVm
+                EmailPreferences = emailPreferencesVm,
+                DepartmentAssignments = assignmentsVm
             };
         }
     }

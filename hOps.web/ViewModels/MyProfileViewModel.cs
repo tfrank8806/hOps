@@ -97,6 +97,19 @@ namespace hOps.web.ViewModels
         public List<int> SelectedDepartmentIds { get; set; } = new();
     }
 
+    public class DepartmentAssignmentOption
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string PropertyLabel { get; set; } = string.Empty;
+        public bool Selected { get; set; }
+    }
+
+    public class DepartmentAssignmentsViewModel
+    {
+        public List<DepartmentAssignmentOption> Options { get; set; } = new();
+    }
+
     public class MyProfileViewModel
     {
         public ProfileFormViewModel Profile { get; set; } = new();
@@ -104,5 +117,6 @@ namespace hOps.web.ViewModels
         public IEnumerable<SelectListItem> PropertyOptions { get; set; } = Enumerable.Empty<SelectListItem>();
         public IEnumerable<SelectListItem> TimeZoneOptions { get; set; } = Enumerable.Empty<SelectListItem>();
         public EmailPreferencesViewModel EmailPreferences { get; set; } = new();
+        public DepartmentAssignmentsViewModel DepartmentAssignments { get; set; } = new();
     }
 }

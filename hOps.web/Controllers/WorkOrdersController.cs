@@ -535,6 +535,147 @@ namespace hOps.web.Controllers
             return RedirectWithFilters();
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CompleteDepartmentWorkOrder(int id)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+            var departmentIds = await _context.UserDepartmentSubscriptions
+                .Where(s => s.UserId == user.Id)
+                .Select(s => s.DepartmentId)
+                .ToListAsync();
+
+            if (!departmentIds.Any())
+            {
+                TempData["ToDoError"] = "You are not assigned to any departments.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var workOrder = await _context.WorkOrders
+                .Include(w => w.Properties)
+                .FirstOrDefaultAsync(w => w.Id == id);
+
+            if (workOrder == null)
+            {
+                return NotFound();
+            }
+
+            if (!workOrder.Properties.Any(p => accessiblePropertyIds.Contains(p.PropertyId)))
+            {
+                return Forbid();
+            }
+
+            if (!workOrder.DepartmentId.HasValue || !departmentIds.Contains(workOrder.DepartmentId.Value))
+            {
+                return Forbid();
+            }
+
+            if (!string.Equals(workOrder.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            {
+                workOrder.Status = "Completed";
+                await _context.SaveChangesAsync();
+                TempData["ToDoMessage"] = $"Marked work order #{id} complete.";
+            }
+            else
+            {
+                TempData["ToDoMessage"] = $"Work order #{id} is already completed.";
+            }
+
+            return RedirectToAction(nameof(Index), new { highlight = id });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddPersonalTodo(string title)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                TempData["ToDoError"] = "Please enter a description for your to-do item.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var trimmed = title.Trim();
+            if (trimmed.Length > 256)
+            {
+                trimmed = trimmed[..256];
+            }
+
+            _context.UserToDoItems.Add(new UserToDoItem
+            {
+                Title = trimmed,
+                UserId = user.Id
+            });
+            await _context.SaveChangesAsync();
+
+            TempData["ToDoMessage"] = "Added a new to-do item.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> TogglePersonalTodo(int id)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var todo = await _context.UserToDoItems
+                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == user.Id);
+
+            if (todo == null)
+            {
+                return NotFound();
+            }
+
+            todo.IsCompleted = !todo.IsCompleted;
+            todo.CompletedAtUtc = todo.IsCompleted ? DateTime.UtcNow : null;
+            await _context.SaveChangesAsync();
+
+            TempData["ToDoMessage"] = todo.IsCompleted
+                ? "Marked to-do item complete."
+                : "Reopened to-do item.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeletePersonalTodo(int id)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var todo = await _context.UserToDoItems
+                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == user.Id);
+
+            if (todo == null)
+            {
+                return NotFound();
+            }
+
+            _context.UserToDoItems.Remove(todo);
+            await _context.SaveChangesAsync();
+
+            TempData["ToDoMessage"] = "Removed the to-do item.";
+            return RedirectToAction(nameof(Index));
+        }
+
         private async Task<WorkOrder> CreateWorkOrderAsync(
             WorkOrderFormViewModel form,
             ApplicationUser user,
@@ -674,12 +815,25 @@ namespace hOps.web.Controllers
                 .Select(r => r.User)
                 .ToList();
 
+            var notificationUserIds = await _context.UserDepartmentSubscriptions
+                .Where(s => s.DepartmentId == departmentId)
+                .Select(s => s.UserId)
+                .Where(id => createdBy == null || id != createdBy.Id)
+                .Distinct()
+                .ToListAsync();
+
+            var departmentName = workOrder.Department?.Name ?? "department";
+
+            if (notificationUserIds.Any())
+            {
+                await CreateDepartmentNotificationsAsync(notificationUserIds, workOrder, workOrderLink, departmentName);
+            }
+
             if (!recipients.Any())
             {
                 return;
             }
 
-            var departmentName = workOrder.Department?.Name ?? "department";
             var subject = $"New work order #{workOrder.Id} assigned to {departmentName}";
             var actorName = BuildUserDisplayName(createdBy);
             var safeActor = WebUtility.HtmlEncode(actorName);
@@ -740,6 +894,35 @@ namespace hOps.web.Controllers
                     _logger.LogError(ex, "Unable to send work order email notification to user {UserId}", recipient.Id);
                 }
             }
+        }
+
+        private async Task CreateDepartmentNotificationsAsync(
+            IEnumerable<string> userIds,
+            WorkOrder workOrder,
+            string workOrderLink,
+            string departmentName)
+        {
+            var now = DateTime.UtcNow;
+            var notificationTitle = $"New {departmentName} work order";
+            var notificationContent = string.IsNullOrWhiteSpace(workOrder.Issue)
+                ? $"Work order #{workOrder.Id}"
+                : workOrder.Issue;
+
+            foreach (var userId in userIds)
+            {
+                _context.UserNotifications.Add(new UserNotification
+                {
+                    UserId = userId,
+                    Type = "workorder",
+                    Title = notificationTitle,
+                    Content = notificationContent,
+                    LinkUrl = workOrderLink,
+                    CreatedAt = now,
+                    IsRead = false
+                });
+            }
+
+            await _context.SaveChangesAsync();
         }
 
         private static string BuildUserDisplayName(ApplicationUser? user)
@@ -1021,6 +1204,74 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
+            var departmentTasks = new List<DepartmentWorkOrderTaskViewModel>();
+            var personalToDos = new List<UserToDoItemViewModel>();
+
+            if (user != null)
+            {
+                var userDepartmentIds = await _context.UserDepartmentSubscriptions
+                    .Where(s => s.UserId == user.Id)
+                    .Select(s => s.DepartmentId)
+                    .ToListAsync();
+                var departmentIdSet = new HashSet<int>(userDepartmentIds);
+
+                if (departmentIdSet.Any())
+                {
+                    var departmentWorkOrders = await _context.WorkOrders
+                        .Where(w => w.DepartmentId.HasValue && departmentIdSet.Contains(w.DepartmentId.Value))
+                        .Where(w =>
+                            !string.Equals(w.Status, "Completed", StringComparison.OrdinalIgnoreCase) &&
+                            !string.Equals(w.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                        .Where(w => w.Properties.Any(p => targetPropertySet.Contains(p.PropertyId)))
+                        .Include(w => w.Department)
+                        .Include(w => w.Properties).ThenInclude(p => p.Property)
+                        .AsNoTracking()
+                        .ToListAsync();
+
+                    departmentTasks = departmentWorkOrders
+                        .Select(w =>
+                        {
+                            var propertyLabel = w.Properties
+                                .Select(p => p.Property != null
+                                    ? (string.IsNullOrWhiteSpace(p.Property.Code)
+                                        ? p.Property.Name
+                                        : $"{p.Property.Name} ({p.Property.Code})")
+                                    : $"Property #{p.PropertyId}")
+                                .FirstOrDefault();
+
+                            return new DepartmentWorkOrderTaskViewModel
+                            {
+                                WorkOrderId = w.Id,
+                                Issue = string.IsNullOrWhiteSpace(w.Issue) ? $"Work Order #{w.Id}" : w.Issue,
+                                DepartmentName = w.Department?.Name ?? "Department",
+                                PropertyName = propertyLabel,
+                                Status = string.IsNullOrWhiteSpace(w.Status) ? "New" : w.Status,
+                                DueDate = w.DueDate,
+                                HasDueDate = w.DueDate != default,
+                                Location = string.IsNullOrWhiteSpace(w.Location) ? null : w.Location
+                            };
+                        })
+                        .OrderBy(t => t.HasDueDate ? t.DueDate : DateTime.MaxValue)
+                        .ThenBy(t => t.WorkOrderId)
+                        .ToList();
+                }
+
+                personalToDos = await _context.UserToDoItems
+                    .Where(t => t.UserId == user.Id)
+                    .OrderBy(t => t.IsCompleted)
+                    .ThenByDescending(t => t.CreatedAtUtc)
+                    .AsNoTracking()
+                    .Select(t => new UserToDoItemViewModel
+                    {
+                        Id = t.Id,
+                        Title = t.Title,
+                        IsCompleted = t.IsCompleted,
+                        CreatedAtUtc = t.CreatedAtUtc,
+                        CompletedAtUtc = t.CompletedAtUtc
+                    })
+                    .ToListAsync();
+            }
+
             var viewModel = new WorkOrdersViewModel
             {
                 WorkOrders = listItems,
@@ -1035,7 +1286,9 @@ namespace hOps.web.Controllers
                 LocationSuggestions = locationSuggestions.OrderBy(x => x).ToList(),
                 StatusColorMap = statusColorMap,
                 EditingWorkOrderId = form?.Id,
-                CanManageWorkOrders = canManage
+                CanManageWorkOrders = canManage,
+                DepartmentTasks = departmentTasks,
+                PersonalToDos = personalToDos
             };
 
             return viewModel;
