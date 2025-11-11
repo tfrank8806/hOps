@@ -141,6 +141,8 @@
     let lastClipboardSnapshot = null;
     let formulaReferenceCursor = null;
     let formulaReferenceHighlightCell = null;
+    let formulaReferenceToken = null;
+    let suppressFormulaInputHandler = false;
 
     const logHistory = new Map();
     const formattingMemory = {
@@ -1709,9 +1711,15 @@
         if (!(target instanceof HTMLElement)) {
             return;
         }
+        if (suppressFormulaInputHandler) {
+            suppressFormulaInputHandler = false;
+            return;
+        }
         if (target.dataset.editing === 'true') {
             if (isFormulaValue(target.textContent ?? '')) {
-                ensureFormulaReferenceCursorInitialized();
+                formulaReferenceToken = null;
+                clearFormulaReferenceHighlight();
+                formulaReferenceCursor = null;
             } else {
                 resetFormulaReferenceState();
             }
@@ -1887,31 +1895,77 @@
         selection.addRange(range);
     }
 
-    function insertTextAtCursor(text) {
-        if (!activeEditingCell) {
-            return false;
+    function getCaretPosition(element) {
+        if (!element) {
+            return null;
         }
         const selection = typeof window.getSelection === 'function' ? window.getSelection() : null;
-        if (!selection) {
-            activeEditingCell.textContent = (activeEditingCell.textContent ?? '') + text;
-            selectCellContents(activeEditingCell, 'end');
-            return true;
-        }
-        if (!selection.rangeCount || !activeEditingCell.contains(selection.anchorNode)) {
-            selectCellContents(activeEditingCell, 'end');
-        }
-        if (!selection.rangeCount) {
-            return false;
+        if (!selection || selection.rangeCount === 0) {
+            return null;
         }
         const range = selection.getRangeAt(0);
-        range.deleteContents();
-        const textNode = document.createTextNode(text);
-        range.insertNode(textNode);
-        range.setStartAfter(textNode);
+        if (!element.contains(range.startContainer)) {
+            return null;
+        }
+        const preRange = range.cloneRange();
+        preRange.selectNodeContents(element);
+        preRange.setEnd(range.startContainer, range.startOffset);
+        return preRange.toString().length;
+    }
+
+    function setCaretPosition(element, offset) {
+        const selection = typeof window.getSelection === 'function' ? window.getSelection() : null;
+        if (!selection || !element) {
+            return;
+        }
+        const range = document.createRange();
+        let remaining = Math.max(0, offset);
+        let nodeFound = null;
+        let nodeOffset = 0;
+
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
+        while (walker.nextNode()) {
+            const node = walker.currentNode;
+            const length = node.textContent?.length ?? 0;
+            if (remaining <= length) {
+                nodeFound = node;
+                nodeOffset = remaining;
+                break;
+            }
+            remaining -= length;
+        }
+
+        if (!nodeFound) {
+            const textNode = element.firstChild instanceof Text ? element.firstChild : document.createTextNode('');
+            if (!element.contains(textNode)) {
+                element.appendChild(textNode);
+            }
+            nodeFound = textNode;
+            nodeOffset = nodeFound.textContent?.length ?? 0;
+        }
+
+        range.setStart(nodeFound, nodeOffset);
         range.collapse(true);
         selection.removeAllRanges();
         selection.addRange(range);
-        return true;
+    }
+
+    function replaceFormulaReferenceText(text) {
+        if (!activeEditingCell) {
+            return;
+        }
+        const currentText = activeEditingCell.textContent ?? '';
+        let start = formulaReferenceToken ? formulaReferenceToken.start : getCaretPosition(activeEditingCell);
+        if (start == null) {
+            start = currentText.length;
+        }
+        const end = formulaReferenceToken ? formulaReferenceToken.end : start;
+        const nextText = currentText.slice(0, start) + text + currentText.slice(end);
+        suppressFormulaInputHandler = true;
+        activeEditingCell.textContent = nextText;
+        suppressFormulaInputHandler = false;
+        formulaReferenceToken = { start, end: start + text.length };
+        setCaretPosition(activeEditingCell, formulaReferenceToken.end);
     }
 
     function clearFormulaReferenceHighlight() {
@@ -1932,6 +1986,7 @@
 
     function resetFormulaReferenceState() {
         formulaReferenceCursor = null;
+        formulaReferenceToken = null;
         clearFormulaReferenceHighlight();
     }
 
@@ -1961,7 +2016,7 @@
         if (!activeEditingCell) {
             return;
         }
-        insertTextAtCursor(formatCellLabel(row, column));
+        replaceFormulaReferenceText(formatCellLabel(row, column));
         focusCellElement(activeEditingCell);
     }
 
