@@ -362,7 +362,7 @@ body:not(.todo-sidebar-collapsed) .todo-sidebar-rail-toggle {
 
 .sidebar-fab-toggle {
     position: fixed;
-    left: clamp(0.75rem, calc(260px + 0.5rem + 12px), 3.5rem);
+    left: calc(260px + 0.75rem + 18px);
     top: 50%;
     transform: translate(-50%, -50%);
     border: 1px solid rgba(15, 23, 42, 0.12);
@@ -417,7 +417,7 @@ body.sidebar-collapsed .sidebar-fab-toggle {
     }
 
     body:not(.sidebar-collapsed) .sidebar-fab-toggle {
-        left: calc(min(80vw, 360px) + 0.5rem + 12px);
+        left: calc(min(80vw, 260px) + 0.5rem + 12px);
     }
 }
 
