@@ -367,7 +367,7 @@ body:not(.todo-sidebar-collapsed) .todo-sidebar-rail-toggle {
     transform: translate(-50%, -50%);
     border: 2px solid rgba(255, 255, 255, 0.25);
     background: linear-gradient(180deg, #0d6efd 0%, #4f81ff 100%);
-    width: 36px;
+    width: 28px;
     height: 110px;
     border-radius: 0 999px 999px 0;
     box-shadow: 0 12px 30px rgba(13, 110, 253, 0.35);
@@ -412,7 +412,7 @@ body.sidebar-collapsed .sidebar-fab-toggle {
         top: auto;
         bottom: 1.5rem;
         transform: translate(-50%, 0);
-        width: 40px;
+        width: 32px;
         height: 80px;
     }
 
