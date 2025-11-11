@@ -53,7 +53,8 @@ namespace hOps.web.Services
 
             foreach (var row in rows)
             {
-                double rowHeight = CalculateRowHeight(row, lineHeight);
+                var wrappedCells = WrapRowCellLines(row, dayColumnWidth, gfx, cellFont);
+                double rowHeight = CalculateRowHeight(wrappedCells, lineHeight);
                 if (y + rowHeight > page.Height - margin)
                 {
                     page = document.AddPage();
@@ -71,7 +72,7 @@ namespace hOps.web.Services
                 {
                     var colX = margin + nameColumnWidth + (i * dayColumnWidth);
                     gfx.DrawLine(pen, colX + dayColumnWidth, y, colX + dayColumnWidth, y + rowHeight);
-                    var lines = row.CellLines.Count > i ? row.CellLines[i] : new List<string>();
+                    var lines = wrappedCells.Count > i ? wrappedCells[i] : new List<string>();
                     DrawCellLines(gfx, cellFont, lines, colX, y, dayColumnWidth, rowHeight, lineHeight);
                 }
 
@@ -83,11 +84,11 @@ namespace hOps.web.Services
             return ms.ToArray();
         }
 
-        private static double CalculateRowHeight(SchedulePdfRow row, double lineHeight)
+        private static double CalculateRowHeight(IReadOnlyList<IReadOnlyList<string>> wrappedCells, double lineHeight)
         {
             double maxLines = 1;
 
-            foreach (var cell in row.CellLines)
+            foreach (var cell in wrappedCells)
             {
                 maxLines = Math.Max(maxLines, Math.Max(1, cell.Count));
             }
@@ -110,6 +111,123 @@ namespace hOps.web.Services
                 gfx.DrawString(line, font, XBrushes.Black, new XRect(x + 2, startY, width - 4, lineHeight), XStringFormats.TopLeft);
                 startY += lineHeight;
             }
+        }
+
+        private static List<IReadOnlyList<string>> WrapRowCellLines(SchedulePdfRow row, double dayColumnWidth, XGraphics gfx, XFont font)
+        {
+            var wrapped = new List<IReadOnlyList<string>>();
+            foreach (var cell in row.CellLines)
+            {
+                wrapped.Add(WrapCellLines(cell, dayColumnWidth - 6, gfx, font));
+            }
+            return wrapped;
+        }
+
+        private static IReadOnlyList<string> WrapCellLines(IReadOnlyList<string> lines, double maxWidth, XGraphics gfx, XFont font)
+        {
+            if (lines.Count == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            var results = new List<string>();
+            foreach (var line in lines)
+            {
+                var wrapped = WrapText(line, maxWidth, gfx, font);
+                if (wrapped.Count == 0)
+                {
+                    results.Add(string.Empty);
+                }
+                else
+                {
+                    results.AddRange(wrapped);
+                }
+            }
+
+            return results;
+        }
+
+        private static List<string> WrapText(string text, double maxWidth, XGraphics gfx, XFont font)
+        {
+            var wrapped = new List<string>();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                wrapped.Add(string.Empty);
+                return wrapped;
+            }
+
+            var words = text.Split(' ');
+            var current = new System.Text.StringBuilder();
+
+            foreach (var word in words)
+            {
+                var candidate = current.Length == 0 ? word : current + " " + word;
+                if (MeasureWidth(candidate, gfx, font) <= maxWidth)
+                {
+                    current.Clear();
+                    current.Append(candidate);
+                }
+                else
+                {
+                    if (current.Length > 0)
+                    {
+                        wrapped.Add(current.ToString());
+                        current.Clear();
+                    }
+
+                    if (MeasureWidth(word, gfx, font) <= maxWidth)
+                    {
+                        current.Append(word);
+                    }
+                    else
+                    {
+                        foreach (var segment in BreakLongWord(word, maxWidth, gfx, font))
+                        {
+                            wrapped.Add(segment);
+                        }
+                    }
+                }
+            }
+
+            if (current.Length > 0)
+            {
+                wrapped.Add(current.ToString());
+            }
+
+            return wrapped;
+        }
+
+        private static IEnumerable<string> BreakLongWord(string word, double maxWidth, XGraphics gfx, XFont font)
+        {
+            var builder = new System.Text.StringBuilder();
+            foreach (var ch in word)
+            {
+                var candidate = builder.ToString() + ch;
+                if (MeasureWidth(candidate, gfx, font) <= maxWidth)
+                {
+                    builder.Append(ch);
+                }
+                else
+                {
+                    if (builder.Length > 0)
+                    {
+                        yield return builder.ToString();
+                        builder.Clear();
+                    }
+
+                    builder.Append(ch);
+                }
+            }
+
+            if (builder.Length > 0)
+            {
+                yield return builder.ToString();
+            }
+        }
+
+        private static double MeasureWidth(string text, XGraphics gfx, XFont font)
+        {
+            return gfx.MeasureString(text, font).Width;
         }
     }
 
