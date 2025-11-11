@@ -320,8 +320,18 @@ namespace hOps.web.Controllers
                 return Forbid();
             }
 
+            var departmentId = dept.Id;
             _db.Departments.Remove(dept);
             await _db.SaveChangesAsync();
+
+            var orphanSubscriptions = await _db.UserDepartmentSubscriptions
+                .Where(s => s.DepartmentId == departmentId)
+                .ToListAsync();
+            if (orphanSubscriptions.Count > 0)
+            {
+                _db.UserDepartmentSubscriptions.RemoveRange(orphanSubscriptions);
+                await _db.SaveChangesAsync();
+            }
 
             if (!string.IsNullOrWhiteSpace(returnUrl))
             {
