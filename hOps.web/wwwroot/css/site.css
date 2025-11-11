@@ -1054,3 +1054,39 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     position: sticky;
     top: 1.5rem;
 }
+
+.schedule-grid-wrapper {
+    position: relative;
+}
+
+.schedule-grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background-color: #f8f9fa;
+}
+
+.schedule-grid {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.schedule-grid th:first-child,
+.schedule-grid td:first-child {
+    width: 220px;
+    min-width: 220px;
+}
+
+.schedule-grid th:not(:first-child),
+.schedule-grid td:not(:first-child) {
+    width: 140px;
+    min-width: 140px;
+    word-break: break-word;
+}
+
+@media (min-width: 992px) {
+    .schedule-side-panel {
+        position: sticky;
+        top: 1rem;
+    }
+}

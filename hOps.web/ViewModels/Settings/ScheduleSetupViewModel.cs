@@ -14,6 +14,7 @@ namespace hOps.web.ViewModels.Settings
         public DayOfWeek StartDayOfWeek { get; set; } = DayOfWeek.Monday;
 
         public List<ScheduleShiftTemplateInputModel> ShiftTemplates { get; set; } = new();
+        public List<ScheduleManualEmployeeViewModel> ManualEmployees { get; set; } = new();
     }
 
     public class ScheduleShiftTemplateInputModel
@@ -21,8 +22,12 @@ namespace hOps.web.ViewModels.Settings
         public int Id { get; set; }
 
         [Required]
-        [Display(Name = "Shift name")]
+        [Display(Name = "Template name")]
         public string Name { get; set; } = string.Empty;
+
+        [Required]
+        [Display(Name = "Shift name")]
+        public string ShiftName { get; set; } = string.Empty;
 
         [Required]
         [Display(Name = "Start time")]
@@ -33,5 +38,18 @@ namespace hOps.web.ViewModels.Settings
         public string EndTime { get; set; } = "17:00";
 
         public int SortOrder { get; set; }
+
+        [Display(Name = "Color")]
+        public string ColorHex { get; set; } = "#3b82f6";
+    }
+
+    public class ScheduleManualEmployeeViewModel
+    {
+        public int Id { get; set; }
+        public string DisplayName { get; set; } = string.Empty;
+        public string? Email { get; set; }
+        public bool IsActive { get; set; }
+        public int AssignmentCount { get; set; }
+        public bool HasAssignments => AssignmentCount > 0;
     }
 }

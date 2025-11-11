@@ -61,9 +61,11 @@
                         <thead>
                             <tr>
                                 <th style="width: 40px;">#</th>
-                                <th>Name</th>
+                                <th>Template Name</th>
+                                <th>Shift Name</th>
                                 <th style="width: 150px;">Start</th>
                                 <th style="width: 150px;">End</th>
+                                <th style="width: 140px;">Color</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -80,10 +82,16 @@
                                             <input asp-for="ShiftTemplates[i].Name" class="form-control form-control-sm" />
                                         </td>
                                         <td>
+                                            <input asp-for="ShiftTemplates[i].ShiftName" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
                                             <input asp-for="ShiftTemplates[i].StartTime" class="form-control form-control-sm" type="time" />
                                         </td>
                                         <td>
                                             <input asp-for="ShiftTemplates[i].EndTime" class="form-control form-control-sm" type="time" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="ShiftTemplates[i].ColorHex" class="form-control form-control-sm form-control-color" type="color" value="@(Model.ShiftTemplates[i].ColorHex ?? "#3b82f6")" />
                                         </td>
                                     </tr>
                                 }
@@ -91,18 +99,24 @@
                             else
                             {
                                 <tr class="shift-template-row">
-                                    <td>
-                                        <input type="hidden" name="ShiftTemplates[0].Id" value="0" />
-                                        <input type="number" name="ShiftTemplates[0].SortOrder" value="0" class="form-control form-control-sm" />
+                                        <td>
+                                            <input type="hidden" name="ShiftTemplates[0].Id" value="0" />
+                                            <input type="number" name="ShiftTemplates[0].SortOrder" value="0" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input name="ShiftTemplates[0].Name" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input name="ShiftTemplates[0].ShiftName" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input name="ShiftTemplates[0].StartTime" type="time" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input name="ShiftTemplates[0].EndTime" type="time" class="form-control form-control-sm" />
                                     </td>
                                     <td>
-                                        <input name="ShiftTemplates[0].Name" class="form-control form-control-sm" />
-                                    </td>
-                                    <td>
-                                        <input name="ShiftTemplates[0].StartTime" type="time" class="form-control form-control-sm" />
-                                    </td>
-                                    <td>
-                                        <input name="ShiftTemplates[0].EndTime" type="time" class="form-control form-control-sm" />
+                                        <input name="ShiftTemplates[0].ColorHex" type="color" value="#3b82f6" class="form-control form-control-sm form-control-color" />
                                     </td>
                                 </tr>
                             }
@@ -112,6 +126,72 @@
 
                 <button type="submit" class="btn btn-primary">Save Settings</button>
             </form>
+
+            <div class="mt-5">
+                <div class="d-flex justify-content-between flex-wrap gap-2 mb-2 align-items-center">
+                    <h5 class="mb-0">Manual Schedule Employees</h5>
+                    <small class="text-muted">Remove non-user employees from the roster</small>
+                </div>
+                @if (Model.ManualEmployees?.Any() == true)
+                {
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th style="width: 240px;">Email</th>
+                                    <th style="width: 160px;">Assignments</th>
+                                    <th style="width: 120px;">Status</th>
+                                    <th style="width: 80px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var employee in Model.ManualEmployees)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@employee.DisplayName</td>
+                                        <td>@(string.IsNullOrWhiteSpace(employee.Email) ? "—" : employee.Email)</td>
+                                        <td>
+                                            @if (employee.AssignmentCount > 0)
+                                            {
+                                                <span class="badge bg-info text-dark">@employee.AssignmentCount shift(s)</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">No assigned shifts</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (employee.IsActive)
+                                            {
+                                                <span class="badge bg-success">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <form asp-action="DeleteManualScheduleEmployee" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="manualEmployeeId" value="@employee.Id" />
+                                                <input type="hidden" name="propertyId" value="@Model.SelectedPropertyId" />
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Remove this employee from the schedule?');">
+                                                    Delete
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">You do not have any manual employees for this property.</p>
+                }
+            </div>
         }
     </div>
 </div>
@@ -126,10 +206,16 @@
             <input name="ShiftTemplates[{{index}}].Name" class="form-control form-control-sm" />
         </td>
         <td>
+            <input name="ShiftTemplates[{{index}}].ShiftName" class="form-control form-control-sm" />
+        </td>
+        <td>
             <input name="ShiftTemplates[{{index}}].StartTime" type="time" class="form-control form-control-sm" />
         </td>
         <td>
             <input name="ShiftTemplates[{{index}}].EndTime" type="time" class="form-control form-control-sm" />
+        </td>
+        <td>
+            <input name="ShiftTemplates[{{index}}].ColorHex" type="color" value="#3b82f6" class="form-control form-control-sm form-control-color" />
         </td>
     </tr>
 </template>

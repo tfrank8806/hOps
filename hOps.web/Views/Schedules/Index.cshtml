@@ -14,8 +14,8 @@
         <p class="text-muted mb-0">@Model.WeekStartDate.ToString("MMM d") - @Model.WeekEndDate.ToString("MMM d, yyyy")</p>
     </div>
     <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary" asp-action="Index" asp-route-weekStart="@previousWeek">&larr; Previous</a>
-        <a class="btn btn-outline-secondary" asp-action="Index" asp-route-weekStart="@nextWeek">Next &rarr;</a>
+        <a class="btn btn-outline-secondary" asp-action="Index" asp-route-weekStart="@previousWeek" asp-route-sortOption="@Model.SortOption">&larr; Previous</a>
+        <a class="btn btn-outline-secondary" asp-action="Index" asp-route-weekStart="@nextWeek" asp-route-sortOption="@Model.SortOption">Next &rarr;</a>
     </div>
 </div>
 
@@ -29,10 +29,10 @@
 }
 
 <div class="row g-4">
-    <div class="col-lg-8">
+    <div class="col-12 col-xl-9 col-xxl-9">
         <div class="card mb-4">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
                     <div>
                         <h5 class="card-title mb-0">Schedule</h5>
                         @if (Model.Status.HasValue)
@@ -46,7 +46,7 @@
                             <span class="badge bg-secondary">No schedule</span>
                         }
                     </div>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
                         @if (!Model.HasSchedule && Model.ShowCreateDraftAction)
                         {
                             <form asp-action="CreateDraft" method="post" class="d-inline">
@@ -64,6 +64,34 @@
                                 <button type="submit" class="btn btn-success">Post Schedule</button>
                             </form>
                         }
+                        @if (Model.HasSchedule && Model.ScheduleId.HasValue)
+                        {
+                            <a class="btn btn-outline-secondary"
+                               asp-action="DownloadSchedule"
+                               asp-route-weekStart="@weekStartParam"
+                               asp-route-format="pdf">
+                                Download PDF
+                            </a>
+                            <a class="btn btn-outline-secondary"
+                               asp-action="DownloadSchedule"
+                               asp-route-weekStart="@weekStartParam"
+                               asp-route-format="xlsx">
+                                Download Excel
+                            </a>
+                        }
+                        @if (Model.HasSchedule && Model.SortOptions?.Any() == true)
+                        {
+                            <form method="get" class="d-flex align-items-center gap-2" id="scheduleSortForm">
+                                <input type="hidden" name="weekStart" value="@weekStartParam" />
+                                <label for="scheduleSort" class="form-label small mb-0 text-muted">Sort by</label>
+                                <select id="scheduleSort" name="sortOption" class="form-select form-select-sm" onchange="this.form.submit()">
+                                    @foreach (var option in Model.SortOptions)
+                                    {
+                                        <option value="@option.Value" selected="@option.Selected">@option.Text</option>
+                                    }
+                                </select>
+                            </form>
+                        }
                     </div>
                 </div>
 
@@ -73,7 +101,7 @@
                 }
                 else
                 {
-                    <div class="table-responsive">
+                    <div class="table-responsive schedule-grid-wrapper">
                         <table class="table table-bordered align-middle schedule-grid">
                             <thead class="table-light">
                                 <tr>
@@ -119,9 +147,13 @@
                                             @foreach (var day in Model.DayColumns)
                                             {
                                                 var dateKey = day.Date.Date;
+                                                var isoDate = dateKey.ToString("yyyy-MM-dd");
                                                 row.AssignmentsByDate.TryGetValue(dateKey, out var assignments);
                                                 row.TimeOffByDate.TryGetValue(dateKey, out var timeOffLabels);
-                                                <td>
+                                                <td class="schedule-cell"
+                                                    data-schedule-cell="true"
+                                                    data-employee-id="@row.ScheduleEmployeeId"
+                                                    data-date="@isoDate">
                                                     @if (assignments != null && assignments.Any())
                                                     {
                                                         foreach (var assignment in assignments)
@@ -131,8 +163,10 @@
                                                             var timeRange = string.IsNullOrWhiteSpace(shiftStart) && string.IsNullOrWhiteSpace(shiftEnd)
                                                                 ? null
                                                                 : $"{shiftStart} - {shiftEnd}";
+                                                            var shiftColor = string.IsNullOrWhiteSpace(assignment.ColorHex) ? null : assignment.ColorHex;
+                                                            var shiftLabel = $"{row.EmployeeName} · {assignment.ShiftName} ({dateKey:MMM d})";
                                                             <div class="schedule-shift border rounded p-2 mb-2">
-                                                                <div class="fw-semibold">@assignment.ShiftName</div>
+                                                                <div class="fw-semibold" style="color:@shiftColor">@assignment.ShiftName</div>
                                                                 @if (!string.IsNullOrWhiteSpace(timeRange))
                                                                 {
                                                                     <div class="text-muted small">@timeRange</div>
@@ -145,7 +179,13 @@
                                                                 @if (Model.CanManage && Model.Status == hOps.web.Models.ScheduleStatus.Draft)
                                                                 {
                                                                     var collapseId = $"editShift_{assignment.AssignmentId}";
-                                                                    <div class="mt-2 d-flex gap-2">
+                                                                    <div class="mt-2 d-flex flex-wrap gap-2">
+                                                                        <button type="button"
+                                                                                class="btn btn-outline-primary btn-sm copy-shift-btn"
+                                                                                data-assignment-id="@assignment.AssignmentId"
+                                                                                data-shift-label="@shiftLabel">
+                                                                            Copy
+                                                                        </button>
                                                                         <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">Edit</button>
                                                                         <form asp-action="DeleteAssignment" method="post" onsubmit="return confirm('Remove this shift?');">
                                                                             @Html.AntiForgeryToken()
@@ -160,6 +200,7 @@
                                                                                 <input type="hidden" name="AssignmentForm.AssignmentId" value="@assignment.AssignmentId" />
                                                                                 <input type="hidden" name="AssignmentForm.ScheduleId" value="@Model.ScheduleId" />
                                                                                 <input type="hidden" name="weekStart" value="@weekStartParam" />
+                                                                                <input type="hidden" name="AssignmentForm.ShiftColorHex" value="@assignment.ColorHex" />
                                                                                 <input type="hidden" name="AssignmentForm.RepeatDays" value="1" />
                                                                                 <input type="hidden" name="AssignmentForm.RepeatSkipWeekends" value="false" />
                                                                                 <div class="row g-2">
@@ -221,146 +262,124 @@
                                         </tr>
                                     }
                                 }
-                                else
-                                {
-                                    <tr>
-                                        <td colspan="@((Model.DayColumns.Count + 1))" class="text-center text-muted">No employees or shifts for this week.</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-            </div>
-        </div>
-
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5>Add Shift</h5>
-                @if (!Model.HasSchedule)
-                {
-                    <p class="text-muted mb-0">Create a schedule draft before adding shifts.</p>
-                }
-                else if (!Model.CanManage)
-                {
-                    <p class="text-muted mb-0">Only managers can edit the schedule.</p>
-                }
                 else
                 {
-                    <form asp-action="AddAssignment" method="post" class="row g-3">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" asp-for="AssignmentForm.ScheduleId" />
-                        <input type="hidden" name="weekStart" value="@weekStartParam" />
-                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-                        <div class="col-md-6">
-                            <label asp-for="AssignmentForm.ScheduleEmployeeId" class="form-label"></label>
-                            <select asp-for="AssignmentForm.ScheduleEmployeeId" class="form-select">
-                                <option value="">-- Select --</option>
-                                @foreach (var option in Model.EmployeeOptions)
-                                {
-                                    <option value="@option.Id">@option.DisplayName</option>
-                                }
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label asp-for="AssignmentForm.ShiftDate" class="form-label"></label>
-                            <input asp-for="AssignmentForm.ShiftDate" class="form-control" type="date" value="@Model.AssignmentForm.ShiftDate.ToString("yyyy-MM-dd")" />
-                        </div>
-                        <div class="col-md-3">
-                            <label asp-for="AssignmentForm.ShiftTemplateId" class="form-label"></label>
-                            <select name="AssignmentForm.ShiftTemplateId" class="form-select" id="shiftTemplateSelect">
-                                <option value="">Custom</option>
-                                @for (var i = 0; i < Model.ShiftTemplates.Count; i++)
-                                {
-                                    var template = Model.ShiftTemplates[i];
-                                    var templateStart = template.StartTime.ToString("hh\\:mm");
-                                    var templateEnd = template.EndTime.ToString("hh\\:mm");
-                                    <option value="@template.Id"
-                                            data-name="@template.Name"
-                                            data-start="@templateStart"
-                                            data-end="@templateEnd">
-                                        @template.Name (@templateStart - @templateEnd)
-                                    </option>
-                                }
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label asp-for="AssignmentForm.ShiftName" class="form-label"></label>
-                            <input asp-for="AssignmentForm.ShiftName" class="form-control" />
-                        </div>
-                        <div class="col-md-4">
-                            <label asp-for="AssignmentForm.ShiftStartTime" class="form-label"></label>
-                            <input asp-for="AssignmentForm.ShiftStartTime" class="form-control" type="time" />
-                        </div>
-                        <div class="col-md-4">
-                            <label asp-for="AssignmentForm.ShiftEndTime" class="form-label"></label>
-                            <input asp-for="AssignmentForm.ShiftEndTime" class="form-control" type="time" />
-                        </div>
-                        <div class="col-md-4">
-                            <label asp-for="AssignmentForm.RepeatDays" class="form-label"></label>
-                            <input asp-for="AssignmentForm.RepeatDays" class="form-control" type="number" min="1" max="21" />
-                            <small class="text-muted">Includes the first day (max 3 weeks).</small>
-                        </div>
-                        <div class="col-md-4 d-flex align-items-center">
-                            <div class="form-check mt-4">
-                                <input asp-for="AssignmentForm.RepeatSkipWeekends" class="form-check-input" />
-                                <label asp-for="AssignmentForm.RepeatSkipWeekends" class="form-check-label"></label>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <label asp-for="AssignmentForm.Notes" class="form-label"></label>
-                            <textarea asp-for="AssignmentForm.Notes" class="form-control"></textarea>
-                        </div>
-                        <div class="col-12">
-                            <button type="submit" class="btn btn-primary">Add Shift</button>
-                        </div>
-                    </form>
+                    <tr>
+                        <td colspan="@((Model.DayColumns.Count + 1))" class="text-center text-muted">No employees or shifts for this week.</td>
+                    </tr>
                 }
+            </tbody>
+        </table>
+                    <p class="text-muted small mt-3">Tip: Double-click a cell to pre-fill the Add Shift form. Copy a shift card to paste it into another day or teammate.</p>
+    </div>
+}
             </div>
         </div>
+
+        @if (Model.CanManage && Model.Status == hOps.web.Models.ScheduleStatus.Draft && Model.ScheduleId.HasValue)
+        {
+            <form id="pasteShiftForm" asp-action="PasteAssignment" method="post" class="d-none">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="scheduleId" value="@Model.ScheduleId" />
+                <input type="hidden" name="sourceAssignmentId" />
+                <input type="hidden" name="targetEmployeeId" />
+                <input type="hidden" name="targetDate" />
+                <input type="hidden" name="weekStart" value="@weekStartParam" />
+            </form>
+        }
     </div>
 
-    <div class="col-lg-4">
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5>Schedule Settings</h5>
-                <p class="mb-1"><strong>Week starts on:</strong> @Model.SettingsSummary.StartDayOfWeek</p>
-                <p class="mb-2"><strong>Default shifts:</strong> @Model.SettingsSummary.ShiftTemplateCount</p>
-                @if (!string.IsNullOrWhiteSpace(Model.SettingsSummary.SettingsUrl))
-                {
-                    <a class="btn btn-link p-0" href="@Model.SettingsSummary.SettingsUrl">Edit schedule setup</a>
-                }
-            </div>
-        </div>
-
-        @if (Model.CanManage)
-        {
+    <div class="col-12 col-xl-3 col-xxl-3">
+        <div class="schedule-side-panel">
             <div class="card mb-4">
                 <div class="card-body">
-                    <h5>Add Employee</h5>
-                    <form asp-action="AddEmployee" method="post">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="weekStart" value="@weekStartParam" />
-                        <div class="mb-3">
-                            <label asp-for="EmployeeForm.DisplayName" class="form-label"></label>
-                            <input asp-for="EmployeeForm.DisplayName" class="form-control" />
-                            <span asp-validation-for="EmployeeForm.DisplayName" class="text-danger"></span>
-                        </div>
-                        <div class="mb-3">
-                            <label asp-for="EmployeeForm.Email" class="form-label"></label>
-                            <input asp-for="EmployeeForm.Email" class="form-control" />
-                            <span asp-validation-for="EmployeeForm.Email" class="text-danger"></span>
-                        </div>
-                        <div class="form-check mb-3">
-                            <input asp-for="EmployeeForm.EmailAlertsEnabled" class="form-check-input" />
-                            <label asp-for="EmployeeForm.EmailAlertsEnabled" class="form-check-label"></label>
-                        </div>
-                        <button type="submit" class="btn btn-outline-primary w-100">Add Employee</button>
-                    </form>
+                    <h5>Add Shift</h5>
+                    @if (!Model.HasSchedule)
+                    {
+                        <p class="text-muted mb-0">Create a schedule draft before adding shifts.</p>
+                    }
+                    else if (!Model.CanManage)
+                    {
+                        <p class="text-muted mb-0">Only managers can edit the schedule.</p>
+                    }
+                    else
+                    {
+                        <div id="scheduleClipboardStatus" class="alert alert-info small d-none"></div>
+                        <form id="addShiftForm" asp-action="AddAssignment" method="post" class="row g-3">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" asp-for="AssignmentForm.ScheduleId" />
+                            <input type="hidden" asp-for="AssignmentForm.ShiftColorHex" id="shiftColorInput" />
+                            <input type="hidden" name="weekStart" value="@weekStartParam" />
+                            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                            <div class="col-12">
+                                <label asp-for="AssignmentForm.ScheduleEmployeeId" class="form-label"></label>
+                                <select asp-for="AssignmentForm.ScheduleEmployeeId" class="form-select">
+                                    <option value="">-- Select --</option>
+                                    @foreach (var option in Model.EmployeeOptions)
+                                    {
+                                        <option value="@option.Id">@option.DisplayName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label asp-for="AssignmentForm.ShiftTemplateId" class="form-label"></label>
+                                <select name="AssignmentForm.ShiftTemplateId" class="form-select" id="shiftTemplateSelect">
+                                    <option value="">Custom</option>
+                                    @for (var i = 0; i < Model.ShiftTemplates.Count; i++)
+                                    {
+                                        var template = Model.ShiftTemplates[i];
+                                        var templateStart = template.StartTime.ToString("hh\\:mm");
+                                        var templateEnd = template.EndTime.ToString("hh\\:mm");
+                                        var templateColor = string.IsNullOrWhiteSpace(template.ColorHex) ? "#3b82f6" : template.ColorHex;
+                                        var templateShiftName = string.IsNullOrWhiteSpace(template.ShiftName) ? template.Name : template.ShiftName;
+                                        <option value="@template.Id"
+                                                data-shift-name="@templateShiftName"
+                                                data-start="@templateStart"
+                                                data-end="@templateEnd"
+                                                data-color="@templateColor">
+                                            @template.Name (@templateStart - @templateEnd)
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label asp-for="AssignmentForm.ShiftDate" class="form-label"></label>
+                                <input asp-for="AssignmentForm.ShiftDate" class="form-control" type="date" value="@Model.AssignmentForm.ShiftDate.ToString("yyyy-MM-dd")" />
+                            </div>
+                            <div class="col-md-4">
+                                <label asp-for="AssignmentForm.ShiftStartTime" class="form-label"></label>
+                                <input asp-for="AssignmentForm.ShiftStartTime" class="form-control" type="time" />
+                            </div>
+                            <div class="col-md-4">
+                                <label asp-for="AssignmentForm.ShiftEndTime" class="form-label"></label>
+                                <input asp-for="AssignmentForm.ShiftEndTime" class="form-control" type="time" />
+                            </div>
+                            <div class="col-md-4">
+                                <label asp-for="AssignmentForm.ShiftName" class="form-label"></label>
+                                <input asp-for="AssignmentForm.ShiftName" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label asp-for="AssignmentForm.RepeatDays" class="form-label"></label>
+                                <input asp-for="AssignmentForm.RepeatDays" class="form-control" type="number" min="1" max="21" />
+                                <small class="text-muted">Includes the first day (max 3 weeks).</small>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-center">
+                                <div class="form-check mt-4">
+                                    <input asp-for="AssignmentForm.RepeatSkipWeekends" class="form-check-input" />
+                                    <label asp-for="AssignmentForm.RepeatSkipWeekends" class="form-check-label"></label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label asp-for="AssignmentForm.Notes" class="form-label"></label>
+                                <textarea asp-for="AssignmentForm.Notes" class="form-control"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary w-100">Add Shift</button>
+                            </div>
+                        </form>
+                    }
                 </div>
             </div>
-        }
-
         <div class="card mb-4">
             <div class="card-body">
                 <h5>Request Time Off</h5>
@@ -448,6 +467,47 @@
                 </div>
             </div>
         }
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5>Schedule Settings</h5>
+                <p class="mb-1"><strong>Week starts on:</strong> @Model.SettingsSummary.StartDayOfWeek</p>
+                <p class="mb-2"><strong>Default shifts:</strong> @Model.SettingsSummary.ShiftTemplateCount</p>
+                @if (!string.IsNullOrWhiteSpace(Model.SettingsSummary.SettingsUrl))
+                {
+                    <a class="btn btn-link p-0" href="@Model.SettingsSummary.SettingsUrl">Edit schedule setup</a>
+                }
+            </div>
+        </div>
+
+        @if (Model.CanManage)
+        {
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5>Add Employee</h5>
+                    <form asp-action="AddEmployee" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="weekStart" value="@weekStartParam" />
+                        <div class="mb-3">
+                            <label asp-for="EmployeeForm.DisplayName" class="form-label"></label>
+                            <input asp-for="EmployeeForm.DisplayName" class="form-control" />
+                            <span asp-validation-for="EmployeeForm.DisplayName" class="text-danger"></span>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="EmployeeForm.Email" class="form-label"></label>
+                            <input asp-for="EmployeeForm.Email" class="form-control" />
+                            <span asp-validation-for="EmployeeForm.Email" class="text-danger"></span>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input asp-for="EmployeeForm.EmailAlertsEnabled" class="form-check-input" />
+                            <label asp-for="EmployeeForm.EmailAlertsEnabled" class="form-check-label"></label>
+                        </div>
+                        <button type="submit" class="btn btn-outline-primary w-100">Add Employee</button>
+                    </form>
+                </div>
+            </div>
+        }
+        </div>
     </div>
 </div>
 

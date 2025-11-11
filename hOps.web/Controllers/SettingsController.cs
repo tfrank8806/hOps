@@ -1421,14 +1421,20 @@ namespace hOps.web.Controllers
 
             var rawShifts = model.ShiftTemplates ?? new List<ScheduleShiftTemplateInputModel>();
             var sanitizedShifts = rawShifts
-                .Where(t => !string.IsNullOrWhiteSpace(t.Name) || !string.IsNullOrWhiteSpace(t.StartTime) || !string.IsNullOrWhiteSpace(t.EndTime))
+                .Where(t =>
+                    !string.IsNullOrWhiteSpace(t.Name) ||
+                    !string.IsNullOrWhiteSpace(t.ShiftName) ||
+                    !string.IsNullOrWhiteSpace(t.StartTime) ||
+                    !string.IsNullOrWhiteSpace(t.EndTime))
                 .Select((t, index) => new ScheduleShiftTemplateInputModel
                 {
                     Id = t.Id,
                     Name = t.Name?.Trim() ?? string.Empty,
+                    ShiftName = t.ShiftName?.Trim() ?? string.Empty,
                     StartTime = t.StartTime ?? string.Empty,
                     EndTime = t.EndTime ?? string.Empty,
-                    SortOrder = t.SortOrder == 0 ? index : t.SortOrder
+                    SortOrder = t.SortOrder == 0 ? index : t.SortOrder,
+                    ColorHex = t.ColorHex ?? "#3b82f6"
                 })
                 .ToList();
 
@@ -1437,6 +1443,11 @@ namespace hOps.web.Controllers
                 if (string.IsNullOrWhiteSpace(shift.Name))
                 {
                     ModelState.AddModelError(string.Empty, "Shift names are required.");
+                }
+
+                if (string.IsNullOrWhiteSpace(shift.ShiftName))
+                {
+                    ModelState.AddModelError(string.Empty, $"Enter a shift name for template {shift.Name ?? "template"}.");
                 }
 
                 if (!TimeSpan.TryParse(shift.StartTime, out _))
@@ -1448,17 +1459,23 @@ namespace hOps.web.Controllers
                 {
                     ModelState.AddModelError(string.Empty, $"Enter a valid end time for {shift.Name}.");
                 }
+
+                var normalizedColor = NormalizeColorHex(shift.ColorHex);
+                if (!string.IsNullOrWhiteSpace(shift.ColorHex) && normalizedColor == null)
+                {
+                    ModelState.AddModelError(string.Empty, $"Enter a valid color for {shift.Name}.");
+                }
+
+                shift.ColorHex = normalizedColor ?? "#3b82f6";
             }
 
             if (!ModelState.IsValid)
             {
                 model.ShiftTemplates = sanitizedShifts;
                 model.PropertyOptions = BuildPropertySelectList(properties, model.SelectedPropertyId, includeGlobal: false);
+                model.ManualEmployees = await BuildManualEmployeesAsync(model.SelectedPropertyId);
                 return View(model);
             }
-
-            var settings = await _db.ScheduleSettings
-                .FirstOrDefaultAsync(s => s.PropertyId == model.SelectedPropertyId);
 
             var existingSettings = await _db.ScheduleSettings
                 .FirstOrDefaultAsync(s => s.PropertyId == model.SelectedPropertyId);
@@ -1510,10 +1527,12 @@ namespace hOps.web.Controllers
                 }
 
                 entity.Name = shift.Name;
+                entity.ShiftName = shift.ShiftName;
                 entity.StartTime = startTime;
                 entity.EndTime = endTime;
                 entity.SortOrder = shift.SortOrder;
                 entity.UpdatedAtUtc = DateTime.UtcNow;
+                entity.ColorHex = shift.ColorHex ?? "#3b82f6";
 
                 if (entity.Id > 0)
                 {
@@ -1562,6 +1581,8 @@ namespace hOps.web.Controllers
                 .ThenBy(t => t.Name)
                 .ToListAsync();
 
+            var manualEmployees = await BuildManualEmployeesAsync(propertyId);
+
             return new ScheduleSetupViewModel
             {
                 SelectedPropertyId = propertyId,
@@ -1572,17 +1593,103 @@ namespace hOps.web.Controllers
                     {
                         Id = t.Id,
                         Name = t.Name,
+                        ShiftName = string.IsNullOrWhiteSpace(t.ShiftName) ? t.Name : t.ShiftName,
                         StartTime = FormatTime(t.StartTime),
                         EndTime = FormatTime(t.EndTime),
-                        SortOrder = t.SortOrder
+                        SortOrder = t.SortOrder,
+                        ColorHex = string.IsNullOrWhiteSpace(t.ColorHex) ? "#3b82f6" : t.ColorHex
                     })
-                    .ToList()
+                    .ToList(),
+                ManualEmployees = manualEmployees
             };
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteManualScheduleEmployee(int manualEmployeeId, int propertyId)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            if (properties.All(p => p.Id != propertyId))
+            {
+                TempData["ScheduleSetupMessage"] = "You do not have access to modify that property.";
+                return RedirectToAction(nameof(ScheduleSetup), new { propertyId });
+            }
+
+            var employee = await _db.ScheduleEmployees
+                .FirstOrDefaultAsync(e => e.Id == manualEmployeeId && e.PropertyId == propertyId);
+
+            if (employee == null)
+            {
+                TempData["ScheduleSetupMessage"] = "The selected employee could not be found.";
+                return RedirectToAction(nameof(ScheduleSetup), new { propertyId });
+            }
+
+            if (!string.IsNullOrWhiteSpace(employee.ApplicationUserId))
+            {
+                TempData["ScheduleSetupMessage"] = "Only manual schedule employees can be deleted from this page.";
+                return RedirectToAction(nameof(ScheduleSetup), new { propertyId });
+            }
+
+            var employeeName = employee.DisplayName;
+            _db.ScheduleEmployees.Remove(employee);
+            await _db.SaveChangesAsync();
+
+            TempData["ScheduleSetupMessage"] = $"{employeeName} was removed from the schedule roster.";
+            return RedirectToAction(nameof(ScheduleSetup), new { propertyId });
+        }
+
+        private async Task<List<ScheduleManualEmployeeViewModel>> BuildManualEmployeesAsync(int propertyId)
+        {
+            return await _db.ScheduleEmployees
+                .Where(e => e.PropertyId == propertyId && e.ApplicationUserId == null)
+                .OrderBy(e => e.DisplayName)
+                .Select(e => new ScheduleManualEmployeeViewModel
+                {
+                    Id = e.Id,
+                    DisplayName = e.DisplayName,
+                    Email = e.Email,
+                    IsActive = e.IsActive,
+                    AssignmentCount = e.Assignments.Count
+                })
+                .ToListAsync();
         }
 
         private static string FormatTime(TimeSpan value)
         {
             return value.ToString(@"hh\:mm");
+        }
+
+        private static string? NormalizeColorHex(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var trimmed = value.Trim();
+            if (!trimmed.StartsWith("#", StringComparison.Ordinal))
+            {
+                trimmed = "#" + trimmed;
+            }
+
+            if (trimmed.Length != 7)
+            {
+                return null;
+            }
+
+            for (int i = 1; i < trimmed.Length; i++)
+            {
+                var c = trimmed[i];
+                bool isHex = (c >= '0' && c <= '9') ||
+                             (c >= 'a' && c <= 'f') ||
+                             (c >= 'A' && c <= 'F');
+                if (!isHex)
+                {
+                    return null;
+                }
+            }
+
+            return trimmed.ToLowerInvariant();
         }
 
         private async Task AlignDraftSchedulesToStartDayAsync(int propertyId, DayOfWeek targetStartDay)

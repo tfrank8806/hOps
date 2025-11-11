@@ -20,5 +20,6 @@ namespace hOps.web.Models
         public TimeSpan? ShiftStartTime { get; set; }
         public TimeSpan? ShiftEndTime { get; set; }
         public string? Notes { get; set; }
+        public string? ColorHex { get; set; }
     }
 }

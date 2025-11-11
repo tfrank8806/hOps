@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using hOps.web.Models;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace hOps.web.ViewModels.Schedules
 {
@@ -22,6 +23,8 @@ namespace hOps.web.ViewModels.Schedules
         public List<ScheduleEmployeeRowViewModel> EmployeeRows { get; set; } = new();
         public List<ScheduleShiftTemplateViewModel> ShiftTemplates { get; set; } = new();
         public List<ScheduleEmployeeOptionViewModel> EmployeeOptions { get; set; } = new();
+        public ScheduleSortOption SortOption { get; set; } = ScheduleSortOption.EmployeeName;
+        public List<SelectListItem> SortOptions { get; set; } = new();
 
         public ScheduleAssignmentFormViewModel AssignmentForm { get; set; } = new();
         public ScheduleEmployeeFormViewModel EmployeeForm { get; set; } = new();
@@ -59,6 +62,7 @@ namespace hOps.web.ViewModels.Schedules
         public bool IsManual { get; set; }
         public string SourceLabel { get; set; } = string.Empty;
         public bool IsActive { get; set; }
+        public string PrimaryShiftName { get; set; } = string.Empty;
         public Dictionary<DateTime, List<ScheduleAssignmentItemViewModel>> AssignmentsByDate { get; set; } = new();
         public Dictionary<DateTime, List<TimeOffBadgeViewModel>> TimeOffByDate { get; set; } = new();
     }
@@ -70,6 +74,7 @@ namespace hOps.web.ViewModels.Schedules
         public TimeSpan? ShiftStartTime { get; set; }
         public TimeSpan? ShiftEndTime { get; set; }
         public string? Notes { get; set; }
+        public string? ColorHex { get; set; }
     }
 
     public class TimeOffBadgeViewModel
@@ -82,8 +87,10 @@ namespace hOps.web.ViewModels.Schedules
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
+        public string ShiftName { get; set; } = string.Empty;
         public TimeSpan StartTime { get; set; }
         public TimeSpan EndTime { get; set; }
+        public string ColorHex { get; set; } = "#3b82f6";
     }
 
     public class ScheduleEmployeeOptionViewModel
@@ -135,6 +142,8 @@ namespace hOps.web.ViewModels.Schedules
 
         [Display(Name = "Skip weekends")]
         public bool RepeatSkipWeekends { get; set; }
+
+        public string? ShiftColorHex { get; set; }
     }
 
     public class ScheduleEmployeeFormViewModel
@@ -182,5 +191,11 @@ namespace hOps.web.ViewModels.Schedules
         public string? DecisionByName { get; set; }
         public DateTime? DecisionAtUtc { get; set; }
         public string? DecisionNotes { get; set; }
+    }
+
+    public enum ScheduleSortOption
+    {
+        EmployeeName,
+        ShiftName
     }
 }

@@ -1,15 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using ClosedXML.Excel;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
 using hOps.web.ViewModels.Schedules;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -22,6 +26,8 @@ namespace hOps.web.Controllers
         private readonly SchedulePublicationService _publicationService;
         private readonly IEmailSender _emailSender;
         private readonly ILogger<SchedulesController> _logger;
+        private readonly SchedulePdfRenderer _pdfRenderer;
+        private const string ScheduleSortSessionKey = "ScheduleSortOption";
 
         public SchedulesController(
             ApplicationDbContext context,
@@ -29,17 +35,19 @@ namespace hOps.web.Controllers
             IUserTimeZoneService timeZoneService,
             SchedulePublicationService publicationService,
             IEmailSender emailSender,
-            ILogger<SchedulesController> logger)
+            ILogger<SchedulesController> logger,
+            SchedulePdfRenderer pdfRenderer)
             : base(context, userManager)
         {
             _timeZoneService = timeZoneService;
             _publicationService = publicationService;
             _emailSender = emailSender;
             _logger = logger;
+            _pdfRenderer = pdfRenderer;
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(string? weekStart = null)
+        public async Task<IActionResult> Index(string? weekStart = null, string? sortOption = null)
         {
             var currentUser = await _userManager.GetUserAsync(User);
             if (currentUser == null)
@@ -47,13 +55,16 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
+            var selectedSort = ResolveSortOption(sortOption);
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
                 ViewData["Title"] = "Schedules";
                 return View(new SchedulePageViewModel
                 {
-                    AlertMessage = "Select a property to view schedules."
+                    AlertMessage = "Select a property to view schedules.",
+                    SortOption = selectedSort,
+                    SortOptions = BuildSortOptions(selectedSort)
                 });
             }
 
@@ -198,8 +209,10 @@ namespace hOps.web.Controllers
                     {
                         Id = t.Id,
                         Name = t.Name,
+                        ShiftName = string.IsNullOrWhiteSpace(t.ShiftName) ? t.Name : t.ShiftName,
                         StartTime = t.StartTime,
-                        EndTime = t.EndTime
+                        EndTime = t.EndTime,
+                        ColorHex = string.IsNullOrWhiteSpace(t.ColorHex) ? "#3b82f6" : t.ColorHex
                     })
                     .ToList(),
                 EmployeeOptions = scheduleEmployees
@@ -213,11 +226,15 @@ namespace hOps.web.Controllers
                         Email = e.Email
                     })
                     .ToList(),
+                SortOption = selectedSort,
+                SortOptions = BuildSortOptions(selectedSort),
                 AssignmentForm = new ScheduleAssignmentFormViewModel
                 {
                     ScheduleId = schedule?.Id ?? 0,
                     ShiftDate = alignedWeekStart,
-                    ShiftName = shiftTemplates.FirstOrDefault()?.Name ?? "Shift",
+                    ShiftName = shiftTemplates
+                        .Select(t => string.IsNullOrWhiteSpace(t.ShiftName) ? t.Name : t.ShiftName)
+                        .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? "Shift",
                     RepeatDays = 1
                 },
                 EmployeeForm = new ScheduleEmployeeFormViewModel(),
@@ -243,11 +260,133 @@ namespace hOps.web.Controllers
 
             if (schedule != null)
             {
-                vm.EmployeeRows = BuildEmployeeRows(schedule, vm.DayColumns, approvedRequestsForWeek);
+                vm.EmployeeRows = BuildEmployeeRows(schedule, vm.DayColumns, approvedRequestsForWeek, scheduleEmployees, selectedSort);
             }
 
             ViewData["Title"] = "Schedules";
             return View(vm);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadSchedule(string format, string? weekStart = null)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["ScheduleError"] = "Select a property before downloading schedules.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var normalizedFormat = (format ?? "pdf").Trim().ToLowerInvariant();
+            if (normalizedFormat != "pdf" && normalizedFormat != "xlsx")
+            {
+                normalizedFormat = "pdf";
+            }
+
+            var settings = await _context.ScheduleSettings
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.PropertyId == property.Id);
+            var startDay = settings?.StartDayOfWeek ?? DayOfWeek.Monday;
+
+            var referenceDate = ParseWeekStart(weekStart) ?? _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
+            var alignedWeekStart = AlignToWeekStart(referenceDate, startDay);
+            var normalizedWeekStart = DateTime.SpecifyKind(alignedWeekStart, DateTimeKind.Utc);
+            var alignedWeekEnd = alignedWeekStart.AddDays(6);
+
+            var schedule = await _context.Schedules
+                .Include(s => s.Assignments)
+                    .ThenInclude(a => a.Employee)
+                .FirstOrDefaultAsync(s => s.PropertyId == property.Id && s.WeekStartDate == normalizedWeekStart);
+
+            if (schedule == null)
+            {
+                TempData["ScheduleError"] = "No schedule exists for that week.";
+                return RedirectToAction(nameof(Index), new { weekStart = alignedWeekStart.ToString("yyyy-MM-dd") });
+            }
+
+            var dayColumns = Enumerable.Range(0, 7)
+                .Select(i => alignedWeekStart.AddDays(i))
+                .ToList();
+
+            var approvedRequests = await _context.ScheduleTimeOffRequests
+                .Where(r => r.PropertyId == property.Id &&
+                            r.Status == TimeOffRequestStatus.Approved &&
+                            r.StartDate <= alignedWeekEnd &&
+                            r.EndDate >= alignedWeekStart)
+                .Include(r => r.Employee)
+                .ToListAsync();
+
+            var gridRows = ScheduleGridBuilder.BuildRows(dayColumns, schedule.Assignments, approvedRequests);
+            if (!gridRows.Any())
+            {
+                TempData["ScheduleError"] = "Add at least one shift before downloading the schedule.";
+                return RedirectToAction(nameof(Index), new { weekStart = alignedWeekStart.ToString("yyyy-MM-dd") });
+            }
+
+            var scheduleEmployees = await _context.ScheduleEmployees
+                .Where(e => e.PropertyId == property.Id)
+                .OrderBy(e => e.DisplayName)
+                .ToListAsync();
+
+            var dayColumnViewModels = dayColumns
+                .Select(d => new ScheduleDayColumnViewModel
+                {
+                    Date = d,
+                    Label = d.ToString("ddd, MMM d"),
+                    IsToday = false
+                })
+                .ToList();
+
+            var sortOption = ResolveSortOption(null);
+            var employeeRows = BuildEmployeeRows(schedule, dayColumnViewModels, approvedRequests, scheduleEmployees, sortOption);
+            if (employeeRows.Any())
+            {
+                var lookup = gridRows.ToDictionary(r => r.ScheduleEmployeeId);
+                var orderedRows = new List<ScheduleGridRow>();
+                foreach (var row in employeeRows)
+                {
+                    if (lookup.TryGetValue(row.ScheduleEmployeeId, out var match))
+                    {
+                        orderedRows.Add(match);
+                    }
+                }
+
+                if (orderedRows.Count != gridRows.Count)
+                {
+                    var seen = new HashSet<int>(orderedRows.Select(r => r.ScheduleEmployeeId));
+                    orderedRows.AddRange(gridRows.Where(r => !seen.Contains(r.ScheduleEmployeeId)));
+                }
+
+                gridRows = orderedRows;
+            }
+
+            if (normalizedFormat == "xlsx")
+            {
+                var fileBytes = BuildScheduleExcel(property.Name, dayColumns, gridRows);
+                var fileName = BuildScheduleFileName(property.Name, alignedWeekStart, "xlsx");
+                return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            else
+            {
+                var pdfRows = gridRows
+                    .Select(r => new SchedulePdfRow
+                    {
+                        EmployeeName = r.EmployeeName,
+                        CellLines = r.CellLines
+                    })
+                    .ToList();
+
+                var title = $"{alignedWeekStart:MMM d} - {alignedWeekEnd:MMM d}";
+                var pdfBytes = _pdfRenderer.Render(property.Name, title, dayColumns, pdfRows);
+                var fileName = BuildScheduleFileName(property.Name, alignedWeekStart, "pdf");
+                return File(pdfBytes, "application/pdf", fileName);
+            }
         }
 
         [Authorize(Roles = "Admin,Manager")]
@@ -344,11 +483,14 @@ namespace hOps.web.Controllers
 
             if (string.IsNullOrWhiteSpace(form.ShiftName) && selectedTemplate != null)
             {
-                form.ShiftName = selectedTemplate.Name;
+                form.ShiftName = string.IsNullOrWhiteSpace(selectedTemplate.ShiftName)
+                    ? selectedTemplate.Name
+                    : selectedTemplate.ShiftName;
             }
 
             var (startTime, endTime) = ParseShiftTimes(form, selectedTemplate);
             var normalizedShiftName = string.IsNullOrWhiteSpace(form.ShiftName) ? "Shift" : form.ShiftName.Trim();
+            var resolvedColorHex = NormalizeColorHex(selectedTemplate?.ColorHex) ?? NormalizeColorHex(form.ShiftColorHex);
 
             var repeatDays = form.RepeatDays < 1 ? 1 : Math.Min(form.RepeatDays, 21);
             var repeatLimitDate = schedule.WeekEndDate.Date;
@@ -382,7 +524,8 @@ namespace hOps.web.Controllers
                         ShiftName = normalizedShiftName,
                         ShiftStartTime = startTime,
                         ShiftEndTime = endTime,
-                        Notes = string.IsNullOrWhiteSpace(form.Notes) ? null : form.Notes.Trim()
+                        Notes = string.IsNullOrWhiteSpace(form.Notes) ? null : form.Notes.Trim(),
+                        ColorHex = resolvedColorHex
                     });
                 }
 
@@ -450,11 +593,14 @@ namespace hOps.web.Controllers
 
             if (string.IsNullOrWhiteSpace(form.ShiftName) && selectedTemplate != null)
             {
-                form.ShiftName = selectedTemplate.Name;
+                form.ShiftName = string.IsNullOrWhiteSpace(selectedTemplate.ShiftName)
+                    ? selectedTemplate.Name
+                    : selectedTemplate.ShiftName;
             }
 
             var (startTime, endTime) = ParseShiftTimes(form, selectedTemplate);
             var normalizedShiftName = string.IsNullOrWhiteSpace(form.ShiftName) ? "Shift" : form.ShiftName.Trim();
+            var resolvedColorHex = NormalizeColorHex(selectedTemplate?.ColorHex) ?? NormalizeColorHex(form.ShiftColorHex) ?? assignment.ColorHex;
 
             assignment.ScheduleEmployeeId = employee.Id;
             assignment.ShiftDate = DateTime.SpecifyKind(form.ShiftDate.Date, DateTimeKind.Utc);
@@ -462,6 +608,7 @@ namespace hOps.web.Controllers
             assignment.ShiftStartTime = startTime;
             assignment.ShiftEndTime = endTime;
             assignment.Notes = string.IsNullOrWhiteSpace(form.Notes) ? null : form.Notes.Trim();
+            assignment.ColorHex = resolvedColorHex;
 
             await _context.SaveChangesAsync();
 
@@ -538,6 +685,84 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
 
             TempData["ScheduleMessage"] = "Employee removed from this schedule.";
+            return RedirectToAction(nameof(Index), new { weekStart });
+        }
+
+        [Authorize(Roles = "Admin,Manager")]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PasteAssignment(int scheduleId, int sourceAssignmentId, int targetEmployeeId, DateTime targetDate, string? weekStart = null)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+
+            var schedule = await _context.Schedules
+                .Include(s => s.Assignments)
+                .FirstOrDefaultAsync(s => s.Id == scheduleId);
+
+            if (schedule == null || property == null || schedule.PropertyId != property.Id)
+            {
+                TempData["ScheduleError"] = "Schedule not found.";
+                return RedirectToAction(nameof(Index), new { weekStart });
+            }
+
+            if (schedule.Status != ScheduleStatus.Draft)
+            {
+                TempData["ScheduleError"] = "Posted schedules cannot be modified.";
+                return RedirectToAction(nameof(Index), new { weekStart });
+            }
+
+            var source = await _context.ScheduleAssignments
+                .FirstOrDefaultAsync(a => a.Id == sourceAssignmentId && a.ScheduleId == scheduleId);
+
+            if (source == null)
+            {
+                TempData["ScheduleError"] = "Source shift not found.";
+                return RedirectToAction(nameof(Index), new { weekStart });
+            }
+
+            var employee = await _context.ScheduleEmployees
+                .FirstOrDefaultAsync(e => e.Id == targetEmployeeId && e.PropertyId == schedule.PropertyId);
+
+            if (employee == null)
+            {
+                TempData["ScheduleError"] = "Employee not found.";
+                return RedirectToAction(nameof(Index), new { weekStart });
+            }
+
+            var normalizedTargetDate = DateTime.SpecifyKind(targetDate.Date, DateTimeKind.Utc);
+            if (normalizedTargetDate < schedule.WeekStartDate || normalizedTargetDate > schedule.WeekEndDate)
+            {
+                TempData["ScheduleError"] = "Target date is outside of this schedule.";
+                return RedirectToAction(nameof(Index), new { weekStart });
+            }
+
+            var duplicate = schedule.Assignments.Any(a =>
+                a.ScheduleEmployeeId == employee.Id &&
+                a.ShiftDate.Date == normalizedTargetDate.Date &&
+                string.Equals(a.ShiftName, source.ShiftName, StringComparison.OrdinalIgnoreCase));
+
+            if (duplicate)
+            {
+                TempData["ScheduleError"] = "A matching shift already exists in that slot.";
+                return RedirectToAction(nameof(Index), new { weekStart });
+            }
+
+            var clone = new ScheduleAssignment
+            {
+                ScheduleId = schedule.Id,
+                ScheduleEmployeeId = employee.Id,
+                ShiftDate = normalizedTargetDate,
+                ShiftName = source.ShiftName,
+                ShiftStartTime = source.ShiftStartTime,
+                ShiftEndTime = source.ShiftEndTime,
+                Notes = source.Notes,
+                ColorHex = source.ColorHex
+            };
+
+            _context.ScheduleAssignments.Add(clone);
+            await _context.SaveChangesAsync();
+
+            TempData["ScheduleMessage"] = "Shift pasted.";
             return RedirectToAction(nameof(Index), new { weekStart });
         }
 
@@ -868,6 +1093,39 @@ namespace hOps.web.Controllers
             return date.Date;
         }
 
+        private static string? NormalizeColorHex(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var trimmed = value.Trim();
+            if (!trimmed.StartsWith("#", StringComparison.Ordinal))
+            {
+                trimmed = "#" + trimmed;
+            }
+
+            if (trimmed.Length != 7)
+            {
+                return null;
+            }
+
+            for (int i = 1; i < trimmed.Length; i++)
+            {
+                var c = trimmed[i];
+                bool isHex = (c >= '0' && c <= '9') ||
+                             (c >= 'a' && c <= 'f') ||
+                             (c >= 'A' && c <= 'F');
+                if (!isHex)
+                {
+                    return null;
+                }
+            }
+
+            return trimmed.ToLowerInvariant();
+        }
+
         private static int CalculateWeekShiftDelta(DateTime currentStart, DateTime desiredStart)
         {
             var rawDelta = (int)(desiredStart.Date - currentStart.Date).TotalDays;
@@ -936,7 +1194,8 @@ namespace hOps.web.Controllers
             Schedule schedule,
             IReadOnlyList<ScheduleDayColumnViewModel> dayColumns,
             IReadOnlyList<ScheduleTimeOffRequest> approvedRequests,
-            IReadOnlyList<ScheduleEmployee>? rosterEmployees = null)
+            IReadOnlyList<ScheduleEmployee>? rosterEmployees = null,
+            ScheduleSortOption sortOption = ScheduleSortOption.EmployeeName)
         {
             var rows = new List<ScheduleEmployeeRowViewModel>();
 
@@ -1025,7 +1284,8 @@ namespace hOps.web.Controllers
                             ShiftName = a.ShiftName,
                             ShiftStartTime = a.ShiftStartTime,
                             ShiftEndTime = a.ShiftEndTime,
-                            Notes = a.Notes
+                            Notes = a.Notes,
+                            ColorHex = a.ColorHex
                         })
                         .ToList();
 
@@ -1045,7 +1305,125 @@ namespace hOps.web.Controllers
                 rows.Add(row);
             }
 
-            return rows.OrderBy(r => r.EmployeeName).ToList();
+            foreach (var row in rows)
+            {
+                row.PrimaryShiftName = row.AssignmentsByDate.Values
+                    .SelectMany(a => a)
+                    .Select(a => a.ShiftName)
+                    .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? string.Empty;
+            }
+
+            IOrderedEnumerable<ScheduleEmployeeRowViewModel> orderedRows;
+            if (sortOption == ScheduleSortOption.ShiftName)
+            {
+                orderedRows = rows
+                    .OrderBy(r => string.IsNullOrWhiteSpace(r.PrimaryShiftName))
+                    .ThenBy(r => r.PrimaryShiftName, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(r => r.EmployeeName, StringComparer.OrdinalIgnoreCase);
+            }
+            else
+            {
+                orderedRows = rows.OrderBy(r => r.EmployeeName, StringComparer.OrdinalIgnoreCase);
+            }
+
+            return orderedRows.ToList();
+        }
+
+        private ScheduleSortOption ResolveSortOption(string? requestedSort)
+        {
+            var parsed = ParseSortOption(requestedSort);
+            if (parsed.HasValue)
+            {
+                HttpContext.Session.SetString(ScheduleSortSessionKey, parsed.Value.ToString());
+                return parsed.Value;
+            }
+
+            var stored = ParseSortOption(HttpContext.Session.GetString(ScheduleSortSessionKey));
+            if (stored.HasValue)
+            {
+                return stored.Value;
+            }
+
+            HttpContext.Session.SetString(ScheduleSortSessionKey, ScheduleSortOption.EmployeeName.ToString());
+            return ScheduleSortOption.EmployeeName;
+        }
+
+        private static ScheduleSortOption? ParseSortOption(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            return Enum.TryParse<ScheduleSortOption>(value, true, out var parsed)
+                ? parsed
+                : null;
+        }
+
+        private static List<SelectListItem> BuildSortOptions(ScheduleSortOption selected)
+        {
+            return new List<SelectListItem>
+            {
+                new SelectListItem("Employee name", ScheduleSortOption.EmployeeName.ToString(), selected == ScheduleSortOption.EmployeeName),
+                new SelectListItem("Shift name", ScheduleSortOption.ShiftName.ToString(), selected == ScheduleSortOption.ShiftName)
+            };
+        }
+
+        private static byte[] BuildScheduleExcel(string propertyName, IReadOnlyList<DateTime> dayColumns, IReadOnlyList<ScheduleGridRow> rows)
+        {
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Schedule");
+
+            worksheet.Cell(1, 1).Value = "Employee";
+            for (int i = 0; i < dayColumns.Count; i++)
+            {
+                var headerCell = worksheet.Cell(1, i + 2);
+                headerCell.Value = $"{dayColumns[i]:ddd}\n{dayColumns[i]:MMM d}";
+                headerCell.Style.Alignment.WrapText = true;
+            }
+
+            var headerRange = worksheet.Range(1, 1, 1, dayColumns.Count + 1);
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#f5f5f5");
+            worksheet.SheetView.FreezeRows(1);
+
+            int rowIndex = 2;
+            foreach (var row in rows)
+            {
+                worksheet.Cell(rowIndex, 1).Value = row.EmployeeName;
+                for (int dayIndex = 0; dayIndex < dayColumns.Count; dayIndex++)
+                {
+                    var lines = row.CellLines.Count > dayIndex ? row.CellLines[dayIndex] : new List<string>();
+                    var cell = worksheet.Cell(rowIndex, dayIndex + 2);
+                    if (lines.Count > 0)
+                    {
+                        cell.Value = string.Join(Environment.NewLine, lines);
+                        cell.Style.Alignment.WrapText = true;
+                    }
+                    else
+                    {
+                        cell.Value = string.Empty;
+                    }
+                }
+
+                rowIndex++;
+            }
+
+            worksheet.Columns().AdjustToContents();
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
+        }
+
+        private static string BuildScheduleFileName(string propertyName, DateTime weekStart, string extension)
+        {
+            var rawName = $"Schedule_{propertyName}_{weekStart:yyyyMMdd}";
+            var invalid = Path.GetInvalidFileNameChars();
+            var safeName = new string(rawName
+                .Select(c => invalid.Contains(c) ? '_' : c)
+                .ToArray());
+            return $"{safeName}.{extension}";
         }
 
         private static TimeOffRequestListItemViewModel MapRequest(ScheduleTimeOffRequest request)
