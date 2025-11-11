@@ -293,19 +293,19 @@ body.todo-sidebar-collapsed .todo-sidebar {
 }
 
 .todo-sidebar-rail-toggle {
-    border: 2px solid rgba(255, 255, 255, 0.25);
-    background: linear-gradient(180deg, #0d6efd 0%, #5a8dee 100%);
-    width: 34px;
-    height: 110px;
+    border: 1px solid rgba(15, 23, 42, 0.15);
+    background: linear-gradient(180deg, #0d6efd 0%, #4c7de0 100%);
+    width: 26px;
+    height: 90px;
     border-radius: 999px 0 0 999px;
-    box-shadow: 0 12px 28px rgba(13, 110, 253, 0.35);
+    box-shadow: 0 8px 18px rgba(13, 110, 253, 0.25);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: background 0.2s ease, transform 0.2s ease;
     position: fixed;
-    right: 0.5rem;
+    right: 0.25rem;
     top: 50%;
     transform: translateY(-50%);
     z-index: 1060;
@@ -318,16 +318,16 @@ body.todo-sidebar-collapsed .todo-sidebar {
 }
 
 .todo-sidebar-rail-toggle:hover {
-    transform: translateY(-50%) translateX(-3px);
+    transform: translateY(-50%) translateX(-2px);
 }
 
 .todo-sidebar-rail-toggle.collapsed {
-    background: linear-gradient(180deg, #6c757d 0%, #4b5563 100%);
+    background: linear-gradient(180deg, #6c757d 0%, #495057 100%);
 }
 
 .todo-sidebar-rail-icon::before {
     content: '\2039';
-    font-size: 1.4rem;
+    font-size: 1.1rem;
     font-weight: 700;
     line-height: 1;
 }
@@ -337,13 +337,13 @@ body.todo-sidebar-collapsed .todo-sidebar-rail-icon::before {
 }
 
 body:not(.todo-sidebar-collapsed) .todo-sidebar-rail-toggle {
-    right: calc(320px + 0.75rem);
+    right: calc(320px + 0.5rem);
 }
 
 @media (max-width: 991.98px) {
     .todo-sidebar-rail-toggle {
-        width: 38px;
-        height: 80px;
+        width: 30px;
+        height: 60px;
         bottom: 1.5rem;
         top: auto;
         transform: none;
@@ -362,15 +362,15 @@ body:not(.todo-sidebar-collapsed) .todo-sidebar-rail-toggle {
 
 .sidebar-fab-toggle {
     position: fixed;
-    left: calc(260px + 0.75rem + 18px);
+    left: clamp(0.75rem, calc(260px + 0.5rem + 12px), 3.5rem);
     top: 50%;
     transform: translate(-50%, -50%);
-    border: 2px solid rgba(255, 255, 255, 0.25);
-    background: linear-gradient(180deg, #0d6efd 0%, #4f81ff 100%);
-    width: 28px;
-    height: 110px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: linear-gradient(180deg, #0d6efd 0%, #3f6fce 100%);
+    width: 24px;
+    height: 90px;
     border-radius: 0 999px 999px 0;
-    box-shadow: 0 12px 30px rgba(13, 110, 253, 0.35);
+    box-shadow: 0 8px 22px rgba(13, 110, 253, 0.25);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -390,16 +390,16 @@ body.sidebar-collapsed .sidebar-fab-toggle {
 }
 
 .sidebar-fab-toggle:hover {
-    transform: translate(-50%, -55%);
+    transform: translate(-50%, -54%);
 }
 
 .sidebar-fab-toggle.collapsed {
-    background: linear-gradient(180deg, #6b7280 0%, #4b5563 100%);
+    background: linear-gradient(180deg, #6b7280 0%, #46505f 100%);
 }
 
 .sidebar-fab-toggle__icon::before {
     content: '\203A';
-    font-size: 1.4rem;
+    font-size: 1.1rem;
     font-weight: 700;
 }
 
@@ -412,12 +412,12 @@ body.sidebar-collapsed .sidebar-fab-toggle {
         top: auto;
         bottom: 1.5rem;
         transform: translate(-50%, 0);
-        width: 32px;
-        height: 80px;
+        width: 28px;
+        height: 70px;
     }
 
     body:not(.sidebar-collapsed) .sidebar-fab-toggle {
-        left: calc(min(80vw, 360px) + 0.75rem + 18px);
+        left: calc(min(80vw, 360px) + 0.5rem + 12px);
     }
 }
 
