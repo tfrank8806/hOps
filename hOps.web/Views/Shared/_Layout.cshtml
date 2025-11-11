@@ -338,12 +338,30 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                             </div>
                         }
+                        @{
+                            var departmentCollapseId = "departmentTasksCollapse";
+                            var personalCollapseId = "personalTodosCollapse";
+                        }
                         <section class="todo-section">
-                            <div class="section-heading d-flex justify-content-between align-items-center">
-                                <span class="fw-semibold">Department Work Orders</span>
-                                <span class="badge bg-light text-dark">@toDoData.DepartmentTasks.Count</span>
+                            <div class="section-heading">
+                                <button class="todo-section-toggle d-flex align-items-center justify-content-between w-100"
+                                        type="button"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#@departmentCollapseId"
+                                        aria-expanded="true"
+                                        aria-controls="@departmentCollapseId">
+                                    <div class="d-flex flex-column text-start">
+                                        <span class="fw-semibold">Department Work Orders</span>
+                                        <small class="text-muted">Shared assignments from your departments</small>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-light text-dark">@toDoData.DepartmentTasks.Count</span>
+                                        <span class="todo-section-toggle-icon" aria-hidden="true"></span>
+                                    </div>
+                                </button>
                             </div>
-                            <div class="todo-list mt-3">
+                            <div id="@departmentCollapseId" class="collapse show">
+                                <div class="todo-list mt-3">
                                 @if (toDoData.DepartmentTasks.Any())
                                 {
                                     foreach (var task in toDoData.DepartmentTasks)
@@ -392,14 +410,29 @@
                                         <p class="text-muted small mb-0">No open work orders are currently assigned to your departments.</p>
                                     }
                                 }
+                                </div>
                             </div>
                         </section>
                         <section class="todo-section mt-4">
-                            <div class="section-heading d-flex justify-content-between align-items-center">
-                                <span class="fw-semibold">My Personal To-Dos</span>
-                                <span class="badge bg-light text-dark">@toDoData.ActivePersonalToDos.Count</span>
+                            <div class="section-heading">
+                                <button class="todo-section-toggle d-flex align-items-center justify-content-between w-100"
+                                        type="button"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#@personalCollapseId"
+                                        aria-expanded="true"
+                                        aria-controls="@personalCollapseId">
+                                    <div class="d-flex flex-column text-start">
+                                        <span class="fw-semibold">My Personal To-Dos</span>
+                                        <small class="text-muted">Quick reminders only visible to you</small>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-light text-dark">@toDoData.ActivePersonalToDos.Count</span>
+                                        <span class="todo-section-toggle-icon" aria-hidden="true"></span>
+                                    </div>
+                                </button>
                             </div>
-                            <div class="todo-list mt-3">
+                            <div id="@personalCollapseId" class="collapse show">
+                                <div class="todo-list mt-3">
                                 @if (toDoData.ActivePersonalToDos.Any())
                                 {
                                     foreach (var todo in toDoData.ActivePersonalToDos)
@@ -429,6 +462,7 @@
                                 {
                                     <p class="text-muted small mb-0">Add personal reminders to stay organized.</p>
                                 }
+                                </div>
                             </div>
                             <form asp-controller="WorkOrders" asp-action="AddPersonalTodo" method="post" class="mt-3">
                                 @Html.AntiForgeryToken()
