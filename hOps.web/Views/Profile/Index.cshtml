@@ -185,6 +185,10 @@
                         <input class="form-check-input" asp-for="EmailPreferences.EmailOnWorkOrderDepartment" />
                         <label class="form-check-label" asp-for="EmailPreferences.EmailOnWorkOrderDepartment"></label>
                     </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" asp-for="EmailPreferences.EmailOnSchedulePosted" />
+                        <label class="form-check-label" asp-for="EmailPreferences.EmailOnSchedulePosted"></label>
+                    </div>
                     @if (Model.EmailPreferences.PropertyOptions?.Any() == true)
                     {
                         for (var i = 0; i < Model.EmailPreferences.PropertyOptions.Count; i++)

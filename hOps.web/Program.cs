@@ -40,6 +40,8 @@ builder.Services.AddTransient<IEmailSender>(sp => sp.GetRequiredService<EmailSen
 builder.Services.AddTransient<IExtendedEmailSender>(sp => sp.GetRequiredService<EmailSender>());
 builder.Services.AddScoped<DirectMessageService>();
 builder.Services.AddScoped<MentionService>();
+builder.Services.AddSingleton<SchedulePdfRenderer>();
+builder.Services.AddScoped<SchedulePublicationService>();
 builder.Services.AddHostedService<DailySummaryEmailService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserTimeZoneService, UserTimeZoneService>();

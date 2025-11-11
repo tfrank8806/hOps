@@ -99,6 +99,11 @@
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link @(currentController == "Schedules" ? "active" : string.Empty)" asp-controller="Schedules" asp-action="Index">
+                                    <span class="sidebar-text">Schedules</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link @(currentController == "PassOnLogs" ? "active" : string.Empty)" asp-controller="PassOnLogs" asp-action="Index">
                                     <span class="sidebar-text">Pass On Logs</span>
                                 </a>
@@ -184,6 +189,7 @@
                                                 Edit Layout
                                             </a>
                                         </li>
+                                        <li><a class="dropdown-item" asp-controller="Settings" asp-action="ScheduleSetup" asp-route-propertyId="@(ViewBag.CurrentProperty?.Id ?? 0)">Schedule Setup</a></li>
                                         @if (roles.Contains("Admin"))
                                         {
                                             <li><a class="dropdown-item" asp-controller="Properties" asp-action="Index">Properties</a></li>

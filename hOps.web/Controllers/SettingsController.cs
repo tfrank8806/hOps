@@ -1,6 +1,7 @@
 ﻿using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
+using hOps.web.ViewModels.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -1381,6 +1382,255 @@ namespace hOps.web.Controllers
                 .ToList();
 
             return Json(new { success = true, layouts = responseLayouts });
+        }
+
+        public async Task<IActionResult> ScheduleSetup(int? propertyId = null)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            if (!properties.Any())
+            {
+                return View(new ScheduleSetupViewModel());
+            }
+
+            var targetPropertyId = propertyId ?? properties.First().Id;
+            if (properties.All(p => p.Id != targetPropertyId))
+            {
+                targetPropertyId = properties.First().Id;
+            }
+
+            var model = await BuildScheduleSetupViewModelAsync(properties, targetPropertyId);
+            ViewBag.ScheduleSetupMessage = TempData["ScheduleSetupMessage"] as string;
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ScheduleSetup(ScheduleSetupViewModel model)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            if (properties.All(p => p.Id != model.SelectedPropertyId))
+            {
+                ModelState.AddModelError(nameof(model.SelectedPropertyId), "Select a property to update.");
+            }
+
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var rawShifts = model.ShiftTemplates ?? new List<ScheduleShiftTemplateInputModel>();
+            var sanitizedShifts = rawShifts
+                .Where(t => !string.IsNullOrWhiteSpace(t.Name) || !string.IsNullOrWhiteSpace(t.StartTime) || !string.IsNullOrWhiteSpace(t.EndTime))
+                .Select((t, index) => new ScheduleShiftTemplateInputModel
+                {
+                    Id = t.Id,
+                    Name = t.Name?.Trim() ?? string.Empty,
+                    StartTime = t.StartTime ?? string.Empty,
+                    EndTime = t.EndTime ?? string.Empty,
+                    SortOrder = t.SortOrder == 0 ? index : t.SortOrder
+                })
+                .ToList();
+
+            foreach (var shift in sanitizedShifts)
+            {
+                if (string.IsNullOrWhiteSpace(shift.Name))
+                {
+                    ModelState.AddModelError(string.Empty, "Shift names are required.");
+                }
+
+                if (!TimeSpan.TryParse(shift.StartTime, out _))
+                {
+                    ModelState.AddModelError(string.Empty, $"Enter a valid start time for {shift.Name}.");
+                }
+
+                if (!TimeSpan.TryParse(shift.EndTime, out _))
+                {
+                    ModelState.AddModelError(string.Empty, $"Enter a valid end time for {shift.Name}.");
+                }
+            }
+
+            if (!ModelState.IsValid)
+            {
+                model.ShiftTemplates = sanitizedShifts;
+                model.PropertyOptions = BuildPropertySelectList(properties, model.SelectedPropertyId, includeGlobal: false);
+                return View(model);
+            }
+
+            var settings = await _db.ScheduleSettings
+                .FirstOrDefaultAsync(s => s.PropertyId == model.SelectedPropertyId);
+
+            var existingSettings = await _db.ScheduleSettings
+                .FirstOrDefaultAsync(s => s.PropertyId == model.SelectedPropertyId);
+            var previousStartDay = existingSettings?.StartDayOfWeek;
+
+            if (existingSettings == null)
+            {
+                var newSettings = new ScheduleSettings
+                {
+                    PropertyId = model.SelectedPropertyId,
+                    StartDayOfWeek = model.StartDayOfWeek,
+                    UpdatedByUserId = currentUser.Id,
+                    UpdatedAtUtc = DateTime.UtcNow
+                };
+                _db.ScheduleSettings.Add(newSettings);
+                existingSettings = newSettings;
+            }
+            else
+            {
+                existingSettings.StartDayOfWeek = model.StartDayOfWeek;
+                existingSettings.UpdatedByUserId = currentUser.Id;
+                existingSettings.UpdatedAtUtc = DateTime.UtcNow;
+            }
+
+            var existingTemplates = await _db.ScheduleShiftTemplates
+                .Where(t => t.PropertyId == model.SelectedPropertyId)
+                .ToListAsync();
+
+            var keepIds = new HashSet<int>();
+            foreach (var shift in sanitizedShifts.OrderBy(s => s.SortOrder).ThenBy(s => s.Name))
+            {
+                var startTime = TimeSpan.Parse(shift.StartTime);
+                var endTime = TimeSpan.Parse(shift.EndTime);
+
+                ScheduleShiftTemplate? entity = null;
+                if (shift.Id > 0)
+                {
+                    entity = existingTemplates.FirstOrDefault(t => t.Id == shift.Id);
+                }
+
+                if (entity == null)
+                {
+                    entity = new ScheduleShiftTemplate
+                    {
+                        PropertyId = model.SelectedPropertyId,
+                        CreatedAtUtc = DateTime.UtcNow
+                    };
+                    _db.ScheduleShiftTemplates.Add(entity);
+                }
+
+                entity.Name = shift.Name;
+                entity.StartTime = startTime;
+                entity.EndTime = endTime;
+                entity.SortOrder = shift.SortOrder;
+                entity.UpdatedAtUtc = DateTime.UtcNow;
+
+                if (entity.Id > 0)
+                {
+                    keepIds.Add(entity.Id);
+                }
+            }
+
+            var toRemove = existingTemplates
+                .Where(t => !keepIds.Contains(t.Id))
+                .ToList();
+
+            if (toRemove.Any())
+            {
+                _db.ScheduleShiftTemplates.RemoveRange(toRemove);
+            }
+
+            await _db.SaveChangesAsync();
+
+            if (!previousStartDay.HasValue || previousStartDay.Value != model.StartDayOfWeek)
+            {
+                await AlignDraftSchedulesToStartDayAsync(model.SelectedPropertyId, model.StartDayOfWeek);
+            }
+
+            TempData["ScheduleSetupMessage"] = "Schedule settings saved.";
+            return RedirectToAction(nameof(ScheduleSetup), new { propertyId = model.SelectedPropertyId });
+        }
+
+        private async Task<ScheduleSetupViewModel> BuildScheduleSetupViewModelAsync(List<Property> properties, int propertyId)
+        {
+            var settings = await _db.ScheduleSettings.FirstOrDefaultAsync(s => s.PropertyId == propertyId);
+            if (settings == null)
+            {
+                settings = new ScheduleSettings
+                {
+                    PropertyId = propertyId,
+                    StartDayOfWeek = DayOfWeek.Monday,
+                    UpdatedAtUtc = DateTime.UtcNow
+                };
+                _db.ScheduleSettings.Add(settings);
+                await _db.SaveChangesAsync();
+            }
+
+            var shiftTemplates = await _db.ScheduleShiftTemplates
+                .Where(t => t.PropertyId == propertyId)
+                .OrderBy(t => t.SortOrder)
+                .ThenBy(t => t.Name)
+                .ToListAsync();
+
+            return new ScheduleSetupViewModel
+            {
+                SelectedPropertyId = propertyId,
+                StartDayOfWeek = settings.StartDayOfWeek,
+                PropertyOptions = BuildPropertySelectList(properties, propertyId, includeGlobal: false),
+                ShiftTemplates = shiftTemplates
+                    .Select(t => new ScheduleShiftTemplateInputModel
+                    {
+                        Id = t.Id,
+                        Name = t.Name,
+                        StartTime = FormatTime(t.StartTime),
+                        EndTime = FormatTime(t.EndTime),
+                        SortOrder = t.SortOrder
+                    })
+                    .ToList()
+            };
+        }
+
+        private static string FormatTime(TimeSpan value)
+        {
+            return value.ToString(@"hh\:mm");
+        }
+
+        private async Task AlignDraftSchedulesToStartDayAsync(int propertyId, DayOfWeek targetStartDay)
+        {
+            var draftSchedules = await _db.Schedules
+                .Include(s => s.Assignments)
+                .Where(s => s.PropertyId == propertyId && s.Status == ScheduleStatus.Draft)
+                .ToListAsync();
+
+            var updatesMade = false;
+            foreach (var draft in draftSchedules)
+            {
+                var offset = NormalizeDayOffset(draft.WeekStartDate.DayOfWeek, targetStartDay);
+                if (offset == 0)
+                {
+                    continue;
+                }
+
+                updatesMade = true;
+                draft.WeekStartDate = draft.WeekStartDate.AddDays(offset);
+                draft.WeekEndDate = draft.WeekStartDate.AddDays(6);
+                draft.UpdatedAtUtc = DateTime.UtcNow;
+
+                foreach (var assignment in draft.Assignments)
+                {
+                    assignment.ShiftDate = assignment.ShiftDate.AddDays(offset);
+                }
+            }
+
+            if (updatesMade)
+            {
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        private static int NormalizeDayOffset(DayOfWeek currentStart, DayOfWeek targetStart)
+        {
+            var rawOffset = (int)targetStart - (int)currentStart;
+            if (rawOffset > 3)
+            {
+                rawOffset -= 7;
+            }
+            else if (rawOffset < -3)
+            {
+                rawOffset += 7;
+            }
+
+            return rawOffset;
         }
     }
 }

@@ -73,6 +73,9 @@ namespace hOps.web.ViewModels
         [Display(Name = "Send me a daily summary email")]
         public bool EmailDailySummary { get; set; }
 
+        [Display(Name = "Email me when a schedule is posted")]
+        public bool EmailOnSchedulePosted { get; set; }
+
         public List<int> SelectedDepartmentIds { get; set; } = new();
         public List<EmailPreferenceDepartmentOption> DepartmentOptions { get; set; } = new();
         public List<int> SelectedPropertyIds { get; set; } = new();

@@ -291,6 +291,7 @@ namespace hOps.web.Controllers
             user.EmailOnWorkOrderDepartment = model.EmailOnWorkOrderDepartment;
             user.EmailOnLogEntry = model.EmailOnLogEntry;
             user.EmailDailySummary = model.EmailDailySummary;
+            user.EmailOnSchedulePosted = model.EmailOnSchedulePosted;
 
             var updateResult = await _userManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
@@ -672,7 +673,8 @@ namespace hOps.web.Controllers
                 EmailOnMention = user.EmailOnMention,
                 EmailOnWorkOrderDepartment = user.EmailOnWorkOrderDepartment,
                 EmailOnLogEntry = user.EmailOnLogEntry,
-                EmailDailySummary = user.EmailDailySummary
+                EmailDailySummary = user.EmailDailySummary,
+                EmailOnSchedulePosted = user.EmailOnSchedulePosted
             };
 
             emailPreferencesVm.PropertyOptions = propertyPreferenceOptions;

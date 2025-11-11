@@ -18,6 +18,7 @@ namespace hOps.web.Models
         public bool EmailOnWorkOrderDepartment { get; set; } = true;
         public bool EmailOnLogEntry { get; set; } = true;
         public bool EmailDailySummary { get; set; } = false;
+        public bool EmailOnSchedulePosted { get; set; } = true;
         public DateTime? DailySummaryLastSentUtc { get; set; }
 
         public int? DefaultPropertyId { get; set; }

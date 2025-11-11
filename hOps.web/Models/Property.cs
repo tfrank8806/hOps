@@ -49,5 +49,11 @@ namespace hOps.web.Models
 
         public ICollection<PackageLogEntry> PackageLogEntries { get; set; } = new List<PackageLogEntry>();
         public ICollection<UserPropertyEmailSubscription> EmailSubscriptions { get; set; } = new List<UserPropertyEmailSubscription>();
+
+        public ScheduleSettings? ScheduleSettings { get; set; }
+        public ICollection<ScheduleShiftTemplate> ScheduleShiftTemplates { get; set; } = new List<ScheduleShiftTemplate>();
+        public ICollection<ScheduleEmployee> ScheduleEmployees { get; set; } = new List<ScheduleEmployee>();
+        public ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
+        public ICollection<ScheduleTimeOffRequest> ScheduleTimeOffRequests { get; set; } = new List<ScheduleTimeOffRequest>();
     }
 }

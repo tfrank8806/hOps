@@ -56,6 +56,12 @@ namespace hOps.web.Data
         public DbSet<DocumentFolderProperty> DocumentFolderProperties { get; set; }
         public DbSet<UserPropertyEmailSubscription> UserPropertyEmailSubscriptions { get; set; }
         public DbSet<UserToDoItem> UserToDoItems { get; set; }
+        public DbSet<ScheduleSettings> ScheduleSettings { get; set; }
+        public DbSet<ScheduleShiftTemplate> ScheduleShiftTemplates { get; set; }
+        public DbSet<ScheduleEmployee> ScheduleEmployees { get; set; }
+        public DbSet<Schedule> Schedules { get; set; }
+        public DbSet<ScheduleAssignment> ScheduleAssignments { get; set; }
+        public DbSet<ScheduleTimeOffRequest> ScheduleTimeOffRequests { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -406,6 +412,103 @@ namespace hOps.web.Data
                 .WithMany(f => f.SubFolders)
                 .HasForeignKey(f => f.ParentFolderId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<ScheduleSettings>()
+                .HasOne(s => s.Property)
+                .WithOne(p => p.ScheduleSettings)
+                .HasForeignKey<ScheduleSettings>(s => s.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ScheduleSettings>()
+                .HasOne(s => s.UpdatedByUser)
+                .WithMany()
+                .HasForeignKey(s => s.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<ScheduleShiftTemplate>()
+                .HasOne(t => t.Property)
+                .WithMany(p => p.ScheduleShiftTemplates)
+                .HasForeignKey(t => t.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ScheduleShiftTemplate>()
+                .HasIndex(t => new { t.PropertyId, t.SortOrder });
+
+            builder.Entity<ScheduleEmployee>()
+                .HasOne(e => e.Property)
+                .WithMany(p => p.ScheduleEmployees)
+                .HasForeignKey(e => e.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ScheduleEmployee>()
+                .HasOne(e => e.ApplicationUser)
+                .WithMany()
+                .HasForeignKey(e => e.ApplicationUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<ScheduleEmployee>()
+                .HasIndex(e => new { e.PropertyId, e.ApplicationUserId })
+                .IsUnique();
+
+            builder.Entity<Schedule>()
+                .HasOne(s => s.Property)
+                .WithMany(p => p.Schedules)
+                .HasForeignKey(s => s.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<Schedule>()
+                .HasOne(s => s.CreatedBy)
+                .WithMany()
+                .HasForeignKey(s => s.CreatedById)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<Schedule>()
+                .HasOne(s => s.UpdatedBy)
+                .WithMany()
+                .HasForeignKey(s => s.UpdatedById)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<Schedule>()
+                .HasOne(s => s.PostedBy)
+                .WithMany()
+                .HasForeignKey(s => s.PostedById)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<ScheduleAssignment>()
+                .HasOne(a => a.Schedule)
+                .WithMany(s => s.Assignments)
+                .HasForeignKey(a => a.ScheduleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ScheduleAssignment>()
+                .HasOne(a => a.Employee)
+                .WithMany(e => e.Assignments)
+                .HasForeignKey(a => a.ScheduleEmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ScheduleTimeOffRequest>()
+                .HasOne(r => r.Property)
+                .WithMany(p => p.ScheduleTimeOffRequests)
+                .HasForeignKey(r => r.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ScheduleTimeOffRequest>()
+                .HasOne(r => r.Employee)
+                .WithMany(e => e.TimeOffRequests)
+                .HasForeignKey(r => r.ScheduleEmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ScheduleTimeOffRequest>()
+                .HasOne(r => r.SubmittedByUser)
+                .WithMany()
+                .HasForeignKey(r => r.SubmittedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<ScheduleTimeOffRequest>()
+                .HasOne(r => r.DecisionByUser)
+                .WithMany()
+                .HasForeignKey(r => r.DecisionByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

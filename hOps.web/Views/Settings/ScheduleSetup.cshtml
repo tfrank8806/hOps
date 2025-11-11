@@ -1,0 +1,161 @@
+@model hOps.web.ViewModels.Settings.ScheduleSetupViewModel
+@{
+    ViewData["Title"] = "Schedule Setup";
+    var successMessage = ViewBag.ScheduleSetupMessage as string;
+    var dayOptions = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToList();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h2 class="mb-0">Schedule Setup</h2>
+    @if (Model.PropertyOptions?.Any() == true)
+    {
+        <form method="get" class="d-flex gap-2">
+            <select name="propertyId" class="form-select" style="min-width: 220px;">
+                @foreach (var option in Model.PropertyOptions)
+                {
+                    <option value="@option.Value" selected="@(option.Selected)">@option.Text</option>
+                }
+            </select>
+            <button type="submit" class="btn btn-outline-secondary">Switch</button>
+        </form>
+    }
+</div>
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+<div class="card">
+    <div class="card-body">
+        @if (Model.PropertyOptions == null || !Model.PropertyOptions.Any())
+        {
+            <p class="text-muted mb-0">You do not have access to any properties.</p>
+        }
+        else
+        {
+            <form asp-action="ScheduleSetup" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="SelectedPropertyId" />
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                <div class="mb-4">
+                    <label asp-for="StartDayOfWeek" class="form-label"></label>
+                    <select asp-for="StartDayOfWeek" class="form-select" style="max-width: 320px;">
+                        @foreach (var day in dayOptions)
+                        {
+                            <option value="@day" selected="@(day == Model.StartDayOfWeek)">@day</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <h5 class="mb-0">Default Shifts</h5>
+                    <button class="btn btn-outline-primary btn-sm" type="button" id="addShiftTemplate">
+                        + Add Shift
+                    </button>
+                </div>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-striped align-middle" id="shiftTemplatesTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">#</th>
+                                <th>Name</th>
+                                <th style="width: 150px;">Start</th>
+                                <th style="width: 150px;">End</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.ShiftTemplates.Any())
+                            {
+                                for (var i = 0; i < Model.ShiftTemplates.Count; i++)
+                                {
+                                    <tr>
+                                        <td>
+                                            <input type="hidden" asp-for="ShiftTemplates[i].Id" />
+                                            <input type="number" asp-for="ShiftTemplates[i].SortOrder" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="ShiftTemplates[i].Name" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="ShiftTemplates[i].StartTime" class="form-control form-control-sm" type="time" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="ShiftTemplates[i].EndTime" class="form-control form-control-sm" type="time" />
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr class="shift-template-row">
+                                    <td>
+                                        <input type="hidden" name="ShiftTemplates[0].Id" value="0" />
+                                        <input type="number" name="ShiftTemplates[0].SortOrder" value="0" class="form-control form-control-sm" />
+                                    </td>
+                                    <td>
+                                        <input name="ShiftTemplates[0].Name" class="form-control form-control-sm" />
+                                    </td>
+                                    <td>
+                                        <input name="ShiftTemplates[0].StartTime" type="time" class="form-control form-control-sm" />
+                                    </td>
+                                    <td>
+                                        <input name="ShiftTemplates[0].EndTime" type="time" class="form-control form-control-sm" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </form>
+        }
+    </div>
+</div>
+
+<template id="shift-row-template">
+    <tr>
+        <td>
+            <input type="hidden" name="ShiftTemplates[{{index}}].Id" value="0" />
+            <input type="number" name="ShiftTemplates[{{index}}].SortOrder" value="{{index}}" class="form-control form-control-sm" />
+        </td>
+        <td>
+            <input name="ShiftTemplates[{{index}}].Name" class="form-control form-control-sm" />
+        </td>
+        <td>
+            <input name="ShiftTemplates[{{index}}].StartTime" type="time" class="form-control form-control-sm" />
+        </td>
+        <td>
+            <input name="ShiftTemplates[{{index}}].EndTime" type="time" class="form-control form-control-sm" />
+        </td>
+    </tr>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const addButton = document.getElementById('addShiftTemplate');
+            const tableBody = document.querySelector('#shiftTemplatesTable tbody');
+            const template = document.getElementById('shift-row-template');
+
+            if (!addButton || !tableBody || !template) {
+                return;
+            }
+
+            addButton.addEventListener('click', () => {
+                const nextIndex = tableBody.querySelectorAll('tr').length;
+                const html = template.innerHTML.replace(/{{index}}/g, nextIndex);
+                const wrapper = document.createElement('tbody');
+                wrapper.innerHTML = html;
+                const newRow = wrapper.firstElementChild;
+                if (newRow) {
+                    tableBody.appendChild(newRow);
+                }
+            });
+        })();
+    </script>
+}
