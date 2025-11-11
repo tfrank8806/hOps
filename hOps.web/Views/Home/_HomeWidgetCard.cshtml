@@ -97,15 +97,20 @@
         }
         else if (items.First() is PackageLogSummaryViewModel)
         {
-            var packages = items.OfType<PackageLogSummaryViewModel>();
-            <ul class="list-unstyled mb-0 widget-list">
-                @foreach (var package in packages)
-                {
-                    var hasLink = !string.IsNullOrWhiteSpace(package.DetailUrl);
-                    <li class="widget-item">
-                        @if (hasLink)
-                        {
-                            <a class="fw-semibold" href="@package.DetailUrl">@package.RecipientName</a>
+            var packages = items.OfType<PackageLogSummaryViewModel>()
+                .Where(package => !package.Delivered)
+                .ToList();
+
+            if (packages.Any())
+            {
+                <ul class="list-unstyled mb-0 widget-list">
+                    @foreach (var package in packages)
+                    {
+                        var hasLink = !string.IsNullOrWhiteSpace(package.DetailUrl);
+                        <li class="widget-item">
+                            @if (hasLink)
+                            {
+                                <a class="fw-semibold" href="@package.DetailUrl">@package.RecipientName</a>
                         }
                         else
                         {
@@ -148,8 +153,13 @@
                         }
                         <div class="small" style="color:@GetDateColor(package.LoggedAt);">Logged @packageLoggedLocal.ToString("g")</div>
                     </li>
-                }
-            </ul>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p class="text-muted small mb-0">No packages are waiting for pickup.</p>
+            }
         }
         else if (items.First() is CalendarEventSummaryViewModel)
         {

@@ -10,6 +10,8 @@ namespace hOps.web.ViewModels.MailLog
         public string? CurrentPropertyName { get; set; }
         public PackageLogEntryForm Form { get; set; } = new();
         public List<PackageLogEntryRowViewModel> Entries { get; set; } = new();
+        [Display(Name = "Hide Delivered to Guest")]
+        public bool HideDelivered { get; set; } = true;
         public bool HasProperty => CurrentPropertyId.HasValue;
     }
 

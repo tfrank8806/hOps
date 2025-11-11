@@ -35,6 +35,13 @@
                         <small class="text-muted">Entries for @Model.CurrentPropertyName</small>
                     }
                 </div>
+                @if (Model.HasProperty)
+                {
+                    <form asp-action="Index" method="get" class="form-check form-switch mb-0">
+                        <input asp-for="HideDelivered" class="form-check-input" type="checkbox" id="hideDeliveredToggle" onchange="this.form.submit()" />
+                        <label class="form-check-label" asp-for="HideDelivered"></label>
+                    </form>
+                }
             </div>
             <div class="card-body">
                 @if (!Model.HasProperty)
@@ -45,6 +52,7 @@
                 {
                     <form asp-action="Create" method="post" class="row g-3 mb-4">
                         @Html.AntiForgeryToken()
+                        <input type="hidden" name="hideDelivered" value="@(Model.HideDelivered ? "true" : "false")" />
                         <div class="col-12">
                             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                         </div>
@@ -96,10 +104,14 @@
 
                     @if (!Model.Entries.Any())
                     {
-                        <p class="text-muted mb-0">No packages logged yet for @Model.CurrentPropertyName.</p>
-                    }
-                    else
-                    {
+                    <p class="text-muted mb-0">
+                        @(Model.HideDelivered
+                            ? "No packages waiting to be delivered to a guest."
+                            : $"No packages logged yet for {Model.CurrentPropertyName}.")
+                    </p>
+                }
+                else
+                {
                         <div class="table-responsive">
                             <table class="table table-striped align-middle mail-log-table">
                                 <thead>
@@ -155,6 +167,7 @@
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="id" value="@entry.Id" />
                                                     <input type="hidden" name="delivered" value="@(entry.Delivered ? "false" : "true")" />
+                                                    <input type="hidden" name="hideDelivered" value="@(Model.HideDelivered ? "true" : "false")" />
                                                     <button type="submit" class="btn btn-sm toggle-delivered-button @(entry.Delivered ? "btn-outline-warning" : "btn-outline-success")">
                                                         @(entry.Delivered ? "Mark Pending" : "Mark Delivered")
                                                     </button>
@@ -162,6 +175,7 @@
                                                 <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Remove this entry?');">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="id" value="@entry.Id" />
+                                                    <input type="hidden" name="hideDelivered" value="@(Model.HideDelivered ? "true" : "false")" />
                                                     <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
                                                 </form>
                                             </td>

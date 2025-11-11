@@ -761,7 +761,7 @@ namespace hOps.web.Controllers
         private async Task PopulatePackageLogAsync(HomeIndexViewModel viewModel, int propertyId)
         {
             var packages = await _context.PackageLogEntries
-                .Where(entry => entry.PropertyId == propertyId)
+                .Where(entry => entry.PropertyId == propertyId && !entry.Delivered)
                 .OrderByDescending(entry => entry.LoggedAt)
                 .Take(8)
                 .Select(entry => new PackageLogSummaryViewModel

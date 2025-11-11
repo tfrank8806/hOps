@@ -34,16 +34,16 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(bool? hideDelivered = null)
         {
             ViewData["Title"] = "Package & Mail Log";
-            var viewModel = await BuildIndexViewModelAsync(null);
+            var viewModel = await BuildIndexViewModelAsync(null, hideDelivered ?? true);
             return View(viewModel);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(PackageLogEntryForm form)
+        public async Task<IActionResult> Create(PackageLogEntryForm form, bool hideDelivered = true)
         {
             ViewData["Title"] = "Package & Mail Log";
 
@@ -61,7 +61,7 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                var invalidModel = await BuildIndexViewModelAsync(form);
+                var invalidModel = await BuildIndexViewModelAsync(form, hideDelivered);
                 return View("Index", invalidModel);
             }
 
@@ -95,12 +95,12 @@ namespace hOps.web.Controllers
                 entry.Notes);
 
             TempData["MailLogMessage"] = "Package entry added.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { hideDelivered });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ToggleDelivered(int id, bool delivered)
+        public async Task<IActionResult> ToggleDelivered(int id, bool delivered, bool hideDelivered = true)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -144,12 +144,12 @@ namespace hOps.web.Controllers
             }
 
             TempData["MailLogMessage"] = message;
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { hideDelivered });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Delete(int id, bool hideDelivered = true)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -172,14 +172,15 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
 
             TempData["MailLogMessage"] = "Package entry removed.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { hideDelivered });
         }
 
-        private async Task<MailLogIndexViewModel> BuildIndexViewModelAsync(PackageLogEntryForm? form)
+        private async Task<MailLogIndexViewModel> BuildIndexViewModelAsync(PackageLogEntryForm? form, bool hideDelivered)
         {
             var viewModel = new MailLogIndexViewModel
             {
-                Form = form ?? new PackageLogEntryForm()
+                Form = form ?? new PackageLogEntryForm(),
+                HideDelivered = hideDelivered
             };
 
             var currentProperty = ViewBag.CurrentProperty as Property;
@@ -198,7 +199,7 @@ namespace hOps.web.Controllers
                 .AsNoTracking()
                 .ToListAsync();
 
-            viewModel.Entries = entries
+            var mappedEntries = entries
                 .Select(e => new PackageLogEntryRowViewModel
                 {
                     Id = e.Id,
@@ -216,6 +217,13 @@ namespace hOps.web.Controllers
                     DeliveredAt = e.DeliveredAt
                 })
                 .ToList();
+
+            if (hideDelivered)
+            {
+                mappedEntries = mappedEntries.Where(e => !e.Delivered).ToList();
+            }
+
+            viewModel.Entries = mappedEntries;
 
             return viewModel;
         }
