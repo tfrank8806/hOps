@@ -14,11 +14,11 @@
             return;
         }
 
-        const templateName = selected.getAttribute('data-name');
+        const templateName = selected.getAttribute('data-name') ?? '';
         const templateStart = selected.getAttribute('data-start');
         const templateEnd = selected.getAttribute('data-end');
 
-        if (shiftNameInput && templateName && !shiftNameInput.value) {
+        if (shiftNameInput) {
             shiftNameInput.value = templateName;
         }
         if (shiftStartInput && templateStart) {

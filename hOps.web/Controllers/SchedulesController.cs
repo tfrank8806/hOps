@@ -243,7 +243,7 @@ namespace hOps.web.Controllers
 
             if (schedule != null)
             {
-                vm.EmployeeRows = BuildEmployeeRows(schedule, vm.DayColumns, approvedRequestsForWeek);
+                vm.EmployeeRows = BuildEmployeeRows(schedule, vm.DayColumns, approvedRequestsForWeek, scheduleEmployees);
             }
 
             ViewData["Title"] = "Schedules";
@@ -891,7 +891,8 @@ namespace hOps.web.Controllers
         private static List<ScheduleEmployeeRowViewModel> BuildEmployeeRows(
             Schedule schedule,
             IReadOnlyList<ScheduleDayColumnViewModel> dayColumns,
-            IReadOnlyList<ScheduleTimeOffRequest> approvedRequests)
+            IReadOnlyList<ScheduleTimeOffRequest> approvedRequests,
+            IReadOnlyList<ScheduleEmployee> rosterEmployees)
         {
             var rows = new List<ScheduleEmployeeRowViewModel>();
 
@@ -911,16 +912,39 @@ namespace hOps.web.Controllers
                 }
             }
 
-            var employeeIds = assignmentsByEmployee.Keys
-                .Union(approvedRequests.Select(r => r.ScheduleEmployeeId))
-                .Distinct()
-                .ToList();
-
-            foreach (var employeeId in employeeIds)
+            var orderedEmployeeIds = new List<int>();
+            foreach (var employee in rosterEmployees)
             {
-                var employee = assignmentsByEmployee.TryGetValue(employeeId, out var assignmentList)
-                    ? assignmentList.First().Employee
-                    : approvedRequests.First(r => r.ScheduleEmployeeId == employeeId).Employee;
+                if (!orderedEmployeeIds.Contains(employee.Id))
+                {
+                    orderedEmployeeIds.Add(employee.Id);
+                }
+            }
+
+            var additionalIds = assignmentsByEmployee.Keys
+                .Concat(approvedRequests.Select(r => r.ScheduleEmployeeId))
+                .Distinct();
+
+            foreach (var id in additionalIds)
+            {
+                if (!orderedEmployeeIds.Contains(id))
+                {
+                    orderedEmployeeIds.Add(id);
+                }
+            }
+
+            foreach (var employeeId in orderedEmployeeIds)
+            {
+                assignmentsByEmployee.TryGetValue(employeeId, out var assignmentList);
+
+                var employee = assignmentList?.FirstOrDefault()?.Employee
+                    ?? rosterEmployees.FirstOrDefault(e => e.Id == employeeId)
+                    ?? approvedRequests.FirstOrDefault(r => r.ScheduleEmployeeId == employeeId)?.Employee;
+
+                if (employee == null)
+                {
+                    continue;
+                }
 
                 var row = new ScheduleEmployeeRowViewModel
                 {
@@ -965,6 +989,7 @@ namespace hOps.web.Controllers
                     }
                 }
 
+                rows.Add(row);
             }
 
             return rows.OrderBy(r => r.EmployeeName).ToList();
@@ -993,3 +1018,4 @@ namespace hOps.web.Controllers
         }
     }
 }
+
