@@ -40,11 +40,24 @@ namespace hOps.web.Services
 
                 foreach (var day in dayColumns)
                 {
-                    var lines = entry.Value
+                    var dayAssignments = entry.Value
                         .Where(a => a.ShiftDate.Date == day.Date)
                         .OrderBy(a => a.ShiftStartTime ?? TimeSpan.Zero)
-                        .Select(BuildAssignmentLine)
                         .ToList();
+
+                    var lines = new List<string>();
+                    foreach (var assignment in dayAssignments)
+                    {
+                        if (lines.Count > 0)
+                        {
+                            lines.Add(string.Empty);
+                        }
+
+                        foreach (var assignmentLine in BuildAssignmentLines(assignment))
+                        {
+                            lines.Add(assignmentLine);
+                        }
+                    }
 
                     if (!lines.Any() && timeOffLookup.Contains((employee.Id, day.Date)))
                     {
@@ -60,23 +73,25 @@ namespace hOps.web.Services
             return rows;
         }
 
-        private static string BuildAssignmentLine(ScheduleAssignment assignment)
+        private static IEnumerable<string> BuildAssignmentLines(ScheduleAssignment assignment)
         {
-            var builder = new StringBuilder();
-            builder.Append(assignment.ShiftName);
+            var lines = new List<string>
+            {
+                assignment.ShiftName
+            };
 
             var range = FormatTimeRange(assignment.ShiftStartTime, assignment.ShiftEndTime);
             if (!string.IsNullOrWhiteSpace(range))
             {
-                builder.Append(" · ").Append(range);
+                lines.Add(range);
             }
 
             if (!string.IsNullOrWhiteSpace(assignment.Notes))
             {
-                builder.Append(" – ").Append(assignment.Notes.Trim());
+                lines.Add(assignment.Notes.Trim());
             }
 
-            return builder.ToString();
+            return lines;
         }
 
         private static string? FormatTimeRange(TimeSpan? start, TimeSpan? end)

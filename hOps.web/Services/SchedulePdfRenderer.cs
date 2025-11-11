@@ -15,7 +15,8 @@ namespace hOps.web.Services
 
             var headerFont = new XFont("Helvetica", 16, XFontStyle.Bold);
             var subHeaderFont = new XFont("Helvetica", 11, XFontStyle.Regular);
-            var cellFont = new XFont("Helvetica", 9, XFontStyle.Regular);
+            var employeeFont = new XFont("Helvetica", 10, XFontStyle.Regular);
+            var cellFont = new XFont("Helvetica", 8, XFontStyle.Regular);
             var headerCellFont = new XFont("Helvetica", 10, XFontStyle.Bold);
             var pen = new XPen(XColors.LightGray, 0.5);
             double lineHeight = gfx.MeasureString("Ag", cellFont).Height + 2;
@@ -33,7 +34,7 @@ namespace hOps.web.Services
                 gfx.DrawString(title, subHeaderFont, XBrushes.Black, new XRect(margin, y, availableWidth, 18), XStringFormats.TopLeft);
                 y += 28;
 
-                var headerHeight = 24;
+                var headerHeight = 32;
                 gfx.DrawRectangle(pen, margin, y, availableWidth, headerHeight);
                 gfx.DrawLine(pen, margin + nameColumnWidth, y, margin + nameColumnWidth, y + headerHeight);
                 gfx.DrawString("Employee", headerCellFont, XBrushes.Black, new XRect(margin + 4, y + 4, nameColumnWidth - 8, headerHeight - 8), XStringFormats.TopLeft);
@@ -42,8 +43,12 @@ namespace hOps.web.Services
                 {
                     var colX = margin + nameColumnWidth + (i * dayColumnWidth);
                     gfx.DrawLine(pen, colX + dayColumnWidth, y, colX + dayColumnWidth, y + headerHeight);
-                    var label = dayColumns[i].ToString("ddd\nMMM d");
-                    gfx.DrawString(label, headerCellFont, XBrushes.Black, new XRect(colX, y, dayColumnWidth, headerHeight), XStringFormats.Center);
+                    var dateText = dayColumns[i].ToString("MMM d");
+                    var dayText = dayColumns[i].ToString("ddd");
+                    var dateRect = new XRect(colX, y + 4, dayColumnWidth, headerHeight / 2);
+                    var dayRect = new XRect(colX, y + headerHeight / 2, dayColumnWidth, headerHeight / 2 - 4);
+                    gfx.DrawString(dateText, headerCellFont, XBrushes.Black, dateRect, XStringFormats.TopCenter);
+                    gfx.DrawString(dayText, headerCellFont, XBrushes.Black, dayRect, XStringFormats.TopCenter);
                 }
 
                 y += headerHeight;
@@ -66,7 +71,7 @@ namespace hOps.web.Services
 
                 gfx.DrawRectangle(pen, margin, y, availableWidth, rowHeight);
                 gfx.DrawLine(pen, margin + nameColumnWidth, y, margin + nameColumnWidth, y + rowHeight);
-                gfx.DrawString(row.EmployeeName, cellFont, XBrushes.Black, new XRect(margin + 4, y + 4, nameColumnWidth - 8, rowHeight - 8), XStringFormats.TopLeft);
+                gfx.DrawString(row.EmployeeName, employeeFont, XBrushes.Black, new XRect(margin + 4, y + 4, nameColumnWidth - 8, rowHeight - 8), XStringFormats.TopLeft);
 
                 for (int i = 0; i < dayColumns.Count; i++)
                 {
