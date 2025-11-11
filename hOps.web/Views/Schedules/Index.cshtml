@@ -91,8 +91,30 @@
                                     {
                                         <tr>
                                             <td>
-                                                <div class="fw-semibold">@row.EmployeeName</div>
-                                                <div class="text-muted small">@row.SourceLabel @(row.IsActive ? "" : "(Inactive)")</div>
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div>
+                                                        <div class="fw-semibold">@row.EmployeeName</div>
+                                                        <div class="text-muted small">@row.SourceLabel @(row.IsActive ? "" : "(Inactive)")</div>
+                                                    </div>
+                                                    @if (Model.CanManage && Model.Status == hOps.web.Models.ScheduleStatus.Draft && Model.ScheduleId.HasValue)
+                                                    {
+                                                        <form asp-action="RemoveEmployeeFromSchedule"
+                                                              method="post"
+                                                              class="ms-2"
+                                                              onsubmit="return confirm('Remove @row.EmployeeName from this schedule?');">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="scheduleId" value="@Model.ScheduleId" />
+                                                            <input type="hidden" name="scheduleEmployeeId" value="@row.ScheduleEmployeeId" />
+                                                            <input type="hidden" name="weekStart" value="@weekStartParam" />
+                                                            <button type="submit"
+                                                                    class="btn btn-outline-danger btn-sm px-2 py-1"
+                                                                    title="Remove from this schedule"
+                                                                    aria-label="Remove @row.EmployeeName from this schedule">
+                                                                &times;
+                                                            </button>
+                                                        </form>
+                                                    }
+                                                </div>
                                             </td>
                                             @foreach (var day in Model.DayColumns)
                                             {

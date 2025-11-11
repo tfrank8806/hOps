@@ -243,7 +243,7 @@ namespace hOps.web.Controllers
 
             if (schedule != null)
             {
-                vm.EmployeeRows = BuildEmployeeRows(schedule, vm.DayColumns, approvedRequestsForWeek, scheduleEmployees);
+                vm.EmployeeRows = BuildEmployeeRows(schedule, vm.DayColumns, approvedRequestsForWeek);
             }
 
             ViewData["Title"] = "Schedules";
@@ -494,6 +494,50 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
 
             TempData["ScheduleMessage"] = "Shift removed.";
+            return RedirectToAction(nameof(Index), new { weekStart });
+        }
+
+        [Authorize(Roles = "Admin,Manager")]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RemoveEmployeeFromSchedule(int scheduleId, int scheduleEmployeeId, string? weekStart = null)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            var schedule = await _context.Schedules
+                .Include(s => s.Assignments)
+                .FirstOrDefaultAsync(s => s.Id == scheduleId);
+
+            if (schedule == null)
+            {
+                TempData["ScheduleError"] = "Schedule not found.";
+                return RedirectToAction(nameof(Index), new { weekStart });
+            }
+
+            if (property == null || schedule.PropertyId != property.Id)
+            {
+                return Forbid();
+            }
+
+            if (schedule.Status != ScheduleStatus.Draft)
+            {
+                TempData["ScheduleError"] = "You can only remove employees while the schedule is in draft.";
+                return RedirectToAction(nameof(Index), new { weekStart });
+            }
+
+            var assignments = schedule.Assignments
+                .Where(a => a.ScheduleEmployeeId == scheduleEmployeeId)
+                .ToList();
+
+            if (!assignments.Any())
+            {
+                TempData["ScheduleMessage"] = "No assignments to remove for this employee.";
+                return RedirectToAction(nameof(Index), new { weekStart });
+            }
+
+            _context.ScheduleAssignments.RemoveRange(assignments);
+            await _context.SaveChangesAsync();
+
+            TempData["ScheduleMessage"] = "Employee removed from this schedule.";
             return RedirectToAction(nameof(Index), new { weekStart });
         }
 
@@ -892,7 +936,7 @@ namespace hOps.web.Controllers
             Schedule schedule,
             IReadOnlyList<ScheduleDayColumnViewModel> dayColumns,
             IReadOnlyList<ScheduleTimeOffRequest> approvedRequests,
-            IReadOnlyList<ScheduleEmployee> rosterEmployees)
+            IReadOnlyList<ScheduleEmployee>? rosterEmployees = null)
         {
             var rows = new List<ScheduleEmployeeRowViewModel>();
 
@@ -912,33 +956,42 @@ namespace hOps.web.Controllers
                 }
             }
 
-            var orderedEmployeeIds = new List<int>();
-            foreach (var employee in rosterEmployees)
-            {
-                if (!orderedEmployeeIds.Contains(employee.Id))
-                {
-                    orderedEmployeeIds.Add(employee.Id);
-                }
-            }
-
-            var additionalIds = assignmentsByEmployee.Keys
+            var activeEmployeeIds = assignmentsByEmployee.Keys
                 .Concat(approvedRequests.Select(r => r.ScheduleEmployeeId))
-                .Distinct();
+                .Distinct()
+                .ToList();
 
-            foreach (var id in additionalIds)
+            var rosterOrder = rosterEmployees?
+                .Select((e, index) => new { e.Id, index })
+                .ToDictionary(x => x.Id, x => x.index) ?? new Dictionary<int, int>();
+
+            activeEmployeeIds.Sort((a, b) =>
             {
-                if (!orderedEmployeeIds.Contains(id))
-                {
-                    orderedEmployeeIds.Add(id);
-                }
-            }
+                var hasA = rosterOrder.TryGetValue(a, out var indexA);
+                var hasB = rosterOrder.TryGetValue(b, out var indexB);
 
-            foreach (var employeeId in orderedEmployeeIds)
+                if (hasA && hasB)
+                {
+                    return indexA.CompareTo(indexB);
+                }
+                if (hasA)
+                {
+                    return -1;
+                }
+                if (hasB)
+                {
+                    return 1;
+                }
+
+                return a.CompareTo(b);
+            });
+
+            foreach (var employeeId in activeEmployeeIds)
             {
                 assignmentsByEmployee.TryGetValue(employeeId, out var assignmentList);
 
                 var employee = assignmentList?.FirstOrDefault()?.Employee
-                    ?? rosterEmployees.FirstOrDefault(e => e.Id == employeeId)
+                    ?? rosterEmployees?.FirstOrDefault(e => e.Id == employeeId)
                     ?? approvedRequests.FirstOrDefault(r => r.ScheduleEmployeeId == employeeId)?.Employee;
 
                 if (employee == null)
