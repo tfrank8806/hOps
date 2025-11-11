@@ -1083,7 +1083,7 @@ namespace hOps.web.Controllers
 
             if (filters.HideCompleted)
             {
-                query = query.Where(w => !string.Equals(w.Status, "Completed", StringComparison.OrdinalIgnoreCase));
+                query = query.Where(w => w.Status == null || w.Status != "Completed");
             }
 
             var workOrders = await query.ToListAsync();
