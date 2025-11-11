@@ -83,8 +83,7 @@ namespace hOps.web.Controllers
         {
             var options = new List<SelectListItem>
             {
-                new SelectListItem("All entries", Url.Action(actionName, new { }), !propertyId.HasValue && !onlyGlobal),
-                new SelectListItem("Global (all properties)", Url.Action(actionName, new { onlyGlobal = true }), !propertyId.HasValue && onlyGlobal)
+                new SelectListItem("All entries", Url.Action(actionName, new { }), !propertyId.HasValue && !onlyGlobal)
             };
 
             foreach (var property in properties)
