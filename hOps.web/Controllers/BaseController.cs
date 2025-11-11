@@ -78,63 +78,79 @@ public class BaseController : Controller
             HttpContext.Items["UserTimeZoneId"] = normalizedTimeZoneId;
             HttpContext.Session.SetString("UserTimeZoneId", normalizedTimeZoneId);
 
-            var unreadMessageCount = await _context.DirectMessages
-                .Where(m => m.RecipientId == user.Id && !m.IsRead)
-                .CountAsync();
-            ViewBag.UnreadDirectMessageCount = unreadMessageCount;
-
-            var latestMessage = await _context.DirectMessages
-                .Where(m => m.RecipientId == user.Id || m.SenderId == user.Id)
-                .OrderByDescending(m => m.SentAt)
-                .Select(m => new
-                {
-                    m.SentAt,
-                    m.Body,
-                    m.SenderId,
-                    m.RecipientId,
-                    m.ConversationId
-                })
-                .FirstOrDefaultAsync();
-
-            if (latestMessage != null)
-            {
-                var otherUserId = string.Equals(latestMessage.SenderId ?? user.Id, user.Id, StringComparison.OrdinalIgnoreCase)
-                    ? (latestMessage.RecipientId ?? user.Id)
-                    : (latestMessage.SenderId ?? user.Id);
-
-                var otherUser = await _userManager.Users
-                    .Where(u => u.Id == otherUserId)
-                    .Select(u => new { u.FirstName, u.LastName, u.Email, u.UserName })
-                    .FirstOrDefaultAsync();
-
-                string? participantName = null;
-                if (otherUser != null)
-                {
-                    var parts = new List<string>();
-                    if (!string.IsNullOrWhiteSpace(otherUser.FirstName))
-                    {
-                        parts.Add(otherUser.FirstName);
-                    }
-                    if (!string.IsNullOrWhiteSpace(otherUser.LastName))
-                    {
-                        parts.Add(otherUser.LastName);
-                    }
-
-                    participantName = parts.Count > 0
-                        ? string.Join(" ", parts)
-                        : (otherUser.Email ?? otherUser.UserName ?? "Teammate");
-                }
-
-                ViewBag.LatestDirectMessageParticipant = participantName;
-                ViewBag.LatestDirectMessageBody = latestMessage.Body ?? string.Empty;
-                ViewBag.LatestDirectMessageSentAt = latestMessage.SentAt;
-                ViewBag.LatestDirectMessageConversationId = latestMessage.ConversationId;
-            }
+            await PopulateDirectMessageBadgeAsync(user);
 
             ViewBag.ToDoSidebarData = await BuildToDoSidebarAsync(user, userProperties);
         }
 
-        await next();
+        var executed = await next();
+
+        if (executed.Exception == null && user != null)
+        {
+            await PopulateDirectMessageBadgeAsync(user);
+        }
+    }
+
+    private async Task PopulateDirectMessageBadgeAsync(ApplicationUser user)
+    {
+        ViewBag.UnreadDirectMessageCount = await _context.DirectMessages
+            .Where(m => m.RecipientId == user.Id && !m.IsRead)
+            .CountAsync();
+
+        ViewBag.LatestDirectMessageParticipant = null;
+        ViewBag.LatestDirectMessageBody = null;
+        ViewBag.LatestDirectMessageSentAt = null;
+        ViewBag.LatestDirectMessageConversationId = null;
+
+        var latestMessage = await _context.DirectMessages
+            .Where(m => m.RecipientId == user.Id || m.SenderId == user.Id)
+            .OrderByDescending(m => m.SentAt)
+            .Select(m => new
+            {
+                m.SentAt,
+                m.Body,
+                m.SenderId,
+                m.RecipientId,
+                m.ConversationId
+            })
+            .FirstOrDefaultAsync();
+
+        if (latestMessage == null)
+        {
+            return;
+        }
+
+        var otherUserId = string.Equals(latestMessage.SenderId ?? user.Id, user.Id, StringComparison.OrdinalIgnoreCase)
+            ? (latestMessage.RecipientId ?? user.Id)
+            : (latestMessage.SenderId ?? user.Id);
+
+        var otherUser = await _userManager.Users
+            .Where(u => u.Id == otherUserId)
+            .Select(u => new { u.FirstName, u.LastName, u.Email, u.UserName })
+            .FirstOrDefaultAsync();
+
+        string? participantName = null;
+        if (otherUser != null)
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(otherUser.FirstName))
+            {
+                parts.Add(otherUser.FirstName);
+            }
+            if (!string.IsNullOrWhiteSpace(otherUser.LastName))
+            {
+                parts.Add(otherUser.LastName);
+            }
+
+            participantName = parts.Count > 0
+                ? string.Join(" ", parts)
+                : (otherUser.Email ?? otherUser.UserName ?? "Teammate");
+        }
+
+        ViewBag.LatestDirectMessageParticipant = participantName;
+        ViewBag.LatestDirectMessageBody = latestMessage.Body ?? string.Empty;
+        ViewBag.LatestDirectMessageSentAt = latestMessage.SentAt;
+        ViewBag.LatestDirectMessageConversationId = latestMessage.ConversationId;
     }
 
     private async Task<ToDoSidebarViewModel?> BuildToDoSidebarAsync(ApplicationUser? user, List<Property>? accessibleProperties)
