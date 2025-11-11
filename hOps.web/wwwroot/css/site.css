@@ -1090,3 +1090,57 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
         top: 1rem;
     }
 }
+
+.realtime-notification-container {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    z-index: 1080;
+}
+
+.realtime-notification {
+    background-color: #1d4ed8;
+    color: #fff;
+    border: none;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.25);
+    min-width: 220px;
+    text-align: left;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.realtime-notification.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.realtime-notification.realtime-notification-log {
+    background-color: #0f766e;
+}
+
+.realtime-notification.realtime-notification-message {
+    background-color: #2563eb;
+}
+
+.realtime-notification-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.realtime-notification-body {
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+    opacity: 0.9;
+}
+
+.realtime-notification-hide {
+    opacity: 0;
+    transform: translateY(10px);
+}

@@ -1,4 +1,4 @@
-﻿using hOps.web.Data;
+using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
 using hOps.web.Utilities;
@@ -29,6 +29,7 @@ namespace hOps.web.Controllers
         private readonly IEmailSender _emailSender;
         private readonly ILogger<PassOnLogsController> _logger;
         private readonly IWebHostEnvironment _environment;
+        private readonly IRealtimeNotificationService _realtimeNotifications;
 
         public PassOnLogsController(
             ApplicationDbContext context,
@@ -36,13 +37,15 @@ namespace hOps.web.Controllers
             MentionService mentionService,
             IEmailSender emailSender,
             ILogger<PassOnLogsController> logger,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            IRealtimeNotificationService realtimeNotifications)
             : base(context, userManager)
         {
             _mentionService = mentionService;
             _emailSender = emailSender;
             _logger = logger;
             _environment = environment;
+            _realtimeNotifications = realtimeNotifications;
         }
 
         public async Task<IActionResult> Index([FromQuery] PassOnLogFiltersViewModel? filters)
@@ -285,12 +288,15 @@ namespace hOps.web.Controllers
                 link,
                 log.Body);
 
-            await SendLogEntryEmailsAsync(log, currentUser, link);
+            var logAlertRecipients = await GetLogEntryAlertRecipientsAsync(log, currentUser);
+            await NotifyLogSubscribersAsync(log, currentUser, link, logAlertRecipients);
+            await SendLogEntryEmailsAsync(log, currentUser, link, logAlertRecipients);
 
             return RedirectToAction(nameof(Details), new { id = log.Id });
         }
 
-        private async Task SendLogEntryEmailsAsync(PassOnLog log, ApplicationUser actor, string linkUrl)
+
+        private async Task<List<ApplicationUser>> GetLogEntryAlertRecipientsAsync(PassOnLog log, ApplicationUser actor)
         {
             await _context.Entry(log)
                 .Collection(l => l.Properties)
@@ -300,10 +306,8 @@ namespace hOps.web.Controllers
 
             var propertyIds = log.Properties.Select(lp => lp.PropertyId).Distinct().ToList();
 
-            var recipientCandidates = await _context.Users
-                .Where(u => u.EmailOnLogEntry
-                            && !string.IsNullOrWhiteSpace(u.Email)
-                            && !string.Equals(u.Id, actor.Id))
+            var candidateUsers = await _context.Users
+                .Where(u => !string.Equals(u.Id, actor.Id))
                 .Select(u => new
                 {
                     User = u,
@@ -312,17 +316,17 @@ namespace hOps.web.Controllers
                 })
                 .ToListAsync();
 
-            var recipients = recipientCandidates
-                .Where(r =>
+            return candidateUsers
+                .Where(candidate =>
                 {
-                    var allowedProperties = r.PropertyPreferences
+                    var allowedProperties = candidate.PropertyPreferences
                         .Where(p => p.IncludeInLogAlerts)
                         .Select(p => p.PropertyId)
                         .ToHashSet();
 
                     if (!allowedProperties.Any())
                     {
-                        allowedProperties = r.AccessIds.ToHashSet();
+                        allowedProperties = candidate.AccessIds.ToHashSet();
                     }
 
                     if (!allowedProperties.Any())
@@ -337,10 +341,60 @@ namespace hOps.web.Controllers
 
                     return propertyIds.Any(pid => allowedProperties.Contains(pid));
                 })
-                .Select(r => r.User)
+                .Select(candidate => candidate.User)
+                .ToList();
+        }
+
+        private async Task NotifyLogSubscribersAsync(
+            PassOnLog log,
+            ApplicationUser actor,
+            string linkUrl,
+            List<ApplicationUser> recipients)
+        {
+            if (!recipients.Any())
+            {
+                return;
+            }
+
+            var actorName = FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
+            var now = DateTime.UtcNow;
+
+            foreach (var recipient in recipients)
+            {
+                _context.UserNotifications.Add(new UserNotification
+                {
+                    UserId = recipient.Id,
+                    Type = "passon-log",
+                    Title = "New pass-on log",
+                    Content = $"{actorName} posted \"{log.Title}\"",
+                    LinkUrl = linkUrl,
+                    CreatedAt = now,
+                    IsRead = false
+                });
+            }
+
+            await _context.SaveChangesAsync();
+
+            var payload = new RealtimeNotificationPayload(
+                "New pass-on log",
+                $"{actorName} posted \"{log.Title}\"",
+                linkUrl,
+                "log");
+
+            await _realtimeNotifications.NotifyUsersAsync(recipients.Select(r => r.Id), payload);
+        }
+
+        private async Task SendLogEntryEmailsAsync(
+            PassOnLog log,
+            ApplicationUser actor,
+            string linkUrl,
+            List<ApplicationUser> recipients)
+        {
+            var emailRecipients = recipients
+                .Where(r => r.EmailOnLogEntry && !string.IsNullOrWhiteSpace(r.Email))
                 .ToList();
 
-            if (!recipients.Any())
+            if (!emailRecipients.Any())
             {
                 return;
             }
@@ -355,7 +409,7 @@ namespace hOps.web.Controllers
             var preview = MentionMarkupFormatter.ToDisplayText(log.Body ?? string.Empty);
             if (!string.IsNullOrWhiteSpace(preview) && preview.Length > 500)
             {
-                preview = $"{preview[..500]}…";
+                preview = $"{preview[..500]}...";
             }
 
             var safeActor = WebUtility.HtmlEncode(actorName);
@@ -381,7 +435,7 @@ namespace hOps.web.Controllers
 
             var htmlBody = bodyBuilder.ToString();
 
-            foreach (var recipient in recipients)
+            foreach (var recipient in emailRecipients)
             {
                 try
                 {
@@ -704,7 +758,7 @@ namespace hOps.web.Controllers
 
             return preview.Length <= 180
                 ? preview
-                : $"{preview[..180]}…";
+                : $"{preview[..180]}�";
         }
 
         private async Task<List<Property>> GetAccessiblePropertiesAsync(string userId)
@@ -936,6 +990,7 @@ namespace hOps.web.Controllers
         }
     }
 }
+
 
 
 

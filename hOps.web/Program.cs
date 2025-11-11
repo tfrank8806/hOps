@@ -1,5 +1,6 @@
 using hOps.web.Data;
 using hOps.web.Models;
+using hOps.web.Hubs;
 using hOps.web.Services;
 using Microsoft.AspNetCore.Identity;
 using System;
@@ -33,6 +34,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+builder.Services.AddSignalR();
 
 // Register email sender
 builder.Services.AddTransient<EmailSender>();
@@ -40,6 +42,7 @@ builder.Services.AddTransient<IEmailSender>(sp => sp.GetRequiredService<EmailSen
 builder.Services.AddTransient<IExtendedEmailSender>(sp => sp.GetRequiredService<EmailSender>());
 builder.Services.AddScoped<DirectMessageService>();
 builder.Services.AddScoped<MentionService>();
+builder.Services.AddScoped<IRealtimeNotificationService, RealtimeNotificationService>();
 builder.Services.AddSingleton<SchedulePdfRenderer>();
 builder.Services.AddScoped<SchedulePublicationService>();
 builder.Services.AddHostedService<DailySummaryEmailService>();
@@ -142,6 +145,7 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+app.MapHub<NotificationHub>("/hubs/notifications");
 app.MapRazorPages();
 
 app.Run();

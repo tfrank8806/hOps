@@ -865,6 +865,12 @@
         })();
     </script>
 
+    @if (SignInManager.IsSignedIn(User))
+    {
+        <div id="realtimeNotificationContainer" class="realtime-notification-container" aria-live="polite"></div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js" crossorigin="anonymous"></script>
+        <script src="~/js/realtime-notifications.js" asp-append-version="true"></script>
+    }
     
 </body>
 </html>

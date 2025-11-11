@@ -17,18 +17,21 @@ namespace hOps.web.Services
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IEmailSender _emailSender;
+        private readonly IRealtimeNotificationService _realtimeNotifications;
         private readonly ILogger<DirectMessageService> _logger;
 
         public DirectMessageService(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             IEmailSender emailSender,
-            ILogger<DirectMessageService> logger)
+            ILogger<DirectMessageService> logger,
+            IRealtimeNotificationService realtimeNotifications)
         {
             _context = context;
             _userManager = userManager;
             _emailSender = emailSender;
             _logger = logger;
+            _realtimeNotifications = realtimeNotifications;
         }
 
         public async Task<DirectMessageConversation> GetOrCreateConversationAsync(string userId, string otherUserId)
@@ -97,6 +100,7 @@ namespace hOps.web.Services
             });
 
             await _context.SaveChangesAsync();
+            await SendRealtimeNotificationAsync(message, senderId, recipientId);
             await SendMessageEmailAsync(message, senderId, recipientId);
             return message;
         }
@@ -252,6 +256,26 @@ namespace hOps.web.Services
             }
 
             await _context.SaveChangesAsync();
+        }
+
+        private async Task SendRealtimeNotificationAsync(DirectMessage message, string senderId, string recipientId)
+        {
+            var sender = await _userManager.FindByIdAsync(senderId);
+            var senderName = sender != null ? BuildDisplayName(sender) : "Teammate";
+
+            var preview = message.Body;
+            if (!string.IsNullOrWhiteSpace(preview) && preview.Length > 160)
+            {
+                preview = $"{preview[..160]}…";
+            }
+
+            var payload = new RealtimeNotificationPayload(
+                "New message",
+                $"{senderName}: {preview}",
+                $"/DirectMessages?conversationId={message.ConversationId}",
+                "message");
+
+            await _realtimeNotifications.NotifyUserAsync(recipientId, payload);
         }
 
         private async Task SendMessageEmailAsync(DirectMessage message, string senderId, string recipientId)
