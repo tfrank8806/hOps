@@ -752,6 +752,34 @@
                 todoBackdrop.classList.toggle('show', !collapsed && todoMediaQuery.matches);
             }
 
+            function syncTodoRailPosition() {
+                if (!todoRailToggle) {
+                    return;
+                }
+
+                if (!todoSidebar || body.classList.contains('todo-sidebar-collapsed')) {
+                    todoRailToggle.style.left = '';
+                    todoRailToggle.style.right = '0px';
+                    return;
+                }
+
+                const sidebarRect = todoSidebar.getBoundingClientRect();
+                const toggleWidth = todoRailToggle.offsetWidth || 0;
+                const viewportWidth = document.documentElement.clientWidth;
+                const gutter = 2;
+
+                let targetLeft = sidebarRect.left - toggleWidth + gutter;
+                const maxLeft = Math.max(0, viewportWidth - toggleWidth);
+                if (sidebarRect.left >= viewportWidth) {
+                    targetLeft = maxLeft;
+                } else {
+                    targetLeft = Math.min(Math.max(targetLeft, 0), maxLeft);
+                }
+
+                todoRailToggle.style.left = `${targetLeft}px`;
+                todoRailToggle.style.right = 'auto';
+            }
+
             function setTodoSidebarCollapsed(collapsed, options = { persist: true }) {
                 if (!todoSidebar) {
                     return;
@@ -766,6 +794,7 @@
                 }
                 updateTodoAria();
                 syncTodoBackdrop();
+                syncTodoRailPosition();
             }
 
             function initialiseTodoSidebar() {
@@ -781,6 +810,7 @@
 
                 const initialCollapsed = todoMediaQuery.matches ? true : collapsedPreference;
                 setTodoSidebarCollapsed(initialCollapsed, { persist: false });
+                syncTodoRailPosition();
             }
 
             function handleTodoScreenChange(e) {
@@ -795,6 +825,7 @@
                     }
                     setTodoSidebarCollapsed(collapsedPreference, { persist: false });
                 }
+                syncTodoRailPosition();
             }
 
             function toggleTodoSidebar(forceValue) {
@@ -820,6 +851,13 @@
                 } else if (todoMediaQuery.addListener) {
                     todoMediaQuery.addListener(handleTodoScreenChange);
                 }
+
+                window.addEventListener('resize', syncTodoRailPosition);
+                window.addEventListener('scroll', () => {
+                    if (!body.classList.contains('todo-sidebar-collapsed')) {
+                        syncTodoRailPosition();
+                    }
+                });
             }
 
             async function fetchAccessRequestCount() {

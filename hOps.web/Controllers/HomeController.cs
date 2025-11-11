@@ -699,7 +699,7 @@ namespace hOps.web.Controllers
                 .Select(wp => wp.WorkOrder)
                 .Where(wo => wo.Status == "New" || wo.Status == "In Progress")
                 .OrderByDescending(wo => wo.CreatedAt)
-                .Take(8)
+                .Take(5)
                 .Select(wo => new WorkOrderSummaryViewModel
                 {
                     Id = wo.Id,
@@ -720,7 +720,7 @@ namespace hOps.web.Controllers
             var lostFoundEntries = await _context.LostFoundEntries
                 .Where(lf => lf.PropertyId == propertyId)
                 .OrderByDescending(lf => lf.CreatedAt)
-                .Take(8)
+                .Take(5)
                 .Select(lf => new LostFoundSummaryViewModel
                 {
                     Id = lf.Id,
@@ -763,7 +763,7 @@ namespace hOps.web.Controllers
             var packages = await _context.PackageLogEntries
                 .Where(entry => entry.PropertyId == propertyId && !entry.Delivered)
                 .OrderByDescending(entry => entry.LoggedAt)
-                .Take(8)
+                .Take(5)
                 .Select(entry => new PackageLogSummaryViewModel
                 {
                     Id = entry.Id,
@@ -791,7 +791,7 @@ namespace hOps.web.Controllers
                 .Include(e => e.Category)
                 .Where(e => e.EndDate >= now.Date)
                 .OrderBy(e => e.StartDate)
-                .Take(8)
+                .Take(5)
                 .AsNoTracking()
                 .ToListAsync();
 
