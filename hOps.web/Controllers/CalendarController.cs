@@ -844,7 +844,7 @@ namespace hOps.web.Controllers
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Calendar: failed to delete attachment '{File}' for event {EventId}", safeName, eventId);
+                    _logger.LogWarning(ex, "Calendar: failed to delete attachment '{File}' for event {EventId}", safeName.Replace("\r", "").Replace("\n", ""), eventId);
                 }
             }
         }
