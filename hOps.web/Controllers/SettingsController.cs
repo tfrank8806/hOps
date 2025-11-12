@@ -443,7 +443,7 @@ namespace hOps.web.Controllers
             _db.WorkOrderTypes.Add(model);
             await _db.SaveChangesAsync();
 
-            if (!string.IsNullOrWhiteSpace(returnUrl))
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
             {
                 return Redirect(returnUrl);
             }
