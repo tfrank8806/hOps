@@ -722,7 +722,9 @@ namespace hOps.web.Controllers
         private async Task PopulateLostFoundAsync(HomeIndexViewModel viewModel, int propertyId)
         {
             var lostFoundEntries = await _context.LostFoundEntries
-                .Where(lf => lf.PropertyId == propertyId)
+                .Where(lf => lf.PropertyId == propertyId &&
+                    lf.Status != LostFoundStatus.ReturnedToGuest &&
+                    lf.Status != LostFoundStatus.DisposedOf)
                 .OrderByDescending(lf => lf.CreatedAt)
                 .Take(5)
                 .Select(lf => new LostFoundSummaryViewModel
