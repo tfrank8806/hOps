@@ -736,7 +736,7 @@ namespace hOps.web.Controllers
 
             var orders = await query
                 .OrderBy(wo => wo.Properties
-                    .Where(p => p.Property != null)
+                    .Where(p => propertyIds.Contains(p.PropertyId) && p.Property != null)
                     .Select(p => p.Property!.Name)
                     .OrderBy(name => name)
                     .FirstOrDefault())
@@ -747,7 +747,7 @@ namespace hOps.web.Controllers
                 .Select(wo =>
                 {
                     var propertyNames = wo.Properties
-                        .Where(p => p.Property != null)
+                        .Where(p => propertyIds.Contains(p.PropertyId) && p.Property != null)
                         .Select(p => p.Property!.Name)
                         .Distinct()
                         .OrderBy(name => name)
@@ -837,7 +837,7 @@ namespace hOps.web.Controllers
                 .Select(e =>
                 {
                     var properties = e.EventProperties
-                        .Where(ep => ep.Property != null)
+                        .Where(ep => propertyIds.Contains(ep.PropertyId) && ep.Property != null)
                         .Select(ep => ep.Property!.Name)
                         .Distinct()
                         .OrderBy(name => name)
@@ -922,7 +922,7 @@ namespace hOps.web.Controllers
                 .Select(l =>
                 {
                     var propertyNames = l.Properties
-                        .Where(lp => lp.Property != null)
+                        .Where(lp => propertyIds.Contains(lp.PropertyId) && lp.Property != null)
                         .Select(lp => lp.Property!.Name)
                         .Distinct()
                         .OrderBy(name => name)
