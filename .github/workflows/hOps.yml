@@ -1,4 +1,6 @@
 name: Build and deploy .NET Core application to Web App hOps
+permissions:
+  contents: read
 on:
   push:
     branches:
