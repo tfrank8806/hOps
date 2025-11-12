@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text;
+using System.Net;
 using Microsoft.AspNetCore.WebUtilities;
 using hOps.web.Data;
 using hOps.web.Models;
@@ -70,7 +71,8 @@ namespace hOps.web.Areas.Identity.Pages.Account
                 var bodyBuilder = new StringBuilder();
                 bodyBuilder.AppendLine("<p>You recently requested to reset your password.</p>");
                 bodyBuilder.AppendLine("<p>");
-                bodyBuilder.AppendLine($@"<a href=""{callbackUrl}"">Reset your password</a>");
+                var encodedUrl = WebUtility.HtmlEncode(callbackUrl);
+                bodyBuilder.AppendLine($@"<a href=""{encodedUrl}"">Reset your password</a>");
                 bodyBuilder.AppendLine("</p>");
                 bodyBuilder.AppendLine("<p>If you did not make this request, you can safely ignore this email.</p>");
 
