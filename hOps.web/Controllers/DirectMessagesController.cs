@@ -123,6 +123,41 @@ namespace hOps.web.Controllers
             }
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int conversationId)
+        {
+            if (conversationId <= 0)
+            {
+                TempData["DirectMessageError"] = "Invalid conversation.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var conversation = await _context.DirectMessageConversations
+                .Include(c => c.Messages)
+                .FirstOrDefaultAsync(c =>
+                    c.Id == conversationId &&
+                    (c.ParticipantAId == currentUser.Id || c.ParticipantBId == currentUser.Id));
+
+            if (conversation == null)
+            {
+                TempData["DirectMessageError"] = "Conversation not found or you don't have access.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            _context.DirectMessageConversations.Remove(conversation);
+            await _context.SaveChangesAsync();
+
+            TempData["DirectMessageMessage"] = "Conversation deleted.";
+            return RedirectToAction(nameof(Index));
+        }
+
         private async Task<MessagingAccessContext> GetMessagingAccessContextAsync(ApplicationUser user)
         {
             var roles = await _userManager.GetRolesAsync(user);

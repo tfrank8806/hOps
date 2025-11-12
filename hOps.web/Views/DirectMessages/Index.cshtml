@@ -160,14 +160,21 @@
                             <span class="direct-messages-widget__summary-name">@participantName</span>
                             <span class="direct-messages-widget__summary-meta">Direct messages</span>
                         </div>
-                        @if (!string.IsNullOrWhiteSpace(participantEmail))
-                        {
-                            <a class="btn btn-outline-primary btn-sm" href="mailto:@participantEmail">Email</a>
-                        }
-                        else
-                        {
-                            <button class="btn btn-outline-primary btn-sm" type="button" disabled title="Email address unavailable">Email</button>
-                        }
+                        <div class="d-flex flex-column gap-2 align-items-stretch">
+                            @if (!string.IsNullOrWhiteSpace(participantEmail))
+                            {
+                                <a class="btn btn-outline-primary btn-sm" href="mailto:@participantEmail">Email</a>
+                            }
+                            else
+                            {
+                                <button class="btn btn-outline-primary btn-sm" type="button" disabled title="Email address unavailable">Email</button>
+                            }
+                            <form asp-action="Delete" method="post" onsubmit="return confirm('Delete this conversation? This cannot be undone.');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="conversationId" value="@Model.ActiveConversation.ConversationId" />
+                                <button class="btn btn-outline-danger btn-sm w-100" type="submit">Delete</button>
+                            </form>
+                        </div>
                     </div>
 
                     <div class="direct-message-thread flex-grow-1">
