@@ -706,6 +706,10 @@ namespace hOps.web.Controllers
                     Status = wo.Status,
                     Issue = wo.Issue,
                     Location = wo.Location,
+                    DepartmentName = wo.Department != null ? wo.Department.Name : null,
+                    DepartmentColor = wo.Department != null && !string.IsNullOrWhiteSpace(wo.Department.Color)
+                        ? wo.Department.Color
+                        : null,
                     CreatedAt = wo.CreatedAt,
                     DetailUrl = Url.Action("Edit", "WorkOrders", new { id = wo.Id }) ?? string.Empty
                 })

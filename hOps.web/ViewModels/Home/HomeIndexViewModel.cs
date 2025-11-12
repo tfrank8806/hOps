@@ -84,6 +84,8 @@ namespace hOps.web.ViewModels.Home
         public string Status { get; set; } = string.Empty;
         public string Issue { get; set; } = string.Empty;
         public string? Location { get; set; }
+        public string? DepartmentName { get; set; }
+        public string? DepartmentColor { get; set; }
         public DateTime CreatedAt { get; set; }
         public string DetailUrl { get; set; } = string.Empty;
     }
