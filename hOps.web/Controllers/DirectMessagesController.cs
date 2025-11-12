@@ -159,61 +159,6 @@ namespace hOps.web.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        private async Task<MessagingAccessContext> GetMessagingAccessContextAsync(ApplicationUser user)
-        {
-            var roles = await _userManager.GetRolesAsync(user);
-            var isAdmin = roles.Contains("Admin");
-
-            var propertyIds = (await _context.UserPropertyAccesses
-                    .Where(upa => upa.ApplicationUserId == user.Id)
-                    .Select(upa => upa.PropertyId)
-                    .ToListAsync())
-                .ToHashSet();
-
-            var allowedUserIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            if (propertyIds.Count > 0)
-            {
-                var propertyUserIds = await _context.UserPropertyAccesses
-                    .Where(upa => propertyIds.Contains(upa.PropertyId) && upa.ApplicationUserId != user.Id)
-                    .Select(upa => upa.ApplicationUserId)
-                    .Distinct()
-                    .ToListAsync();
-
-                foreach (var id in propertyUserIds)
-                {
-                    allowedUserIds.Add(id);
-                }
-            }
-
-            var adminRoleId = await _context.Roles
-                .Where(r => r.NormalizedName == "ADMIN")
-                .Select(r => r.Id)
-                .FirstOrDefaultAsync();
-
-            if (adminRoleId != null)
-            {
-                var adminUserIds = await _context.UserRoles
-                    .Where(ur => ur.RoleId == adminRoleId && ur.UserId != user.Id)
-                    .Select(ur => ur.UserId)
-                    .ToListAsync();
-
-                foreach (var id in adminUserIds)
-                {
-                    allowedUserIds.Add(id);
-                }
-            }
-
-            if (isAdmin)
-            {
-                return new MessagingAccessContext(true, propertyIds, allowedUserIds);
-            }
-
-            return new MessagingAccessContext(false, propertyIds, allowedUserIds);
-        }
-
-        private sealed record MessagingAccessContext(bool IsAdmin, HashSet<int> PropertyIds, HashSet<string> AllowedUserIds);
-
         private async Task<DirectMessagePageViewModel> BuildViewModelAsync(ApplicationUser currentUser, int? conversationId, string? userId, bool startNew)
         {
             var access = await GetMessagingAccessContextAsync(currentUser);
