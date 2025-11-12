@@ -246,7 +246,9 @@ namespace hOps.web.Controllers
                     wo.Status,
                     wo.Issue,
                     wo.Location,
-                    wo.CreatedAt
+                    wo.CreatedAt,
+                    DepartmentName = wo.Department != null ? wo.Department.Name : null,
+                    DepartmentColor = wo.Department != null ? wo.Department.Color : null
                 })
                 .AsNoTracking()
                 .ToListAsync();
@@ -258,6 +260,8 @@ namespace hOps.web.Controllers
                     wo.Id,
                     wo.Status,
                     wo.Issue,
+                    DepartmentName = wo.DepartmentName,
+                    DepartmentColor = string.IsNullOrWhiteSpace(wo.DepartmentColor) ? "#dc3545" : wo.DepartmentColor,
                     CreatedAt = _timeZoneService.ConvertToUserTime(wo.CreatedAt)
                         .ToString("MMM d, yyyy h:mm tt", CultureInfo.CurrentCulture),
                     DetailUrl = Url.Action(nameof(Edit), new { id = wo.Id }) ?? Url.Action(nameof(Index))

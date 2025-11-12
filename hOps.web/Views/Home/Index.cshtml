@@ -962,6 +962,17 @@
             color: inherit;
         }
 
+        .layout-room-menu__workorder-icon {
+            width: 0.8rem;
+            height: 0.8rem;
+            border-radius: 999px;
+            background: var(--dept-color, #dc3545);
+            display: inline-flex;
+            align-self: center;
+            flex-shrink: 0;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+        }
+
         .layout-room-menu__workorder-link:hover,
         .layout-room-menu__workorder-link:focus {
             color: #0d6efd;
@@ -1210,10 +1221,23 @@
                 items.forEach(order => {
                     const li = document.createElement('li');
                     const link = document.createElement('a');
-                    link.className = 'layout-room-menu__workorder-link';
+                    link.className = 'layout-room-menu__workorder-link d-flex align-items-start gap-2';
                     link.href = order.detailUrl || workOrdersUrl || '#';
                     link.target = '_blank';
                     link.rel = 'noopener';
+
+                    const icon = document.createElement('span');
+                    icon.className = 'layout-room-menu__workorder-icon';
+                    if (order.departmentColor) {
+                        icon.style.setProperty('--dept-color', order.departmentColor);
+                    }
+                    if (order.departmentName) {
+                        icon.title = order.departmentName;
+                    }
+                    icon.setAttribute('aria-hidden', 'true');
+
+                    const textWrap = document.createElement('div');
+                    textWrap.className = 'flex-grow-1';
 
                     const statusSpan = document.createElement('span');
                     statusSpan.className = 'fw-semibold me-2';
@@ -1225,11 +1249,21 @@
 
                     const meta = document.createElement('small');
                     meta.className = 'text-muted d-block';
-                    meta.textContent = order.createdAt ?? '';
+                    const metaParts = [];
+                    if (order.departmentName) {
+                        metaParts.push(order.departmentName);
+                    }
+                    if (order.createdAt) {
+                        metaParts.push(order.createdAt);
+                    }
+                    meta.textContent = metaParts.join(' • ');
 
-                    link.appendChild(statusSpan);
-                    link.appendChild(issueSpan);
-                    link.appendChild(meta);
+                    textWrap.appendChild(statusSpan);
+                    textWrap.appendChild(issueSpan);
+                    textWrap.appendChild(meta);
+
+                    link.appendChild(icon);
+                    link.appendChild(textWrap);
                     li.appendChild(link);
                     list.appendChild(li);
                 });
