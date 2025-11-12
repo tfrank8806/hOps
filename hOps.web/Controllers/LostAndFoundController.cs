@@ -181,9 +181,21 @@ namespace hOps.web.Controllers
 
             entry.Status = status;
 
-            if (status != LostFoundStatus.Logged)
+            LostFoundEntry? matchedEntry = null;
+            if (entry.MatchedEntryId.HasValue)
             {
-                await ClearExistingMatchAsync(entry);
+                matchedEntry = entry.MatchedEntry;
+                if (matchedEntry == null)
+                {
+                    matchedEntry = await _context.LostFoundEntries
+                        .FirstOrDefaultAsync(e => e.Id == entry.MatchedEntryId.Value);
+                }
+
+                if (matchedEntry != null)
+                {
+                    matchedEntry.Status = status;
+                    _context.LostFoundEntries.Update(matchedEntry);
+                }
             }
 
             _context.LostFoundEntries.Update(entry);
@@ -556,6 +568,12 @@ namespace hOps.web.Controllers
             {
                 var statusSet = new HashSet<LostFoundStatus>(filters.Statuses);
                 filteredEntries = filteredEntries.Where(e => statusSet.Contains(e.Status));
+            }
+
+            if (filters.HideClosedItems)
+            {
+                filteredEntries = filteredEntries.Where(e =>
+                    e.Status == LostFoundStatus.Logged);
             }
 
             filteredEntries = filters.SortOrder == "oldest"

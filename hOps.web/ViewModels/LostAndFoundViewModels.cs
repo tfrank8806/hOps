@@ -31,6 +31,8 @@ namespace hOps.web.ViewModels
 
         public List<LostFoundStatus> Statuses { get; set; } = new();
 
+        public bool HideClosedItems { get; set; } = true;
+
         public void Normalize()
         {
             SortOrder = string.IsNullOrWhiteSpace(SortOrder) ? "newest" : SortOrder.Trim().ToLowerInvariant();
