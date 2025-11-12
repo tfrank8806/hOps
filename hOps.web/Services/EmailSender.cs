@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.IO;
 using hOps.web.Models;
+using hOps.web.Utilities;
 
 namespace hOps.web.Services
 {
@@ -74,11 +75,19 @@ namespace hOps.web.Services
                 client.UseDefaultCredentials = true;
             }
 
+            if (SensitiveContentGuard.ContainsSensitiveData(htmlMessage))
+            {
+                _logger.LogWarning("EmailSender: blocked email to {Email} because body contained restricted content.", email);
+                return;
+            }
+
+            var safeBody = SensitiveContentGuard.Sanitize(htmlMessage);
+
             using var mail = new MailMessage
             {
                 From = new MailAddress(fromEmail, string.IsNullOrWhiteSpace(fromName) ? fromEmail : fromName),
                 Subject = subject ?? string.Empty,
-                Body = htmlMessage ?? string.Empty,
+                Body = safeBody,
                 IsBodyHtml = true
             };
 
