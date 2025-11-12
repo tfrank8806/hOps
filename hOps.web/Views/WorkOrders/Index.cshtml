@@ -56,9 +56,9 @@
         filterQuery.Add("PropertyIds", propertyId.ToString(CultureInfo.InvariantCulture));
     }
 
-    if (Model.Filters.HideCompleted)
+    if (!Model.Filters.HideCompleted)
     {
-        filterQuery.Add("HideCompleted", "true");
+        filterQuery.Add("HideCompleted", "false");
     }
 
     var filterQueryString = filterQuery.ToQueryString().ToString();
@@ -107,9 +107,9 @@
             builder.Add("PropertyIds", propertyId.ToString(CultureInfo.InvariantCulture));
         }
 
-        if (Model.Filters.HideCompleted)
+        if (!Model.Filters.HideCompleted)
         {
-            builder.Add("HideCompleted", "true");
+            builder.Add("HideCompleted", "false");
         }
 
         var url = Url.Action("Index") + builder.ToQueryString();
@@ -420,6 +420,7 @@
                     <div class="d-flex align-items-center gap-3">
                         <h5 class="mb-0">Work Orders (@Model.WorkOrders.Count)</h5>
                         <form method="get" class="d-flex align-items-center gap-2 hide-completed-form">
+                            <input type="hidden" name="HideCompleted" value="false" />
                             <input type="hidden" name="SortOrder" value="@Model.Filters.SortOrder" />
                             @if (!string.IsNullOrWhiteSpace(Model.Filters.RoomNumber))
                             {

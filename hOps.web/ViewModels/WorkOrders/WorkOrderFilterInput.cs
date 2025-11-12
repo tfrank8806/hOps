@@ -14,7 +14,7 @@ namespace hOps.web.ViewModels.WorkOrders
         public List<string> CreatorIds { get; set; } = new();
         public string? Search { get; set; }
         public List<int> PropertyIds { get; set; } = new();
-        public bool HideCompleted { get; set; }
+        public bool HideCompleted { get; set; } = true;
 
         public void Normalize()
         {

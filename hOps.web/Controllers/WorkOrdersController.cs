@@ -1112,8 +1112,22 @@ namespace hOps.web.Controllers
                 }).ToList()
             }).ToList();
 
-            var departments = await _context.Departments.OrderBy(d => d.Name).ToListAsync();
-            var workOrderTypes = await _context.WorkOrderTypes.OrderBy(t => t.Name).ToListAsync();
+            var departmentQuery = _context.Departments.AsQueryable();
+            var workOrderTypeQuery = _context.WorkOrderTypes.AsQueryable();
+
+            if (targetPropertySet.Any())
+            {
+                departmentQuery = departmentQuery.Where(d => !d.PropertyId.HasValue || targetPropertySet.Contains(d.PropertyId.Value));
+                workOrderTypeQuery = workOrderTypeQuery.Where(t => !t.PropertyId.HasValue || targetPropertySet.Contains(t.PropertyId.Value));
+            }
+            else
+            {
+                departmentQuery = departmentQuery.Where(_ => false);
+                workOrderTypeQuery = workOrderTypeQuery.Where(_ => false);
+            }
+
+            var departments = await departmentQuery.OrderBy(d => d.Name).ToListAsync();
+            var workOrderTypes = await workOrderTypeQuery.OrderBy(t => t.Name).ToListAsync();
 
             var creatorFilters = new HashSet<string>(filters.CreatorIds, StringComparer.OrdinalIgnoreCase);
 
