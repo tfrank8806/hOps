@@ -592,7 +592,18 @@
     }
 
     function generateId(prefix = 'log') {
-        return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        // Use cryptographically secure random values for ID
+        let randomPart;
+        if (window.crypto && window.crypto.getRandomValues) {
+            // 8 bytes = 16 hex characters
+            const array = new Uint8Array(8);
+            window.crypto.getRandomValues(array);
+            randomPart = Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
+        } else {
+            // Fallback to Math.random() if crypto is not available (not recommended)
+            randomPart = Math.random().toString(16).slice(2);
+        }
+        return `${prefix}_${Date.now()}_${randomPart}`;
     }
 
     function normalizeAuditEntry(entry) {
