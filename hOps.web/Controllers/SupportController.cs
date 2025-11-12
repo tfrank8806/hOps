@@ -122,7 +122,7 @@ namespace hOps.web.Controllers
             _logger.LogInformation("Support ticket submitted by {UserId} ({ContactEmail}) with subject {Subject}",
                 currentUser?.Id ?? "UnknownUser",
                 model.ContactEmail ?? currentUser?.Email ?? "no-email",
-                model.Subject);
+                model.Subject?.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
 
             TempData[SuccessTempDataKey] = true;
             return RedirectToAction(nameof(Index));
