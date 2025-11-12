@@ -304,7 +304,9 @@ namespace hOps.web.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unable to send direct message email notification to user {UserId}", recipientId);
+                // Sanitize recipientId to prevent log forging
+                var sanitizedRecipientId = recipientId.Replace("\n", "").Replace("\r", "");
+                _logger.LogError(ex, "Unable to send direct message email notification to user {UserId}", sanitizedRecipientId);
             }
         }
 
