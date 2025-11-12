@@ -83,15 +83,10 @@ public class BaseController : Controller
             ViewBag.ToDoSidebarData = await BuildToDoSidebarAsync(user, userProperties);
         }
 
-        var executed = await next();
-
-        if (executed.Exception == null && user != null)
-        {
-            await PopulateDirectMessageBadgeAsync(user);
-        }
+        await next();
     }
 
-    private async Task PopulateDirectMessageBadgeAsync(ApplicationUser user)
+    protected async Task PopulateDirectMessageBadgeAsync(ApplicationUser user)
     {
         ViewBag.UnreadDirectMessageCount = await _context.DirectMessages
             .Where(m => m.RecipientId == user.Id && !m.IsRead)

@@ -41,6 +41,7 @@ namespace hOps.web.Controllers
             }
 
             var viewModel = await BuildViewModelAsync(currentUser, conversationId, userId, startNew);
+            await PopulateDirectMessageBadgeAsync(currentUser);
             return View(viewModel);
         }
 
