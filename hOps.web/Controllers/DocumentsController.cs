@@ -35,7 +35,7 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(int? folderId = null, string? sort = null, string? direction = null)
+        public async Task<IActionResult> Index(int? folderId = null, string? sort = null, string? direction = null, string? search = null)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -44,6 +44,7 @@ namespace hOps.web.Controllers
             }
 
             var (sortField, sortDirection) = NormalizeSort(sort, direction);
+            var searchQuery = NormalizeSearch(search);
 
             var effectiveFolderId = folderId;
             if (!effectiveFolderId.HasValue && Request.Cookies.TryGetValue(LastFolderCookieName, out var storedFolder))
@@ -58,14 +59,14 @@ namespace hOps.web.Controllers
                 }
             }
 
-            var viewModel = await BuildIndexViewModelAsync(user, null, null, effectiveFolderId, sortField, sortDirection);
+            var viewModel = await BuildIndexViewModelAsync(user, null, null, effectiveFolderId, sortField, sortDirection, searchQuery);
             PersistFolderPreference(viewModel.SelectedFolderId, viewModel.ShowingUnassignedOnly);
             return View(viewModel);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Upload([Bind(Prefix = "Form")] DocumentUploadFormViewModel form, int? currentFolderId, string? currentSort, string? currentDirection)
+        public async Task<IActionResult> Upload([Bind(Prefix = "Form")] DocumentUploadFormViewModel form, int? currentFolderId, string? currentSort, string? currentDirection, string? currentSearch)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -73,6 +74,7 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
             var (sortField, sortDirection) = NormalizeSort(currentSort, currentDirection);
+            var searchQuery = NormalizeSearch(currentSearch);
 
             var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
             var accessiblePropertySet = accessiblePropertyIds.ToHashSet();
@@ -139,7 +141,8 @@ namespace hOps.web.Controllers
                     null,
                     currentFolderId ?? form.FolderId,
                     sortField,
-                    sortDirection);
+                    sortDirection,
+                    searchQuery);
                 return View("Index", invalidModel);
             }
 
@@ -189,20 +192,20 @@ namespace hOps.web.Controllers
             TempData["DocumentSuccess"] = "Document uploaded successfully.";
             if (form.FolderId.HasValue)
             {
-                return RedirectToAction(nameof(Index), new { folderId = form.FolderId.Value, sort = sortField, direction = sortDirection });
+                return RedirectToAction(nameof(Index), new { folderId = form.FolderId.Value, sort = sortField, direction = sortDirection, search = searchQuery });
             }
 
             if (currentFolderId.HasValue && currentFolderId.Value == -1)
             {
-                return RedirectToAction(nameof(Index), new { folderId = -1, sort = sortField, direction = sortDirection });
+                return RedirectToAction(nameof(Index), new { folderId = -1, sort = sortField, direction = sortDirection, search = searchQuery });
             }
 
-            return RedirectToAction(nameof(Index), new { sort = sortField, direction = sortDirection });
+            return RedirectToAction(nameof(Index), new { sort = sortField, direction = sortDirection, search = searchQuery });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateFolder([Bind(Prefix = "FolderForm")] DocumentFolderFormViewModel form, int? currentFolderId, string? currentSort, string? currentDirection)
+        public async Task<IActionResult> CreateFolder([Bind(Prefix = "FolderForm")] DocumentFolderFormViewModel form, int? currentFolderId, string? currentSort, string? currentDirection, string? currentSearch)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -230,6 +233,7 @@ namespace hOps.web.Controllers
             }
 
             var (sortField, sortDirection) = NormalizeSort(currentSort, currentDirection);
+            var searchQuery = NormalizeSearch(currentSearch);
             var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
             var accessiblePropertySet = accessiblePropertyIds.ToHashSet();
 
@@ -253,7 +257,7 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                var invalidViewModel = await BuildIndexViewModelAsync(user, null, form, currentFolderId, sortField, sortDirection);
+                var invalidViewModel = await BuildIndexViewModelAsync(user, null, form, currentFolderId, sortField, sortDirection, searchQuery);
                 return View("Index", invalidViewModel);
             }
 
@@ -281,7 +285,197 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
 
             TempData["DocumentSuccess"] = "Folder created successfully.";
-            return RedirectToAction(nameof(Index), new { folderId = folder.Id, sort = sortField, direction = sortDirection });
+            return RedirectToAction(nameof(Index), new { folderId = folder.Id, sort = sortField, direction = sortDirection, search = searchQuery });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateFolderSettings([Bind(Prefix = "FolderSettingsForm")] DocumentFolderSettingsForm form, int? currentFolderId, string? currentSort, string? currentDirection, string? currentSearch)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var (sortField, sortDirection) = NormalizeSort(currentSort, currentDirection);
+            var searchQuery = NormalizeSearch(currentSearch);
+            form.Name = form.Name?.Trim() ?? string.Empty;
+
+            var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+            var accessiblePropertySet = accessiblePropertyIds.ToHashSet();
+            var (_, accessibleFolderIds) = await GetAccessibleFoldersAsync(accessiblePropertySet);
+
+            var folder = await _context.DocumentFolders
+                .Include(f => f.FolderProperties)
+                .Include(f => f.Documents)
+                    .ThenInclude(d => d.DocumentProperties)
+                .FirstOrDefaultAsync(f => f.Id == form.FolderId);
+
+            if (folder == null)
+            {
+                return NotFound();
+            }
+
+            if (!accessibleFolderIds.Contains(folder.Id))
+            {
+                return Forbid();
+            }
+
+            form.SelectedPropertyIds = form.SelectedPropertyIds?
+                .Where(accessiblePropertySet.Contains)
+                .Distinct()
+                .ToList() ?? new List<int>();
+
+            if (string.IsNullOrWhiteSpace(form.Name))
+            {
+                ModelState.AddModelError(nameof(form.Name), "Folder name is required.");
+            }
+
+            if (form.Visibility == DocumentFolderVisibility.SelectedProperties)
+            {
+                if (!form.SelectedPropertyIds.Any())
+                {
+                    ModelState.AddModelError(nameof(form.SelectedPropertyIds), "Select at least one property for this folder.");
+                }
+            }
+            else
+            {
+                form.SelectedPropertyIds.Clear();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                var invalidViewModel = await BuildIndexViewModelAsync(
+                    user,
+                    null,
+                    null,
+                    currentFolderId ?? form.FolderId,
+                    sortField,
+                    sortDirection,
+                    searchQuery,
+                    form);
+                return View("Index", invalidViewModel);
+            }
+
+            folder.Name = form.Name;
+            folder.Visibility = form.Visibility;
+            folder.FolderProperties.Clear();
+
+            foreach (var propertyId in form.SelectedPropertyIds)
+            {
+                folder.FolderProperties.Add(new DocumentFolderProperty
+                {
+                    DocumentFolderId = folder.Id,
+                    PropertyId = propertyId
+                });
+            }
+
+            if (form.ApplyToDocuments)
+            {
+                var folderDocuments = await _context.Documents
+                    .Where(d => d.FolderId == folder.Id)
+                    .Include(d => d.DocumentProperties)
+                    .ToListAsync();
+
+                foreach (var document in folderDocuments)
+                {
+                    ApplyFolderVisibilityToDocument(document, form);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["DocumentSuccess"] = "Folder settings updated.";
+            var targetFolderId = currentFolderId ?? form.FolderId;
+            return RedirectToAction(nameof(Index), new { folderId = targetFolderId, sort = sortField, direction = sortDirection, search = searchQuery });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateDocumentVisibility(DocumentVisibilityForm form, int? currentFolderId, string? currentSort, string? currentDirection, string? currentSearch)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var (sortField, sortDirection) = NormalizeSort(currentSort, currentDirection);
+            var searchQuery = NormalizeSearch(currentSearch);
+
+            var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+            var accessiblePropertySet = accessiblePropertyIds.ToHashSet();
+            var accessibleFolderIds = (await GetAccessibleFoldersAsync(accessiblePropertySet)).AccessibleFolderIds;
+
+            var document = await _context.Documents
+                .Include(d => d.DocumentProperties)
+                .Include(d => d.Folder)
+                .FirstOrDefaultAsync(d => d.Id == form.DocumentId);
+
+            if (document == null)
+            {
+                return NotFound();
+            }
+
+            if (!UserCanAccessDocument(document, accessiblePropertySet, accessibleFolderIds))
+            {
+                return Forbid();
+            }
+
+            form.SelectedPropertyIds = form.SelectedPropertyIds?
+                .Where(accessiblePropertySet.Contains)
+                .Distinct()
+                .ToList() ?? new List<int>();
+
+            switch (form.AccessScope)
+            {
+                case DocumentAccessScope.AllUsers:
+                    form.SelectedPropertyIds.Clear();
+                    form.PropertyId = null;
+                    break;
+                case DocumentAccessScope.PropertyOnly:
+                    if (!form.PropertyId.HasValue || !accessiblePropertySet.Contains(form.PropertyId.Value))
+                    {
+                        ModelState.AddModelError(nameof(form.PropertyId), "Select a valid property.");
+                    }
+                    form.SelectedPropertyIds.Clear();
+                    break;
+                case DocumentAccessScope.SelectedProperties:
+                    if (!form.SelectedPropertyIds.Any())
+                    {
+                        ModelState.AddModelError(nameof(form.SelectedPropertyIds), "Select at least one property.");
+                    }
+                    form.PropertyId = null;
+                    break;
+                default:
+                    ModelState.AddModelError(nameof(form.AccessScope), "Invalid visibility option.");
+                    break;
+            }
+
+            if (!ModelState.IsValid)
+            {
+                TempData["DocumentError"] = "Unable to update document visibility.";
+                return RedirectToAction(nameof(Index), new { folderId = currentFolderId, sort = sortField, direction = sortDirection, search = searchQuery });
+            }
+
+            if (form.AccessScope == DocumentAccessScope.AllUsers)
+            {
+                ApplyDocumentVisibility(document, DocumentAccessScope.AllUsers, null, Array.Empty<int>());
+            }
+            else if (form.AccessScope == DocumentAccessScope.PropertyOnly)
+            {
+                ApplyDocumentVisibility(document, DocumentAccessScope.PropertyOnly, form.PropertyId, Array.Empty<int>());
+            }
+            else
+            {
+                ApplyDocumentVisibility(document, DocumentAccessScope.SelectedProperties, null, form.SelectedPropertyIds);
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["DocumentSuccess"] = "Document visibility updated.";
+            return RedirectToAction(nameof(Index), new { folderId = currentFolderId, sort = sortField, direction = sortDirection, search = searchQuery });
         }
 
         [HttpGet]
@@ -335,7 +529,9 @@ namespace hOps.web.Controllers
             DocumentFolderFormViewModel? folderForm,
             int? selectedFolderId,
             string sortField,
-            string sortDirection)
+            string sortDirection,
+            string? searchQuery,
+            DocumentFolderSettingsForm? folderSettingsForm = null)
         {
             var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
             var accessiblePropertySet = accessiblePropertyIds.ToHashSet();
@@ -347,6 +543,7 @@ namespace hOps.web.Controllers
             }
 
             var (folderEntities, accessibleFolderIds) = await GetAccessibleFoldersAsync(accessiblePropertySet);
+            var normalizedSearch = NormalizeSearch(searchQuery);
             var folderLookup = folderEntities.ToDictionary(f => f.Id);
             var showUnassignedOnly = selectedFolderId.HasValue && selectedFolderId.Value == -1;
             var actualSelectedFolderId = showUnassignedOnly ? (int?)null : selectedFolderId;
@@ -382,6 +579,40 @@ namespace hOps.web.Controllers
                         .Distinct()
                         .ToList();
                 }
+            }
+
+            DocumentFolderSettingsForm? effectiveFolderSettings = null;
+            if (folderSettingsForm != null)
+            {
+                effectiveFolderSettings = new DocumentFolderSettingsForm
+                {
+                    FolderId = folderSettingsForm.FolderId,
+                    Name = folderSettingsForm.Name,
+                    Visibility = folderSettingsForm.Visibility,
+                    SelectedPropertyIds = folderSettingsForm.SelectedPropertyIds?
+                        .Where(accessiblePropertySet.Contains)
+                        .Distinct()
+                        .ToList() ?? new List<int>(),
+                    ApplyToDocuments = folderSettingsForm.ApplyToDocuments
+                };
+            }
+            else if (actualSelectedFolderId.HasValue && folderLookup.TryGetValue(actualSelectedFolderId.Value, out var selectedFolder))
+            {
+                var selectedIds = selectedFolder.Visibility == DocumentFolderVisibility.SelectedProperties
+                    ? selectedFolder.FolderProperties
+                        .Select(fp => fp.PropertyId)
+                        .Where(accessiblePropertySet.Contains)
+                        .Distinct()
+                        .ToList()
+                    : new List<int>();
+
+                effectiveFolderSettings = new DocumentFolderSettingsForm
+                {
+                    FolderId = selectedFolder.Id,
+                    Name = selectedFolder.Name,
+                    Visibility = selectedFolder.Visibility,
+                    SelectedPropertyIds = selectedIds
+                };
             }
 
             DocumentUploadFormViewModel effectiveUploadForm;
@@ -468,6 +699,16 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
+            var folderSettingsPropertyOptions = propertyOptions
+                .Select(option => new DocumentPropertyOptionViewModel
+                {
+                    Id = option.Id,
+                    Name = option.Name,
+                    Code = option.Code,
+                    IsSelected = effectiveFolderSettings?.SelectedPropertyIds.Contains(option.Id) ?? false
+                })
+                .ToList();
+
             var documents = await _context.Documents
                 .Include(d => d.UploadedBy)
                 .Include(d => d.Property)
@@ -490,6 +731,14 @@ namespace hOps.web.Controllers
                 .Select(d => ToListItemViewModel(d, folderPathMap))
                 .ToList();
 
+            if (!string.IsNullOrWhiteSpace(normalizedSearch))
+            {
+                var lowered = normalizedSearch.ToLowerInvariant();
+                filteredDocuments = filteredDocuments
+                    .Where(d => DocumentMatchesSearch(d, lowered))
+                    .ToList();
+            }
+
             var folderTree = BuildFolderTree(folderEntities, accessibleDocuments, actualSelectedFolderId);
             var folderOptions = folderTree
                 .Select(node => new DocumentFolderOptionViewModel
@@ -510,7 +759,9 @@ namespace hOps.web.Controllers
                 FolderOptions = folderOptions,
                 FolderTree = folderTree,
                 FolderForm = effectiveFolderForm,
+                FolderSettingsForm = effectiveFolderSettings,
                 FolderPropertyOptions = folderPropertyOptions,
+                SelectedFolderPropertyOptions = folderSettingsPropertyOptions,
                 ChildFolders = childFolders,
                 SelectedFolderId = actualSelectedFolderId,
                 ShowingUnassignedOnly = showUnassignedOnly,
@@ -520,7 +771,8 @@ namespace hOps.web.Controllers
                 CurrentPropertyId = currentProperty?.Id,
                 CurrentPropertyName = currentProperty?.Name,
                 SortField = sortField,
-                SortDirection = sortDirection
+                SortDirection = sortDirection,
+                SearchQuery = normalizedSearch ?? string.Empty
             };
         }
 
@@ -543,6 +795,17 @@ namespace hOps.web.Controllers
                         .OrderBy(label => label)
                         .ToArray(),
                 _ => Array.Empty<string>()
+            };
+            var propertyIds = document.AccessScope switch
+            {
+                DocumentAccessScope.PropertyOnly when document.PropertyId.HasValue
+                    => new[] { document.PropertyId.Value },
+                DocumentAccessScope.SelectedProperties
+                    => document.DocumentProperties
+                        .Select(dp => dp.PropertyId)
+                        .Distinct()
+                        .ToArray(),
+                _ => Array.Empty<int>()
             };
 
             var accessSummary = document.AccessScope switch
@@ -575,6 +838,8 @@ namespace hOps.web.Controllers
                 AccessScope = document.AccessScope,
                 AccessSummary = accessSummary,
                 TargetProperties = propertyLabels,
+                TargetPropertyIds = propertyIds,
+                AccessPropertyId = document.AccessScope == DocumentAccessScope.PropertyOnly ? document.PropertyId : null,
                 FolderId = document.FolderId,
                 FolderPath = folderPath,
                 Description = document.Description
@@ -908,6 +1173,81 @@ namespace hOps.web.Controllers
             }
 
             return assignedPropertyIds.Any(accessiblePropertyIds.Contains);
+        }
+
+        private static string? NormalizeSearch(string? searchTerm)
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+            {
+                return null;
+            }
+
+            return searchTerm.Trim();
+        }
+
+        private static bool DocumentMatchesSearch(DocumentListItemViewModel document, string loweredTerm)
+        {
+            bool Contains(string? value)
+            {
+                return !string.IsNullOrWhiteSpace(value) &&
+                    value.ToLowerInvariant().Contains(loweredTerm);
+            }
+
+            if (Contains(document.DisplayName) ||
+                Contains(document.OriginalFileName) ||
+                Contains(document.Description) ||
+                Contains(document.FolderPath))
+            {
+                return true;
+            }
+
+            return document.TargetProperties.Any(Contains);
+        }
+
+        private static void ApplyDocumentVisibility(Document document, DocumentAccessScope accessScope, int? propertyId, IEnumerable<int> selectedPropertyIds)
+        {
+            document.AccessScope = accessScope;
+            document.DocumentProperties.Clear();
+
+            switch (accessScope)
+            {
+                case DocumentAccessScope.AllUsers:
+                    document.PropertyId = null;
+                    break;
+                case DocumentAccessScope.PropertyOnly:
+                    document.PropertyId = propertyId;
+                    break;
+                case DocumentAccessScope.SelectedProperties:
+                    document.PropertyId = null;
+                    foreach (var property in selectedPropertyIds.Distinct())
+                    {
+                        document.DocumentProperties.Add(new DocumentProperty
+                        {
+                            DocumentId = document.Id,
+                            PropertyId = property
+                        });
+                    }
+                    break;
+            }
+        }
+
+        private static void ApplyFolderVisibilityToDocument(Document document, DocumentFolderSettingsForm form)
+        {
+            if (form.Visibility == DocumentFolderVisibility.Global)
+            {
+                ApplyDocumentVisibility(document, DocumentAccessScope.AllUsers, null, Array.Empty<int>());
+                return;
+            }
+
+            var targets = form.SelectedPropertyIds?.Distinct().ToList() ?? new List<int>();
+            if (targets.Count == 1)
+            {
+                ApplyDocumentVisibility(document, DocumentAccessScope.PropertyOnly, targets[0], Array.Empty<int>());
+            }
+            else
+            {
+                ApplyDocumentVisibility(document, DocumentAccessScope.SelectedProperties, null, targets);
+            }
         }
     }
 }
