@@ -85,7 +85,7 @@
                                    asp-route-sort="@Model.SortField"
                                    asp-route-direction="@Model.SortDirection"
                                    style="padding-left:@paddingStyle;">
-                                    <span>@folder.Name</span>
+                                    <span>@Html.Encode(folder.Name)</span>
                                     <span class="badge bg-secondary">@folder.DocumentCount</span>
                                 </a>
                             }
