@@ -297,7 +297,7 @@ namespace hOps.web.Controllers
             _db.Departments.Update(model);
             await _db.SaveChangesAsync();
 
-            if (!string.IsNullOrWhiteSpace(returnUrl))
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
             {
                 return Redirect(returnUrl);
             }
