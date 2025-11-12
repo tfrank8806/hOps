@@ -1,5 +1,6 @@
 @using Microsoft.AspNetCore.Mvc.Rendering
 @model hOps.web.ViewModels.Documents.DocumentsIndexViewModel
+@inject Microsoft.AspNetCore.Mvc.Rendering.IHtmlHelper<dynamic> Html
 @{
     ViewData["Title"] = "Documents";
     ViewData["MainContainerClass"] = "main-inner--wide";
@@ -306,8 +307,8 @@
                                             <td colspan="2">
                                                 <a asp-action="Index"
                                                    asp-route-folderId="@child.Id"
-                                                   asp-route-sort="@Model.SortField"
-                                                   asp-route-direction="@Model.SortDirection"
+                                                   asp-route-sort="@Html.Encode(Model.SortField)"
+                                                   asp-route-direction="@Html.Encode(Model.SortDirection)"
                                                    class="text-decoration-none text-reset">
                                                     <span class="me-2" aria-hidden="true">📁</span><strong>@child.Name</strong>
                                                 </a>
@@ -320,8 +321,8 @@
                                                 <a class="btn btn-outline-secondary btn-sm"
                                                    asp-action="Index"
                                                    asp-route-folderId="@child.Id"
-                                                   asp-route-sort="@Model.SortField"
-                                                   asp-route-direction="@Model.SortDirection">
+                                                   asp-route-sort="@Html.Encode(Model.SortField)"
+                                                   asp-route-direction="@Html.Encode(Model.SortDirection)">
                                                     Open
                                                 </a>
                                             </td>
