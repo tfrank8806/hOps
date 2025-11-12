@@ -19,18 +19,21 @@ namespace hOps.web.Controllers
         private readonly ILogger<MailLogController> _logger;
         private readonly MentionService _mentionService;
         private readonly IUserTimeZoneService _timeZoneService;
+        private readonly IRealtimeNotificationService _realtimeNotifications;
 
         public MailLogController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             ILogger<MailLogController> logger,
             MentionService mentionService,
-            IUserTimeZoneService timeZoneService)
+            IUserTimeZoneService timeZoneService,
+            IRealtimeNotificationService realtimeNotifications)
             : base(context, userManager)
         {
             _logger = logger;
             _mentionService = mentionService;
             _timeZoneService = timeZoneService;
+            _realtimeNotifications = realtimeNotifications;
         }
 
         [HttpGet]
@@ -93,6 +96,7 @@ namespace hOps.web.Controllers
                 $"Mail Log Entry for {entry.RecipientName}",
                 link,
                 entry.Notes);
+            await NotifyPropertyUsersOfMailLogAsync(entry, user, link);
 
             TempData["MailLogMessage"] = "Package entry added.";
             return RedirectToAction(nameof(Index), new { hideDelivered });
@@ -226,6 +230,62 @@ namespace hOps.web.Controllers
             viewModel.Entries = mappedEntries;
 
             return viewModel;
+        }
+
+        private async Task NotifyPropertyUsersOfMailLogAsync(PackageLogEntry entry, ApplicationUser actor, string link)
+        {
+            var recipientIds = await _context.UserPropertyAccesses
+                .Where(upa => upa.PropertyId == entry.PropertyId && upa.ApplicationUserId != actor.Id)
+                .Select(upa => upa.ApplicationUserId)
+                .Distinct()
+                .ToListAsync();
+
+            if (!recipientIds.Any())
+            {
+                return;
+            }
+
+            var recipients = await _context.Users
+                .Where(u => recipientIds.Contains(u.Id))
+                .ToListAsync();
+
+            if (!recipients.Any())
+            {
+                return;
+            }
+
+            var actorName = BuildDisplayName(actor);
+            var entryLabel = string.IsNullOrWhiteSpace(entry.RecipientName)
+                ? "a package"
+                : $"a package for {entry.RecipientName}";
+            var content = string.IsNullOrWhiteSpace(actorName)
+                ? $"New log entry for {entryLabel}"
+                : $"{actorName} logged {entryLabel}";
+            var now = DateTime.UtcNow;
+
+            foreach (var recipient in recipients)
+            {
+                _context.UserNotifications.Add(new UserNotification
+                {
+                    UserId = recipient.Id,
+                    Type = "log",
+                    Title = "New mail log entry",
+                    Content = content,
+                    LinkUrl = link,
+                    CreatedAt = now,
+                    IsRead = false
+                });
+            }
+
+            await _context.SaveChangesAsync();
+
+            var payload = new RealtimeNotificationPayload(
+                "New mail log entry",
+                content,
+                link,
+                "log");
+
+            await _realtimeNotifications.NotifyUsersAsync(recipientIds, payload);
         }
 
         private static DateTime? NormalizeDate(DateTime? date)
