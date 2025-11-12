@@ -30,6 +30,24 @@
     var selectedFolderId = Model.SelectedFolderId;
     var showingUnassignedOnly = Model.ShowingUnassignedOnly;
     int? currentFolderRouteValue = showingUnassignedOnly ? -1 : selectedFolderId;
+    string SanitizeSortField(string? input)
+    {
+        var normalized = string.IsNullOrWhiteSpace(input) ? "uploaded" : input.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "name" => "name",
+            "size" => "size",
+            "shared" => "shared",
+            "folder" => "folder",
+            _ => "uploaded"
+        };
+    }
+    string SanitizeSortDirection(string? input)
+    {
+        return string.Equals(input, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
+    }
+    var safeSortField = SanitizeSortField(Model.SortField);
+    var safeSortDirection = SanitizeSortDirection(Model.SortDirection);
     string GetNextDirection(string field) => string.Equals(Model.SortField, field, StringComparison.OrdinalIgnoreCase) && Model.SortDirection == "asc" ? "desc" : "asc";
     string GetSortIndicator(string field) => string.Equals(Model.SortField, field, StringComparison.OrdinalIgnoreCase) ? (Model.SortDirection == "asc" ? "\u25B2" : "\u25BC") : string.Empty;
 }
@@ -61,11 +79,11 @@
                 </div>
                 <div class="card-body">
                     <div class="list-group list-group-flush mb-3">
-                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(selectedFolderId == null && !showingUnassignedOnly ? "active" : string.Empty)" asp-action="Index" asp-route-sort="@Model.SortField" asp-route-direction="@Model.SortDirection">
+                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(selectedFolderId == null && !showingUnassignedOnly ? "active" : string.Empty)" asp-action="Index" asp-route-sort="@safeSortField" asp-route-direction="@safeSortDirection">
                             <span>All documents</span>
                             <span class="badge bg-secondary">@Model.TotalDocumentCount</span>
                         </a>
-                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(showingUnassignedOnly ? "active" : string.Empty)" asp-action="Index" asp-route-folderId="-1" asp-route-sort="@Model.SortField" asp-route-direction="@Model.SortDirection">
+                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(showingUnassignedOnly ? "active" : string.Empty)" asp-action="Index" asp-route-folderId="-1" asp-route-sort="@safeSortField" asp-route-direction="@safeSortDirection">
                             <span>No folder</span>
                             <span class="badge bg-secondary">@Model.UnassignedDocumentCount</span>
                         </a>
@@ -82,8 +100,8 @@
                                 <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(folder.IsSelected ? "active" : string.Empty)"
                                    asp-action="Index"
                                    asp-route-folderId="@folder.Id"
-                                   asp-route-sort="@Model.SortField"
-                                   asp-route-direction="@Model.SortDirection"
+                                   asp-route-sort="@safeSortField"
+                                   asp-route-direction="@safeSortDirection"
                                    style="padding-left:@paddingStyle;">
                                     <span>@Html.Encode(folder.Name)</span>
                                     <span class="badge bg-secondary">@folder.DocumentCount</span>
@@ -95,8 +113,8 @@
                     <form asp-action="CreateFolder" method="post" novalidate>
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="currentFolderId" value="@(showingUnassignedOnly ? "-1" : (selectedFolderId?.ToString() ?? string.Empty))" />
-                        <input type="hidden" name="currentSort" value="@Model.SortField" />
-                        <input type="hidden" name="currentDirection" value="@Model.SortDirection" />
+                        <input type="hidden" name="currentSort" value="@safeSortField" />
+                        <input type="hidden" name="currentDirection" value="@safeSortDirection" />
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                         <div class="mb-3">
                             <label asp-for="FolderForm.Name" class="form-label"></label>
@@ -155,8 +173,8 @@
                     <form asp-action="Upload" method="post" enctype="multipart/form-data" novalidate>
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="currentFolderId" value="@(showingUnassignedOnly ? "-1" : (selectedFolderId?.ToString() ?? string.Empty))" />
-                        <input type="hidden" name="currentSort" value="@Model.SortField" />
-                        <input type="hidden" name="currentDirection" value="@Model.SortDirection" />
+                        <input type="hidden" name="currentSort" value="@safeSortField" />
+                        <input type="hidden" name="currentDirection" value="@safeSortDirection" />
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
                         <div class="mb-3">
@@ -307,8 +325,8 @@
                                             <td colspan="2">
                                                 <a asp-action="Index"
                                                    asp-route-folderId="@child.Id"
-                                                   asp-route-sort="@Html.Encode(Model.SortField)"
-                                                   asp-route-direction="@Html.Encode(Model.SortDirection)"
+                                                   asp-route-sort="@safeSortField"
+                                                   asp-route-direction="@safeSortDirection"
                                                    class="text-decoration-none text-reset">
                                                     <span class="me-2" aria-hidden="true">📁</span><strong>@child.Name</strong>
                                                 </a>
@@ -321,8 +339,8 @@
                                                 <a class="btn btn-outline-secondary btn-sm"
                                                    asp-action="Index"
                                                    asp-route-folderId="@child.Id"
-                                                   asp-route-sort="@Html.Encode(Model.SortField)"
-                                                   asp-route-direction="@Html.Encode(Model.SortDirection)">
+                                                   asp-route-sort="@safeSortField"
+                                                   asp-route-direction="@safeSortDirection">
                                                     Open
                                                 </a>
                                             </td>
@@ -377,8 +395,8 @@
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="id" value="@doc.Id" />
                                                 <input type="hidden" name="currentFolderId" value="@(currentFolderRouteValue?.ToString() ?? string.Empty)" />
-                                                <input type="hidden" name="currentSort" value="@Model.SortField" />
-                                                <input type="hidden" name="currentDirection" value="@Model.SortDirection" />
+                                                <input type="hidden" name="currentSort" value="@safeSortField" />
+                                                <input type="hidden" name="currentDirection" value="@safeSortDirection" />
                                                 @{
                                                     var moveFolderItems = Model.FolderOptions
                                                         .Select(option => new SelectListItem(FormatFolderLabel(option), option.Id.ToString(), doc.FolderId == option.Id))
