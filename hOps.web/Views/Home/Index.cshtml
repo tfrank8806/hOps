@@ -10,6 +10,9 @@
     var hasProperty = property != null;
     ViewData["MainContainerClass"] = "main-inner--wide home-main-container";
     ViewData["ContentSurfaceClass"] = "content-surface--flush";
+    string EscapeTextareaValue(string? value) => string.IsNullOrEmpty(value)
+        ? string.Empty
+        : value.Replace("</textarea>", "&lt;/textarea&gt;");
 }
 
 <div class="home-dashboard">
@@ -82,7 +85,7 @@
                                 <input type="hidden" name="PropertyId" value="@property!.Id" />
                                 <div class="mb-3">
                                     <label for="announcementContent" class="form-label">Announcement</label>
-                                    <textarea class="form-control" id="announcementContent" name="Content" rows="6" maxlength="4000" data-enable-mentions="true" data-rich-text="true">@Model.Announcement.Content</textarea>
+                                    <textarea class="form-control" id="announcementContent" name="Content" rows="6" maxlength="4000" data-enable-mentions="true" data-rich-text="true">@Html.Raw(EscapeTextareaValue(Model.Announcement.Content))</textarea>
                                     <div class="form-text">Use the toolbar for bold, italic, underline, lists, and quotes. Markdown shortcuts also work.</div>
                                 </div>
                                 @if (Model.Announcement.Attachments.Any())
@@ -339,7 +342,7 @@
                                                     <input type="hidden" name="PropertyId" value="@property!.Id" />
                                                     <div class="mb-3">
                                                         <label class="form-label" for="bulletinContent_@post.Id">Edit message</label>
-                                                        <textarea class="form-control" id="bulletinContent_@post.Id" name="Content" rows="3" maxlength="2000" data-enable-mentions="true" data-rich-text="true">@post.Content</textarea>
+                                                        <textarea class="form-control" id="bulletinContent_@post.Id" name="Content" rows="3" maxlength="2000" data-enable-mentions="true" data-rich-text="true">@Html.Raw(EscapeTextareaValue(post.Content))</textarea>
                                                         <div class="form-text">Use the toolbar to emphasize changes before saving.</div>
                                                     </div>
                                                     @if (post.Attachments.Any())
