@@ -778,7 +778,12 @@ namespace hOps.web.Controllers
 
             if (!string.IsNullOrWhiteSpace(returnUrl))
             {
-                return Redirect(returnUrl);
+                // Only allow redirects to relative URLs to prevent open redirect vulnerability
+                if (Uri.TryCreate(returnUrl, UriKind.Relative, out var validatedUri))
+                {
+                    return Redirect(returnUrl);
+                }
+                // Invalid or unsafe returnUrl; fall through to safe redirect
             }
 
             return RedirectToSettingsList(nameof(PhonebookTypes), propertyId, onlyGlobal);
