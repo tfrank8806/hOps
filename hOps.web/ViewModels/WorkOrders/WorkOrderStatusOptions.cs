@@ -18,10 +18,26 @@ namespace hOps.web.ViewModels.WorkOrders
 
         public static string GetColor(string status)
         {
-            var match = All.FirstOrDefault(s =>
+            var match = FindMatch(status);
+            return match?.ColorHex ?? "#6c757d";
+        }
+
+        public static string GetLabel(string status)
+        {
+            var match = FindMatch(status);
+            return match?.Label ?? status;
+        }
+
+        private static WorkOrderStatusOption? FindMatch(string status)
+        {
+            if (string.IsNullOrWhiteSpace(status))
+            {
+                return null;
+            }
+
+            return All.FirstOrDefault(s =>
                 s.Key.Equals(status, StringComparison.OrdinalIgnoreCase) ||
                 (s.Key.Equals("New", StringComparison.OrdinalIgnoreCase) && status.Equals("Open", StringComparison.OrdinalIgnoreCase)));
-            return match?.ColorHex ?? "#6c757d";
         }
     }
 }

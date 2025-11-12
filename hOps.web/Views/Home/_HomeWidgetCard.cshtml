@@ -70,7 +70,11 @@
                                     </div>
                                 }
                             </div>
-                            <span class="badge" style="background-color:@hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetColor(order.Status)">@order.Status</span>
+                            @{
+                                var statusColor = hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetColor(order.Status);
+                                var statusLabel = hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetLabel(order.Status);
+                            }
+                            <span class="badge" style="background-color:@statusColor">@statusLabel</span>
                         </div>
                         @{
                             var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
