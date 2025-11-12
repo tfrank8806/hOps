@@ -354,6 +354,7 @@
                                         type="button"
                                         data-bs-toggle="collapse"
                                         data-bs-target="#@departmentCollapseId"
+                                        data-section-key="department"
                                         aria-expanded="true"
                                         aria-controls="@departmentCollapseId">
                                     <div class="d-flex flex-column text-start">
@@ -425,6 +426,7 @@
                                         type="button"
                                         data-bs-toggle="collapse"
                                         data-bs-target="#@personalCollapseId"
+                                        data-section-key="personal"
                                         aria-expanded="true"
                                         aria-controls="@personalCollapseId">
                                     <div class="d-flex flex-column text-start">
@@ -726,10 +728,12 @@
             const todoBackdrop = document.getElementById('todoSidebarBackdrop');
             const todoMediaQuery = window.matchMedia('(max-width: 991.98px)');
             const TODO_SIDEBAR_STORAGE_KEY = 'todoSidebarCollapsed';
+            const TODO_SECTION_STATE_STORAGE_KEY = 'todoSidebarSectionState';
             const todoToggleButtons = [];
             if (todoRailToggle) {
                 todoToggleButtons.push(todoRailToggle);
             }
+            const todoSectionState = loadTodoSectionState();
 
             function updateTodoAria() {
                 if (!todoSidebar) {
@@ -835,6 +839,70 @@
                 setTodoSidebarCollapsed(shouldCollapse);
             }
 
+            function loadTodoSectionState() {
+                try {
+                    const raw = localStorage.getItem(TODO_SECTION_STATE_STORAGE_KEY);
+                    if (!raw) {
+                        return {};
+                    }
+                    const parsed = JSON.parse(raw);
+                    return parsed && typeof parsed === 'object' ? parsed : {};
+                } catch {
+                    return {};
+                }
+            }
+
+            function persistTodoSectionState(key, isExpanded) {
+                todoSectionState[key] = isExpanded;
+                try {
+                    localStorage.setItem(TODO_SECTION_STATE_STORAGE_KEY, JSON.stringify(todoSectionState));
+                } catch {
+                    // ignore storage failures
+                }
+            }
+
+            function initTodoSectionPersistence() {
+                if (!window.bootstrap) {
+                    return;
+                }
+
+                const sectionButtons = document.querySelectorAll('.todo-section-toggle[data-section-key]');
+                if (!sectionButtons.length) {
+                    return;
+                }
+
+                sectionButtons.forEach(button => {
+                    const key = button.dataset.sectionKey;
+                    const targetSelector = button.getAttribute('data-bs-target');
+                    if (!key || !targetSelector) {
+                        return;
+                    }
+                    const target = document.querySelector(targetSelector);
+                    if (!target) {
+                        return;
+                    }
+
+                    const shouldExpand = todoSectionState.hasOwnProperty(key)
+                        ? !!todoSectionState[key]
+                        : true;
+
+                    target.classList.toggle('show', shouldExpand);
+                    target.classList.remove('collapsing');
+                    target.style.height = '';
+                    button.setAttribute('aria-expanded', shouldExpand.toString());
+
+                    target.addEventListener('shown.bs.collapse', () => {
+                        button.setAttribute('aria-expanded', 'true');
+                        persistTodoSectionState(key, true);
+                    });
+
+                    target.addEventListener('hidden.bs.collapse', () => {
+                        button.setAttribute('aria-expanded', 'false');
+                        persistTodoSectionState(key, false);
+                    });
+                });
+            }
+
             if (todoSidebar) {
                 todoToggleButtons.forEach(btn => {
                     btn.addEventListener('click', () => toggleTodoSidebar());
@@ -851,6 +919,8 @@
                 } else if (todoMediaQuery.addListener) {
                     todoMediaQuery.addListener(handleTodoScreenChange);
                 }
+
+                initTodoSectionPersistence();
 
                 window.addEventListener('resize', syncTodoRailPosition);
                 window.addEventListener('scroll', () => {
