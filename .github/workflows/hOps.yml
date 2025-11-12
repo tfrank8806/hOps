@@ -16,6 +16,9 @@ env:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      actions: write
+      contents: read
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET SDK
@@ -51,6 +54,9 @@ jobs:
   deploy:
     runs-on: windows-latest
     needs: build
+    permissions:
+      actions: read
+      contents: read
     steps:
     - name: Download artifact from build job
       uses: actions/download-artifact@v4
