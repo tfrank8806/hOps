@@ -89,10 +89,31 @@ namespace hOps.web.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Import(int propertyId, IFormFile csvFile)
         {
             if (csvFile == null || csvFile.Length == 0)
-                return BadRequest("CSV file empty");
+            {
+                TempData["RoomImportError"] = "CSV file is empty.";
+                return RedirectToAction(nameof(Index), new { propertyId });
+            }
+
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            if (roles.Contains("Manager") && !roles.Contains("Admin"))
+            {
+                var hasAccess = await _context.UserPropertyAccesses
+                    .AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == propertyId);
+                if (!hasAccess)
+                {
+                    return Forbid();
+                }
+            }
 
             using var stream = csvFile.OpenReadStream();
             using var reader = new StreamReader(stream);
@@ -118,12 +139,19 @@ namespace hOps.web.Controllers
                 rooms.Add(room);
             }
 
+            if (!rooms.Any())
+            {
+                TempData["RoomImportError"] = "No valid rooms were found in the uploaded file. Existing rooms were left unchanged.";
+                return RedirectToAction(nameof(Index), new { propertyId });
+            }
+
             var existing = _context.Rooms.Where(r => r.PropertyId == propertyId);
             _context.Rooms.RemoveRange(existing);
 
             await _context.Rooms.AddRangeAsync(rooms);
             await _context.SaveChangesAsync();
 
+            TempData["RoomImportMessage"] = $"{rooms.Count} rooms imported successfully.";
             return RedirectToAction(nameof(Index), new { propertyId });
         }
     }

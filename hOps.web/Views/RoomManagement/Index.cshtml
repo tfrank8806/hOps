@@ -7,6 +7,19 @@
 
 <h2>Rooms for @propertyName</h2>
 
+@if (TempData["RoomImportError"] is string importError)
+{
+    <div class="alert alert-danger" role="alert">
+        @importError
+    </div>
+}
+else if (TempData["RoomImportMessage"] is string importMessage)
+{
+    <div class="alert alert-success" role="alert">
+        @importMessage
+    </div>
+}
+
 <form asp-action="Save" method="post">
     <input type="hidden" name="propertyId" value="@propertyId" />
     <table class="table">
