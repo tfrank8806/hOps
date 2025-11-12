@@ -42,13 +42,31 @@ else
                     <td>@req.PropertyCode</td>
                     <td>@req.RequestedAt.ToString("g")</td>
                     <td>
-                        <form asp-action="Approve" asp-controller="Admin" method="post" style="display:inline;">
+                        <form asp-action="Approve" asp-controller="Admin" method="post" class="mb-2">
+                            @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@req.Id" />
-                            <button type="submit" class="btn btn-success btn-sm">Approve</button>
+                            <div class="mb-2">
+                                <label class="form-label small mb-1" for="approveComments_@req.Id">Comments (optional)</label>
+                                <textarea class="form-control form-control-sm"
+                                          id="approveComments_@req.Id"
+                                          name="comments"
+                                          rows="2"
+                                          placeholder="Included in approval email"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-sm w-100">Approve</button>
                         </form>
-                        <form asp-action="Reject" asp-controller="Admin" method="post" style="display:inline;">
+                        <form asp-action="Reject" asp-controller="Admin" method="post">
+                            @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@req.Id" />
-                            <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+                            <div class="mb-2">
+                                <label class="form-label small mb-1" for="rejectComments_@req.Id">Comments (optional)</label>
+                                <textarea class="form-control form-control-sm"
+                                          id="rejectComments_@req.Id"
+                                          name="comments"
+                                          rows="2"
+                                          placeholder="Included in rejection email"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-danger btn-sm w-100">Reject</button>
                         </form>
                     </td>
                 </tr>

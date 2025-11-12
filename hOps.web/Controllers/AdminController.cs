@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Net;
 using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
@@ -54,7 +55,7 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateUser(AdminCreateUserInputModel? input)
+        public async Task<IActionResult> CreateUser([Bind(Prefix = "CreateUser")] AdminCreateUserInputModel? input)
         {
             var currentUser = await _userManager.GetUserAsync(User);
             if (currentUser == null)
@@ -761,7 +762,7 @@ HotelOps Admin Team
         }
 
         [HttpPost]
-        public async Task<IActionResult> Approve(int id)
+        public async Task<IActionResult> Approve(int id, string? comments)
         {
             var request = await _context.UserAccessRequests.FindAsync(id);
             if (request == null)
@@ -787,12 +788,13 @@ HotelOps Admin Team
 
             await _userManager.AddToRoleAsync(user, "User");
 
+            var commentsHtml = BuildCommentsHtml(comments);
             var message = $@"
 Hi {user.FirstName},<br/><br/>
 Your access request for HotelOps has been <strong>approved</strong>.<br/>
 You can now log in using your email and temporary password:<br/>
 <strong>Password:</strong> {tempPassword}<br/><br/>
-Please change your password after login.<br/><br/>
+Please change your password after login.<br/>{commentsHtml}<br/>
 HotelOps Admin Team
 ";
             await _emailSender.SendEmailAsync(user.Email, "HotelOps Access Approved", message);
@@ -802,7 +804,7 @@ HotelOps Admin Team
         }
 
         [HttpPost]
-        public async Task<IActionResult> Reject(int id)
+        public async Task<IActionResult> Reject(int id, string? comments)
         {
             var req = await _context.UserAccessRequests.FindAsync(id);
             if (req == null)
@@ -815,7 +817,7 @@ HotelOps Admin Team
             var message = $@"
 Hi {req.FirstName},<br/><br/>
 Your access request for HotelOps was <strong>not approved</strong>.<br/>
-If you believe this is in error, please contact your property manager.<br/><br/>
+If you believe this is in error, please contact your property manager.<br/>{BuildCommentsHtml(comments)}<br/>
 Thank you,<br/>
 HotelOps Admin Team
 ";
@@ -823,6 +825,22 @@ HotelOps Admin Team
             TempData["Success"] = "Request rejected and user notified.";
 
             return RedirectToAction(nameof(AccessRequests));
+        }
+
+        private static string BuildCommentsHtml(string? comments)
+        {
+            if (string.IsNullOrWhiteSpace(comments))
+            {
+                return string.Empty;
+            }
+
+            var encoded = WebUtility.HtmlEncode(comments.Trim());
+            encoded = encoded
+                .Replace("\r\n", "\n")
+                .Replace("\r", "\n")
+                .Replace("\n", "<br/>");
+
+            return $"<br/><strong>Comments:</strong><br/>{encoded}<br/>";
         }
 
         private static string GenerateTemporaryPassword()
