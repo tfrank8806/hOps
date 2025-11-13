@@ -13,6 +13,9 @@ namespace hOps.web.Models
         public string ParticipantBId { get; set; } = string.Empty;
         public ApplicationUser? ParticipantB { get; set; }
 
+        public bool ParticipantAArchived { get; set; }
+        public bool ParticipantBArchived { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

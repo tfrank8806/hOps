@@ -1,0 +1,45 @@
+@using hOps.web.Utilities
+@model hOps.web.ViewModels.Messages.DirectMessagePageViewModel
+
+@if (!Model.Conversations.Any())
+{
+    <div class="direct-messages-conversation-list__empty text-muted small px-3 py-4">
+        No conversations yet.
+    </div>
+}
+else
+{
+    foreach (var conversation in Model.Conversations)
+    {
+        var url = Url.Action("Index", new { conversationId = conversation.ConversationId });
+        var displayName = string.IsNullOrWhiteSpace(conversation.ParticipantName)
+            ? (!string.IsNullOrWhiteSpace(conversation.ParticipantEmail) ? conversation.ParticipantEmail : "Teammate")
+            : conversation.ParticipantName;
+        var participantInitial = string.IsNullOrWhiteSpace(displayName)
+            ? "?"
+            : displayName.Trim()[0].ToString().ToUpperInvariant();
+        var lastTimestamp = conversation.LastMessageAt.HasValue
+            ? TimeZoneService.ConvertToUserTime(conversation.LastMessageAt.Value)
+            : (DateTime?)null;
+        var isActive = Model.ActiveConversation?.ConversationId == conversation.ConversationId;
+        <a href="@url" class="direct-messages-conversation-item @(isActive ? "active" : string.Empty)">
+            <div class="direct-messages-conversation-item__avatar">@participantInitial</div>
+            <div class="direct-messages-conversation-item__body">
+                <div class="direct-messages-conversation-item__row">
+                    <span class="direct-messages-conversation-item__name">@displayName</span>
+                    @if (lastTimestamp.HasValue)
+                    {
+                        <time datetime="@lastTimestamp.Value.ToString("o")" class="direct-messages-conversation-item__time">@lastTimestamp.Value.ToString("g")</time>
+                    }
+                </div>
+                <div class="direct-messages-conversation-item__preview @(conversation.HasUnread ? "direct-messages-conversation-item__preview--unread" : string.Empty)">
+                    @(string.IsNullOrWhiteSpace(conversation.LastMessagePreview) ? "(No recent messages)" : conversation.LastMessagePreview)
+                </div>
+            </div>
+            @if (conversation.HasUnread)
+            {
+                <span class="badge rounded-pill bg-primary direct-messages-conversation-item__badge">@conversation.UnreadCount</span>
+            }
+        </a>
+    }
+}

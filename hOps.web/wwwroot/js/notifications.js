@@ -47,6 +47,15 @@
 
     const intervalId = window.setInterval(refreshUnreadCount, 60000);
 
+    const handleRealtimeNotification = (event) => {
+        const type = (event?.detail?.type ?? event?.detail?.Type ?? '').toString().toLowerCase();
+        if (type === 'message') {
+            refreshUnreadCount();
+        }
+    };
+
+    window.addEventListener('realtime:notification', handleRealtimeNotification);
+
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
             refreshUnreadCount();
@@ -55,5 +64,6 @@
 
     window.addEventListener('unload', () => {
         window.clearInterval(intervalId);
+        window.removeEventListener('realtime:notification', handleRealtimeNotification);
     });
 })();

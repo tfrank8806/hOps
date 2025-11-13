@@ -37,12 +37,25 @@
         setTimeout(removeBubble, 10000);
     }
 
+    function dispatchRealtimeEvent(payload) {
+        try {
+            const detail = payload ?? {};
+            window.dispatchEvent(new CustomEvent('realtime:notification', { detail }));
+            document.dispatchEvent(new CustomEvent('realtime:notification', { detail }));
+        } catch (error) {
+            console.error('Realtime notification dispatch failure', error);
+        }
+    }
+
     const connection = new signalR.HubConnectionBuilder()
         .withUrl('/hubs/notifications')
         .withAutomaticReconnect()
         .build();
 
-    connection.on('ReceiveNotification', payload => createBubble(payload));
+    connection.on('ReceiveNotification', payload => {
+        createBubble(payload);
+        dispatchRealtimeEvent(payload);
+    });
 
     connection.start().catch(err => console.error('Notification hub error', err));
 })();

@@ -140,23 +140,40 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
-            var conversation = await _context.DirectMessageConversations
-                .Include(c => c.Messages)
-                .FirstOrDefaultAsync(c =>
-                    c.Id == conversationId &&
-                    (c.ParticipantAId == currentUser.Id || c.ParticipantBId == currentUser.Id));
+            await _messageService.ArchiveConversationForUserAsync(conversationId, currentUser.Id);
+            TempData["DirectMessageMessage"] = "Conversation removed from your view.";
+            return RedirectToAction(nameof(Index));
+        }
 
-            if (conversation == null)
+        [HttpGet]
+        public async Task<IActionResult> ConversationListPartial(int? conversationId = null)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
             {
-                TempData["DirectMessageError"] = "Conversation not found or you don't have access.";
-                return RedirectToAction(nameof(Index));
+                return Challenge();
             }
 
-            _context.DirectMessageConversations.Remove(conversation);
-            await _context.SaveChangesAsync();
+            var model = await BuildViewModelAsync(currentUser, conversationId, null, false);
+            return PartialView("_ConversationItems", model);
+        }
 
-            TempData["DirectMessageMessage"] = "Conversation deleted.";
-            return RedirectToAction(nameof(Index));
+        [HttpGet]
+        public async Task<IActionResult> ConversationMessagesPartial(int conversationId)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var model = await BuildViewModelAsync(currentUser, conversationId, null, false);
+            if (model.ActiveConversation == null)
+            {
+                return NotFound();
+            }
+
+            return PartialView("_ConversationMessages", model.ActiveConversation);
         }
 
         private async Task<DirectMessagePageViewModel> BuildViewModelAsync(ApplicationUser currentUser, int? conversationId, string? userId, bool startNew)
@@ -201,18 +218,31 @@ namespace hOps.web.Controllers
                 }
             }
 
-            var participantIds = filteredSummaries.Select(s => s.OtherUserId).Distinct().ToList();
-            var participantInfo = await _userManager.Users
-                .Where(u => participantIds.Contains(u.Id))
-                .Select(u => new
+            async Task<(Dictionary<string, string> NameLookup, Dictionary<string, string?> EmailLookup)> BuildParticipantLookupsAsync()
+            {
+                var participantIds = filteredSummaries.Select(s => s.OtherUserId).Distinct().ToList();
+                if (!participantIds.Any())
                 {
-                    u.Id,
-                    Name = BuildDisplayName(u),
-                    u.Email
-                })
-                .ToListAsync();
-            var nameLookup = participantInfo.ToDictionary(u => u.Id, u => u.Name);
-            var emailLookup = participantInfo.ToDictionary(u => u.Id, u => u.Email);
+                    return (new Dictionary<string, string>(), new Dictionary<string, string?>());
+                }
+
+                var info = await _userManager.Users
+                    .Where(u => participantIds.Contains(u.Id))
+                    .Select(u => new
+                    {
+                        u.Id,
+                        Name = BuildDisplayName(u),
+                        u.Email
+                    })
+                    .ToListAsync();
+
+                var nameLookup = info.ToDictionary(p => p.Id, p => p.Name, StringComparer.OrdinalIgnoreCase);
+                var emailLookup = info.ToDictionary(p => p.Id, p => p.Email, StringComparer.OrdinalIgnoreCase);
+
+                return (nameLookup, emailLookup);
+            }
+
+            var (nameLookup, emailLookup) = await BuildParticipantLookupsAsync();
 
             var conversationItems = filteredSummaries
                 .Select(summary =>
@@ -246,10 +276,6 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
-            var conversationLookup = conversationItems
-                .GroupBy(c => c.ParticipantId, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First().ConversationId, StringComparer.OrdinalIgnoreCase);
-
             ConversationDetailViewModel? activeConversation = null;
             if (resolvedConversationId.HasValue)
             {
@@ -264,23 +290,73 @@ namespace hOps.web.Controllers
                         ParticipantEmail = detail.OtherUserEmail,
                         Messages = detail.Messages
                             .Select(m => new DirectMessageBubbleViewModel
-                            {
-                                MessageId = m.MessageId,
-                                SenderId = m.SenderId,
-                                SenderName = currentUser.Id == m.SenderId
-                                    ? "You"
-                                    : conversationItems.FirstOrDefault(c => c.ParticipantId == m.SenderId)?.ParticipantName ?? "User",
-                                Body = m.Body,
-                                SentAt = _timeZoneService.ConvertToUserTime(m.SentAt),
-                                IsOwnMessage = m.IsOwnMessage,
-                                IsRead = m.IsRead,
-                                ReadAt = m.ReadAt.HasValue ? _timeZoneService.ConvertToUserTime(m.ReadAt.Value) : (DateTime?)null
-                            })
-                            .ToList()
+                                {
+                                    MessageId = m.MessageId,
+                                    SenderId = m.SenderId,
+                                    SenderName = currentUser.Id == m.SenderId
+                                        ? "You"
+                                        : nameLookup.TryGetValue(m.SenderId, out var senderName)
+                                            ? senderName
+                                            : detail.OtherUserName ?? "User",
+                                    Body = m.Body,
+                                    SentAt = _timeZoneService.ConvertToUserTime(m.SentAt),
+                                    IsOwnMessage = m.IsOwnMessage,
+                                    IsRead = m.IsRead,
+                                    ReadAt = m.ReadAt.HasValue ? _timeZoneService.ConvertToUserTime(m.ReadAt.Value) : (DateTime?)null
+                                })
+                                .ToList()
                     };
                 }
             }
-            else if (!filteredSummaries.Any() && summaries.Any())
+
+            if (activeConversation != null &&
+                filteredSummaries.All(s => s.ConversationId != activeConversation.ConversationId))
+            {
+                summaries = await _messageService.GetConversationSummariesAsync(currentUser.Id);
+                filteredSummaries = access.IsAdmin
+                    ? summaries
+                    : summaries.Where(summary => allowedRecipientIds!.Contains(summary.OtherUserId)).ToList();
+
+                (nameLookup, emailLookup) = await BuildParticipantLookupsAsync();
+
+                conversationItems = filteredSummaries
+                    .Select(summary =>
+                    {
+                        var participantName = nameLookup.TryGetValue(summary.OtherUserId, out var value)
+                            ? value
+                            : null;
+
+                        if (string.IsNullOrWhiteSpace(participantName))
+                        {
+                            participantName = emailLookup.TryGetValue(summary.OtherUserId, out var fallbackEmail) && !string.IsNullOrWhiteSpace(fallbackEmail)
+                                ? fallbackEmail!
+                                : "Teammate";
+                        }
+
+                        return new ConversationListItemViewModel
+                        {
+                            ConversationId = summary.ConversationId,
+                            ParticipantId = summary.OtherUserId,
+                            ParticipantName = participantName,
+                            ParticipantEmail = emailLookup.TryGetValue(summary.OtherUserId, out var participantEmail)
+                                ? participantEmail
+                                : null,
+                            LastMessagePreview = string.IsNullOrWhiteSpace(summary.LastMessagePreview)
+                                ? null
+                                : MentionMarkupFormatter.ToDisplayText(summary.LastMessagePreview),
+                            LastMessageAt = summary.LastMessageAt,
+                            HasUnread = summary.UnreadCount > 0,
+                            UnreadCount = summary.UnreadCount
+                        };
+                    })
+                    .ToList();
+            }
+
+            var conversationLookup = conversationItems
+                .GroupBy(c => c.ParticipantId, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().ConversationId, StringComparer.OrdinalIgnoreCase);
+
+            if (!filteredSummaries.Any() && summaries.Any())
             {
                 var latest = summaries
                     .OrderByDescending(s => s.LastMessageAt ?? DateTime.MinValue)
@@ -303,7 +379,9 @@ namespace hOps.web.Controllers
                                     SenderId = m.SenderId,
                                     SenderName = currentUser.Id == m.SenderId
                                         ? "You"
-                                        : conversationItems.FirstOrDefault(c => c.ParticipantId == m.SenderId)?.ParticipantName ?? "User",
+                                        : nameLookup.TryGetValue(m.SenderId, out var senderName)
+                                            ? senderName
+                                            : detail.OtherUserName ?? "User",
                                     Body = m.Body,
                                     SentAt = _timeZoneService.ConvertToUserTime(m.SentAt),
                                     IsOwnMessage = m.IsOwnMessage,

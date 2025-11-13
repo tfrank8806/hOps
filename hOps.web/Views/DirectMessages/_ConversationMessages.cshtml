@@ -1,0 +1,20 @@
+@using hOps.web.Utilities
+@model hOps.web.ViewModels.Messages.ConversationDetailViewModel?
+
+@if (Model == null || !Model.Messages.Any())
+{
+    <div class="text-muted small px-3 py-4">No messages yet.</div>
+}
+else
+{
+    foreach (var message in Model.Messages)
+    {
+        <div class="message-bubble @(message.IsOwnMessage ? "message-outgoing" : "message-incoming")">
+            <div class="message-meta">
+                <span class="message-sender">@message.SenderName</span>
+                <span class="message-time text-muted">@message.SentAt.ToString("g")</span>
+            </div>
+            <div class="message-body">@Html.Raw(MentionMarkupFormatter.ToHtml(message.Body))</div>
+        </div>
+    }
+}

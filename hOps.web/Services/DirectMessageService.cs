@@ -4,9 +4,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Net;
 
@@ -19,19 +21,25 @@ namespace hOps.web.Services
         private readonly IEmailSender _emailSender;
         private readonly IRealtimeNotificationService _realtimeNotifications;
         private readonly ILogger<DirectMessageService> _logger;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IConfiguration _configuration;
 
         public DirectMessageService(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             IEmailSender emailSender,
             ILogger<DirectMessageService> logger,
-            IRealtimeNotificationService realtimeNotifications)
+            IRealtimeNotificationService realtimeNotifications,
+            IHttpContextAccessor httpContextAccessor,
+            IConfiguration configuration)
         {
             _context = context;
             _userManager = userManager;
             _emailSender = emailSender;
             _logger = logger;
             _realtimeNotifications = realtimeNotifications;
+            _httpContextAccessor = httpContextAccessor;
+            _configuration = configuration;
         }
 
         public async Task<DirectMessageConversation> GetOrCreateConversationAsync(string userId, string otherUserId)
@@ -86,13 +94,15 @@ namespace hOps.web.Services
 
             _context.DirectMessages.Add(message);
             conversation.UpdatedAt = message.SentAt;
+            conversation.ParticipantAArchived = false;
+            conversation.ParticipantBArchived = false;
 
             _context.UserNotifications.Add(new UserNotification
             {
                 UserId = recipientId,
                 Type = "message",
                 Title = "New message",
-                Content = body.Length > 140 ? $"{body.Substring(0, 140)}…" : body,
+                Content = body.Length > 140 ? $"{body.Substring(0, 140)}..." : body,
                 LinkUrl = $"/DirectMessages?conversationId={conversationId}",
                 CreatedAt = message.SentAt,
                 DirectMessage = message,
@@ -119,7 +129,9 @@ namespace hOps.web.Services
         public async Task<List<ConversationSummary>> GetConversationSummariesAsync(string userId)
         {
             return await _context.DirectMessageConversations
-                .Where(c => c.ParticipantAId == userId || c.ParticipantBId == userId)
+                .Where(c =>
+                    (c.ParticipantAId == userId && !c.ParticipantAArchived) ||
+                    (c.ParticipantBId == userId && !c.ParticipantBArchived))
                 .Select(c => new ConversationSummary
                 {
                     ConversationId = c.Id,
@@ -149,6 +161,19 @@ namespace hOps.web.Services
                 return null;
             }
 
+            var unarchived = false;
+            if (conversation.ParticipantAId == userId && conversation.ParticipantAArchived)
+            {
+                conversation.ParticipantAArchived = false;
+                unarchived = true;
+            }
+
+            if (conversation.ParticipantBId == userId && conversation.ParticipantBArchived)
+            {
+                conversation.ParticipantBArchived = false;
+                unarchived = true;
+            }
+
             var otherUserId = conversation.ParticipantAId == userId ? conversation.ParticipantBId : conversation.ParticipantAId;
             var otherUser = await _userManager.Users.FirstOrDefaultAsync(u => u.Id == otherUserId);
 
@@ -176,7 +201,8 @@ namespace hOps.web.Services
                 .Where(m => m.RecipientId == userId && !m.IsRead)
                 .ToList();
 
-            if (unreadMessages.Count > 0)
+            var hadUnreadChanges = unreadMessages.Count > 0;
+            if (hadUnreadChanges)
             {
                 var now = DateTime.UtcNow;
                 foreach (var message in unreadMessages)
@@ -198,6 +224,10 @@ namespace hOps.web.Services
                     notification.ReadAt = now;
                 }
 
+            }
+
+            if (hadUnreadChanges || unarchived)
+            {
                 await _context.SaveChangesAsync();
             }
 
@@ -217,6 +247,31 @@ namespace hOps.web.Services
         {
             return await _context.UserNotifications
                 .CountAsync(n => n.UserId == userId && !n.IsRead);
+        }
+
+        public async Task ArchiveConversationForUserAsync(int conversationId, string userId)
+        {
+            var conversation = await _context.DirectMessageConversations
+                .FirstOrDefaultAsync(c =>
+                    c.Id == conversationId &&
+                    (c.ParticipantAId == userId || c.ParticipantBId == userId));
+
+            if (conversation == null)
+            {
+                return;
+            }
+
+            if (conversation.ParticipantAId == userId)
+            {
+                conversation.ParticipantAArchived = true;
+            }
+            else
+            {
+                conversation.ParticipantBArchived = true;
+            }
+
+            conversation.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
         }
 
         public async Task MarkNotificationAsReadAsync(int notificationId, string userId)
@@ -266,7 +321,7 @@ namespace hOps.web.Services
             var preview = message.Body;
             if (!string.IsNullOrWhiteSpace(preview) && preview.Length > 160)
             {
-                preview = $"{preview[..160]}…";
+                preview = $"{preview[..160]}...";
             }
 
             var payload = new RealtimeNotificationPayload(
@@ -288,10 +343,10 @@ namespace hOps.web.Services
 
             var sender = await _userManager.FindByIdAsync(senderId);
             var senderName = sender != null ? BuildDisplayName(sender) : "A colleague";
-            var preview = message.Body.Length > 200 ? $"{message.Body[..200]}…" : message.Body;
+            var preview = message.Body.Length > 200 ? $"{message.Body[..200]}..." : message.Body;
             var safePreview = WebUtility.HtmlEncode(preview);
             var safeSender = WebUtility.HtmlEncode(senderName);
-            var link = $"/DirectMessages?conversationId={message.ConversationId}";
+            var link = BuildConversationUrl(message.ConversationId);
             var htmlBody = $"""
                 <p>{safeSender} sent you a new message.</p>
                 <p style="margin:0 0 1rem 0;"><em>{safePreview}</em></p>
@@ -335,6 +390,25 @@ namespace hOps.web.Services
             }
 
             return string.IsNullOrWhiteSpace(user.Email) ? user.UserName ?? "Unknown user" : user.Email!;
+        }
+
+        private string BuildConversationUrl(int conversationId)
+        {
+            var relative = $"/DirectMessages?conversationId={conversationId}";
+            var request = _httpContextAccessor.HttpContext?.Request;
+            if (request != null)
+            {
+                return $"{request.Scheme}://{request.Host}{relative}";
+            }
+
+            var baseUrl = _configuration["App:BaseUrl"] ?? _configuration["AppBaseUrl"];
+            if (!string.IsNullOrWhiteSpace(baseUrl))
+            {
+                var trimmed = baseUrl!.TrimEnd('/');
+                return $"{trimmed}{relative}";
+            }
+
+            return relative;
         }
     }
 
