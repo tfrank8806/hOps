@@ -13,6 +13,10 @@
         ? Url.Action("LayoutEditor", "Settings", new { propertyId = propertyId.Value, floor = 1 })
         : Url.Action("LayoutEditor", "Settings");
 
+    var scheduleSetupUrl = propertyId.HasValue
+        ? Url.Action("ScheduleSetup", "Settings", new { propertyId = propertyId.Value })
+        : Url.Action("ScheduleSetup", "Settings");
+
     var links = new[]
     {
         new { Title = "Access Requests", Description = "Review and approve pending property access requests.", Url = Url.Action("AccessRequests", "Admin") },
@@ -20,6 +24,7 @@
         new { Title = "Departments", Description = "Configure departments for routing work orders and tasks.", Url = Url.Action("Departments", "Settings") },
         new { Title = "Work Order Types", Description = "Add or edit work order issue types and categories.", Url = Url.Action("WorkOrderTypes", "Settings") },
         new { Title = "Rooms Editor", Description = "Maintain the list of rooms for the selected property.", Url = roomsUrl },
+        new { Title = "Schedule Setup", Description = "Define default shifts and weekly schedule settings.", Url = scheduleSetupUrl },
         new { Title = "Phonebook Types", Description = "Customize phonebook categories and labels.", Url = Url.Action("PhonebookTypes", "Settings") },
         new { Title = "Calendar Categories", Description = "Manage calendar event labels and colors.", Url = Url.Action("CalendarCategories", "Settings") },
         new { Title = "Layout Editor", Description = "Design the property layout for use across dashboards.", Url = layoutUrl },
