@@ -1436,10 +1436,12 @@ namespace hOps.web.Controllers
             var rawShifts = model.ShiftTemplates ?? new List<ScheduleShiftTemplateInputModel>();
             var sanitizedShifts = rawShifts
                 .Where(t =>
-                    !string.IsNullOrWhiteSpace(t.Name) ||
-                    !string.IsNullOrWhiteSpace(t.ShiftName) ||
-                    !string.IsNullOrWhiteSpace(t.StartTime) ||
-                    !string.IsNullOrWhiteSpace(t.EndTime))
+                    !t.IsDeleted &&
+                    (
+                        !string.IsNullOrWhiteSpace(t.Name) ||
+                        !string.IsNullOrWhiteSpace(t.ShiftName) ||
+                        !string.IsNullOrWhiteSpace(t.StartTime) ||
+                        !string.IsNullOrWhiteSpace(t.EndTime)))
                 .Select((t, index) => new ScheduleShiftTemplateInputModel
                 {
                     Id = t.Id,
@@ -1448,7 +1450,9 @@ namespace hOps.web.Controllers
                     StartTime = t.StartTime ?? string.Empty,
                     EndTime = t.EndTime ?? string.Empty,
                     SortOrder = t.SortOrder == 0 ? index : t.SortOrder,
-                    ColorHex = t.ColorHex ?? "#3b82f6"
+                    ColorHex = t.ColorHex ?? "#3b82f6",
+                    AlertIfMissing = t.AlertIfMissing,
+                    IsDeleted = false
                 })
                 .ToList();
 
@@ -1547,6 +1551,7 @@ namespace hOps.web.Controllers
                 entity.SortOrder = shift.SortOrder;
                 entity.UpdatedAtUtc = DateTime.UtcNow;
                 entity.ColorHex = shift.ColorHex ?? "#3b82f6";
+                entity.AlertIfMissing = shift.AlertIfMissing;
 
                 if (entity.Id > 0)
                 {
@@ -1611,7 +1616,9 @@ namespace hOps.web.Controllers
                         StartTime = FormatTime(t.StartTime),
                         EndTime = FormatTime(t.EndTime),
                         SortOrder = t.SortOrder,
-                        ColorHex = string.IsNullOrWhiteSpace(t.ColorHex) ? "#3b82f6" : t.ColorHex
+                        ColorHex = string.IsNullOrWhiteSpace(t.ColorHex) ? "#3b82f6" : t.ColorHex,
+                        AlertIfMissing = t.AlertIfMissing,
+                        IsDeleted = false
                     })
                     .ToList(),
                 ManualEmployees = manualEmployees

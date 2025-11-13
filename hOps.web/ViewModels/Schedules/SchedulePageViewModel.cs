@@ -32,6 +32,7 @@ namespace hOps.web.ViewModels.Schedules
 
         public List<TimeOffRequestListItemViewModel> PendingRequests { get; set; } = new();
         public List<TimeOffRequestListItemViewModel> MyRequests { get; set; } = new();
+        public List<ScheduleShiftAlertViewModel> ShiftAlerts { get; set; } = new();
 
         public ScheduleSettingsSummaryViewModel SettingsSummary { get; set; } = new();
 
@@ -191,6 +192,14 @@ namespace hOps.web.ViewModels.Schedules
         public string? DecisionByName { get; set; }
         public DateTime? DecisionAtUtc { get; set; }
         public string? DecisionNotes { get; set; }
+    }
+
+    public class ScheduleShiftAlertViewModel
+    {
+        public int ShiftTemplateId { get; set; }
+        public string ShiftName { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 
     public enum ScheduleSortOption

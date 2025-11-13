@@ -263,6 +263,8 @@ namespace hOps.web.Controllers
                 vm.EmployeeRows = BuildEmployeeRows(schedule, vm.DayColumns, approvedRequestsForWeek, scheduleEmployees, selectedSort);
             }
 
+            vm.ShiftAlerts = BuildShiftAlerts(schedule, shiftTemplates, vm.DayColumns);
+
             ViewData["Title"] = "Schedules";
             return View(vm);
         }
@@ -1367,6 +1369,57 @@ namespace hOps.web.Controllers
                 new SelectListItem("Employee name", ScheduleSortOption.EmployeeName.ToString(), selected == ScheduleSortOption.EmployeeName),
                 new SelectListItem("Shift name", ScheduleSortOption.ShiftName.ToString(), selected == ScheduleSortOption.ShiftName)
             };
+        }
+
+        private static List<ScheduleShiftAlertViewModel> BuildShiftAlerts(
+            Schedule? schedule,
+            IReadOnlyCollection<ScheduleShiftTemplate> shiftTemplates,
+            IReadOnlyCollection<ScheduleDayColumnViewModel> dayColumns)
+        {
+            var alerts = new List<ScheduleShiftAlertViewModel>();
+            if (schedule == null ||
+                schedule.Status != ScheduleStatus.Draft ||
+                shiftTemplates.All(t => !t.AlertIfMissing) ||
+                dayColumns.Count == 0)
+            {
+                return alerts;
+            }
+
+            var assignmentsByDate = schedule.Assignments?
+                .GroupBy(a => a.ShiftDate.Date)
+                .ToDictionary(g => g.Key, g => g.ToList())
+                ?? new Dictionary<DateTime, List<ScheduleAssignment>>();
+
+            foreach (var template in shiftTemplates.Where(t => t.AlertIfMissing))
+            {
+                var targetShiftName = string.IsNullOrWhiteSpace(template.ShiftName) ? template.Name : template.ShiftName;
+                if (string.IsNullOrWhiteSpace(targetShiftName))
+                {
+                    continue;
+                }
+
+                foreach (var day in dayColumns)
+                {
+                    var dateKey = day.Date.Date;
+                    var hasShift = assignmentsByDate.TryGetValue(dateKey, out var assignmentsForDate) &&
+                        assignmentsForDate.Any(a =>
+                            !string.IsNullOrWhiteSpace(a.ShiftName) &&
+                            string.Equals(a.ShiftName.Trim(), targetShiftName.Trim(), StringComparison.OrdinalIgnoreCase));
+
+                    if (!hasShift)
+                    {
+                        alerts.Add(new ScheduleShiftAlertViewModel
+                        {
+                            ShiftTemplateId = template.Id,
+                            ShiftName = targetShiftName,
+                            Date = dateKey,
+                            Message = $"{targetShiftName} not scheduled for {day.Date:dddd}"
+                        });
+                    }
+                }
+            }
+
+            return alerts;
         }
 
         private static byte[] BuildScheduleExcel(string propertyName, IReadOnlyList<DateTime> dayColumns, IReadOnlyList<ScheduleGridRow> rows)

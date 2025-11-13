@@ -95,6 +95,38 @@
                     </div>
                 </div>
 
+                @if (Model.ShiftAlerts.Any())
+                {
+                    var firstAlert = Model.ShiftAlerts.First();
+                    var remainingCount = Model.ShiftAlerts.Count - 1;
+                    var collapseId = "shiftAlertsCollapse";
+                    <div class="alert alert-warning" role="alert">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                            <div>
+                                <div class="fw-semibold">Shift alerts</div>
+                                <div>
+                                    @firstAlert.Message
+                                    @if (remainingCount > 0)
+                                    {
+                                        <span class="text-muted">(+@remainingCount more)</span>
+                                    }
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">
+                                View details
+                            </button>
+                        </div>
+                        <div class="collapse mt-3" id="@collapseId">
+                            <ul class="mb-0">
+                                @foreach (var alert in Model.ShiftAlerts)
+                                {
+                                    <li>@alert.Message</li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                }
+
                 @if (!Model.HasSchedule)
                 {
                     <p class="text-muted mb-0">No schedule exists for this week.</p>

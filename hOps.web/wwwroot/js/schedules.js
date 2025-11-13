@@ -63,6 +63,13 @@
                 shiftColorInput.value = '';
             }
         });
+
+        if (templateSelect.value) {
+            const initialOption = templateSelect.selectedOptions[0];
+            if (initialOption) {
+                applyTemplate(initialOption);
+            }
+        }
     }
 
     function setAddFormTarget(employeeId, isoDate) {

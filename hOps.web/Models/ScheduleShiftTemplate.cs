@@ -17,6 +17,7 @@ namespace hOps.web.Models
         public TimeSpan EndTime { get; set; } = TimeSpan.FromHours(17);
         public int SortOrder { get; set; } = 0;
         public string ColorHex { get; set; } = "#3b82f6";
+        public bool AlertIfMissing { get; set; }
 
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAtUtc { get; set; }

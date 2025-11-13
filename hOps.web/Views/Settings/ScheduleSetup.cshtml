@@ -66,17 +66,20 @@
                                 <th style="width: 150px;">Start</th>
                                 <th style="width: 150px;">End</th>
                                 <th style="width: 140px;">Color</th>
+                                <th style="width: 140px;">Shift Alert</th>
+                                <th style="width: 140px;">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            @if (Model.ShiftTemplates.Any())
+                        <tbody data-next-index="@(Model.ShiftTemplates?.Count ?? 0)">
+                            @if (Model.ShiftTemplates?.Any() == true)
                             {
                                 for (var i = 0; i < Model.ShiftTemplates.Count; i++)
                                 {
-                                    <tr>
+                                    <tr class="shift-template-row">
                                         <td>
                                             <input type="hidden" asp-for="ShiftTemplates[i].Id" />
-                                            <input type="number" asp-for="ShiftTemplates[i].SortOrder" class="form-control form-control-sm" />
+                                            <input type="hidden" asp-for="ShiftTemplates[i].IsDeleted" data-role="delete-flag" />
+                                            <input type="number" asp-for="ShiftTemplates[i].SortOrder" class="form-control form-control-sm" data-role="sort-input" />
                                         </td>
                                         <td>
                                             <input asp-for="ShiftTemplates[i].Name" class="form-control form-control-sm" />
@@ -93,30 +96,61 @@
                                         <td>
                                             <input asp-for="ShiftTemplates[i].ColorHex" class="form-control form-control-sm form-control-color" type="color" value="@(Model.ShiftTemplates[i].ColorHex ?? "#3b82f6")" />
                                         </td>
+                                        <td>
+                                            <div class="form-check">
+                                                <input class="form-check-input" asp-for="ShiftTemplates[i].AlertIfMissing" />
+                                                <label asp-for="ShiftTemplates[i].AlertIfMissing" class="form-check-label small text-muted">Alert if missing</label>
+                                            </div>
+                                        </td>
+                                        <td class="text-nowrap">
+                                            <div class="btn-group btn-group-sm mb-2" role="group">
+                                                <button type="button" class="btn btn-outline-secondary" data-action="move-up" title="Move up">&uarr;</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-action="move-down" title="Move down">&darr;</button>
+                                            </div>
+                                            <div>
+                                                <button type="button" class="btn btn-outline-danger btn-sm" data-action="delete" title="Delete shift">Delete</button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 }
                             }
                             else
                             {
                                 <tr class="shift-template-row">
-                                        <td>
-                                            <input type="hidden" name="ShiftTemplates[0].Id" value="0" />
-                                            <input type="number" name="ShiftTemplates[0].SortOrder" value="0" class="form-control form-control-sm" />
-                                        </td>
-                                        <td>
-                                            <input name="ShiftTemplates[0].Name" class="form-control form-control-sm" />
-                                        </td>
-                                        <td>
-                                            <input name="ShiftTemplates[0].ShiftName" class="form-control form-control-sm" />
-                                        </td>
-                                        <td>
-                                            <input name="ShiftTemplates[0].StartTime" type="time" class="form-control form-control-sm" />
-                                        </td>
-                                        <td>
-                                            <input name="ShiftTemplates[0].EndTime" type="time" class="form-control form-control-sm" />
+                                    <td>
+                                        <input type="hidden" name="ShiftTemplates[0].Id" value="0" />
+                                        <input type="hidden" name="ShiftTemplates[0].IsDeleted" value="false" data-role="delete-flag" />
+                                        <input type="number" name="ShiftTemplates[0].SortOrder" value="0" class="form-control form-control-sm" data-role="sort-input" />
+                                    </td>
+                                    <td>
+                                        <input name="ShiftTemplates[0].Name" class="form-control form-control-sm" />
+                                    </td>
+                                    <td>
+                                        <input name="ShiftTemplates[0].ShiftName" class="form-control form-control-sm" />
+                                    </td>
+                                    <td>
+                                        <input name="ShiftTemplates[0].StartTime" type="time" class="form-control form-control-sm" />
+                                    </td>
+                                    <td>
+                                        <input name="ShiftTemplates[0].EndTime" type="time" class="form-control form-control-sm" />
                                     </td>
                                     <td>
                                         <input name="ShiftTemplates[0].ColorHex" type="color" value="#3b82f6" class="form-control form-control-sm form-control-color" />
+                                    </td>
+                                    <td>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="ShiftTemplates_0__AlertIfMissing" name="ShiftTemplates[0].AlertIfMissing" />
+                                            <label class="form-check-label small text-muted" for="ShiftTemplates_0__AlertIfMissing">Alert if missing</label>
+                                        </div>
+                                    </td>
+                                    <td class="text-nowrap">
+                                        <div class="btn-group btn-group-sm mb-2" role="group">
+                                            <button type="button" class="btn btn-outline-secondary" data-action="move-up" title="Move up">&uarr;</button>
+                                            <button type="button" class="btn btn-outline-secondary" data-action="move-down" title="Move down">&darr;</button>
+                                        </div>
+                                        <div>
+                                            <button type="button" class="btn btn-outline-danger btn-sm" data-action="delete" title="Delete shift">Delete</button>
+                                        </div>
                                     </td>
                                 </tr>
                             }
@@ -197,10 +231,11 @@
 </div>
 
 <template id="shift-row-template">
-    <tr>
+    <tr class="shift-template-row">
         <td>
             <input type="hidden" name="ShiftTemplates[{{index}}].Id" value="0" />
-            <input type="number" name="ShiftTemplates[{{index}}].SortOrder" value="{{index}}" class="form-control form-control-sm" />
+            <input type="hidden" name="ShiftTemplates[{{index}}].IsDeleted" value="false" data-role="delete-flag" />
+            <input type="number" name="ShiftTemplates[{{index}}].SortOrder" value="{{index}}" class="form-control form-control-sm" data-role="sort-input" />
         </td>
         <td>
             <input name="ShiftTemplates[{{index}}].Name" class="form-control form-control-sm" />
@@ -217,6 +252,21 @@
         <td>
             <input name="ShiftTemplates[{{index}}].ColorHex" type="color" value="#3b82f6" class="form-control form-control-sm form-control-color" />
         </td>
+        <td>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="ShiftTemplates_{{index}}__AlertIfMissing" name="ShiftTemplates[{{index}}].AlertIfMissing" />
+                <label class="form-check-label small text-muted" for="ShiftTemplates_{{index}}__AlertIfMissing">Alert if missing</label>
+            </div>
+        </td>
+        <td class="text-nowrap">
+            <div class="btn-group btn-group-sm mb-2" role="group">
+                <button type="button" class="btn btn-outline-secondary" data-action="move-up" title="Move up">&uarr;</button>
+                <button type="button" class="btn btn-outline-secondary" data-action="move-down" title="Move down">&darr;</button>
+            </div>
+            <div>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-action="delete" title="Delete shift">Delete</button>
+            </div>
+        </td>
     </tr>
 </template>
 
@@ -232,16 +282,101 @@
                 return;
             }
 
+            const getVisibleRows = () => Array.from(tableBody.querySelectorAll('tr')).filter(row => !row.classList.contains('d-none'));
+
+            const updateSortInputs = () => {
+                getVisibleRows().forEach((row, index) => {
+                    const sortInput = row.querySelector('[data-role="sort-input"]');
+                    if (sortInput) {
+                        sortInput.value = index;
+                    }
+                });
+            };
+
+            const findPreviousVisible = (row) => {
+                let prev = row.previousElementSibling;
+                while (prev && prev.classList.contains('d-none')) {
+                    prev = prev.previousElementSibling;
+                }
+                return prev;
+            };
+
+            const findNextVisible = (row) => {
+                let next = row.nextElementSibling;
+                while (next && next.classList.contains('d-none')) {
+                    next = next.nextElementSibling;
+                }
+                return next;
+            };
+
+            const markRowDeleted = (row) => {
+                const deleteFlag = row.querySelector('[data-role="delete-flag"]');
+                if (deleteFlag) {
+                    deleteFlag.value = 'true';
+                }
+                row.classList.add('d-none');
+                updateSortInputs();
+            };
+
+            tableBody.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-action]');
+                if (!button) {
+                    return;
+                }
+
+                const action = button.getAttribute('data-action');
+                const row = button.closest('tr');
+                if (!row) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                if (action === 'delete') {
+                    if (confirm('Remove this shift template?')) {
+                        markRowDeleted(row);
+                    }
+                    return;
+                }
+
+                if (row.classList.contains('d-none')) {
+                    return;
+                }
+
+                if (action === 'move-up') {
+                    const prev = findPreviousVisible(row);
+                    if (prev) {
+                        tableBody.insertBefore(row, prev);
+                        updateSortInputs();
+                    }
+                } else if (action === 'move-down') {
+                    const next = findNextVisible(row);
+                    if (next) {
+                        tableBody.insertBefore(next, row);
+                        updateSortInputs();
+                    }
+                }
+            });
+
+            const getNextIndex = () => {
+                const current = Number(tableBody.getAttribute('data-next-index')) || tableBody.querySelectorAll('tr').length;
+                tableBody.setAttribute('data-next-index', (current + 1).toString());
+                return current;
+            };
+
             addButton.addEventListener('click', () => {
-                const nextIndex = tableBody.querySelectorAll('tr').length;
+                const nextIndex = getNextIndex();
                 const html = template.innerHTML.replace(/{{index}}/g, nextIndex);
                 const wrapper = document.createElement('tbody');
                 wrapper.innerHTML = html;
                 const newRow = wrapper.firstElementChild;
                 if (newRow) {
                     tableBody.appendChild(newRow);
+                    updateSortInputs();
                 }
             });
+
+            updateSortInputs();
         })();
     </script>
 }

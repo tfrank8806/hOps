@@ -41,6 +41,11 @@ namespace hOps.web.ViewModels.Settings
 
         [Display(Name = "Color")]
         public string ColorHex { get; set; } = "#3b82f6";
+
+        [Display(Name = "Shift Alert")]
+        public bool AlertIfMissing { get; set; }
+
+        public bool IsDeleted { get; set; }
     }
 
     public class ScheduleManualEmployeeViewModel
