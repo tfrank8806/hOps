@@ -205,6 +205,61 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Move(int id, int? folderId, int? currentFolderId, string? currentSort, string? currentDirection, string? currentSearch)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var (sortField, sortDirection) = NormalizeSort(currentSort, currentDirection);
+            var searchQuery = NormalizeSearch(currentSearch);
+
+            var document = await _context.Documents
+                .Include(d => d.DocumentProperties)
+                .FirstOrDefaultAsync(d => d.Id == id);
+
+            if (document == null)
+            {
+                return NotFound();
+            }
+
+            var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+            var (accessibleFolders, accessibleFolderIds) = await GetAccessibleFoldersAsync(accessiblePropertyIds);
+
+            if (!UserCanAccessDocument(document, accessiblePropertyIds, accessibleFolderIds))
+            {
+                return Forbid();
+            }
+
+            if (folderId.HasValue)
+            {
+                if (!accessibleFolderIds.Contains(folderId.Value))
+                {
+                    return Forbid();
+                }
+
+                var folderExists = accessibleFolders.Any(f => f.Id == folderId.Value);
+                if (!folderExists)
+                {
+                    TempData["DocumentError"] = "Selected folder was not found.";
+                    return RedirectToAction(nameof(Index), new { folderId = currentFolderId, sort = sortField, direction = sortDirection, search = searchQuery });
+                }
+            }
+
+            document.FolderId = folderId;
+            await _context.SaveChangesAsync();
+
+            TempData["DocumentSuccess"] = folderId.HasValue
+                ? "Document moved successfully."
+                : "Document removed from folder.";
+
+            return RedirectToAction(nameof(Index), new { folderId = currentFolderId, sort = sortField, direction = sortDirection, search = searchQuery });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateFolder([Bind(Prefix = "FolderForm")] DocumentFolderFormViewModel form, int? currentFolderId, string? currentSort, string? currentDirection, string? currentSearch)
         {
             var user = await _userManager.GetUserAsync(User);
