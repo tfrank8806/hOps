@@ -47,12 +47,24 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Send(DirectMessageForm form)
+        public async Task<IActionResult> Send([Bind(Prefix = "Form")] DirectMessageForm form)
         {
+            var trimmedBody = form.Body?.Trim();
+
+            if (form.ConversationId <= 0)
+            {
+                ModelState.AddModelError(nameof(form.ConversationId), "Select a conversation to reply to.");
+            }
+
+            if (string.IsNullOrWhiteSpace(trimmedBody))
+            {
+                ModelState.AddModelError(nameof(form.Body), "Please enter a message before sending.");
+            }
+
             if (!ModelState.IsValid)
             {
                 TempData["DirectMessageError"] = "Please enter a message before sending.";
-                return RedirectToAction(nameof(Index), new { conversationId = form.ConversationId });
+                return RedirectToAction(nameof(Index), new { conversationId = form.ConversationId > 0 ? form.ConversationId : null });
             }
 
             var currentUser = await _userManager.GetUserAsync(User);
@@ -83,7 +95,7 @@ namespace hOps.web.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            await _messageService.SendMessageAsync(form.ConversationId, currentUser.Id, recipientId, form.Body);
+            await _messageService.SendMessageAsync(form.ConversationId, currentUser.Id, recipientId, trimmedBody!);
             TempData["DirectMessageMessage"] = "Message sent.";
             return RedirectToAction(nameof(Index), new { conversationId = form.ConversationId });
         }
