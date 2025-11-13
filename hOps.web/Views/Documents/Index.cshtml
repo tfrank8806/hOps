@@ -417,7 +417,7 @@
                                                    asp-route-folderId="@child.Id"
                                                    asp-route-sort="@safeSortField"
                                                    asp-route-direction="@safeSortDirection"
-                                                   asp-route-search="@searchQuery"
+                                                   asp-route-search="@Html.Encode(searchQuery)"
                                                    class="text-decoration-none text-reset">
                                                     <span class="me-2" aria-hidden="true">📁</span><strong>@child.Name</strong>
                                                 </a>
@@ -432,7 +432,7 @@
                                                    asp-route-folderId="@child.Id"
                                                    asp-route-sort="@safeSortField"
                                                    asp-route-direction="@safeSortDirection"
-                                                   asp-route-search="@searchQuery">
+                                                   asp-route-search="@Html.Encode(searchQuery)">
                                                     Open
                                                 </a>
                                             </td>
