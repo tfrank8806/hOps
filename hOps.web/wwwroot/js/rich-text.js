@@ -702,7 +702,7 @@
             case 'p':
             case 'div': {
                 const content = serializeChildren(element);
-                return content ? `${content}\n` : '\n';
+                return content ? `${content}\n\n` : '\n\n';
             }
             case 'ul':
                 return serializeList(element, '-');
