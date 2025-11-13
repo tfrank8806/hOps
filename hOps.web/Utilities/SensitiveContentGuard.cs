@@ -7,13 +7,16 @@ namespace hOps.web.Utilities
     {
         private static readonly string[] RestrictedMarkers = new[]
         {
-            "password",
+            "password=",
+            "pwd=",
             "ssn",
             "social security",
             "credit card",
             "api key",
-            "secret",
+            "secret key",
+            "private key",
             "token=",
+            "bearer ",
             "stack trace",
             "exception:",
             "connection string"
