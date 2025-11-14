@@ -1,9 +1,6 @@
-﻿(function () {
+(function () {
     const selector = '[data-enable-mentions="true"]';
-    const inputs = Array.from(document.querySelectorAll(selector));
-    if (!inputs.length) {
-        return;
-    }
+    const trackedInputs = new Set();
 
     const START_MARKER = '\u200D';
     const END_MARKER = '\u200E';
@@ -11,18 +8,75 @@
     const ZERO_WIDTH_ONE = '\u200C';
     const state = new WeakMap();
 
-    inputs.forEach(initMentionInput);
+    document.querySelectorAll(selector).forEach(initMentionInput);
+
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                if (!(node instanceof HTMLElement)) {
+                    return;
+                }
+
+                if (node.matches(selector)) {
+                    initMentionInput(node);
+                }
+
+                if (typeof node.querySelectorAll === 'function') {
+                    node.querySelectorAll(selector).forEach(initMentionInput);
+                }
+            });
+
+            mutation.removedNodes.forEach((node) => {
+                if (!(node instanceof HTMLElement)) {
+                    return;
+                }
+
+                if (node.matches(selector)) {
+                    disposeMentionInput(node);
+                }
+
+                if (typeof node.querySelectorAll === 'function') {
+                    node.querySelectorAll(selector).forEach(disposeMentionInput);
+                }
+            });
+        });
+    });
+
+    if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
 
     function initMentionInput(input) {
+        if (!input || trackedInputs.has(input)) {
+            return;
+        }
+
+        trackedInputs.add(input);
         input.setAttribute('autocomplete', 'off');
         input.addEventListener('input', () => handleInput(input));
         input.addEventListener('keydown', (event) => handleKeyDown(event, input));
         input.addEventListener('blur', () => setTimeout(() => hideSuggestions(input), 120));
+
         state.set(input, {
             anchor: null,
             container: createSuggestionContainer(),
             items: []
         });
+    }
+
+    function disposeMentionInput(input) {
+        if (!trackedInputs.has(input)) {
+            return;
+        }
+
+        hideSuggestions(input);
+        const info = state.get(input);
+        if (info && info.container && info.container.parentElement) {
+            info.container.parentElement.removeChild(info.container);
+        }
+
+        trackedInputs.delete(input);
+        state.delete(input);
     }
 
     function createSuggestionContainer() {
@@ -47,6 +101,10 @@
         }
 
         const info = state.get(input);
+        if (!info) {
+            return;
+        }
+
         info.anchor = mention;
 
         if (mention.term.length < 2) {
@@ -63,16 +121,11 @@
 
     function handleKeyDown(event, input) {
         const info = state.get(input);
-        const container = info?.container;
-        if (!container || container.classList.contains('d-none')) {
+        if (!info || !info.items.length || info.container.classList.contains('d-none')) {
             return;
         }
 
         const items = info.items;
-        if (!items.length) {
-            return;
-        }
-
         const currentIndex = items.findIndex((item) => item.classList.contains('active'));
 
         if (event.key === 'ArrowDown') {
@@ -95,6 +148,10 @@
 
     function showSuggestions(input, users) {
         const info = state.get(input);
+        if (!info) {
+            return;
+        }
+
         const container = info.container;
         container.innerHTML = '';
         info.items = [];
@@ -114,10 +171,12 @@
             item.dataset.mentionUser = user.id;
             item.dataset.mentionDisplay = user.displayName;
             item.textContent = user.displayName;
+
             item.addEventListener('mousedown', (event) => {
                 event.preventDefault();
                 selectMention(item, input);
             });
+
             container.appendChild(item);
             info.items.push(item);
         });
@@ -131,17 +190,18 @@
         if (!info) {
             return;
         }
-        info.container.classList.add('d-none');
-        info.items = [];
+
         info.anchor = null;
+        info.items = [];
+        if (info.container) {
+            info.container.classList.add('d-none');
+        }
     }
 
     function positionSuggestions(input, container) {
         const rect = input.getBoundingClientRect();
-        const top = rect.bottom + window.scrollY + 6;
-        const left = rect.left + window.scrollX;
-        container.style.top = top + 'px';
-        container.style.left = left + 'px';
+        container.style.left = window.scrollX + rect.left + 'px';
+        container.style.top = window.scrollY + rect.bottom + 6 + 'px';
         container.style.width = rect.width + 'px';
     }
 
@@ -158,7 +218,7 @@
 
     function selectMention(item, input) {
         const info = state.get(input);
-        if (!info?.anchor) {
+        if (!info || !info.anchor) {
             return;
         }
 
@@ -178,7 +238,7 @@
 
         input.value = before + mentionText + after;
         input.focus();
-        const caretPosition = before.length + mentionText.length; // keep caret past hidden markers
+        const caretPosition = before.length + mentionText.length;
         input.setSelectionRange(caretPosition, caretPosition);
         input.dispatchEvent(new Event('input', { bubbles: true }));
         hideSuggestions(input);
@@ -186,7 +246,7 @@
 
     function getMentionContext(input) {
         const value = input.value;
-        const cursor = input.selectionStart ?? value.length;
+        const cursor = input.selectionStart == null ? value.length : input.selectionStart;
         const beforeCursor = value.slice(0, cursor);
         const atIndex = beforeCursor.lastIndexOf('@');
 
@@ -210,18 +270,11 @@
         ) {
             return null;
         }
+
         const termMatch = rawTerm.match(/^[^\s@]*/);
         const term = termMatch ? termMatch[0] : '';
 
-        if (!term.length) {
-            return null;
-        }
-
-        if (/[^a-zA-Z0-9_.-]/.test(term)) {
-            return null;
-        }
-
-        if (term.length > 30) {
+        if (!term.length || /[^a-zA-Z0-9_.-]/.test(term) || term.length > 30) {
             return null;
         }
 
@@ -232,12 +285,6 @@
         };
     }
 
-    function escapeHtml(value) {
-        const element = document.createElement('textarea');
-        element.textContent = value ?? '';
-        return element.innerHTML;
-    }
-    
     function encodeIdentifier(id) {
         let bits = '';
         for (let i = 0; i < id.length; i++) {
@@ -252,21 +299,15 @@
         return encoded;
     }
 
-    window.addEventListener('scroll', () => {
-        inputs.forEach((input) => {
+    function repositionActiveSuggestions() {
+        trackedInputs.forEach((input) => {
             const info = state.get(input);
-            if (info && !info.container.classList.contains('d-none')) {
+            if (info && info.container && !info.container.classList.contains('d-none')) {
                 positionSuggestions(input, info.container);
             }
         });
-    }, { passive: true });
+    }
 
-    window.addEventListener('resize', () => {
-        inputs.forEach((input) => {
-            const info = state.get(input);
-            if (info && !info.container.classList.contains('d-none')) {
-                positionSuggestions(input, info.container);
-            }
-        });
-    });
+    window.addEventListener('scroll', repositionActiveSuggestions, { passive: true });
+    window.addEventListener('resize', repositionActiveSuggestions);
 })();
