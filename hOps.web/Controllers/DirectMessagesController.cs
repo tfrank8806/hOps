@@ -101,7 +101,7 @@ namespace hOps.web.Controllers
             if (!ModelState.IsValid)
             {
                 TempData["DirectMessageError"] = "Please enter a message before sending.";
-                return RedirectToAction(nameof(Index), new { conversationId = form.ConversationId > 0 ? form.ConversationId : null });
+                return RedirectToAction(nameof(Index), new { conversationId = form.ConversationId > 0 ? (int?)form.ConversationId : null });
             }
 
             var currentUser = await _userManager.GetUserAsync(User);
