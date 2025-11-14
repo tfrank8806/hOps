@@ -388,11 +388,16 @@
 
         <div class="col-12 col-lg-4">
             <div class="card shadow-sm h-100">
-                <div class="card-header d-flex align-items-center justify-content-between">
+                <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <h2 class="h5 mb-0">Pass On Logs</h2>
-                    <a class="btn btn-outline-secondary btn-sm" href="@(Url.Action("Index", "PassOnLogs") ?? "/PassOnLogs")">
-                        View All
-                    </a>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a class="btn btn-outline-primary btn-sm" href="@(Url.Action("Create", "PassOnLogs") ?? "/PassOnLogs/Create")">
+                            + New Pass On
+                        </a>
+                        <a class="btn btn-outline-secondary btn-sm" href="@(Url.Action("Index", "PassOnLogs") ?? "/PassOnLogs")">
+                            View All
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body">
                     @if (!hasProperty)

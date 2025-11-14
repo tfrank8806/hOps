@@ -1,4 +1,4 @@
-using hOps.web.Data;
+﻿using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
 using hOps.web.Utilities;
@@ -656,11 +656,15 @@ namespace hOps.web.Controllers
                 return NotFound();
             }
 
-            var accessiblePropertyIds = (await GetAccessiblePropertiesAsync(currentUser.Id)).Select(p => p.Id).ToList();
+            var accessiblePropertyIds = (await GetAccessiblePropertiesAsync(currentUser.Id))
+                .Select(p => p.Id)
+                .ToList();
             if (!log.Properties.Any(p => accessiblePropertyIds.Contains(p.PropertyId)))
             {
                 return Forbid();
             }
+
+            var (nextLogId, previousLogId) = await GetNeighborLogIdsAsync(log, accessiblePropertyIds);
 
             if (log.CreatedById != currentUser.Id && !log.Views.Any(v => v.ViewerId == currentUser.Id))
             {
@@ -674,7 +678,7 @@ namespace hOps.web.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            var model = BuildDetailsViewModel(log, currentUser.Id);
+            var model = BuildDetailsViewModel(log, currentUser.Id, nextLogId, previousLogId);
 
             return View(model);
         }
@@ -701,7 +705,9 @@ namespace hOps.web.Controllers
                 return NotFound();
             }
 
-            var accessiblePropertyIds = (await GetAccessiblePropertiesAsync(currentUser.Id)).Select(p => p.Id).ToList();
+            var accessiblePropertyIds = (await GetAccessiblePropertiesAsync(currentUser.Id))
+                .Select(p => p.Id)
+                .ToList();
             if (!log.Properties.Any(p => accessiblePropertyIds.Contains(p.PropertyId)))
             {
                 return Forbid();
@@ -716,7 +722,8 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                var modelWithErrors = BuildDetailsViewModel(log, currentUser.Id);
+                var (nextLogId, previousLogId) = await GetNeighborLogIdsAsync(log, accessiblePropertyIds);
+                var modelWithErrors = BuildDetailsViewModel(log, currentUser.Id, nextLogId, previousLogId);
                 modelWithErrors.NewComment = input;
                 return View("Details", modelWithErrors);
             }
@@ -758,7 +765,7 @@ namespace hOps.web.Controllers
 
             return preview.Length <= 180
                 ? preview
-                : $"{preview[..180]}�";
+                : $"{preview[..180]}…";
         }
 
         private async Task<List<Property>> GetAccessiblePropertiesAsync(string userId)
@@ -914,7 +921,7 @@ namespace hOps.web.Controllers
             return Path.GetFileName(attachment.FilePath);
         }
 
-        private PassOnLogDetailsViewModel BuildDetailsViewModel(PassOnLog log, string currentUserId)
+        private PassOnLogDetailsViewModel BuildDetailsViewModel(PassOnLog log, string currentUserId, int? nextLogId, int? previousLogId)
         {
             var vm = new PassOnLogDetailsViewModel
             {
@@ -956,10 +963,44 @@ namespace hOps.web.Controllers
                 NewComment = new PassOnLogCommentInputModel
                 {
                     LogId = log.Id
-                }
+                },
+                NextLogId = nextLogId,
+                PreviousLogId = previousLogId
             };
 
             return vm;
+        }
+
+        private async Task<(int? NextLogId, int? PreviousLogId)> GetNeighborLogIdsAsync(PassOnLog log, List<int> accessiblePropertyIds)
+        {
+            if (accessiblePropertyIds == null || accessiblePropertyIds.Count == 0)
+            {
+                return (null, null);
+            }
+
+            var baseQuery = _context.PassOnLogs
+                .AsNoTracking()
+                .Where(l => l.Properties.Any(p => accessiblePropertyIds.Contains(p.PropertyId)))
+                .Where(l => l.Id != log.Id);
+
+            var newerCandidate = await baseQuery
+                .Where(l => l.CreatedAt > log.CreatedAt || (l.CreatedAt == log.CreatedAt && l.Id > log.Id))
+                .OrderBy(l => l.CreatedAt)
+                .ThenBy(l => l.Id)
+                .Select(l => l.Id)
+                .FirstOrDefaultAsync();
+
+            var olderCandidate = await baseQuery
+                .Where(l => l.CreatedAt < log.CreatedAt || (l.CreatedAt == log.CreatedAt && l.Id < log.Id))
+                .OrderByDescending(l => l.CreatedAt)
+                .ThenByDescending(l => l.Id)
+                .Select(l => l.Id)
+                .FirstOrDefaultAsync();
+
+            int? nextLogId = newerCandidate == 0 ? null : newerCandidate;
+            int? previousLogId = olderCandidate == 0 ? null : olderCandidate;
+
+            return (nextLogId, previousLogId);
         }
 
         private sealed class UploadedAttachmentInfo
@@ -990,6 +1031,7 @@ namespace hOps.web.Controllers
         }
     }
 }
+
 
 
 
