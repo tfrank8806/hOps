@@ -8,6 +8,8 @@
     var showNewConversation = Model.ShowNewConversation;
 }
 
+@await Html.PartialAsync("_MessagesNav")
+
 <div class="row g-4 direct-messages-page align-items-stretch flex-grow-1">
     <div class="col-lg-4 col-xl-3 col-xxl-3 d-flex">
         <div class="card shadow-sm flex-fill">

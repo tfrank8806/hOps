@@ -1,9 +1,10 @@
 (function () {
     const triggerBadge = document.getElementById('messagesMenuTriggerBadge');
-    const listBadge = document.getElementById('messagesMenuListBadge');
+    const conversationBadge = document.getElementById('messagesMenuConversationsBadge');
+    const alertsBadge = document.getElementById('messagesMenuAlertsBadge');
     const menu = document.getElementById('messagesMenu');
 
-    if (!menu || !triggerBadge || !listBadge) {
+    if (!menu || !triggerBadge || !conversationBadge || !alertsBadge) {
         return;
     }
 
@@ -35,9 +36,12 @@
             }
 
             const data = await response.json();
-            const unreadCount = typeof data.unreadCount === 'number' ? data.unreadCount : 0;
-            applyCountToBadge(triggerBadge, unreadCount);
-            applyCountToBadge(listBadge, unreadCount);
+            const totalUnread = typeof data.totalUnread === 'number' ? data.totalUnread : 0;
+            const unreadConversations = typeof data.unreadConversations === 'number' ? data.unreadConversations : 0;
+            const unreadAlerts = typeof data.unreadAlerts === 'number' ? data.unreadAlerts : 0;
+            applyCountToBadge(triggerBadge, totalUnread);
+            applyCountToBadge(conversationBadge, unreadConversations);
+            applyCountToBadge(alertsBadge, unreadAlerts);
         } catch (error) {
             console.error('Unable to refresh message counts:', error);
         }
@@ -49,7 +53,7 @@
 
     const handleRealtimeNotification = (event) => {
         const type = (event?.detail?.type ?? event?.detail?.Type ?? '').toString().toLowerCase();
-        if (type === 'message') {
+        if (type) {
             refreshUnreadCount();
         }
     };

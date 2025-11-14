@@ -234,19 +234,19 @@ namespace hOps.web.Services
             return detail;
         }
 
-        public async Task<List<UserNotification>> GetRecentNotificationsAsync(string userId, int take = 10)
+        public async Task<List<UserNotification>> GetRecentAlertsAsync(string userId, int take = 10)
         {
             return await _context.UserNotifications
-                .Where(n => n.UserId == userId)
+                .Where(n => n.UserId == userId && n.Type != "message")
                 .OrderByDescending(n => n.CreatedAt)
                 .Take(take)
                 .ToListAsync();
         }
 
-        public async Task<int> GetUnreadNotificationCountAsync(string userId)
+        public async Task<int> GetUnreadAlertCountAsync(string userId)
         {
             return await _context.UserNotifications
-                .CountAsync(n => n.UserId == userId && !n.IsRead);
+                .CountAsync(n => n.UserId == userId && !n.IsRead && n.Type != "message");
         }
 
         public async Task ArchiveConversationForUserAsync(int conversationId, string userId)
@@ -292,10 +292,10 @@ namespace hOps.web.Services
             }
         }
 
-        public async Task MarkAllNotificationsReadAsync(string userId)
+        public async Task MarkAllAlertsReadAsync(string userId)
         {
             var notifications = await _context.UserNotifications
-                .Where(n => n.UserId == userId && !n.IsRead)
+                .Where(n => n.UserId == userId && !n.IsRead && n.Type != "message")
                 .ToListAsync();
 
             if (notifications.Count == 0)

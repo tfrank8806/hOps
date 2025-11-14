@@ -1,0 +1,67 @@
+@model hOps.web.ViewModels.Messages.AlertsPageViewModel
+@{
+    ViewData["Title"] = "Alerts";
+    ViewData["MainContainerClass"] = "main-inner--wide";
+    ViewData["ContentSurfaceClass"] = "content-surface--flush";
+}
+
+@await Html.PartialAsync("_MessagesNav")
+
+<div class="card shadow-sm">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h2 class="h5 mb-0">Alerts</h2>
+            <small class="text-muted">
+                @(Model.UnreadAlertCount == 0
+                    ? "All caught up"
+                    : $"{Model.UnreadAlertCount} unread")
+            </small>
+        </div>
+        <form asp-controller="Notifications" asp-action="MarkAllRead" method="post" class="d-inline-flex">
+            @Html.AntiForgeryToken()
+            <button type="submit"
+                    class="btn btn-outline-secondary btn-sm"
+                    @(Model.UnreadAlertCount == 0 ? "disabled" : null)>
+                Mark all as read
+            </button>
+        </form>
+    </div>
+    <div class="card-body">
+        @if (!Model.Alerts.Any())
+        {
+            <p class="text-muted mb-0">No alerts yet. New mentions and notifications will show up here.</p>
+        }
+        else
+        {
+            <div class="list-group list-group-flush">
+                @foreach (var alert in Model.Alerts)
+                {
+                    var badgeClass = alert.IsRead ? "bg-secondary-subtle text-secondary" : "bg-primary text-white";
+                    <div class="list-group-item px-0">
+                        <div class="d-flex justify-content-between flex-wrap gap-2">
+                            <div>
+                                <div class="fw-semibold">@alert.Title</div>
+                                <div class="text-muted small">@alert.CreatedAt.ToString("g")</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge rounded-pill @badgeClass">@((alert.Type ?? "alert").ToUpperInvariant())</span>
+                                @if (!alert.IsRead)
+                                {
+                                    <span class="badge bg-warning text-dark">Unread</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(alert.LinkUrl))
+                                {
+                                    <a class="btn btn-outline-primary btn-sm" href="@alert.LinkUrl">Open</a>
+                                }
+                            </div>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(alert.Content))
+                        {
+                            <p class="text-muted mb-0 mt-2">@alert.Content</p>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>

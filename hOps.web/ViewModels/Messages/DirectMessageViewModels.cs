@@ -50,6 +50,12 @@ namespace hOps.web.ViewModels.Messages
         public bool ShowNewConversation { get; set; }
     }
 
+    public class AlertsPageViewModel
+    {
+        public List<NotificationListItemViewModel> Alerts { get; set; } = new();
+        public int UnreadAlertCount { get; set; }
+    }
+
     public class DirectMessageForm
     {
         [Required]

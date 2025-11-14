@@ -11,6 +11,10 @@
     var contentSurfaceClass = ViewData["ContentSurfaceClass"] as string ?? string.Empty;
     var unreadDirectMessageCount = ViewBag.UnreadDirectMessageCount is int count ? count : 0;
     var unreadDirectMessageBadgeText = unreadDirectMessageCount > 99 ? "99+" : unreadDirectMessageCount.ToString();
+    var unreadAlertCount = ViewBag.UnreadAlertCount is int alertCount ? alertCount : 0;
+    var unreadAlertBadgeText = unreadAlertCount > 99 ? "99+" : unreadAlertCount.ToString();
+    var totalUnreadMessageCenterCount = ViewBag.UnreadMessageCenterCount is int total ? total : unreadDirectMessageCount + unreadAlertCount;
+    var totalUnreadMessageCenterBadgeText = totalUnreadMessageCenterCount > 99 ? "99+" : totalUnreadMessageCenterCount.ToString();
     string? latestMessageParticipant = ViewBag.LatestDirectMessageParticipant as string;
     latestMessageParticipant = string.IsNullOrWhiteSpace(latestMessageParticipant) ? null : latestMessageParticipant.Trim();
     string latestMessageBody = ViewBag.LatestDirectMessageBody as string ?? string.Empty;
@@ -264,7 +268,7 @@
                             <li class="nav-item dropdown me-2" id="messagesMenu">
                                 <a class="nav-link dropdown-toggle position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     <span class="me-1">Messages</span>
-                                    <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle @(unreadDirectMessageCount > 0 ? string.Empty : "d-none")" id="messagesMenuTriggerBadge">@unreadDirectMessageBadgeText</span>
+                                    <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle @(totalUnreadMessageCenterCount > 0 ? string.Empty : "d-none")" id="messagesMenuTriggerBadge">@totalUnreadMessageCenterBadgeText</span>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end messages-dropdown-menu">
                                     <li>
@@ -276,7 +280,13 @@
                                     <li>
                                         <a class="dropdown-item d-flex align-items-center justify-content-between" asp-controller="DirectMessages" asp-action="Index" id="messagesMenuConversations">
                                             <span>Conversations</span>
-                                            <span class="badge rounded-pill bg-primary @(unreadDirectMessageCount > 0 ? string.Empty : "d-none")" id="messagesMenuListBadge">@unreadDirectMessageBadgeText</span>
+                                            <span class="badge rounded-pill bg-primary @(unreadDirectMessageCount > 0 ? string.Empty : "d-none")" id="messagesMenuConversationsBadge">@unreadDirectMessageBadgeText</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item d-flex align-items-center justify-content-between" asp-controller="DirectMessages" asp-action="Alerts" id="messagesMenuAlerts">
+                                            <span>Alerts</span>
+                                            <span class="badge rounded-pill bg-info @(unreadAlertCount > 0 ? string.Empty : "d-none")" id="messagesMenuAlertsBadge">@unreadAlertBadgeText</span>
                                         </a>
                                     </li>
                                 </ul>

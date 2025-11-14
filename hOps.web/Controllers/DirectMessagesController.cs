@@ -40,7 +40,44 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
+            ViewData["ActiveMessagesTab"] = "conversations";
             var viewModel = await BuildViewModelAsync(currentUser, conversationId, userId, startNew);
+            await PopulateDirectMessageBadgeAsync(currentUser);
+            return View(viewModel);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Alerts()
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            ViewData["ActiveMessagesTab"] = "alerts";
+
+            var alerts = await _messageService.GetRecentAlertsAsync(currentUser.Id, 25);
+            var unreadAlertCount = await _messageService.GetUnreadAlertCountAsync(currentUser.Id);
+            var items = alerts
+                .Select(alert => new NotificationListItemViewModel
+                {
+                    Id = alert.Id,
+                    Title = alert.Title,
+                    Content = alert.Content,
+                    LinkUrl = alert.LinkUrl,
+                    CreatedAt = _timeZoneService.ConvertToUserTime(alert.CreatedAt),
+                    IsRead = alert.IsRead,
+                    Type = alert.Type
+                })
+                .ToList();
+
+            var viewModel = new AlertsPageViewModel
+            {
+                Alerts = items,
+                UnreadAlertCount = unreadAlertCount
+            };
+
             await PopulateDirectMessageBadgeAsync(currentUser);
             return View(viewModel);
         }

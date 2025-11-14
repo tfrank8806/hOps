@@ -93,25 +93,22 @@ public class BaseController : Controller
             var restrictToAllowedUsers = !access.IsAdmin;
 
             ViewBag.UnreadDirectMessageCount = 0;
+            ViewBag.UnreadAlertCount = 0;
+            ViewBag.UnreadMessageCenterCount = 0;
             ViewBag.LatestDirectMessageParticipant = null;
             ViewBag.LatestDirectMessageBody = null;
             ViewBag.LatestDirectMessageSentAt = null;
             ViewBag.LatestDirectMessageConversationId = null;
 
+            var counts = await GetMessageCenterCountsAsync(user, access);
+            ViewBag.UnreadDirectMessageCount = counts.UnreadConversations;
+            ViewBag.UnreadAlertCount = counts.UnreadAlerts;
+            ViewBag.UnreadMessageCenterCount = counts.UnreadConversations + counts.UnreadAlerts;
+
             if (restrictToAllowedUsers && allowedUserIds.Count == 0)
             {
                 return;
             }
-
-            var unreadQuery = _context.DirectMessages
-                .Where(m => m.RecipientId == user.Id && !m.IsRead);
-
-            if (restrictToAllowedUsers)
-            {
-                unreadQuery = unreadQuery.Where(m => allowedUserIds.Contains(m.SenderId));
-            }
-
-            ViewBag.UnreadDirectMessageCount = await unreadQuery.CountAsync();
 
             var latestMessageQuery = _context.DirectMessages
                 .Where(m => m.RecipientId == user.Id || m.SenderId == user.Id);
@@ -309,6 +306,28 @@ public class BaseController : Controller
         return new MessagingAccessContext(isAdmin, propertyIds, allowedUserIds);
     }
 
+    protected async Task<MessageCenterCounts> GetMessageCenterCountsAsync(ApplicationUser user, MessagingAccessContext? accessContext = null)
+    {
+        var access = accessContext ?? await GetMessagingAccessContextAsync(user);
+        var allowedUserIds = access.AllowedUserIds.ToList();
+        var restrictToAllowedUsers = !access.IsAdmin;
+
+        var unreadQuery = _context.DirectMessages
+            .Where(m => m.RecipientId == user.Id && !m.IsRead);
+
+        if (restrictToAllowedUsers)
+        {
+            unreadQuery = unreadQuery.Where(m => allowedUserIds.Contains(m.SenderId));
+        }
+
+        var unreadMessages = await unreadQuery.CountAsync();
+        var unreadAlerts = await _context.UserNotifications
+            .CountAsync(n => n.UserId == user.Id && !n.IsRead && n.Type != "message");
+
+        return new MessageCenterCounts(unreadMessages, unreadAlerts);
+    }
+
     protected sealed record MessagingAccessContext(bool IsAdmin, HashSet<int> PropertyIds, HashSet<string> AllowedUserIds);
+    protected sealed record MessageCenterCounts(int UnreadConversations, int UnreadAlerts);
 }
 

@@ -37,7 +37,7 @@ namespace hOps.web.Controllers
                 return Unauthorized();
             }
 
-            var notifications = await _messageService.GetRecentNotificationsAsync(currentUser.Id);
+            var notifications = await _messageService.GetRecentAlertsAsync(currentUser.Id);
             var items = notifications
                 .Select(n => new NotificationListItemViewModel
                 {
@@ -51,11 +51,16 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
-            var unreadCount = notifications.Count(n => !n.IsRead);
+            var counts = await GetMessageCenterCountsAsync(currentUser);
+            var unreadAlerts = counts.UnreadAlerts;
+            var unreadConversations = counts.UnreadConversations;
+            var totalUnread = unreadAlerts + unreadConversations;
 
             return Json(new
             {
-                unreadCount,
+                unreadAlerts,
+                unreadConversations,
+                totalUnread,
                 items
             });
         }
@@ -71,7 +76,7 @@ namespace hOps.web.Controllers
             }
 
             await _messageService.MarkNotificationAsReadAsync(id, currentUser.Id);
-            return RedirectToAction("Index", "DirectMessages");
+            return RedirectToAction("Alerts", "DirectMessages");
         }
 
         [HttpPost]
@@ -84,8 +89,8 @@ namespace hOps.web.Controllers
                 return Unauthorized();
             }
 
-            await _messageService.MarkAllNotificationsReadAsync(currentUser.Id);
-            return RedirectToAction("Index", "DirectMessages");
+            await _messageService.MarkAllAlertsReadAsync(currentUser.Id);
+            return RedirectToAction("Alerts", "DirectMessages");
         }
     }
 }
