@@ -52,4 +52,5 @@ jobs:
           app-name: 'guestquest-hwdgfmdygec5ekah'
           package: .
 
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_0DEEF527B6DA415BA1767F55F5697B90 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
+
