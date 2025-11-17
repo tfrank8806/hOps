@@ -990,7 +990,7 @@ namespace hOps.web.Controllers
                 .Include(c => c.PhonebookType)!.ThenInclude(t => t.Property)
                 .AsNoTracking()
                 .Where(c => c.PhonebookType != null && c.PhonebookType.PropertyId.HasValue && propertyIds.Contains(c.PhonebookType.PropertyId.Value))
-                .OrderBy(c => c.PhonebookType!.Property!.Name)
+                .OrderBy(c => c.PhonebookType?.Property?.Name ?? string.Empty)
                 .ThenBy(c => c.TypeName)
                 .ThenBy(c => c.LastName)
                 .ThenBy(c => c.FirstName)

@@ -677,7 +677,7 @@ namespace hOps.web.Controllers
                 .Select(t => new QuickSelectOptionViewModel
                 {
                     Id = t.Id,
-                    Name = t.Name
+                    Name = t.Name ?? string.Empty
                 })
                 .ToListAsync();
 
@@ -686,7 +686,7 @@ namespace hOps.web.Controllers
                 .Select(d => new QuickSelectOptionViewModel
                 {
                     Id = d.Id,
-                    Name = d.Name
+                    Name = d.Name ?? string.Empty
                 })
                 .ToListAsync();
 

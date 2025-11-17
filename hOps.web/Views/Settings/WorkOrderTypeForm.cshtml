@@ -1,7 +1,8 @@
 ﻿@model hOps.web.Models.WorkOrderType
 @using Microsoft.AspNetCore.Mvc.Rendering
 @{
-    ViewData["Title"] = ViewData["FormAction"].ToString()?.Contains("Edit") == true ? "Edit Work Order Type" : "Create Work Order Type";
+    var formAction = ViewData["FormAction"] as string ?? "CreateWorkOrderType";
+    ViewData["Title"] = formAction.Contains("Edit", System.StringComparison.OrdinalIgnoreCase) ? "Edit Work Order Type" : "Create Work Order Type";
     var propertyOptions = ViewBag.PropertyOptions as List<SelectListItem> ?? new List<SelectListItem>();
     bool onlyGlobal = ViewBag.OnlyGlobal as bool? ?? false;
     string returnUrl = ViewBag.ReturnUrl as string ?? Url.Action("WorkOrderTypes") ?? string.Empty;
@@ -9,7 +10,7 @@
 
 <h2>@ViewData["Title"]</h2>
 
-<form asp-action="@ViewData["FormAction"]" method="post">
+<form asp-action="@formAction" method="post">
     <input type="hidden" asp-for="Id" />
     <input type="hidden" name="onlyGlobal" value="@(onlyGlobal.ToString().ToLowerInvariant())" />
     <input type="hidden" name="returnUrl" value="@returnUrl" />

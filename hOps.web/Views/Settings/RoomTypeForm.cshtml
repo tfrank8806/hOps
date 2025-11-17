@@ -1,7 +1,7 @@
 ﻿@model hOps.web.Models.RoomType
 @{
-    string formAction = (string)ViewData["FormAction"] ?? "CreateRoomType";
-    ViewData["Title"] = formAction.Contains("Edit") ? "Edit Room Type" : "Create Room Type";
+    string formAction = ViewData["FormAction"] as string ?? "CreateRoomType";
+    ViewData["Title"] = formAction.Contains("Edit", System.StringComparison.OrdinalIgnoreCase) ? "Edit Room Type" : "Create Room Type";
 }
 
 <h2>@ViewData["Title"]</h2>

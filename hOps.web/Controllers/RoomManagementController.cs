@@ -19,11 +19,13 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> Index(int propertyId)
         {
             var currentUser = await _userManager.GetUserAsync(User);
-            IList<string> roles = new List<string>();
-            if (currentUser != null)
+            if (currentUser == null)
             {
-                roles = await _userManager.GetRolesAsync(currentUser);
+                return Challenge();
             }
+
+            IList<string> roles = new List<string>();
+            roles = await _userManager.GetRolesAsync(currentUser);
 
             // If manager, enforce access restriction
             if (roles.Contains("Manager") && !roles.Contains("Admin"))
@@ -53,11 +55,13 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> Save(int propertyId, List<Room> rooms)
         {
             var currentUser = await _userManager.GetUserAsync(User);
-            IList<string> roles = new List<string>();
-            if (currentUser != null)
+            if (currentUser == null)
             {
-                roles = await _userManager.GetRolesAsync(currentUser);
+                return Challenge();
             }
+
+            IList<string> roles = new List<string>();
+            roles = await _userManager.GetRolesAsync(currentUser);
             if (roles.Contains("Manager") && !roles.Contains("Admin"))
             {
                 bool hasAccess = await _context.UserPropertyAccesses
