@@ -48,7 +48,7 @@ jobs:
       - name: Azure Login
         uses: azure/login@v2
         with:
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_0DEEF527B6DA415BA1767F55F5697B90 }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
       
       - name: Deploy to Azure Web App
         id: deploy-to-webapp

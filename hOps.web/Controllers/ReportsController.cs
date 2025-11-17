@@ -987,7 +987,7 @@ namespace hOps.web.Controllers
             }
 
             var contacts = await _context.PhonebookContacts
-                .Include(c => c.PhonebookType)!.ThenInclude(t => t.Property)
+                .Include(c => c.PhonebookType).ThenInclude(t => t.Property)
                 .AsNoTracking()
                 .Where(c => c.PhonebookType != null && c.PhonebookType.PropertyId.HasValue && propertyIds.Contains(c.PhonebookType.PropertyId.Value))
                 .OrderBy(c => c.PhonebookType != null && c.PhonebookType.Property != null ? c.PhonebookType.Property.Name : string.Empty)
