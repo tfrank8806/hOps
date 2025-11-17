@@ -23,10 +23,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
 
-    // Use SQL Server when the connection string points to a SQL endpoint; otherwise fall back to SQLite.
+    // Prefer SQL Server for cloud/remote connection strings; fall back to SQLite for local file-based strings.
+    var lc = connectionString.ToLowerInvariant();
     var prefersSqlServer =
-        connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase) ||
-        connectionString.Contains("Data Source=tcp:", StringComparison.OrdinalIgnoreCase) ||
+        lc.Contains("server=") ||
+        lc.Contains("data source=tcp:") ||
+        lc.Contains("database.windows.net") ||
+        lc.Contains("initial catalog=") ||
         CanParseSqlServerConnectionString(connectionString);
 
     if (prefersSqlServer)
