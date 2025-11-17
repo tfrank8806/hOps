@@ -116,11 +116,19 @@ using (var scope = app.Services.CreateScope())
     var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
 
-    // Apply pending migrations with fallback support for legacy schemas
-    await ApplyMigrationsWithLegacySupportAsync(dbContext);
+    var isSqlite = dbContext.Database.IsSqlite();
 
-    await EnsureProfilePhotoPathColumnAsync(dbContext);
-    await EnsureRoomLayoutShapeColumnsAsync(dbContext);
+    // Apply migrations with provider-specific handling; skip SQLite-only helpers for SQL Server.
+    if (isSqlite)
+    {
+        await ApplyMigrationsWithLegacySupportAsync(dbContext);
+        await EnsureProfilePhotoPathColumnAsync(dbContext);
+        await EnsureRoomLayoutShapeColumnsAsync(dbContext);
+    }
+    else
+    {
+        await dbContext.Database.MigrateAsync();
+    }
 
     await SeedRolesAsync(roleManager);
     await SeedAdminUserAsync(userManager, roleManager);
