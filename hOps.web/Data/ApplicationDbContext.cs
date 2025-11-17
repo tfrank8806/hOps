@@ -253,6 +253,12 @@ namespace hOps.web.Data
                 .WithMany()
                 .HasForeignKey(v => v.ViewerId);
 
+            builder.Entity<ScheduleTimeOffRequest>()
+                .HasOne(r => r.Employee)
+                .WithMany(e => e.TimeOffRequests)
+                .HasForeignKey(r => r.ScheduleEmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             builder.Entity<PassOnLogComment>()
                 .HasOne(c => c.PassOnLog)
                 .WithMany(l => l.Comments)

@@ -1227,11 +1227,11 @@ namespace hOps.web.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_ScheduleTimeOffRequests_ScheduleEmployees_ScheduleEmployeeId",
-                        column: x => x.ScheduleEmployeeId,
-                        principalTable: "ScheduleEmployees",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                    name: "FK_ScheduleTimeOffRequests_ScheduleEmployees_ScheduleEmployeeId",
+                    column: x => x.ScheduleEmployeeId,
+                    principalTable: "ScheduleEmployees",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(

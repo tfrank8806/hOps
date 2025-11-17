@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("hOps.web.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9942b2d29f76f773fa34143642765fec8c17f036")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ec5ff30838cda1809116ace83b95d582950ab250")]
 [assembly: System.Reflection.AssemblyProductAttribute("hOps.web.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("hOps.web.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
