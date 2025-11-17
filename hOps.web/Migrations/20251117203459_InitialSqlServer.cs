@@ -1259,11 +1259,11 @@ namespace hOps.web.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_ScheduleAssignments_Schedules_ScheduleId",
-                        column: x => x.ScheduleId,
-                        principalTable: "Schedules",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                    name: "FK_ScheduleAssignments_Schedules_ScheduleId",
+                    column: x => x.ScheduleId,
+                    principalTable: "Schedules",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
