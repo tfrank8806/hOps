@@ -14,5 +14,7 @@ namespace hOps.web.Models
         // optional layout position
         public int X { get; set; }
         public int Y { get; set; }
+
+        public ICollection<RoomLayout> RoomLayouts { get; set; } = new List<RoomLayout>();
     }
 }

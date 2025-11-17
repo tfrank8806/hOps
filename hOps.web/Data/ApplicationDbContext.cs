@@ -112,6 +112,12 @@ namespace hOps.web.Data
                 .HasForeignKey(pes => pes.PropertyId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            builder.Entity<RoomLayout>()
+                .HasOne(rl => rl.Room)
+                .WithMany(r => r.RoomLayouts)
+                .HasForeignKey(rl => rl.RoomId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             builder.Entity<Schedule>()
                 .HasOne(s => s.CreatedBy)
                 .WithMany()
