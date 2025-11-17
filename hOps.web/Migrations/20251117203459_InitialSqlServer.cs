@@ -528,7 +528,7 @@ namespace hOps.web.Migrations
                         column: x => x.MatchedEntryId,
                         principalTable: "LostFoundEntries",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_LostFoundEntries_Properties_PropertyId",
                         column: x => x.PropertyId,
@@ -689,20 +689,17 @@ namespace hOps.web.Migrations
                         name: "FK_Schedules_AspNetUsers_CreatedById",
                         column: x => x.CreatedById,
                         principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
+                        principalColumn: "Id");
                     table.ForeignKey(
                         name: "FK_Schedules_AspNetUsers_PostedById",
                         column: x => x.PostedById,
                         principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
+                        principalColumn: "Id");
                     table.ForeignKey(
                         name: "FK_Schedules_AspNetUsers_UpdatedById",
                         column: x => x.UpdatedById,
                         principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
+                        principalColumn: "Id");
                     table.ForeignKey(
                         name: "FK_Schedules_Properties_PropertyId",
                         column: x => x.PropertyId,

@@ -90,7 +90,7 @@ namespace hOps.web.Data
                 .HasOne(e => e.MatchedEntry)
                 .WithMany()
                 .HasForeignKey(e => e.MatchedEntryId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<UserPropertyAccess>()
                 .HasOne(upa => upa.Property)
@@ -111,6 +111,24 @@ namespace hOps.web.Data
                 .WithMany(p => p.EmailSubscriptions)
                 .HasForeignKey(pes => pes.PropertyId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<Schedule>()
+                .HasOne(s => s.CreatedBy)
+                .WithMany()
+                .HasForeignKey(s => s.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<Schedule>()
+                .HasOne(s => s.UpdatedBy)
+                .WithMany()
+                .HasForeignKey(s => s.UpdatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<Schedule>()
+                .HasOne(s => s.PostedBy)
+                .WithMany()
+                .HasForeignKey(s => s.PostedById)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<UserPropertyEmailSubscription>()
                 .Property(pes => pes.IncludeInLogAlerts)
