@@ -245,7 +245,8 @@ namespace hOps.web.Data
             builder.Entity<PassOnLogView>()
                 .HasOne(v => v.PassOnLog)
                 .WithMany(l => l.Views)
-                .HasForeignKey(v => v.PassOnLogId);
+                .HasForeignKey(v => v.PassOnLogId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<PassOnLogView>()
                 .HasOne(v => v.Viewer)

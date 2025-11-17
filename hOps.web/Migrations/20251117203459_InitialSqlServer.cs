@@ -1180,11 +1180,11 @@ namespace hOps.web.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_PassOnLogViews_PassOnLogs_PassOnLogId",
-                        column: x => x.PassOnLogId,
-                        principalTable: "PassOnLogs",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                    name: "FK_PassOnLogViews_PassOnLogs_PassOnLogId",
+                    column: x => x.PassOnLogId,
+                    principalTable: "PassOnLogs",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
