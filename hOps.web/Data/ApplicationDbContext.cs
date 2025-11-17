@@ -118,6 +118,18 @@ namespace hOps.web.Data
                 .HasForeignKey(rl => rl.RoomId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            builder.Entity<Document>()
+                .HasOne(d => d.Folder)
+                .WithMany(f => f.Documents)
+                .HasForeignKey(d => d.FolderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<DocumentFolder>()
+                .HasOne(f => f.ParentFolder)
+                .WithMany(f => f.SubFolders)
+                .HasForeignKey(f => f.ParentFolderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             builder.Entity<Schedule>()
                 .HasOne(s => s.CreatedBy)
                 .WithMany()

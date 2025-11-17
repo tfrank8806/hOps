@@ -1059,7 +1059,7 @@ namespace hOps.web.Migrations
                         column: x => x.FolderId,
                         principalTable: "DocumentFolders",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_Documents_Properties_PropertyId",
                         column: x => x.PropertyId,
