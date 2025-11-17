@@ -227,6 +227,18 @@ namespace hOps.web.Data
                 .WithMany(p => p.PassOnLogLinks)
                 .HasForeignKey(lp => lp.PropertyId);
 
+            builder.Entity<PassOnLogComment>()
+                .HasOne(c => c.PassOnLog)
+                .WithMany(l => l.Comments)
+                .HasForeignKey(c => c.PassOnLogId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<PassOnLogAttachment>()
+                .HasOne(a => a.PassOnLog)
+                .WithMany(l => l.Attachments)
+                .HasForeignKey(a => a.PassOnLogId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             builder.Entity<PassOnLogView>()
                 .HasKey(v => new { v.PassOnLogId, v.ViewerId });
 
