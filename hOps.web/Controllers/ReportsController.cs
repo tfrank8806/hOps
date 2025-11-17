@@ -989,12 +989,21 @@ namespace hOps.web.Controllers
             var contacts = await _context.PhonebookContacts
                 .Include(c => c.PhonebookType).ThenInclude(t => t.Property)
                 .AsNoTracking()
-                .Where(c => c.PhonebookType != null && c.PhonebookType.PropertyId.HasValue)
-                .Where(c => propertyIds.Contains(c.PhonebookType!.PropertyId!.Value))
-                .OrderBy(c => c.PhonebookType != null && c.PhonebookType.Property != null ? c.PhonebookType.Property.Name : string.Empty)
-                .ThenBy(c => c.TypeName)
-                .ThenBy(c => c.LastName)
-                .ThenBy(c => c.FirstName)
+                .Where(c => c.PhonebookType != null
+                    && c.PhonebookType.PropertyId.HasValue
+                    && propertyIds.Contains(c.PhonebookType.PropertyId.Value))
+                .Select(c => new
+                {
+                    Contact = c,
+                    PropertyName = c.PhonebookType != null && c.PhonebookType.Property != null
+                        ? c.PhonebookType.Property.Name
+                        : string.Empty
+                })
+                .OrderBy(x => x.PropertyName)
+                .ThenBy(x => x.Contact.TypeName)
+                .ThenBy(x => x.Contact.LastName)
+                .ThenBy(x => x.Contact.FirstName)
+                .Select(x => x.Contact)
                 .ToListAsync();
 
             var rows = contacts

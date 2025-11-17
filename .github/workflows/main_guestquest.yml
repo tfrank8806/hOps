@@ -49,6 +49,6 @@ jobs:
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'guestquest-hwdgfmdygec5ekah'
+          app-name: 'GuestQuest'
           package: .
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_0DEEF527B6DA415BA1767F55F5697B90 }}
