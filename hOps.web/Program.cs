@@ -25,12 +25,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
     // Prefer SQL Server for cloud/remote connection strings; fall back to SQLite for local file-based strings.
     var lc = connectionString.ToLowerInvariant();
-    var prefersSqlServer =
-        lc.Contains("server=") ||
-        lc.Contains("data source=tcp:") ||
-        lc.Contains("database.windows.net") ||
-        lc.Contains("initial catalog=") ||
-        CanParseSqlServerConnectionString(connectionString);
+    var prefersSqlServer = IsSqlServerConnectionString(connectionString, lc);
 
     if (prefersSqlServer)
     {
@@ -43,22 +38,61 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         sqliteOptions => sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
 });
 
-static bool CanParseSqlServerConnectionString(string connectionString)
+static bool IsSqlServerConnectionString(string connectionString, string lowerCasedConnectionString)
 {
     if (string.IsNullOrWhiteSpace(connectionString))
     {
         return false;
     }
 
-    try
-    {
-        _ = new SqlConnectionStringBuilder(connectionString);
-        return true;
-    }
-    catch
+    // Quick exit for obvious SQLite patterns.
+    if (lowerCasedConnectionString.Contains(".db", StringComparison.Ordinal) ||
+        lowerCasedConnectionString.Contains(".sqlite", StringComparison.Ordinal) ||
+        lowerCasedConnectionString.Contains("mode=memory", StringComparison.Ordinal))
     {
         return false;
     }
+
+    // Common SQL Server markers.
+    if (lowerCasedConnectionString.Contains("server=", StringComparison.Ordinal) ||
+        lowerCasedConnectionString.Contains("data source=tcp:", StringComparison.Ordinal) ||
+        lowerCasedConnectionString.Contains("database.windows.net", StringComparison.Ordinal) ||
+        lowerCasedConnectionString.Contains("initial catalog=", StringComparison.Ordinal) ||
+        lowerCasedConnectionString.Contains("authentication=active directory", StringComparison.Ordinal))
+    {
+        return true;
+    }
+
+    try
+    {
+        var builder = new SqlConnectionStringBuilder(connectionString);
+        var dataSource = builder.DataSource?.Trim() ?? string.Empty;
+
+        // Treat file-like data sources as SQLite.
+        if (dataSource.EndsWith(".db", StringComparison.OrdinalIgnoreCase) ||
+            dataSource.EndsWith(".db3", StringComparison.OrdinalIgnoreCase) ||
+            dataSource.EndsWith(".sqlite", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // If the data source looks like a host:port or host,prefer SQL Server; otherwise, default to SQLite.
+        if (dataSource.Contains(":", StringComparison.Ordinal) || dataSource.Contains(",", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        // No path separators is an indicator of a server/instance name.
+        if (!dataSource.Contains("/", StringComparison.Ordinal) && !dataSource.Contains("\\", StringComparison.Ordinal))
+        {
+            return true;
+        }
+    }
+    catch
+    {
+    }
+
+    return false;
 }
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
