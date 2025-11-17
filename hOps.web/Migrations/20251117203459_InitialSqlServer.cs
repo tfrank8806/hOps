@@ -1283,11 +1283,11 @@ namespace hOps.web.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_CalendarEventProperties_Properties_PropertyId",
-                        column: x => x.PropertyId,
-                        principalTable: "Properties",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                    name: "FK_CalendarEventProperties_Properties_PropertyId",
+                    column: x => x.PropertyId,
+                    principalTable: "Properties",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(

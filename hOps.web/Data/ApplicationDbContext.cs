@@ -192,7 +192,8 @@ namespace hOps.web.Data
             builder.Entity<CalendarEventProperty>()
                 .HasOne(cep => cep.Property)
                 .WithMany(p => p.CalendarEvents)
-                .HasForeignKey(cep => cep.PropertyId);
+                .HasForeignKey(cep => cep.PropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<CalendarEventProperty>()
                 .HasOne(cep => cep.CalendarEvent)
