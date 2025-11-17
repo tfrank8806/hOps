@@ -24,18 +24,39 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
 
     // Use SQL Server when the connection string points to a SQL endpoint; otherwise fall back to SQLite.
-    if (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase) ||
-        connectionString.Contains("Data Source=tcp:", StringComparison.OrdinalIgnoreCase))
+    var prefersSqlServer =
+        connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase) ||
+        connectionString.Contains("Data Source=tcp:", StringComparison.OrdinalIgnoreCase) ||
+        CanParseSqlServerConnectionString(connectionString);
+
+    if (prefersSqlServer)
     {
         options.UseSqlServer(connectionString);
+        return;
     }
-    else
-    {
-        options.UseSqlite(
-            connectionString,
-            sqliteOptions => sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
-    }
+
+    options.UseSqlite(
+        connectionString,
+        sqliteOptions => sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
 });
+
+static bool CanParseSqlServerConnectionString(string connectionString)
+{
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        return false;
+    }
+
+    try
+    {
+        _ = new SqlConnectionStringBuilder(connectionString);
+        return true;
+    }
+    catch
+    {
+        return false;
+    }
+}
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
