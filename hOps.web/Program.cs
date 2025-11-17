@@ -11,6 +11,7 @@ using System.Data;
 using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using System.Linq;
+using Microsoft.Data.SqlClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,9 +20,22 @@ var builder = WebApplication.CreateBuilder(args);
 // ----------------------
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        sqliteOptions => sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
+
+    // Use SQL Server when the connection string points to a SQL endpoint; otherwise fall back to SQLite.
+    if (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase) ||
+        connectionString.Contains("Data Source=tcp:", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseSqlServer(connectionString);
+    }
+    else
+    {
+        options.UseSqlite(
+            connectionString,
+            sqliteOptions => sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
+    }
+});
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
