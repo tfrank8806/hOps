@@ -1307,112 +1307,120 @@ namespace hOps.web.Controllers
         [HttpPost]
         public async Task<IActionResult> SaveLayout([FromBody] LayoutSaveRequest request)
         {
-            if (request == null || request.PropertyId <= 0)
+            try
             {
-                return BadRequest();
-            }
-
-            static int NormalizeRotation(int rotation)
-            {
-                var normalized = (int)Math.Round(rotation / 45.0) * 45;
-                normalized %= 360;
-                if (normalized < 0)
+                if (request == null || request.PropertyId <= 0)
                 {
-                    normalized += 360;
-                }
-                return normalized;
-            }
-
-            var properties = await GetEditablePropertiesAsync();
-            if (properties.All(p => p.Id != request.PropertyId))
-            {
-                return Forbid();
-            }
-
-            var propertyId = request.PropertyId;
-            var floor = request.Floor;
-            var layoutsOnFloor = await _db.RoomLayouts
-                .Where(l => l.PropertyId == propertyId && l.Floor == floor)
-                .ToListAsync();
-
-            var keepIds = new HashSet<int>();
-            var orderedLayouts = new List<RoomLayout>();
-
-            foreach (var dto in request.Layouts ?? new List<RoomLayoutDto>())
-            {
-                var trimmedLabel = string.IsNullOrWhiteSpace(dto.Label) ? null : dto.Label!.Trim();
-                var normalizedShapeType = string.IsNullOrWhiteSpace(dto.ShapeType) ? null : dto.ShapeType!.Trim();
-                var normalizedShapeData = string.IsNullOrWhiteSpace(dto.ShapeData) ? null : dto.ShapeData!.Trim();
-                var normalizedRotation = NormalizeRotation(dto.TextRotation);
-
-                RoomLayout? layoutEntity = null;
-                if (dto.Id > 0)
-                {
-                    layoutEntity = layoutsOnFloor.FirstOrDefault(l => l.Id == dto.Id);
+                    return BadRequest();
                 }
 
-                if (layoutEntity == null && dto.RoomId > 0)
+                static int NormalizeRotation(int rotation)
                 {
-                    layoutEntity = layoutsOnFloor.FirstOrDefault(l => l.RoomId == dto.RoomId);
-                }
-
-                if (layoutEntity == null)
-                {
-                    layoutEntity = new RoomLayout
+                    var normalized = (int)Math.Round(rotation / 45.0) * 45;
+                    normalized %= 360;
+                    if (normalized < 0)
                     {
-                        PropertyId = propertyId,
-                        RoomId = dto.RoomId,
-                        Floor = floor
-                    };
-                    _db.RoomLayouts.Add(layoutEntity);
-                    layoutsOnFloor.Add(layoutEntity);
+                        normalized += 360;
+                    }
+                    return normalized;
                 }
 
-                layoutEntity.RoomId = dto.RoomId;
-                layoutEntity.Floor = floor;
-                layoutEntity.X = dto.X;
-                layoutEntity.Y = dto.Y;
-                layoutEntity.Width = dto.Width;
-                layoutEntity.Height = dto.Height;
-                layoutEntity.Label = trimmedLabel;
-                layoutEntity.ShapeType = normalizedShapeType;
-                layoutEntity.ShapeData = normalizedShapeData;
-                layoutEntity.TextRotation = normalizedRotation;
-
-                orderedLayouts.Add(layoutEntity);
-                if (layoutEntity.Id > 0)
+                var properties = await GetEditablePropertiesAsync();
+                if (properties.All(p => p.Id != request.PropertyId))
                 {
-                    keepIds.Add(layoutEntity.Id);
+                    return Forbid();
                 }
-            }
 
-            foreach (var existing in layoutsOnFloor.ToList())
+                var propertyId = request.PropertyId;
+                var floor = request.Floor;
+                var layoutsOnFloor = await _db.RoomLayouts
+                    .Where(l => l.PropertyId == propertyId && l.Floor == floor)
+                    .ToListAsync();
+
+                var keepIds = new HashSet<int>();
+                var orderedLayouts = new List<RoomLayout>();
+
+                foreach (var dto in request.Layouts ?? new List<RoomLayoutDto>())
+                {
+                    var trimmedLabel = string.IsNullOrWhiteSpace(dto.Label) ? null : dto.Label!.Trim();
+                    var normalizedShapeType = string.IsNullOrWhiteSpace(dto.ShapeType) ? null : dto.ShapeType!.Trim();
+                    var normalizedShapeData = string.IsNullOrWhiteSpace(dto.ShapeData) ? null : dto.ShapeData!.Trim();
+                    var normalizedRotation = NormalizeRotation(dto.TextRotation);
+
+                    RoomLayout? layoutEntity = null;
+                    if (dto.Id > 0)
+                    {
+                        layoutEntity = layoutsOnFloor.FirstOrDefault(l => l.Id == dto.Id);
+                    }
+
+                    if (layoutEntity == null && dto.RoomId > 0)
+                    {
+                        layoutEntity = layoutsOnFloor.FirstOrDefault(l => l.RoomId == dto.RoomId);
+                    }
+
+                    if (layoutEntity == null)
+                    {
+                        layoutEntity = new RoomLayout
+                        {
+                            PropertyId = propertyId,
+                            RoomId = dto.RoomId,
+                            Floor = floor
+                        };
+                        _db.RoomLayouts.Add(layoutEntity);
+                        layoutsOnFloor.Add(layoutEntity);
+                    }
+
+                    layoutEntity.RoomId = dto.RoomId;
+                    layoutEntity.Floor = floor;
+                    layoutEntity.X = dto.X;
+                    layoutEntity.Y = dto.Y;
+                    layoutEntity.Width = dto.Width;
+                    layoutEntity.Height = dto.Height;
+                    layoutEntity.Label = trimmedLabel;
+                    layoutEntity.ShapeType = normalizedShapeType;
+                    layoutEntity.ShapeData = normalizedShapeData;
+                    layoutEntity.TextRotation = normalizedRotation;
+
+                    orderedLayouts.Add(layoutEntity);
+                    if (layoutEntity.Id > 0)
+                    {
+                        keepIds.Add(layoutEntity.Id);
+                    }
+                }
+
+                foreach (var existing in layoutsOnFloor.ToList())
+                {
+                    if (existing.Id > 0 && !keepIds.Contains(existing.Id))
+                    {
+                        _db.RoomLayouts.Remove(existing);
+                    }
+                }
+
+                await _db.SaveChangesAsync();
+
+                var responseLayouts = orderedLayouts
+                    .Select(l => new
+                    {
+                        id = l.Id,
+                        roomId = l.RoomId,
+                        label = l.Label ?? string.Empty,
+                        x = l.X,
+                        y = l.Y,
+                        width = l.Width,
+                        height = l.Height,
+                        shapeType = string.IsNullOrWhiteSpace(l.ShapeType) ? "rectangle" : l.ShapeType,
+                        shapeData = l.ShapeData ?? string.Empty,
+                        textRotation = l.TextRotation
+                    })
+                    .ToList();
+
+                return Json(new { success = true, layouts = responseLayouts });
+            }
+            catch (Exception ex)
             {
-                if (existing.Id > 0 && !keepIds.Contains(existing.Id))
-                {
-                    _db.RoomLayouts.Remove(existing);
-                }
+                Response.StatusCode = 500;
+                return Json(new { success = false, error = ex.Message });
             }
-
-            await _db.SaveChangesAsync();
-
-            var responseLayouts = orderedLayouts
-                .Select(l => new
-                {
-                    id = l.Id,
-                    roomId = l.RoomId,
-                    label = l.Label ?? string.Empty,
-                    x = l.X,
-                    y = l.Y,
-                    width = l.Width,
-                    height = l.Height,
-                    shapeType = string.IsNullOrWhiteSpace(l.ShapeType) ? "rectangle" : l.ShapeType,
-                    shapeData = l.ShapeData ?? string.Empty,
-                    textRotation = l.TextRotation
-                })
-                .ToList();
-
-            return Json(new { success = true, layouts = responseLayouts });
         }
 
         public async Task<IActionResult> ScheduleSetup(int? propertyId = null)
