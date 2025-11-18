@@ -1211,6 +1211,9 @@ namespace hOps.web.Migrations
                     b.Property<string>("ShapeType")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("TextRotation")
+                        .HasColumnType("int");
+
                     b.Property<int>("Width")
                         .HasColumnType("int");
 

@@ -369,6 +369,11 @@ static async Task EnsureRoomLayoutShapeColumnsAsync(ApplicationDbContext dbConte
             missingColumns.Add(("ShapeData", "ALTER TABLE \"RoomLayouts\" ADD COLUMN \"ShapeData\" TEXT;"));
         }
 
+        if (!existingColumns.Contains("TextRotation"))
+        {
+            missingColumns.Add(("TextRotation", "ALTER TABLE \"RoomLayouts\" ADD COLUMN \"TextRotation\" INTEGER DEFAULT 0;"));
+        }
+
         foreach (var (_, sql) in missingColumns)
         {
             await using var alterCommand = connection.CreateCommand();

@@ -559,14 +559,15 @@
                                          data-shape-type="@tile.ShapeType"
                                          data-shape-data="@tile.ShapeData"
                                          data-room-id="@tile.RoomId"
-                                         data-room-label="@tile.RoomNumber"
-                                         data-room-number="@tile.LocationKey"
-                                         data-room-floor="@tile.Floor"
-                                         data-navigate-url="@navigateUrl"
-                                         style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%;border-color:@tile.FloorColor;background-color:@overlayBg;"
-                                         aria-label="@ariaLabel"
-                                         tabindex="@(isInteractiveRoom || !string.IsNullOrWhiteSpace(navigateUrl) ? "0" : "-1")"
-                                         @(isInteractiveRoom ? "role=\"button\" aria-haspopup=\"dialog\"" : (string.IsNullOrWhiteSpace(navigateUrl) ? null : "role=\"link\""))>
+                                     data-room-label="@tile.RoomNumber"
+                                     data-room-number="@tile.LocationKey"
+                                     data-room-floor="@tile.Floor"
+                                     data-text-rotation="@tile.TextRotation"
+                                     data-navigate-url="@navigateUrl"
+                                     style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%;border-color:@tile.FloorColor;background-color:@overlayBg; --tile-text-rotation:@($"{tile.TextRotation}deg");"
+                                     aria-label="@ariaLabel"
+                                     tabindex="@(isInteractiveRoom || !string.IsNullOrWhiteSpace(navigateUrl) ? "0" : "-1")"
+                                     @(isInteractiveRoom ? "role=\"button\" aria-haspopup=\"dialog\"" : (string.IsNullOrWhiteSpace(navigateUrl) ? null : "role=\"link\""))>
                                         @if (tile.Badges.Any())
                                         {
                                             <div class="tile-badges tile-badges--overlay">
@@ -627,9 +628,10 @@
                                                  data-room-label="@tile.RoomNumber"
                                                  data-room-number="@tile.LocationKey"
                                                  data-room-floor="@tile.Floor"
+                                                 data-text-rotation="@tile.TextRotation"
                                                  tabindex="@(isInteractiveRoom ? "0" : "-1")"
                                                  @(isInteractiveRoom ? "role=\"button\" aria-haspopup=\"dialog\"" : null)
-                                                 style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%">
+                                                 style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%; --tile-text-rotation:@($"{tile.TextRotation}deg");">
                                                 @if (isConnector)
                                                 {
                                                     <span class="tile-connector-icon tile-connector-icon--@connectorDirection">@connectorDisplay</span>
@@ -758,10 +760,12 @@
             letter-spacing: 0.1rem;
             color: #0f2e61;
             line-height: 1;
+            transform: rotate(var(--tile-text-rotation, 0deg));
+            transform-origin: center;
         }
 
         .tile-connector-icon--horizontal {
-            transform: rotate(90deg);
+            transform: rotate(calc(var(--tile-text-rotation, 0deg) + 90deg));
             display: inline-block;
             transform-origin: center;
         }
@@ -840,6 +844,8 @@
             color: #0f2e61;
             margin-top: 0.25rem;
             line-height: 1.1;
+            transform: rotate(var(--tile-text-rotation, 0deg));
+            transform-origin: center;
         }
 
         .room-tile-overlay.room-tile--connector {
@@ -854,9 +860,7 @@
         }
 
         .room-tile-overlay.room-tile--connector[data-shape-data="horizontal"] .tile-label {
-            transform: rotate(90deg);
-            display: inline-block;
-            transform-origin: center;
+            transform: rotate(calc(var(--tile-text-rotation, 0deg) + 90deg));
         }
 
         .room-tile-overlay.room-tile--custom {
@@ -898,6 +902,9 @@
         .tile-room {
             font-weight: 600;
             font-size: 1rem;
+            display: inline-block;
+            transform: rotate(var(--tile-text-rotation, 0deg));
+            transform-origin: center;
         }
 
         .tile-type {

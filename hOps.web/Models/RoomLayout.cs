@@ -70,5 +70,11 @@ namespace hOps.web.Models
         /// layout editor to reproduce the custom appearance.
         /// </summary>
         public string? ShapeData { get; set; }
+
+        /// <summary>
+        /// Rotation to apply to the label text, stored in degrees. Intended to be
+        /// a 45-degree increment (0-315) to help fit text into constrained shapes.
+        /// </summary>
+        public int TextRotation { get; set; }
     }
 }

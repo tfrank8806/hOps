@@ -613,6 +613,7 @@ namespace hOps.web.Controllers
                     Height = entry.Layout.Height,
                     ShapeType = shapeType,
                     ShapeData = shapeData,
+                    TextRotation = entry.Layout.TextRotation,
                     FloorColor = floorColorMap.TryGetValue(entry.Layout.Floor, out var color)
                         ? color
                         : "#6c757d",

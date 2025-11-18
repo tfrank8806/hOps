@@ -13,5 +13,6 @@
         public string? Label { get; set; } // Optional label for display purposes
         public string? ShapeType { get; set; }
         public string? ShapeData { get; set; }
+        public int TextRotation { get; set; }
     }
 }

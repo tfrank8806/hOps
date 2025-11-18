@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
+using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -1259,7 +1260,8 @@ namespace hOps.web.Controllers
                     Height = l.Height,
                     Label = l.Label,
                     ShapeType = l.ShapeType,
-                    ShapeData = l.ShapeData
+                    ShapeData = l.ShapeData,
+                    TextRotation = l.TextRotation
                 })
                 .ToList();
 
@@ -1310,6 +1312,17 @@ namespace hOps.web.Controllers
                 return BadRequest();
             }
 
+            static int NormalizeRotation(int rotation)
+            {
+                var normalized = (int)Math.Round(rotation / 45.0) * 45;
+                normalized %= 360;
+                if (normalized < 0)
+                {
+                    normalized += 360;
+                }
+                return normalized;
+            }
+
             var properties = await GetEditablePropertiesAsync();
             if (properties.All(p => p.Id != request.PropertyId))
             {
@@ -1330,6 +1343,7 @@ namespace hOps.web.Controllers
                 var trimmedLabel = string.IsNullOrWhiteSpace(dto.Label) ? null : dto.Label!.Trim();
                 var normalizedShapeType = string.IsNullOrWhiteSpace(dto.ShapeType) ? null : dto.ShapeType!.Trim();
                 var normalizedShapeData = string.IsNullOrWhiteSpace(dto.ShapeData) ? null : dto.ShapeData!.Trim();
+                var normalizedRotation = NormalizeRotation(dto.TextRotation);
 
                 RoomLayout? layoutEntity = null;
                 if (dto.Id > 0)
@@ -1363,6 +1377,7 @@ namespace hOps.web.Controllers
                 layoutEntity.Label = trimmedLabel;
                 layoutEntity.ShapeType = normalizedShapeType;
                 layoutEntity.ShapeData = normalizedShapeData;
+                layoutEntity.TextRotation = normalizedRotation;
 
                 orderedLayouts.Add(layoutEntity);
                 if (layoutEntity.Id > 0)
@@ -1392,7 +1407,8 @@ namespace hOps.web.Controllers
                     width = l.Width,
                     height = l.Height,
                     shapeType = string.IsNullOrWhiteSpace(l.ShapeType) ? "rectangle" : l.ShapeType,
-                    shapeData = l.ShapeData ?? string.Empty
+                    shapeData = l.ShapeData ?? string.Empty,
+                    textRotation = l.TextRotation
                 })
                 .ToList();
 

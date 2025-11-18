@@ -890,7 +890,8 @@ namespace hOps.web.Migrations
                     Height = table.Column<int>(type: "int", nullable: false),
                     Label = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     ShapeType = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ShapeData = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    ShapeData = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    TextRotation = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {

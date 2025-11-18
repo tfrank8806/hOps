@@ -36,5 +36,6 @@ namespace hOps.web.ViewModels
         public string? Label { get; set; }
         public string? ShapeType { get; set; }
         public string? ShapeData { get; set; }
+        public int TextRotation { get; set; }
     }
 }

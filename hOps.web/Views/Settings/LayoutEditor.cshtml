@@ -98,8 +98,14 @@
             line-height: 1;
         }
 
+        .room-box .room-label {
+            display: inline-block;
+            transform: rotate(var(--text-rotation, 0deg));
+            transform-origin: center;
+        }
+
         .room-box--connector[data-connector-direction="horizontal"] .room-label {
-            transform: rotate(90deg);
+            transform: rotate(calc(var(--text-rotation, 0deg) + 90deg));
         }
 
         .room-box .box-controls {
@@ -128,6 +134,10 @@
         .room-box .box-controls button {
             padding: 2px 6px;
             font-size: 0.8em;
+        }
+
+        .text-rotation-select {
+            width: 5.5rem;
         }
 
         .shape-dialog-overlay {
@@ -262,17 +272,22 @@
             <div id="ghost-layer" style="position:absolute; inset:0; pointer-events:none; z-index:0;"></div>
             @foreach (var layout in Model.Layouts)
             {
-                var label = Model.Rooms.FirstOrDefault(r => r.Id == layout.RoomId)?.RoomNumber
-                    ?? (!string.IsNullOrWhiteSpace(layout.Label) ? layout.Label : layout.RoomId.ToString());
+                var baseLabel = Model.Rooms.FirstOrDefault(r => r.Id == layout.RoomId)?.RoomNumber;
                 var shapeType = string.IsNullOrWhiteSpace(layout.ShapeType) ? "rectangle" : layout.ShapeType;
                 var shapeData = layout.ShapeData ?? string.Empty;
+                var isConnector = string.Equals(shapeType, "connector", StringComparison.OrdinalIgnoreCase);
+                var label = isConnector
+                    ? (!string.IsNullOrWhiteSpace(layout.Label) ? layout.Label : "||")
+                    : (!string.IsNullOrWhiteSpace(layout.Label) ? layout.Label : (baseLabel ?? layout.RoomId.ToString()));
                 var clipStyle = string.IsNullOrWhiteSpace(shapeData) ? string.Empty : $"clip-path:{shapeData}; -webkit-clip-path:{shapeData};";
-                <div class="room-box"
+                var textRotation = layout.TextRotation;
+                <div class="room-box @(isConnector ? "room-box--connector" : string.Empty)"
                      data-layout-id="@layout.Id"
                      data-room-id="@layout.RoomId"
                      data-room-label="@label"
                      data-shape-type="@shapeType"
                      data-shape-data="@shapeData"
+                     data-text-rotation="@textRotation"
                      style="
                              position:absolute;
                              left:@($"{layout.X}px");
@@ -284,11 +299,22 @@
                              z-index:1;
                              display:flex; align-items:center; justify-content:center;
                              cursor:move; @clipStyle
+                             --text-rotation:@($"{textRotation}deg");
                          ">
                     <span class="room-label">@label</span>
                     <div class="box-controls">
                         <button class="btn btn-sm btn-light btn-customize-shape" title="Customize shape">Shape</button>
                         <button class="btn btn-sm btn-light btn-move-back" title="Move back">Back</button>
+                        <select class="form-select form-select-sm text-rotation-select" title="Rotate text">
+                            <option value="0" selected>0°</option>
+                            <option value="45">45°</option>
+                            <option value="90">90°</option>
+                            <option value="135">135°</option>
+                            <option value="180">180°</option>
+                            <option value="225">225°</option>
+                            <option value="270">270°</option>
+                            <option value="315">315°</option>
+                        </select>
                         <button class="btn btn-sm btn-light btn-delete-shape" title="Delete">Delete</button>
                     </div>
                     <div class="resize-handle" style="
@@ -376,6 +402,43 @@
                 ["l-bottom-left", "polygon(0% 0%, 35% 0%, 35% 70%, 100% 70%, 100% 100%, 0% 100%)"],
                 ["l-bottom-right", "polygon(65% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 70%, 65% 70%)"]
             ]);
+            const rotationStep = 45;
+
+            function normalizeRotation(value) {
+                const numeric = Number.isFinite(value) ? value : 0;
+                let normalized = Math.round(numeric / rotationStep) * rotationStep;
+                normalized %= 360;
+                if (normalized < 0) {
+                    normalized += 360;
+                }
+                return normalized;
+            }
+
+            function defaultRotationForShape(shapeType, shapeData) {
+                return 0;
+            }
+
+            function setTextRotation(element, rotation) {
+                if (!(element instanceof HTMLElement)) {
+                    return 0;
+                }
+                const normalized = normalizeRotation(rotation);
+                element.setAttribute("data-text-rotation", String(normalized));
+                element.style.setProperty("--text-rotation", `${normalized}deg`);
+                return normalized;
+            }
+
+            function getTextRotation(element) {
+                if (!(element instanceof HTMLElement)) {
+                    return 0;
+                }
+                const raw = element.getAttribute("data-text-rotation");
+                const parsed = parseInt(raw ?? "0", 10);
+                if (Number.isFinite(parsed)) {
+                    return normalizeRotation(parsed);
+                }
+                return 0;
+            }
 
             const initialPaletteRooms = new Map();
             const paletteRoomLabels = new Map();
@@ -646,7 +709,8 @@
                     const height = parseInt(b.style.height) || b.offsetHeight;
                     const shapeType = b.getAttribute("data-shape-type") ?? "rectangle";
                     const shapeData = b.getAttribute("data-shape-data") ?? "";
-                    return { layoutId, roomId, label, x, y, width, height, shapeType, shapeData };
+                    const textRotation = getTextRotation(b);
+                    return { layoutId, roomId, label, x, y, width, height, shapeType, shapeData, textRotation };
                 });
 
                 state.sort((a, b) => {
@@ -675,7 +739,8 @@
                     entry.width,
                     entry.height,
                     entry.shapeType,
-                    entry.shapeData
+                    entry.shapeData,
+                    entry.textRotation
                 ]));
             }
 
@@ -697,6 +762,7 @@
                             height: entry.height ?? gridSize,
                             shapeType: entry.shapeType ?? "rectangle",
                             shapeData: entry.shapeData ?? "",
+                            textRotation: entry.textRotation ?? 0,
                             skipRecord: true
                         }
                     );
@@ -1052,6 +1118,19 @@
                     div.getAttribute("data-shape-type") ?? "rectangle",
                     div.getAttribute("data-shape-data") ?? ""
                 );
+
+                const normalizedRotation = setTextRotation(div, getTextRotation(div));
+                const rotationSelect = div.querySelector(".text-rotation-select");
+                if (rotationSelect) {
+                    rotationSelect.value = String(normalizedRotation);
+                    rotationSelect.addEventListener("change", evt => {
+                        evt.stopPropagation();
+                        const selectedValue = parseInt(rotationSelect.value, 10);
+                        const normalized = setTextRotation(div, selectedValue);
+                        rotationSelect.value = String(normalized);
+                        recordState();
+                    });
+                }
                 const isConnector = (div.getAttribute("data-shape-type") ?? "").toLowerCase() === "connector";
 
                 const labelSpan = div.querySelector(".room-label");
@@ -1132,6 +1211,7 @@
                 div.style.alignItems = "center";
                 div.style.justifyContent = "center";
                 div.style.cursor = "move";
+                div.style.setProperty("--text-rotation", "0deg");
 
                 const span = document.createElement("span");
                 span.classList.add("room-label");
@@ -1155,6 +1235,16 @@
                 btnMoveBack.title = "Move back to palette";
                 btnMoveBack.textContent = "Back";
                 controls.appendChild(btnMoveBack);
+                const rotationSelect = document.createElement("select");
+                rotationSelect.classList.add("form-select", "form-select-sm", "text-rotation-select");
+                rotationSelect.title = "Rotate text";
+                [0, 45, 90, 135, 180, 225, 270, 315].forEach(deg => {
+                    const opt = document.createElement("option");
+                    opt.value = String(deg);
+                    opt.textContent = `${deg}°`;
+                    rotationSelect.appendChild(opt);
+                });
+                controls.appendChild(rotationSelect);
                 const btnDel = document.createElement("button");
                 btnDel.classList.add("btn", "btn-sm", "btn-light", "btn-delete-shape");
                 btnDel.title = "Delete shape";
@@ -1180,6 +1270,15 @@
                     typeof opts.shapeType === "string" ? opts.shapeType : "rectangle",
                     typeof opts.shapeData === "string" ? opts.shapeData : ""
                 );
+
+                const shapeType = typeof opts.shapeType === "string" ? opts.shapeType : "rectangle";
+                const shapeData = typeof opts.shapeData === "string" ? opts.shapeData : "";
+                const initialRotation = typeof opts.textRotation === "number"
+                    ? normalizeRotation(opts.textRotation)
+                    : defaultRotationForShape(shapeType, shapeData);
+                const normalizedRotation = setTextRotation(div, initialRotation);
+                rotationSelect.value = String(normalizedRotation);
+
                 setupBoxInteractions(div);
                 if (!opts.skipRecord) {
                     recordState();
@@ -1334,6 +1433,7 @@
                     const label = b.getAttribute("data-room-label") ?? "";
                     const shapeType = b.getAttribute("data-shape-type") ?? "rectangle";
                     const shapeData = b.getAttribute("data-shape-data") ?? "";
+                    const textRotation = getTextRotation(b);
                     layoutDtos.push({
                         id: Number.isNaN(layoutId) ? 0 : layoutId,
                         propertyId: propertyId,
@@ -1345,7 +1445,8 @@
                         height: h,
                         label: label,
                         shapeType: shapeType,
-                        shapeData: shapeData
+                        shapeData: shapeData,
+                        textRotation: textRotation
                     });
                 });
 
@@ -1391,6 +1492,14 @@
                                 ? layout.shapeData
                                 : (box.getAttribute("data-shape-data") ?? "");
                             applyShapeToElement(box, normalizedShapeType, normalizedShapeData);
+
+                            if (layout && typeof layout.textRotation === "number") {
+                                const normalizedRotation = setTextRotation(box, layout.textRotation);
+                                const rotationSelect = box.querySelector(".text-rotation-select");
+                                if (rotationSelect) {
+                                    rotationSelect.value = String(normalizedRotation);
+                                }
+                            }
                         });
                     }
 
