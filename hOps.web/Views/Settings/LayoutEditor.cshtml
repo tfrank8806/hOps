@@ -1426,7 +1426,11 @@
                 }
             }
 
-            document.getElementById("save-layout-btn").addEventListener("click", async () => {
+            const saveButton = document.getElementById("save-layout-btn");
+            saveButton.addEventListener("click", async () => {
+                if (saveButton.disabled) {
+                    return;
+                }
                 const boxesNodeList = container.querySelectorAll(".room-box");
                 const boxes = Array.from(boxesNodeList);
                 const layoutDtos = [];
@@ -1466,13 +1470,26 @@
                     layouts: layoutDtos
                 };
 
-                const resp = await fetch('@Url.Action("SaveLayout", "Settings")', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const result = await resp.json();
-                if (result.success) {
+                saveButton.disabled = true;
+                saveButton.textContent = "Saving...";
+
+                try {
+                    const resp = await fetch('@Url.Action("SaveLayout", "Settings")', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!resp.ok) {
+                        const errorText = await resp.text();
+                        throw new Error(`Save failed (${resp.status}): ${errorText.substring(0, 200)}`);
+                    }
+
+                    const result = await resp.json();
+                    if (!result || result.success !== true) {
+                        throw new Error("Save failed (unexpected response).");
+                    }
+
                     if (Array.isArray(result.layouts)) {
                         result.layouts.forEach((layout, index) => {
                             const box = boxes[index];
@@ -1530,8 +1547,12 @@
                     updateUndoRedoButtons();
 
                     alert("Layout saved!");
-                } else {
-                    alert("Error saving layout");
+                } catch (err) {
+                    console.error(err);
+                    alert(err instanceof Error ? err.message : "Error saving layout");
+                } finally {
+                    saveButton.disabled = false;
+                    saveButton.textContent = "Save Layout";
                 }
             });
 
