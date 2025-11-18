@@ -1419,7 +1419,9 @@ namespace hOps.web.Controllers
             catch (Exception ex)
             {
                 Response.StatusCode = 500;
-                return Json(new { success = false, error = ex.Message });
+                var details = ex.InnerException?.Message ?? ex.Message;
+                Console.Error.WriteLine($"SaveLayout error: {ex}");
+                return Json(new { success = false, error = details });
             }
         }
 
