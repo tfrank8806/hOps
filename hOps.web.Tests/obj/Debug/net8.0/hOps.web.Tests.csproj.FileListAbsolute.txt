@@ -386,3 +386,4 @@ C:\hOps\hOps.web.Tests\obj\Debug\net8.0\ref\hOps.web.Tests.dll
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\PdfSharpCore.dll
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\SixLabors.ImageSharp.dll
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\de\PdfSharpCore.resources.dll
+C:\hops\hOps.web.Tests\bin\Debug\net8.0\web.config
