@@ -1331,7 +1331,17 @@
             let resizeBox = null, startW = 0, startH = 0, startDX = 0, startDY = 0;
 
             function startDrag(evt) {
-                if (evt.target.classList.contains("resize-handle")) {
+                const targetEl = evt.target;
+                const isResizeHandle = targetEl instanceof HTMLElement && targetEl.classList.contains("resize-handle");
+                const isControlElement = targetEl instanceof HTMLElement &&
+                    (targetEl.closest(".box-controls") ||
+                        ["BUTTON", "SELECT", "OPTION", "TEXTAREA", "INPUT", "LABEL"].includes(targetEl.tagName));
+
+                if (!isResizeHandle && isControlElement) {
+                    return;
+                }
+
+                if (isResizeHandle) {
                     resizeBox = evt.target.parentElement;
                     startW = parseInt(window.getComputedStyle(resizeBox).width);
                     startH = parseInt(window.getComputedStyle(resizeBox).height);
