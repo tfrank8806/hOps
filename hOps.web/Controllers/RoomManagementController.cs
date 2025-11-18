@@ -52,6 +52,7 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequestFormLimits(ValueCountLimit = 20000)]
         public async Task<IActionResult> Save(int propertyId, List<Room> rooms)
         {
             var currentUser = await _userManager.GetUserAsync(User);

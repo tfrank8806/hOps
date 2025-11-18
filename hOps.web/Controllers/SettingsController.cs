@@ -1043,6 +1043,7 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequestFormLimits(ValueCountLimit = 20000)]
         public async Task<IActionResult> SaveRooms(int propertyId, List<Room> rooms)
         {
             var properties = await GetEditablePropertiesAsync();
