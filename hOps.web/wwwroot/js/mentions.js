@@ -6,7 +6,40 @@
     const END_MARKER = '\u200E';
     const ZERO_WIDTH_ZERO = '\u200B';
     const ZERO_WIDTH_ONE = '\u200C';
+    const CARET_STYLE_PROPERTIES = [
+        'direction',
+        'boxSizing',
+        'width',
+        'height',
+        'overflowX',
+        'overflowY',
+        'borderTopWidth',
+        'borderRightWidth',
+        'borderBottomWidth',
+        'borderLeftWidth',
+        'paddingTop',
+        'paddingRight',
+        'paddingBottom',
+        'paddingLeft',
+        'fontStyle',
+        'fontVariant',
+        'fontWeight',
+        'fontStretch',
+        'fontSize',
+        'fontSizeAdjust',
+        'lineHeight',
+        'fontFamily',
+        'textAlign',
+        'textTransform',
+        'textIndent',
+        'textDecoration',
+        'letterSpacing',
+        'wordSpacing',
+        'tabSize',
+        'MozTabSize'
+    ];
     const state = new WeakMap();
+    const caretMirror = createCaretMirror();
 
     document.querySelectorAll(selector).forEach(initMentionInput);
 
@@ -91,6 +124,21 @@
         container.style.padding = '0.25rem 0';
         document.body.appendChild(container);
         return container;
+    }
+
+    function createCaretMirror() {
+        const mirror = document.createElement('div');
+        mirror.style.position = 'absolute';
+        mirror.style.visibility = 'hidden';
+        mirror.style.whiteSpace = 'pre-wrap';
+        mirror.style.wordWrap = 'break-word';
+        mirror.style.top = '-9999px';
+        mirror.style.left = '-9999px';
+        mirror.style.padding = '0';
+        mirror.style.border = '0';
+        mirror.style.boxSizing = 'border-box';
+        document.body.appendChild(mirror);
+        return mirror;
     }
 
     function handleInput(input) {
@@ -200,9 +248,16 @@
 
     function positionSuggestions(input, container) {
         const rect = input.getBoundingClientRect();
-        container.style.left = window.scrollX + rect.left + 'px';
-        container.style.top = window.scrollY + rect.bottom + 6 + 'px';
-        container.style.width = rect.width + 'px';
+        const caret = getCaretCoordinates(input);
+        const width = Math.min(Math.max(rect.width, 220), 360);
+        container.style.width = width + 'px';
+        if (caret) {
+            container.style.left = window.scrollX + rect.left + caret.left + 'px';
+            container.style.top = window.scrollY + rect.top + caret.top + caret.height + 6 + 'px';
+        } else {
+            container.style.left = window.scrollX + rect.left + 'px';
+            container.style.top = window.scrollY + rect.bottom + 6 + 'px';
+        }
     }
 
     function setActive(items, index) {
@@ -214,6 +269,42 @@
                 item.classList.remove('active');
             }
         });
+    }
+
+    function getCaretCoordinates(input) {
+        if (!(input instanceof HTMLInputElement) && !(input instanceof HTMLTextAreaElement)) {
+            return null;
+        }
+
+        const selectionStart = input.selectionStart == null ? input.value.length : input.selectionStart;
+        copyCaretStyles(input);
+
+        caretMirror.textContent = input.value.slice(0, selectionStart);
+        const marker = document.createElement('span');
+        marker.textContent = input.value.slice(selectionStart) || '.';
+        marker.style.display = 'inline-block';
+        caretMirror.appendChild(marker);
+
+        const markerRect = marker.getBoundingClientRect();
+        const mirrorRect = caretMirror.getBoundingClientRect();
+        const style = window.getComputedStyle(input);
+        const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) || 16;
+
+        const top = markerRect.top - mirrorRect.top - input.scrollTop;
+        const left = markerRect.left - mirrorRect.left - input.scrollLeft;
+
+        caretMirror.innerHTML = '';
+        return { top, left, height: lineHeight };
+    }
+
+    function copyCaretStyles(input) {
+        const style = window.getComputedStyle(input);
+        CARET_STYLE_PROPERTIES.forEach((prop) => {
+            caretMirror.style[prop] = style[prop];
+        });
+
+        const width = style.width === 'auto' ? input.clientWidth : parseFloat(style.width);
+        caretMirror.style.width = (isNaN(width) ? input.clientWidth : width) + 'px';
     }
 
     function selectMention(item, input) {
