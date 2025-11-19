@@ -32,6 +32,9 @@
     var createButtonLabel = string.IsNullOrWhiteSpace(Model.CreateButtonText)
         ? "+ New"
         : Model.CreateButtonText!;
+    var createController = Model.CreateControllerName ?? string.Empty;
+    var createAction = Model.CreateActionName ?? string.Empty;
+    var createFragment = Model.CreateFragment ?? string.Empty;
 }
 
 <div class="card shadow-sm h-100">
@@ -41,9 +44,9 @@
             @if (hasCreateAction)
             {
                 <a class="btn btn-sm btn-primary"
-                   asp-controller="@Model.CreateControllerName!"
-                   asp-action="@Model.CreateActionName!"
-                   asp-fragment="@Model.CreateFragment">
+                   asp-controller="@createController"
+                   asp-action="@createAction"
+                   asp-fragment="@createFragment">
                     @createButtonLabel
                 </a>
             }

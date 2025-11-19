@@ -1,6 +1,8 @@
 @using System
 @using System.Globalization
+@using System.IO
 @using System.Linq
+@using System.Text.Json
 @using Microsoft.AspNetCore.Html
 @using Microsoft.AspNetCore.Http.Extensions
 @using hOps.web.Utilities
@@ -117,6 +119,17 @@
         var classes = $"sortable-header {(isAsc || isDesc ? "active" : string.Empty)}";
 
         return new HtmlString($"<a class=\"{classes}\" href=\"{url}\">{label}<span class=\"sort-indicator\">{indicator}</span></a>");
+    }
+
+    private static bool IsImageAttachment(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return false;
+        }
+
+        var extension = System.IO.Path.GetExtension(fileName).ToLowerInvariant();
+        return extension is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".svg";
     }
 }
 
@@ -265,6 +278,27 @@
 
         .workorder-details p {
             margin-bottom: 0;
+        }
+
+        .workorder-row[data-workorder] {
+            cursor: pointer;
+        }
+
+        .workorder-row[data-workorder] .workorder-action-group,
+        .workorder-row[data-workorder] .workorder-action-group * {
+            cursor: default;
+        }
+
+        .workorder-attachment-img {
+            width: 100%;
+            height: auto;
+            border-radius: 0.75rem;
+            object-fit: cover;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+        }
+
+        .workorder-modal-attachments .file-card {
+            min-height: 140px;
         }
 
         .sortable-header {
@@ -521,80 +555,114 @@
                                     var nextStatusLabel = statusSequence[(statusIndex + 1) % statusSequence.Length];
                                     var statusDisplay = order.Status.Equals("New", StringComparison.OrdinalIgnoreCase) ? "Open" : order.Status;
                                     var nextStatusFriendlyName = nextStatusLabel.Equals("New", StringComparison.OrdinalIgnoreCase) ? "Open" : nextStatusLabel;
+                                    var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
+                                    var attachmentsPayload = order.Attachments.Select(att =>
+                                    {
+                                        var fileLabel = string.IsNullOrWhiteSpace(att.FileName)
+                                            ? System.IO.Path.GetFileName(att.FilePath ?? string.Empty)
+                                            : att.FileName;
+                                        var rawPath = att.FilePath ?? string.Empty;
+                                        var resolvedUrl = string.IsNullOrWhiteSpace(rawPath) ? string.Empty : Url.Content(rawPath);
+                                        var imageCandidate = !string.IsNullOrWhiteSpace(att.FileName) ? att.FileName : rawPath;
+                                        return new
+                                        {
+                                            name = string.IsNullOrWhiteSpace(fileLabel) ? "Attachment" : fileLabel,
+                                            url = resolvedUrl,
+                                            isImage = IsImageAttachment(imageCandidate)
+                                        };
+                                    }).ToList();
+                                    var departmentDisplay = string.IsNullOrWhiteSpace(order.Department) ? "Unassigned" : order.Department;
+                                    var workOrderPayload = new
+                                    {
+                                        id = order.Id,
+                                        issue = order.Issue,
+                                        issueHtml = MentionMarkupFormatter.ToHtml(order.Issue),
+                                        details = order.Details ?? string.Empty,
+                                        detailsHtml = string.IsNullOrWhiteSpace(order.Details) ? string.Empty : MentionMarkupFormatter.ToHtml(order.Details),
+                                        location = order.Location,
+                                        status = order.Status,
+                                        statusColor = order.StatusColor,
+                                        workOrderType = order.WorkOrderType ?? "Unspecified",
+                                        department = departmentDisplay,
+                                        departmentColor = order.DepartmentColor,
+                                        dueDateText = order.DueDate.ToString("MMM dd, yyyy"),
+                                        createdAtText = createdLocal.ToString("MMM dd, yyyy h:mm tt"),
+                                        creator = string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator,
+                                        properties = order.Properties,
+                                        attachments = attachmentsPayload
+                                    };
+                                    var workOrderPayloadJson = JsonSerializer.Serialize(workOrderPayload);
 
-                                    <tr class="workorder-row @(isEditingRow ? "table-active" : string.Empty)" style="border-left: 4px solid @order.StatusColor;">
-                                        <td class="col-actions text-center">
-                                            <div class="workorder-action-group">
-                                                <a class="btn btn-outline-primary btn-sm"
-                                                   href="@($"{Url.Action("Edit", new { id = order.Id })}{filterQueryString}")">
-                                                    Edit
-                                                </a>
-                                                @if (Model.CanManageWorkOrders)
-                                                {
-                                                    var advanceUrl = $"{Url.Action("AdvanceStatus", new { id = order.Id })}{filterQueryString}";
-                                                    <form method="post" action="@advanceUrl" class="workorder-progress-form">
-                                                        @Html.AntiForgeryToken()
-                                                        <button type="submit" class="btn btn-outline-secondary btn-sm" title="Next status: @nextStatusFriendlyName">
-                                                            Next Status
-                                                        </button>
-                                                    </form>
-                                                }
-                                            </div>
-                                        </td>
-                                        <td class="col-status">
-                                            <span class="badge" style="background-color:@order.StatusColor;">@statusDisplay</span>
-                                        </td>
-                                        <td class="col-location">
-                                            <div class="fw-semibold workorder-location">@order.Location</div>
-                                            @if (!string.IsNullOrWhiteSpace(order.Details))
-                                            {
-                                                <small class="text-muted workorder-details">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Details))</small>
-                                            }
-                                        </td>
-                                        <td class="col-department">
-                                            @if (!string.IsNullOrWhiteSpace(order.Department))
-                                            {
-                                                <span class="badge" style="background-color:@order.DepartmentColor;">@order.Department</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="text-muted">Unassigned</span>
-                                            }
-                                        </td>
-                                        <td class="col-type">@order.WorkOrderType</td>
-                                        <td class="col-issue">
-                                            <div class="workorder-issue">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Issue))</div>
-                                        </td>
-                                        <td class="col-due @(isPastDue ? "fw-bold text-danger" : string.Empty)">@order.DueDate.ToString("MMM dd, yyyy")</td>
-                                        @{ var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt); }
-                                        <td class="col-created">@createdLocal.ToString("MMM dd, yyyy")</td>
-                                        <td class="col-creator">@(string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator)</td>
-                                        <td class="col-attachments text-center">
-                                            @if (order.Attachments.Any())
-                                            {
-                                                <div class="d-flex flex-wrap justify-content-center gap-2">
-                                                    @foreach (var attachment in order.Attachments)
-                                                    {
-                                                        <a href="@attachment.FilePath"
-                                                           target="_blank"
-                                                           class="attachment-link"
-                                                           title="@attachment.FileName">
-                                                            <span class="visually-hidden">View attachment (@attachment.FileName)</span>
-                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                                                                <path fill="currentColor" d="M6.354 13.657a3.5 3.5 0 0 1-4.95-4.95l6.718-6.718a2.5 2.5 0 0 1 3.536 3.536L5.621 11.612a1.5 1.5 0 1 1-2.121-2.121l5.303-5.304a.5.5 0 1 1 .708.708L4.208 10.2a.5.5 0 0 0 .707.707l5.303-5.303a1.5 1.5 0 1 0-2.121-2.121L1.379 10.5a2.5 2.5 0 1 0 3.536 3.536l5.657-5.657a.5.5 0 0 1 .707.708l-5.657 5.657Z" />
-                                                            </svg>
-                                                        </a>
-                                                    }
-                                                </div>
-                                            }
-                                            else
-                                            {
-                                                <span></span>
-                                            }
-                                        </td>
-                                    </tr>
-                                }
+                <tr class="workorder-row @(isEditingRow ? "table-active" : string.Empty)"
+                    style="border-left: 4px solid @order.StatusColor;"
+                    data-workorder="@workOrderPayloadJson">
+                    <td class="col-actions text-center">
+                        <div class="workorder-action-group">
+                            <a class="btn btn-outline-primary btn-sm"
+                               href="@($"{Url.Action("Edit", new { id = order.Id })}{filterQueryString}")">
+                                Edit
+                            </a>
+                            @if (Model.CanManageWorkOrders)
+                            {
+                                var advanceUrl = $"{Url.Action("AdvanceStatus", new { id = order.Id })}{filterQueryString}";
+                                <form method="post" action="@advanceUrl" class="workorder-progress-form">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm" title="Next status: @nextStatusFriendlyName">
+                                        Next Status
+                                    </button>
+                                </form>
                             }
+                        </div>
+                    </td>
+                    <td class="col-status">
+                        <span class="badge" style="background-color:@order.StatusColor;">@statusDisplay</span>
+                    </td>
+                    <td class="col-location">
+                        <div class="fw-semibold workorder-location">@order.Location</div>
+                        @if (!string.IsNullOrWhiteSpace(order.Details))
+                        {
+                            <small class="text-muted workorder-details">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Details))</small>
+                        }
+                    </td>
+                    <td class="col-department">
+                        @if (!string.IsNullOrWhiteSpace(order.Department))
+                        {
+                            <span class="badge" style="background-color:@order.DepartmentColor;">@order.Department</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Unassigned</span>
+                        }
+                    </td>
+                    <td class="col-type">@order.WorkOrderType</td>
+                    <td class="col-issue">
+                        <div class="workorder-issue">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Issue))</div>
+                    </td>
+                    <td class="col-due @(isPastDue ? "fw-bold text-danger" : string.Empty)">@order.DueDate.ToString("MMM dd, yyyy")</td>
+                    <td class="col-created">@createdLocal.ToString("MMM dd, yyyy")</td>
+                    <td class="col-creator">@(string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator)</td>
+                    <td class="col-attachments text-center">
+                        @if (order.Attachments.Any())
+                        {
+                            <button type="button"
+                                    class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
+                                    data-workorder-trigger="attachments">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                                    <path fill="currentColor" d="M6.354 13.657a3.5 3.5 0 0 1-4.95-4.95l6.718-6.718a2.5 2.5 0 0 1 3.536 3.536L5.621 11.612a1.5 1.5 0 1 1-2.121-2.121l5.303-5.304a.5.5 0 1 1 .708.708L4.208 10.2a.5.5 0 0 0 .707.707l5.303-5.303a1.5 1.5 0 1 0-2.121-2.121L1.379 10.5a2.5 2.5 0 1 0 3.536 3.536l5.657-5.657a.5.5 0 0 1 .707.708l-5.657 5.657Z" />
+                                </svg>
+                                <span>Preview</span>
+                                <span class="badge bg-light text-dark">@order.Attachments.Count</span>
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="text-muted">-</span>
+                        }
+                    </td>
+                </tr>
+            }
+        }
+    }
                         </tbody>
                     </table>
                 </div>
@@ -730,8 +798,67 @@
     </div>
 </div>
 
+<div class="modal fade" id="workOrderDetailsModal" tabindex="-1" aria-labelledby="workOrderDetailsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header flex-wrap gap-2">
+                <div>
+                    <h5 class="modal-title mb-0" id="workOrderDetailsLabel" data-workorder-field="title">Work Order</h5>
+                    <div class="text-muted small" data-workorder-field="meta"></div>
+                </div>
+                <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
+                    <span class="badge" data-workorder-field="status"></span>
+                    <span class="badge bg-light text-dark border" data-workorder-field="type"></span>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="fw-semibold text-uppercase small text-muted">Location</div>
+                        <div data-workorder-field="location"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="fw-semibold text-uppercase small text-muted">Department</div>
+                        <div data-workorder-field="department"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="fw-semibold text-uppercase small text-muted">Due Date</div>
+                        <div data-workorder-field="dueDate"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="fw-semibold text-uppercase small text-muted">Created</div>
+                        <div data-workorder-field="created"></div>
+                        <div class="text-muted small" data-workorder-field="creator"></div>
+                    </div>
+                    <div class="col-12">
+                        <div class="fw-semibold text-uppercase small text-muted">Properties</div>
+                        <div data-workorder-field="properties"></div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="fw-semibold text-uppercase small text-muted">Issue</div>
+                    <div data-workorder-field="issue"></div>
+                </div>
+                <div class="mb-3">
+                    <div class="fw-semibold text-uppercase small text-muted">Details</div>
+                    <div data-workorder-field="details" class="text-body"></div>
+                </div>
+                <div class="mb-2" data-workorder-attachments-section>
+                    <div class="fw-semibold text-uppercase small text-muted">Attachments</div>
+                    <div class="row g-3 workorder-modal-attachments" data-workorder-attachments></div>
+                    <p class="text-muted small mb-0" data-workorder-attachments-empty>No attachments were uploaded for this work order.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/workorders.js" asp-append-version="true"></script>
     <script>
         (function () {
             const printButton = document.getElementById('printWorkOrdersButton');
