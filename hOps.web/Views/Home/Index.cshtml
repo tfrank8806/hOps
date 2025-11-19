@@ -704,6 +704,11 @@
             border-radius: 0.65rem;
             padding: 0.5rem;
             display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            text-align: center;
+            gap: 0.25rem;
             flex-direction: column;
             gap: 0.5rem;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -834,6 +839,9 @@
             align-items: center;
             text-align: center;
             padding: 0.4rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
         }
 
         .room-tile-overlay .tile-label {
@@ -844,6 +852,8 @@
             color: #0f2e61;
             margin-top: 0.25rem;
             line-height: 1.1;
+            text-align: center;
+            word-break: break-word;
             transform: rotate(var(--tile-text-rotation, 0deg));
             transform-origin: center;
         }
@@ -894,15 +904,23 @@
 
         .tile-header {
             display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            gap: 0.5rem;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 0.35rem;
+            text-align: center;
         }
 
         .tile-room {
             font-weight: 600;
             font-size: 1rem;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            text-align: center;
+            line-height: 1.2;
+            word-break: break-word;
             transform: rotate(var(--tile-text-rotation, 0deg));
             transform-origin: center;
         }
