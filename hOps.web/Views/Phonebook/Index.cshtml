@@ -1,10 +1,24 @@
 @model hOps.web.ViewModels.PhonebookIndexViewModel
+@using System
 @using System.Text.Json
 @using System.Text.Encodings.Web
 @using System.Linq
 @{ 
     ViewData["Title"] = "Phonebook";
     ViewData["MainContainerClass"] = "main-inner--wide";
+    string[] SplitValues(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Array.Empty<string>();
+        }
+
+        return value
+            .Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(v => v.Trim())
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .ToArray();
+    }
     var contactsData = Model.Contacts.Select(contact => new
     {
         id = contact.Id,
@@ -14,7 +28,9 @@
         company = contact.Company,
         title = contact.Title,
         phone = contact.PhoneNumber,
+        phones = SplitValues(contact.PhoneNumber),
         email = contact.Email,
+        emails = SplitValues(contact.Email),
         fax = contact.Fax,
         website = contact.Website,
         address = contact.Address,
@@ -134,12 +150,22 @@ else
                             <p id="contactTitle">-</p>
                         </div>
                         <div class="col-sm-6">
-                            <h6 class="text-uppercase text-muted">Phone</h6>
-                            <p id="contactPhone">-</p>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <h6 class="text-uppercase text-muted mb-0">Phone</h6>
+                                <a id="addPhoneButton"
+                                   class="btn btn-sm btn-outline-secondary phonebook-add-action disabled"
+                                   aria-disabled="true">+ Add phone</a>
+                            </div>
+                            <div id="contactPhoneList" class="phonebook-contact-list text-muted">-</div>
                         </div>
                         <div class="col-sm-6">
-                            <h6 class="text-uppercase text-muted">Email</h6>
-                            <p id="contactEmail">-</p>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <h6 class="text-uppercase text-muted mb-0">Email</h6>
+                                <a id="addEmailButton"
+                                   class="btn btn-sm btn-outline-secondary phonebook-add-action disabled"
+                                   aria-disabled="true">+ Add email</a>
+                            </div>
+                            <div id="contactEmailList" class="phonebook-contact-list text-muted">-</div>
                         </div>
                         <div class="col-sm-6">
                             <h6 class="text-uppercase text-muted">Fax</h6>
@@ -184,8 +210,10 @@ else
                 company: document.getElementById('contactCompany'),
                 type: document.getElementById('contactType'),
                 title: document.getElementById('contactTitle'),
-                phone: document.getElementById('contactPhone'),
-                email: document.getElementById('contactEmail'),
+                phoneList: document.getElementById('contactPhoneList'),
+                emailList: document.getElementById('contactEmailList'),
+                addPhoneButton: document.getElementById('addPhoneButton'),
+                addEmailButton: document.getElementById('addEmailButton'),
                 fax: document.getElementById('contactFax'),
                 website: document.getElementById('contactWebsite'),
                 address: document.getElementById('contactAddress'),
@@ -206,6 +234,72 @@ else
 
             const basePath = window.location.pathname.replace(/\/$/, '');
 
+            function normalizeValues(arrayValue, fallback) {
+                if (Array.isArray(arrayValue) && arrayValue.length) {
+                    return arrayValue;
+                }
+                if (!fallback) {
+                    return [];
+                }
+                return fallback
+                    .split(/\r?\n/)
+                    .map(v => v.trim())
+                    .filter(Boolean);
+            }
+
+            function escapeHtml(value) {
+                const div = document.createElement('div');
+                div.textContent = value;
+                return div.innerHTML;
+            }
+
+            function renderMultiValue(target, values, fallback, type) {
+                if (!target) {
+                    return;
+                }
+
+                const entries = normalizeValues(values, fallback);
+                target.innerHTML = '';
+                if (!entries.length) {
+                    target.classList.add('text-muted');
+                    target.textContent = '-';
+                    return;
+                }
+
+                target.classList.remove('text-muted');
+                const list = document.createElement('ul');
+                list.className = 'list-unstyled mb-0';
+                entries.forEach(entry => {
+                    const li = document.createElement('li');
+                    const safeValue = escapeHtml(entry);
+                    if (type === 'phone') {
+                        li.innerHTML = `<a href="tel:${encodeURIComponent(entry)}">${safeValue}</a>`;
+                    } else if (type === 'email') {
+                        li.innerHTML = `<a href="mailto:${encodeURIComponent(entry)}">${safeValue}</a>`;
+                    } else {
+                        li.textContent = entry;
+                    }
+                    list.appendChild(li);
+                });
+                target.appendChild(list);
+            }
+
+            function setActionButton(button, url) {
+                if (!button) {
+                    return;
+                }
+
+                if (url) {
+                    button.href = url;
+                    button.classList.remove('disabled');
+                    button.removeAttribute('aria-disabled');
+                } else {
+                    button.classList.add('disabled');
+                    button.setAttribute('aria-disabled', 'true');
+                    button.removeAttribute('href');
+                }
+            }
+
             function updateDetails(contact) {
                 detailElements.name.textContent = contact.name || 'Unnamed contact';
                 detailElements.company.textContent = contact.company || '';
@@ -213,19 +307,25 @@ else
                 detailElements.type.textContent = contact.type || '-';
                 detailElements.type.style.backgroundColor = contact.typeColor || '#6c757d';
                 detailElements.title.textContent = formatValue(contact.title);
-                detailElements.phone.innerHTML = contact.phone ? `<a href="tel:${contact.phone}">${contact.phone}</a>` : '-';
-                detailElements.email.innerHTML = contact.email ? `<a href="mailto:${contact.email}">${contact.email}</a>` : '-';
+                renderMultiValue(detailElements.phoneList, contact.phones, contact.phone, 'phone');
+                renderMultiValue(detailElements.emailList, contact.emails, contact.email, 'email');
                 detailElements.fax.textContent = formatValue(contact.fax);
                 detailElements.website.innerHTML = contact.website ? `<a href="${contact.website}" target="_blank" rel="noopener">${contact.website}</a>` : '-';
                 detailElements.address.textContent = formatValue(contact.address);
                 detailElements.notes.textContent = formatValue(contact.notes, 'No notes');
-                detailElements.editButton.href = `${basePath}/Edit/${contact.id}`;
-                detailElements.editButton.classList.remove('disabled');
-                detailElements.editButton.removeAttribute('aria-disabled');
+                const editUrl = `${basePath}/Edit/${contact.id}`;
+                setActionButton(detailElements.editButton, editUrl);
+                setActionButton(detailElements.addPhoneButton, `${editUrl}#phoneFields`);
+                setActionButton(detailElements.addEmailButton, `${editUrl}#emailFields`);
             }
 
             function clearSelection() {
                 document.querySelectorAll('.phonebook-list-item.active').forEach(item => item.classList.remove('active'));
+                renderMultiValue(detailElements.phoneList, [], null, 'phone');
+                renderMultiValue(detailElements.emailList, [], null, 'email');
+                setActionButton(detailElements.editButton, null);
+                setActionButton(detailElements.addPhoneButton, null);
+                setActionButton(detailElements.addEmailButton, null);
             }
 
             if (list) {

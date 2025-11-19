@@ -1,10 +1,12 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 
 namespace hOps.web.Models
 {
-    public class PhonebookContact
+    public class PhonebookContact : IValidatableObject
     {
         public int Id { get; set; }
 
@@ -26,11 +28,9 @@ namespace hOps.web.Models
 
         public string? Title { get; set; }
 
-        [Phone]
         [Display(Name = "Phone Number")]
         public string? PhoneNumber { get; set; }
 
-        [EmailAddress]
         public string? Email { get; set; }
 
         [Phone]
@@ -64,6 +64,40 @@ namespace hOps.web.Models
 
                 return TypeName;
             }
+        }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            var phoneValidator = new PhoneAttribute();
+            foreach (var phone in SplitMultiline(PhoneNumber))
+            {
+                if (!phoneValidator.IsValid(phone))
+                {
+                    yield return new ValidationResult($"Invalid phone number: {phone}", new[] { nameof(PhoneNumber) });
+                }
+            }
+
+            var emailValidator = new EmailAddressAttribute();
+            foreach (var email in SplitMultiline(Email))
+            {
+                if (!emailValidator.IsValid(email))
+                {
+                    yield return new ValidationResult($"Invalid email address: {email}", new[] { nameof(Email) });
+                }
+            }
+        }
+
+        private static IEnumerable<string> SplitMultiline(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return Enumerable.Empty<string>();
+            }
+
+            return value
+                .Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(v => v.Trim())
+                .Where(v => !string.IsNullOrWhiteSpace(v));
         }
     }
 }

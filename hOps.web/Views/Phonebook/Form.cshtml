@@ -1,6 +1,25 @@
+@using System
 @model hOps.web.ViewModels.PhonebookContactFormViewModel
 @{
     ViewData["Title"] = Model.Title;
+
+    string[] BuildEntries(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return new[] { string.Empty };
+        }
+
+        var parts = raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(v => v.Trim())
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .ToArray();
+
+        return parts.Length > 0 ? parts : new[] { string.Empty };
+    }
+
+    var phoneEntries = BuildEntries(Model.Contact.PhoneNumber);
+    var emailEntries = BuildEntries(Model.Contact.Email);
 }
 
 <h1 class="h3 mb-4">@Model.Title</h1>
@@ -61,14 +80,50 @@
             <input asp-for="Contact.Title" class="form-control" />
             <span asp-validation-for="Contact.Title" class="text-danger"></span>
         </div>
-        <div class="col-md-6">
-            <label asp-for="Contact.PhoneNumber" class="form-label"></label>
-            <input asp-for="Contact.PhoneNumber" class="form-control" />
+        <div class="col-md-6" id="phoneFields">
+            <label class="form-label" for="phoneFieldGroup">Phone Numbers</label>
+            <input type="hidden" asp-for="Contact.PhoneNumber" data-field-hidden="phone" />
+            <div id="phoneFieldGroup" class="phonebook-field-group" data-field-group="phone">
+                @foreach (var phone in phoneEntries)
+                {
+                    <div class="input-group mb-2" data-field-row="phone">
+                        <input type="tel"
+                               class="form-control"
+                               value="@phone"
+                               placeholder="(555) 123-4567" />
+                        <button type="button"
+                                class="btn btn-outline-danger"
+                                data-remove-field="phone"
+                                aria-label="Remove phone number">&times;</button>
+                    </div>
+                }
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-add-field="phone">
+                + Add phone
+            </button>
             <span asp-validation-for="Contact.PhoneNumber" class="text-danger"></span>
         </div>
-        <div class="col-md-6">
-            <label asp-for="Contact.Email" class="form-label"></label>
-            <input asp-for="Contact.Email" class="form-control" />
+        <div class="col-md-6" id="emailFields">
+            <label class="form-label" for="emailFieldGroup">Email Addresses</label>
+            <input type="hidden" asp-for="Contact.Email" data-field-hidden="email" />
+            <div id="emailFieldGroup" class="phonebook-field-group" data-field-group="email">
+                @foreach (var email in emailEntries)
+                {
+                    <div class="input-group mb-2" data-field-row="email">
+                        <input type="email"
+                               class="form-control"
+                               value="@email"
+                               placeholder="name@example.com" />
+                        <button type="button"
+                                class="btn btn-outline-danger"
+                                data-remove-field="email"
+                                aria-label="Remove email address">&times;</button>
+                    </div>
+                }
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-add-field="email">
+                + Add email
+            </button>
             <span asp-validation-for="Contact.Email" class="text-danger"></span>
         </div>
         <div class="col-md-6">
@@ -101,4 +156,82 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const setupGroup = (fieldName) => {
+                const container = document.querySelector(`[data-field-group="${fieldName}"]`);
+                const hiddenInput = document.querySelector(`[data-field-hidden="${fieldName}"]`);
+                const addButton = document.querySelector(`[data-add-field="${fieldName}"]`);
+                if (!container || !hiddenInput || !addButton) {
+                    return;
+                }
+
+                const form = hiddenInput.form;
+
+                const createRow = (value = '') => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'input-group mb-2';
+                    wrapper.setAttribute('data-field-row', fieldName);
+
+                    const input = document.createElement('input');
+                    input.className = 'form-control';
+                    input.type = fieldName === 'email' ? 'email' : 'tel';
+                    input.placeholder = fieldName === 'email' ? 'name@example.com' : '(555) 123-4567';
+                    input.value = value;
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'btn btn-outline-danger';
+                    removeBtn.setAttribute('data-remove-field', fieldName);
+                    removeBtn.setAttribute('aria-label', `Remove ${fieldName}`);
+                    removeBtn.innerHTML = '&times;';
+
+                    wrapper.append(input, removeBtn);
+                    return wrapper;
+                };
+
+                const updateHidden = () => {
+                    const values = Array.from(container.querySelectorAll('input'))
+                        .map(input => input.value.trim())
+                        .filter(Boolean);
+                    hiddenInput.value = values.join('\n');
+                    updateRemoveButtons();
+                };
+
+                const updateRemoveButtons = () => {
+                    const disable = container.querySelectorAll('[data-field-row]').length <= 1;
+                    container.querySelectorAll('[data-remove-field]').forEach(btn => {
+                        btn.disabled = disable;
+                    });
+                };
+
+                addButton.addEventListener('click', () => {
+                    const row = createRow();
+                    container.appendChild(row);
+                    row.querySelector('input')?.focus();
+                    updateHidden();
+                });
+
+                container.addEventListener('click', (event) => {
+                    const target = event.target;
+                    if (!target.matches('[data-remove-field]')) {
+                        return;
+                    }
+
+                    const row = target.closest('[data-field-row]');
+                    if (row && container.querySelectorAll('[data-field-row]').length > 1) {
+                        row.remove();
+                        updateHidden();
+                    }
+                });
+
+                container.addEventListener('input', updateHidden);
+                form?.addEventListener('submit', updateHidden);
+                updateHidden();
+            };
+
+            setupGroup('phone');
+            setupGroup('email');
+        })();
+    </script>
 }
