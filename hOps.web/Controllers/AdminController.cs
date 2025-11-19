@@ -22,6 +22,7 @@ namespace hOps.web.Controllers
     {
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IEmailSender _emailSender;
+        private const string ExternalLoginUrl = "https://www.guestquest.net/Identity/Account/Login";
 
         public AdminController(
             ApplicationDbContext db,
@@ -214,7 +215,7 @@ namespace hOps.web.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            var loginUrl = Url.Page("/Account/Login", pageHandler: null, values: null, protocol: Request.Scheme) ?? string.Empty;
+            var loginUrl = ExternalLoginUrl;
             var message = $@"
 Hi {user.FirstName},<br/><br/>
 An account has been created for you on HotelOps.<br/>
@@ -375,7 +376,7 @@ HotelOps Admin Team
             targetUser.MustChangePassword = true;
             await _userManager.UpdateAsync(targetUser);
 
-            var loginUrl = Url.Page("/Account/Login", pageHandler: null, values: null, protocol: Request.Scheme) ?? string.Empty;
+            var loginUrl = ExternalLoginUrl;
             var message = $@"
 Hi {targetUser.FirstName},<br/><br/>
 Your HotelOps password was reset by an administrator.<br/>
