@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -85,10 +86,16 @@ namespace hOps.web.Areas.Identity.Pages.Account
             if (result.Succeeded)
             {
                 var user = await _userManager.FindByEmailAsync(Input.Email);
-                if (user != null && user.MustChangePassword)
+                if (user != null)
                 {
-                    _logger.LogInformation("Redirecting user {UserId} to forced password change.", user.Id);
-                    return RedirectToPage("./ForceChangePassword");
+                    user.LastLoginAtUtc = DateTime.UtcNow;
+                    await _userManager.UpdateAsync(user);
+
+                    if (user.MustChangePassword)
+                    {
+                        _logger.LogInformation("Redirecting user {UserId} to forced password change.", user.Id);
+                        return RedirectToPage("./ForceChangePassword");
+                    }
                 }
 
                 _logger.LogInformation("User {Email} logged in.", Input.Email);

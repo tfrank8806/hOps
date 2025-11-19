@@ -671,7 +671,8 @@ HotelOps Admin Team
                     Roles = roles,
                     PropertyIds = propertyIds,
                     CanDelete = canDelete,
-                    CanResetPassword = canReset
+                    CanResetPassword = canReset,
+                    LastLoginAtUtc = u.LastLoginAtUtc
                 });
             }
 

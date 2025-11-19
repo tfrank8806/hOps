@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 
 namespace hOps.web.Models
 {
@@ -12,6 +13,6 @@ namespace hOps.web.Models
         public IList<int> PropertyIds { get; set; } = new List<int>();
         public bool CanDelete { get; set; }
         public bool CanResetPassword { get; set; }
-        // Optionally, you can include a list of property names or full Property objects
+        public DateTime? LastLoginAtUtc { get; set; }
     }
 }

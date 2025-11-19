@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Identity;
 using hOps.web.Utilities;
 
@@ -20,6 +22,7 @@ namespace hOps.web.Models
         public bool EmailDailySummary { get; set; } = false;
         public bool EmailOnSchedulePosted { get; set; } = true;
         public DateTime? DailySummaryLastSentUtc { get; set; }
+        public DateTime? LastLoginAtUtc { get; set; }
 
         public int? DefaultPropertyId { get; set; }
         public Property? DefaultProperty { get; set; }

@@ -43,6 +43,7 @@
                 <th>Last Name</th>
                 <th>Roles</th>
                 <th>Properties</th>
+                <th class="text-nowrap">Last Login</th>
                 <th class="text-nowrap">Actions</th>
             </tr>
         </thead>
@@ -50,7 +51,7 @@
             @if (!Model.Users.Any())
             {
                 <tr>
-                    <td colspan="6" class="text-center py-4">No users found.</td>
+                    <td colspan="7" class="text-center py-4">No users found.</td>
                 </tr>
             }
             else
@@ -77,6 +78,16 @@
                             else
                             {
                                 <em>None</em>
+                            }
+                        </td>
+                        <td class="text-nowrap">
+                            @if (user.LastLoginAtUtc.HasValue)
+                            {
+                                @TimeZoneService.ConvertToUserTime(user.LastLoginAtUtc.Value).ToString("g")
+                            }
+                            else
+                            {
+                                <em>Never</em>
                             }
                         </td>
                         <td>
