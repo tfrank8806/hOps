@@ -398,6 +398,11 @@ static async Task ApplyMigrationsWithLegacySupportAsync(ApplicationDbContext dbC
     {
         await dbContext.Database.MigrateAsync();
     }
+    catch (SqliteException ex) when (IsDuplicateTableCreateError(ex, "AspNetRoles"))
+    {
+        await EnsureInitialSqlServerMigrationRecordedAsync(dbContext);
+        await dbContext.Database.MigrateAsync();
+    }
     catch (SqliteException ex) when (IsDuplicateMustChangePasswordColumnError(ex))
     {
         await EnsureMustChangePasswordColumnAsync(dbContext);
@@ -598,7 +603,25 @@ static bool IsDuplicateTableSchemaError(SqliteException ex, string tableName)
         return true;
     }
 
-    return message.Contains("already exists", StringComparison.OrdinalIgnoreCase);
+        return message.Contains("already exists", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool IsDuplicateTableCreateError(SqliteException ex, string tableName)
+{
+    if (ex.SqliteErrorCode != 1)
+    {
+        return false;
+    }
+
+    var message = ex.Message ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(message))
+    {
+        return false;
+    }
+
+    return message.Contains($"table \"{tableName}\" already exists", StringComparison.OrdinalIgnoreCase)
+        || message.Contains($"table '{tableName}' already exists", StringComparison.OrdinalIgnoreCase)
+        || message.Contains($"table {tableName} already exists", StringComparison.OrdinalIgnoreCase);
 }
 
 static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbContext)
@@ -662,6 +685,44 @@ static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbCon
             // schema errors when preparing the INSERT. Treat this as a no-op because the
             // existing tables already represent the applied migration.
         }
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
+        }
+    }
+}
+
+static async Task EnsureInitialSqlServerMigrationRecordedAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        var requiredTables = new[]
+        {
+            "AspNetRoles",
+            "AspNetUsers",
+            "AspNetUserRoles"
+        };
+
+        foreach (var table in requiredTables)
+        {
+            if (!await TableExistsAsync(connection, table))
+            {
+                return;
+            }
+        }
+
+        await EnsureMigrationRecordedAsync(connection, "20251117203459_InitialSqlServer", "8.0.20");
     }
     finally
     {
