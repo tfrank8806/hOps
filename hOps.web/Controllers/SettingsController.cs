@@ -1252,7 +1252,7 @@ namespace hOps.web.Controllers
                 {
                     Id = l.Id,
                     PropertyId = l.PropertyId,
-                    RoomId = l.RoomId,
+                    RoomId = l.RoomId ?? 0,
                     Floor = l.Floor,
                     X = l.X,
                     Y = l.Y,
@@ -1346,6 +1346,7 @@ namespace hOps.web.Controllers
                     var normalizedShapeType = string.IsNullOrWhiteSpace(dto.ShapeType) ? null : dto.ShapeType!.Trim();
                     var normalizedShapeData = string.IsNullOrWhiteSpace(dto.ShapeData) ? null : dto.ShapeData!.Trim();
                     var normalizedRotation = NormalizeRotation(dto.TextRotation);
+                    var normalizedRoomId = dto.RoomId.HasValue && dto.RoomId.Value > 0 ? dto.RoomId.Value : (int?)null;
 
                     RoomLayout? layoutEntity = null;
                     if (dto.Id > 0)
@@ -1353,9 +1354,9 @@ namespace hOps.web.Controllers
                         layoutEntity = layoutsOnFloor.FirstOrDefault(l => l.Id == dto.Id);
                     }
 
-                    if (layoutEntity == null && dto.RoomId > 0)
+                    if (layoutEntity == null && normalizedRoomId.HasValue)
                     {
-                        layoutEntity = layoutsOnFloor.FirstOrDefault(l => l.RoomId == dto.RoomId);
+                        layoutEntity = layoutsOnFloor.FirstOrDefault(l => l.RoomId == normalizedRoomId.Value);
                     }
 
                     if (layoutEntity == null)
@@ -1363,14 +1364,14 @@ namespace hOps.web.Controllers
                         layoutEntity = new RoomLayout
                         {
                             PropertyId = propertyId,
-                            RoomId = dto.RoomId,
+                            RoomId = normalizedRoomId,
                             Floor = floor
                         };
                         _db.RoomLayouts.Add(layoutEntity);
                         layoutsOnFloor.Add(layoutEntity);
                     }
 
-                    layoutEntity.RoomId = dto.RoomId;
+                    layoutEntity.RoomId = normalizedRoomId;
                     layoutEntity.Floor = floor;
                     layoutEntity.X = dto.X;
                     layoutEntity.Y = dto.Y;
@@ -1402,7 +1403,7 @@ namespace hOps.web.Controllers
                     .Select(l => new
                     {
                         id = l.Id,
-                        roomId = l.RoomId,
+                        roomId = l.RoomId ?? 0,
                         label = l.Label ?? string.Empty,
                         x = l.X,
                         y = l.Y,

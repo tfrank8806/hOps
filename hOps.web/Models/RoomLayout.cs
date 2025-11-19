@@ -18,7 +18,7 @@ namespace hOps.web.Models
         /// <summary>
         /// The room this layout box is associated with.
         /// </summary>
-        public int RoomId { get; set; }
+        public int? RoomId { get; set; }
         public Room? Room { get; set; }
 
         /// <summary>
