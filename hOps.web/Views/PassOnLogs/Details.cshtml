@@ -72,12 +72,15 @@
                     <ul class="list-unstyled mb-4">
                         @foreach (var comment in Model.Comments)
                         {
-                            <li class="mb-3">
+                            <li class="passon-comment mb-3">
                                 @{
                                     var commentLocal = TimeZoneService.ConvertToUserTime(comment.CreatedAt);
                                 }
-                                <div class="fw-semibold">@comment.CreatorName <span class="text-muted small">@commentLocal.ToString("g")</span></div>
-                                <div class="comment-body rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(comment.Body))</div>
+                                <div class="passon-comment__header">
+                                    <div class="fw-semibold mb-0">@comment.CreatorName</div>
+                                    <div class="text-muted small">@commentLocal.ToString("g")</div>
+                                </div>
+                                <div class="passon-comment__body rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(comment.Body))</div>
                             </li>
                         }
                     </ul>
@@ -129,6 +132,32 @@
         </div>
     </div>
 </div>
+
+@section Styles {
+    <style>
+        .passon-comment {
+            border: 1px solid rgba(13, 110, 253, 0.15);
+            border-radius: 0.85rem;
+            background-color: #fafbff;
+            padding: 0.75rem 0.9rem;
+        }
+
+        .passon-comment__header {
+            background: linear-gradient(135deg, rgba(13, 110, 253, 0.12), rgba(13, 110, 253, 0.03));
+            border-radius: 0.65rem;
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 0.35rem;
+        }
+
+        .passon-comment__body {
+            color: #1f2937;
+        }
+    </style>
+}
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
