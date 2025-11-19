@@ -50,7 +50,7 @@
                 }
                 else
                 {
-                    <form asp-action="Create" method="post" class="row g-3 mb-4">
+                    <form asp-action="Create" method="post" class="row g-3 mb-4" id="mailLogCreateForm">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="hideDelivered" value="@(Model.HideDelivered ? "true" : "false")" />
                         <div class="col-12">

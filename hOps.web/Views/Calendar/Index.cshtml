@@ -227,7 +227,7 @@
                     <span>Create Event</span>
                 </div>
                 <div class="card-body">
-                    <form asp-action="Create" method="post" enctype="multipart/form-data">
+                    <form asp-action="Create" method="post" enctype="multipart/form-data" id="calendarCreateForm">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="month" value="@Model.CurrentMonth.Month" />
                         <input type="hidden" name="year" value="@Model.CurrentMonth.Year" />

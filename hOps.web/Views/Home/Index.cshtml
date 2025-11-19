@@ -440,16 +440,48 @@
 
     <div class="row g-4 mt-1">
         <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Package Log", Model.PackageLogs.Cast<object>().ToList(), "MailLog", "Index")' />
+            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel(
+                "Package Log",
+                Model.PackageLogs.Cast<object>().ToList(),
+                "MailLog",
+                "Index",
+                createControllerName: "MailLog",
+                createActionName: "Index",
+                createButtonText: "+ New Package",
+                createFragment: "mailLogCreateForm")' />
         </div>
         <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Upcoming Events", Model.UpcomingEvents.Cast<object>().ToList(), "Calendar", "Index")' />
+            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel(
+                "Upcoming Events",
+                Model.UpcomingEvents.Cast<object>().ToList(),
+                "Calendar",
+                "Index",
+                createControllerName: "Calendar",
+                createActionName: "Index",
+                createButtonText: "+ New Event",
+                createFragment: "calendarCreateForm")' />
         </div>
         <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Work Orders", Model.WorkOrders.Cast<object>().ToList(), "WorkOrders", "Index")' />
+            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel(
+                "Work Orders",
+                Model.WorkOrders.Cast<object>().ToList(),
+                "WorkOrders",
+                "Index",
+                createControllerName: "WorkOrders",
+                createActionName: "Index",
+                createButtonText: "+ New Work Order",
+                createFragment: "workOrdersForm")' />
         </div>
         <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel("Lost & Found", Model.LostFoundEntries.Cast<object>().ToList(), "LostAndFound", "Index")' />
+            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel(
+                "Lost & Found",
+                Model.LostFoundEntries.Cast<object>().ToList(),
+                "LostAndFound",
+                "Index",
+                createControllerName: "LostAndFound",
+                createActionName: "Index",
+                createButtonText: "+ New L&F Entry",
+                createFragment: "lostFoundEntryForm")' />
         </div>
     </div>
 

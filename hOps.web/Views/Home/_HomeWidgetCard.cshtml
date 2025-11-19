@@ -27,10 +27,28 @@
     }
 }
 
+@{
+    var hasCreateAction = !string.IsNullOrWhiteSpace(Model.CreateControllerName) && !string.IsNullOrWhiteSpace(Model.CreateActionName);
+    var createButtonLabel = string.IsNullOrWhiteSpace(Model.CreateButtonText)
+        ? "+ New"
+        : Model.CreateButtonText!;
+}
+
 <div class="card shadow-sm h-100">
-    <div class="card-header d-flex align-items-center justify-content-between">
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <h2 class="h6 mb-0">@Model.Title</h2>
-        <a class="btn btn-sm btn-outline-primary" asp-controller="@Model.ControllerName" asp-action="@Model.ActionName">View All</a>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            @if (hasCreateAction)
+            {
+                <a class="btn btn-sm btn-primary"
+                   asp-controller="@Model.CreateControllerName!"
+                   asp-action="@Model.CreateActionName!"
+                   asp-fragment="@Model.CreateFragment">
+                    @createButtonLabel
+                </a>
+            }
+            <a class="btn btn-sm btn-outline-primary" asp-controller="@Model.ControllerName" asp-action="@Model.ActionName">View All</a>
+        </div>
     </div>
     <div class="card-body">
         @if (!items.Any())
