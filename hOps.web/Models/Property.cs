@@ -44,6 +44,7 @@ namespace hOps.web.Models
         public ICollection<DocumentFolderProperty> DocumentFolderLinks { get; set; } = new List<DocumentFolderProperty>();
 
         public ICollection<ManagerAnnouncement> ManagerAnnouncements { get; set; } = new List<ManagerAnnouncement>();
+        public ICollection<SalesContact> SalesContacts { get; set; } = new List<SalesContact>();
 
         public ICollection<BulletinPost> BulletinPosts { get; set; } = new List<BulletinPost>();
 

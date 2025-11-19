@@ -55,6 +55,7 @@ namespace hOps.web.Data
         public DbSet<DocumentProperty> DocumentProperties { get; set; }
         public DbSet<DocumentFolderProperty> DocumentFolderProperties { get; set; }
         public DbSet<UserPropertyEmailSubscription> UserPropertyEmailSubscriptions { get; set; }
+        public DbSet<SalesContact> SalesContacts { get; set; }
         public DbSet<UserToDoItem> UserToDoItems { get; set; }
         public DbSet<ScheduleSettings> ScheduleSettings { get; set; }
         public DbSet<ScheduleShiftTemplate> ScheduleShiftTemplates { get; set; }
@@ -480,6 +481,22 @@ namespace hOps.web.Data
                 .WithOne(p => p.ScheduleSettings)
                 .HasForeignKey<ScheduleSettings>(s => s.PropertyId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<SalesContact>()
+                .HasOne(sc => sc.Property)
+                .WithMany(p => p.SalesContacts)
+                .HasForeignKey(sc => sc.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<SalesContact>()
+                .HasOne(sc => sc.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(sc => sc.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<SalesContact>()
+                .HasIndex(sc => new { sc.PropertyId, sc.Email })
+                .IsUnique();
 
             builder.Entity<ScheduleSettings>()
                 .HasOne(s => s.UpdatedByUser)

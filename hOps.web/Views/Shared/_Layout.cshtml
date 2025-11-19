@@ -142,6 +142,11 @@
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link @(currentController == "Sales" ? "active" : string.Empty)" asp-controller="Sales" asp-action="Index">
+                                    <span class="sidebar-text">Sales Lead</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link @((currentController == "Support" && string.Equals(currentAction, "Tips", System.StringComparison.OrdinalIgnoreCase)) ? "active" : string.Empty)" asp-controller="Support" asp-action="Tips">
                                     <span class="sidebar-text">FAQs</span>
                                 </a>

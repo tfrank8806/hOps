@@ -1,0 +1,343 @@
+@model hOps.web.ViewModels.Sales.SalesLeadPageViewModel
+@using hOps.web.ViewModels.Sales
+@using System.Collections.Generic
+@using System
+@{
+    ViewData["Title"] ??= "Sales Lead";
+    var hasProperty = Model.HasCurrentProperty;
+    var inquirySelections = Model.Form.InquiryTypes ?? new List<string>();
+    var otherSelected = inquirySelections.Any(type => type.Equals(SalesLeadFormViewModel.OtherInquiryKey, StringComparison.OrdinalIgnoreCase));
+}
+
+<div class="row g-4">
+    <div class="col-12 col-xl-8">
+        <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h1 class="h5 mb-0">Sales Lead</h1>
+                    <small class="text-muted">Send qualified leads to your sales contact and property managers instantly.</small>
+                </div>
+            </div>
+            <div class="card-body">
+                @if (Model.SubmittedSuccessfully)
+                {
+                    <div class="alert alert-success" role="alert">
+                        Thanks! Your sales lead has been emailed to the selected sales contact and the management team.
+                    </div>
+                }
+
+                @if (!hasProperty)
+                {
+                    <div class="alert alert-warning" role="alert">
+                        Select a property using the property picker in the header before submitting a sales lead.
+                    </div>
+                }
+
+                <form id="salesLeadForm" asp-action="Index" method="post" novalidate>
+                    @Html.AntiForgeryToken()
+
+                    @Html.ValidationSummary(false, "", new { @class = "text-danger fw-semibold" })
+
+                    <fieldset @(hasProperty ? null : "disabled")>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="salesContactSelect">@Html.DisplayNameFor(m => m.Form.SalesContactId)</label>
+                            <div class="d-flex gap-2 flex-column flex-md-row">
+                                <select class="form-select" id="salesContactSelect" name="Form.SalesContactId" aria-describedby="salesContactHelp">
+                                    <option value="">Select a sales contact</option>
+                                    @foreach (var option in Model.SalesContactOptions)
+                                    {
+                                        <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
+                                    }
+                                    <option value="__new">Add new sales contact...</option>
+                                </select>
+                            </div>
+                            <div id="salesContactHelp" class="form-text">
+                                Choose who should receive this lead. Use the <em>Add new sales contact</em> option to add someone new.
+                            </div>
+                            <span asp-validation-for="Form.SalesContactId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label asp-for="Form.GroupName" class="form-label fw-semibold"></label>
+                                <input asp-for="Form.GroupName" class="form-control" placeholder="Company or event name" />
+                                <span asp-validation-for="Form.GroupName" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="Form.ContactName" class="form-label fw-semibold"></label>
+                                <input asp-for="Form.ContactName" class="form-control" placeholder="Primary contact" />
+                                <span asp-validation-for="Form.ContactName" class="text-danger small"></span>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-0 mt-md-3">
+                            <div class="col-md-6">
+                                <label asp-for="Form.ContactPhone" class="form-label fw-semibold"></label>
+                                <input asp-for="Form.ContactPhone" class="form-control" inputmode="tel" placeholder="(555) 555-5555" />
+                                <span asp-validation-for="Form.ContactPhone" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="Form.ContactEmail" class="form-label fw-semibold"></label>
+                                <input asp-for="Form.ContactEmail" class="form-control" placeholder="contact@example.com" />
+                                <span asp-validation-for="Form.ContactEmail" class="text-danger small"></span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3 mt-3">
+                            <label class="form-label fw-semibold">@Html.DisplayNameFor(m => m.Form.InquiryTypes)</label>
+                            <div class="row row-cols-1 row-cols-md-2 g-2">
+                                @foreach (var option in SalesLeadFormViewModel.InquiryOptions)
+                                {
+                                    var checkboxId = $"inquiry_{option.Key}";
+                                    <div class="col">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" value="@option.Key" id="@checkboxId" name="Form.InquiryTypes" data-inquiry-key="@option.Key"
+                                                   @(inquirySelections.Any(type => type.Equals(option.Key, StringComparison.OrdinalIgnoreCase)) ? "checked" : null) />
+                                            <label class="form-check-label" for="@checkboxId">
+                                                <strong>@option.Label</strong><br />
+                                                <span class="text-muted small">@option.Description</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            <span asp-validation-for="Form.InquiryTypes" class="text-danger small"></span>
+                        </div>
+
+                        <div class="mb-3 @(otherSelected ? string.Empty : "d-none")" id="otherInquiryDetailsRow">
+                            <label asp-for="Form.InquiryOtherDetails" class="form-label fw-semibold"></label>
+                            <input asp-for="Form.InquiryOtherDetails" class="form-control" id="otherInquiryDetailsInput" placeholder="Share more about the request" />
+                            <span asp-validation-for="Form.InquiryOtherDetails" class="text-danger small"></span>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label asp-for="Form.StartDate" class="form-label fw-semibold">Dates (if known)</label>
+                                <div class="input-group">
+                                    <input asp-for="Form.StartDate" class="form-control" type="date" />
+                                    <span class="input-group-text">to</span>
+                                    <input asp-for="Form.EndDate" class="form-control" type="date" />
+                                </div>
+                                <span asp-validation-for="Form.StartDate" class="text-danger small"></span>
+                                <span asp-validation-for="Form.EndDate" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Budget (if known)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input asp-for="Form.BudgetMinimum" class="form-control" type="number" min="0" step="100" placeholder="Min" />
+                                    <span class="input-group-text">to</span>
+                                    <input asp-for="Form.BudgetMaximum" class="form-control" type="number" min="0" step="100" placeholder="Max" />
+                                </div>
+                                <span asp-validation-for="Form.BudgetMinimum" class="text-danger small"></span>
+                                <span asp-validation-for="Form.BudgetMaximum" class="text-danger small"></span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3 mt-3">
+                            <label asp-for="Form.AdditionalDetails" class="form-label fw-semibold"></label>
+                            <textarea asp-for="Form.AdditionalDetails" class="form-control" rows="5" placeholder="Share any extra context the team should know."></textarea>
+                            <span asp-validation-for="Form.AdditionalDetails" class="text-danger small"></span>
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn btn-primary" @(hasProperty ? null : "disabled")>Submit Lead</button>
+                        </div>
+                    </fieldset>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header">
+                <h2 class="h6 mb-0 text-uppercase text-muted">Property Context</h2>
+            </div>
+            <div class="card-body d-flex flex-column gap-3">
+                <div>
+                    <h3 class="h6 text-muted text-uppercase">Current Property</h3>
+                    @if (Model.HasCurrentProperty)
+                    {
+                        <p class="mb-0 fw-semibold">@Model.CurrentPropertyName</p>
+                        @if (!string.IsNullOrWhiteSpace(Model.CurrentPropertyCode))
+                        {
+                            <p class="mb-0 text-muted small">@Model.CurrentPropertyCode</p>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">No property selected</p>
+                    }
+                    <p class="small text-muted mb-0">Use the property picker in the header to change this selection.</p>
+                </div>
+                <div>
+                    <h3 class="h6 text-muted text-uppercase">Who gets notified?</h3>
+                    <ul class="small ps-3 mb-0">
+                        <li>The sales contact you choose.</li>
+                        <li>All team members with Manager or Admin access for this property.</li>
+                        <li>Each email includes your name and the details entered in the form.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="h6 text-muted text-uppercase">Tip</h3>
+                    <p class="small mb-0">Need to add someone new? Choose <em>Add new sales contact</em> from the dropdown, enter their details, and they will appear immediately.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addSalesContactModal" tabindex="-1" aria-labelledby="addSalesContactModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="addSalesContactModalLabel">Add Sales Contact</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addSalesContactForm" novalidate>
+                <div class="modal-body">
+                    <div class="alert alert-danger d-none" id="addContactError"></div>
+                    <div class="alert alert-success d-none" id="addContactSuccess"></div>
+                    <div class="mb-3">
+                        <label for="newContactName" class="form-label fw-semibold">Name</label>
+                        <input type="text" class="form-control" id="newContactName" name="Name" maxlength="200" required placeholder="Full name" />
+                    </div>
+                    <div class="mb-0">
+                        <label for="newContactEmail" class="form-label fw-semibold">Email</label>
+                        <input type="email" class="form-control" id="newContactEmail" name="Email" maxlength="256" required placeholder="person@example.com" />
+                    </div>
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Contact</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const contactSelect = document.getElementById('salesContactSelect');
+            const addContactModalEl = document.getElementById('addSalesContactModal');
+            const addContactForm = document.getElementById('addSalesContactForm');
+            const addContactError = document.getElementById('addContactError');
+            const addContactSuccess = document.getElementById('addContactSuccess');
+            const addContactUrl = '@Url.Action("AddContact", "Sales")';
+            const tokenInput = document.querySelector('#salesLeadForm input[name="__RequestVerificationToken"]');
+            const otherInputRow = document.getElementById('otherInquiryDetailsRow');
+            const otherInput = document.getElementById('otherInquiryDetailsInput');
+            const otherCheck = document.querySelector('input[data-inquiry-key="@SalesLeadFormViewModel.OtherInquiryKey"]');
+            const modal = addContactModalEl ? new bootstrap.Modal(addContactModalEl) : null;
+            let lastValidContactValue = contactSelect?.value ?? '';
+
+            function toggleOtherInput() {
+                if (!otherInputRow || !otherInput || !otherCheck) {
+                    return;
+                }
+                const shouldShow = otherCheck.checked;
+                otherInputRow.classList.toggle('d-none', !shouldShow);
+                otherInput.disabled = !shouldShow;
+            }
+
+            toggleOtherInput();
+            otherCheck?.addEventListener('change', toggleOtherInput);
+
+            contactSelect?.addEventListener('change', () => {
+                if (contactSelect.value === '__new') {
+                    contactSelect.value = lastValidContactValue || '';
+                    addContactError?.classList.add('d-none');
+                    addContactSuccess?.classList.add('d-none');
+                    addContactForm?.reset();
+                    modal?.show();
+                    document.getElementById('newContactName')?.focus();
+                    return;
+                }
+                lastValidContactValue = contactSelect.value;
+            });
+
+            addContactForm?.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (!tokenInput || !addContactUrl) {
+                    return;
+                }
+                const submitButton = addContactForm.querySelector('button[type="submit"]');
+                submitButton?.setAttribute('disabled', 'disabled');
+
+                const payload = {
+                    name: document.getElementById('newContactName')?.value?.trim() ?? '',
+                    email: document.getElementById('newContactEmail')?.value?.trim() ?? ''
+                };
+
+                if (!payload.name || !payload.email) {
+                    showContactError('Name and email are required.');
+                    submitButton?.removeAttribute('disabled');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(addContactUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': tokenInput.value
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        const message = result?.message ?? 'Unable to save the sales contact.';
+                        showContactError(message);
+                        submitButton?.removeAttribute('disabled');
+                        return;
+                    }
+
+                    showContactSuccess('Sales contact saved.');
+                    const addNewOption = contactSelect?.querySelector('option[value="__new"]');
+                    const option = document.createElement('option');
+                    option.value = result?.contact?.id?.toString() ?? '';
+                    option.textContent = `${result?.contact?.name ?? 'New Contact'} (${result?.contact?.email ?? ''})`.trim();
+
+                    if (contactSelect && option.value) {
+                        contactSelect.insertBefore(option, addNewOption ?? null);
+                        contactSelect.value = option.value;
+                        lastValidContactValue = option.value;
+                    }
+
+                    setTimeout(() => {
+                        modal?.hide();
+                        addContactForm.reset();
+                        addContactSuccess?.classList.add('d-none');
+                        addContactError?.classList.add('d-none');
+                    }, 900);
+                } catch {
+                    showContactError('Something went wrong while saving the contact.');
+                } finally {
+                    submitButton?.removeAttribute('disabled');
+                }
+            });
+
+            function showContactError(message) {
+                if (!addContactError) {
+                    return;
+                }
+                addContactError.textContent = message;
+                addContactError.classList.remove('d-none');
+                addContactSuccess?.classList.add('d-none');
+            }
+
+            function showContactSuccess(message) {
+                if (!addContactSuccess) {
+                    return;
+                }
+                addContactSuccess.textContent = message;
+                addContactSuccess.classList.remove('d-none');
+                addContactError?.classList.add('d-none');
+            }
+        })();
+    </script>
+}
