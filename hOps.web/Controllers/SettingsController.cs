@@ -1420,8 +1420,17 @@ namespace hOps.web.Controllers
             {
                 Response.StatusCode = 500;
                 var details = ex.InnerException?.Message ?? ex.Message;
-                Console.Error.WriteLine($"SaveLayout error: {ex}");
-                return Json(new { success = false, error = details });
+                var full = ex.ToString();
+                Console.Error.WriteLine($"SaveLayout error: {full}");
+
+                // Include more detail in the response so the UI can show the true cause.
+                var safeMessage = string.IsNullOrWhiteSpace(details) ? full : $"{details} | {full}";
+                if (safeMessage.Length > 2000)
+                {
+                    safeMessage = safeMessage.Substring(0, 2000);
+                }
+
+                return Json(new { success = false, error = safeMessage });
             }
         }
 
