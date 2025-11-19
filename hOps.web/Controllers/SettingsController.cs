@@ -1342,6 +1342,12 @@ namespace hOps.web.Controllers
 
                 foreach (var dto in request.Layouts ?? new List<RoomLayoutDto>())
                 {
+                    // Skip entries with no room and no layout data
+                    if (!dto.RoomId.HasValue && dto.Id == 0 && string.IsNullOrWhiteSpace(dto.ShapeType) && string.IsNullOrWhiteSpace(dto.Label))
+                    {
+                        continue;
+                    }
+
                     var trimmedLabel = string.IsNullOrWhiteSpace(dto.Label) ? null : dto.Label!.Trim();
                     var normalizedShapeType = string.IsNullOrWhiteSpace(dto.ShapeType) ? null : dto.ShapeType!.Trim();
                     var normalizedShapeData = string.IsNullOrWhiteSpace(dto.ShapeData) ? null : dto.ShapeData!.Trim();
