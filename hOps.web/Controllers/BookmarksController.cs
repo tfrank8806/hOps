@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using hOps.web.Data;
@@ -267,6 +268,83 @@ namespace hOps.web.Controllers
                 BookmarkSection.Team => bookmark.CreatedById == currentUser.Id || isManager,
                 _ => false
             };
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> QuickList()
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            var canManagePropertyBookmarks = roles.Contains("Manager") || roles.Contains("Admin");
+            var quickList = new List<object>();
+
+            var userBookmarks = await _context.Bookmarks
+                .Where(b => b.Section == BookmarkSection.User && b.CreatedById == currentUser.Id)
+                .OrderBy(b => b.Name)
+                .Take(5)
+                .ToListAsync();
+
+            quickList.AddRange(userBookmarks
+                .Where(b => !string.IsNullOrWhiteSpace(b.Url))
+                .Select(b => new
+            {
+                name = b.Name,
+                url = b.Url,
+                section = "Personal"
+            }));
+
+            if (currentPropertyId.HasValue)
+            {
+                var propertyName = await _context.Properties
+                    .Where(p => p.Id == currentPropertyId.Value)
+                    .Select(p => p.Name)
+                    .FirstOrDefaultAsync();
+
+                var propertyLabel = string.IsNullOrWhiteSpace(propertyName)
+                    ? "Current Property"
+                    : propertyName;
+
+                var teamBookmarks = await _context.Bookmarks
+                    .Where(b => b.Section == BookmarkSection.Team && b.PropertyId == currentPropertyId.Value)
+                    .OrderBy(b => b.Name)
+                    .Take(5)
+                    .ToListAsync();
+
+                quickList.AddRange(teamBookmarks
+                    .Where(b => !string.IsNullOrWhiteSpace(b.Url))
+                    .Select(b => new
+                {
+                    name = b.Name,
+                    url = b.Url,
+                    section = $"Team · {propertyLabel}"
+                }));
+
+                if (canManagePropertyBookmarks)
+                {
+                    var propertyBookmarks = await _context.Bookmarks
+                        .Where(b => b.Section == BookmarkSection.Property && b.PropertyId == currentPropertyId.Value)
+                        .OrderBy(b => b.Name)
+                        .Take(5)
+                        .ToListAsync();
+
+                    quickList.AddRange(propertyBookmarks
+                        .Where(b => !string.IsNullOrWhiteSpace(b.Url))
+                        .Select(b => new
+                    {
+                        name = b.Name,
+                        url = b.Url,
+                        section = $"Property · {propertyLabel}"
+                    }));
+                }
+            }
+
+            return Json(quickList.Take(12));
         }
     }
 }

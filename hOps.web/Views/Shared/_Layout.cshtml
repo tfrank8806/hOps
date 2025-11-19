@@ -84,12 +84,6 @@
 
                         @if (SignInManager.IsSignedIn(User))
                         {
-                            <li class="nav-item">
-                                <a class="nav-link @(currentController == "Calendar" ? "active" : string.Empty)" asp-controller="Calendar" asp-action="Index">
-                                    <span class="sidebar-text">Calendar</span>
-                                </a>
-                            </li>
-
                             var user = await UserManager.GetUserAsync(User);
                             IList<string> roles = new List<string>();
                             if (user is not null)
@@ -98,33 +92,18 @@
                             }
 
                             <li class="nav-item">
-                                <a class="nav-link @(currentController == "WorkOrders" ? "active" : string.Empty)" asp-controller="WorkOrders" asp-action="Index">
-                                    <span class="sidebar-text">Work Orders</span>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link @(currentController == "Schedules" ? "active" : string.Empty)" asp-controller="Schedules" asp-action="Index">
-                                    <span class="sidebar-text">Schedules</span>
-                                </a>
-                            </li>
-                            <li class="nav-item">
                                 <a class="nav-link @(currentController == "PassOnLogs" ? "active" : string.Empty)" asp-controller="PassOnLogs" asp-action="Index">
                                     <span class="sidebar-text">Pass On Logs</span>
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link @(currentController == "Phonebook" ? "active" : string.Empty)" asp-controller="Phonebook" asp-action="Index">
-                                    <span class="sidebar-text">Phonebook</span>
+                                <a class="nav-link @(currentController == "WorkOrders" ? "active" : string.Empty)" asp-controller="WorkOrders" asp-action="Index">
+                                    <span class="sidebar-text">Work Orders</span>
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link @(currentController == "Bookmarks" ? "active" : string.Empty)" asp-controller="Bookmarks" asp-action="Index">
-                                    <span class="sidebar-text">Bookmarks</span>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link @(currentController == "Documents" ? "active" : string.Empty)" asp-controller="Documents" asp-action="Index">
-                                    <span class="sidebar-text">Documents</span>
+                                <a class="nav-link @(currentController == "Calendar" ? "active" : string.Empty)" asp-controller="Calendar" asp-action="Index">
+                                    <span class="sidebar-text">Calendar</span>
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -133,33 +112,48 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link @(currentController == "Logs" ? "active" : string.Empty)" asp-controller="Logs" asp-action="Index">
-                                    <span class="sidebar-text">Logs</span>
-                                </a>
-                            </li>
-                            <li class="nav-item">
                                 <a class="nav-link @(currentController == "MailLog" ? "active" : string.Empty)" asp-controller="MailLog" asp-action="Index">
                                     <span class="sidebar-text">Package &amp; Mail Log</span>
                                 </a>
                             </li>
                             <li class="nav-item">
-                            <a class="nav-link @(currentController == "Reports" ? "active" : string.Empty)" asp-controller="Reports" asp-action="Index">
-                                <span class="sidebar-text">Reports</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link @((currentController == "Support" && string.Equals(currentAction, "Index", System.StringComparison.OrdinalIgnoreCase)) ? "active" : string.Empty)" asp-controller="Support" asp-action="Index">
-                                <span class="sidebar-text">Support</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link @((currentController == "Support" && string.Equals(currentAction, "Tips", System.StringComparison.OrdinalIgnoreCase)) ? "active" : string.Empty)" asp-controller="Support" asp-action="Tips">
-                                <span class="sidebar-text">Tips &amp; Tricks</span>
-                            </a>
-                        </li>
+                                <a class="nav-link @(currentController == "Phonebook" ? "active" : string.Empty)" asp-controller="Phonebook" asp-action="Index">
+                                    <span class="sidebar-text">Phonebook</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @(currentController == "Schedules" ? "active" : string.Empty)" asp-controller="Schedules" asp-action="Index">
+                                    <span class="sidebar-text">Schedules</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @(currentController == "Documents" ? "active" : string.Empty)" asp-controller="Documents" asp-action="Index">
+                                    <span class="sidebar-text">Documents</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @(currentController == "Logs" ? "active" : string.Empty)" asp-controller="Logs" asp-action="Index">
+                                    <span class="sidebar-text">Custom Logs</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @(currentController == "Reports" ? "active" : string.Empty)" asp-controller="Reports" asp-action="Index">
+                                    <span class="sidebar-text">Reports</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @((currentController == "Support" && string.Equals(currentAction, "Tips", System.StringComparison.OrdinalIgnoreCase)) ? "active" : string.Empty)" asp-controller="Support" asp-action="Tips">
+                                    <span class="sidebar-text">FAQs</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @((currentController == "Support" && string.Equals(currentAction, "Index", System.StringComparison.OrdinalIgnoreCase)) ? "active" : string.Empty)" asp-controller="Support" asp-action="Index">
+                                    <span class="sidebar-text">Support</span>
+                                </a>
+                            </li>
 
-                        if (roles.Contains("Manager") || roles.Contains("Admin"))
-                        {
+                            if (roles.Contains("Manager") || roles.Contains("Admin"))
+                            {
                                 <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle @(currentController == "Admin" || currentController == "Settings" || currentController == "Properties" ? "active" : string.Empty)" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                         <span class="sidebar-text position-relative">
@@ -264,6 +258,22 @@
                                     </ul>
                                 </li>
                             }
+
+                            <li class="nav-item dropdown me-2" id="bookmarkMenu">
+                                <a class="nav-link position-relative bookmark-toggle" href="#" role="button" id="bookmarkMenuToggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Quick bookmarks">
+                                    <svg class="bookmark-toggle-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                                    </svg>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-end bookmark-dropdown-menu" aria-labelledby="bookmarkMenuToggle">
+                                    <div class="px-3 py-2 text-muted small">Quick Bookmarks</div>
+                                    <div id="bookmarkMenuContent">
+                                        <div class="px-3 py-2 text-muted small">Loading bookmarks...</div>
+                                    </div>
+                                    <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item" asp-controller="Bookmarks" asp-action="Index">Manage bookmarks</a>
+                                </div>
+                            </li>
 
                             <li class="nav-item dropdown me-2" id="messagesMenu">
                                 <a class="nav-link dropdown-toggle position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -568,6 +578,94 @@
             const QUICK_MENU_WIDTH = 240;
             let quickMenuHideTimer;
             const SIDEBAR_STORAGE_KEY = 'sidebarCollapsed';
+            const bookmarkMenu = document.getElementById('bookmarkMenu');
+            const bookmarkMenuContent = document.getElementById('bookmarkMenuContent');
+
+            if (bookmarkMenu && bookmarkMenuContent && window.bootstrap) {
+                const toggle = bookmarkMenu.querySelector('[data-bs-toggle="dropdown"]');
+                const dropdown = toggle ? bootstrap.Dropdown.getOrCreateInstance(toggle, { autoClose: true }) : null;
+                let bookmarksLoaded = false;
+                let bookmarksLoading = false;
+
+                const escapeHtml = (value) => {
+                    const div = document.createElement('div');
+                    div.textContent = value ?? '';
+                    return div.innerHTML;
+                };
+
+                const renderBookmarks = (items) => {
+                    if (!items.length) {
+                        bookmarkMenuContent.innerHTML = '<div class="px-3 py-2 text-muted small">No bookmarks yet.</div>';
+                        return;
+                    }
+
+                    const list = document.createElement('ul');
+                    list.className = 'mb-0 px-2 py-1';
+
+                    items.forEach(item => {
+                        const name = escapeHtml(item.name || 'Untitled bookmark');
+                        const section = item.section ? escapeHtml(item.section) : '';
+                        const url = item.url || '#';
+                        const listItem = document.createElement('li');
+                        listItem.className = 'mb-1';
+                        listItem.innerHTML = `
+                            <a class="dropdown-item d-flex flex-column gap-1" href="${url}" target="_blank" rel="noopener">
+                                <span class="fw-semibold">${name}</span>
+                                ${section ? `<small class="text-muted">${section}</small>` : ''}
+                            </a>`;
+                        list.appendChild(listItem);
+                    });
+
+                    bookmarkMenuContent.innerHTML = '';
+                    bookmarkMenuContent.appendChild(list);
+                };
+
+                const loadBookmarks = async () => {
+                    if (bookmarksLoaded || bookmarksLoading) {
+                        return;
+                    }
+                    bookmarksLoading = true;
+                    try {
+                        const response = await fetch('/Bookmarks/QuickList');
+                        if (!response.ok) {
+                            throw new Error('Request failed');
+                        }
+                        const data = await response.json();
+                        const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+                        renderBookmarks(items);
+                        bookmarksLoaded = true;
+                    } catch (err) {
+                        console.error('Unable to load bookmarks', err);
+                        bookmarkMenuContent.innerHTML = '<div class="px-3 py-2 text-danger small">Unable to load bookmarks.</div>';
+                    } finally {
+                        bookmarksLoading = false;
+                    }
+                };
+
+                const showBookmarkDropdown = () => {
+                    if (dropdown) {
+                        dropdown.show();
+                        loadBookmarks();
+                    }
+                };
+
+                const hideBookmarkDropdown = () => {
+                    if (dropdown) {
+                        dropdown.hide();
+                    }
+                };
+
+                bookmarkMenu.addEventListener('mouseenter', showBookmarkDropdown);
+                bookmarkMenu.addEventListener('mouseleave', () => {
+                    setTimeout(() => {
+                        if (!bookmarkMenu.matches(':hover')) {
+                            hideBookmarkDropdown();
+                        }
+                    }, 200);
+                });
+
+                toggle?.addEventListener('click', () => loadBookmarks());
+            }
 
             function updateSidebarAria() {
                 const expanded = !body.classList.contains('sidebar-collapsed');
