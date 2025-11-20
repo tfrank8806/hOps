@@ -249,6 +249,39 @@ namespace hOps.web.Services
                 .CountAsync(n => n.UserId == userId && !n.IsRead && n.Type != "message");
         }
 
+        public async Task<UserNotification?> GetAlertAsync(int notificationId, string userId)
+        {
+            return await _context.UserNotifications
+                .FirstOrDefaultAsync(n => n.Id == notificationId && n.UserId == userId && n.Type != "message");
+        }
+
+        public async Task DeleteAlertAsync(int notificationId, string userId)
+        {
+            var alert = await GetAlertAsync(notificationId, userId);
+            if (alert == null)
+            {
+                return;
+            }
+
+            _context.UserNotifications.Remove(alert);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAllAlertsAsync(string userId)
+        {
+            var alerts = await _context.UserNotifications
+                .Where(n => n.UserId == userId && n.Type != "message")
+                .ToListAsync();
+
+            if (alerts.Count == 0)
+            {
+                return;
+            }
+
+            _context.UserNotifications.RemoveRange(alerts);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task ArchiveConversationForUserAsync(int conversationId, string userId)
         {
             var conversation = await _context.DirectMessageConversations
@@ -276,9 +309,7 @@ namespace hOps.web.Services
 
         public async Task MarkNotificationAsReadAsync(int notificationId, string userId)
         {
-            var notification = await _context.UserNotifications
-                .FirstOrDefaultAsync(n => n.Id == notificationId && n.UserId == userId);
-
+            var notification = await GetAlertAsync(notificationId, userId);
             if (notification == null)
             {
                 return;

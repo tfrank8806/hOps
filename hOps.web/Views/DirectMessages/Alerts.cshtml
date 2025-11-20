@@ -3,6 +3,7 @@
     ViewData["Title"] = "Alerts";
     ViewData["MainContainerClass"] = "main-inner--wide";
     ViewData["ContentSurfaceClass"] = "content-surface--flush";
+    var hasAlerts = Model.Alerts.Any();
 }
 
 @await Html.PartialAsync("_MessagesNav")
@@ -17,17 +18,27 @@
                     : $"{Model.UnreadAlertCount} unread")
             </small>
         </div>
-        <form asp-controller="Notifications" asp-action="MarkAllRead" method="post" class="d-inline-flex">
-            @Html.AntiForgeryToken()
-            <button type="submit"
-                    class="btn btn-outline-secondary btn-sm"
-                    @(Model.UnreadAlertCount == 0 ? "disabled" : null)>
-                Mark all as read
-            </button>
-        </form>
+        <div class="d-flex gap-2">
+            <form asp-controller="Notifications" asp-action="MarkAllRead" method="post" class="d-inline-flex">
+                @Html.AntiForgeryToken()
+                <button type="submit"
+                        class="btn btn-outline-secondary btn-sm"
+                        @(Model.UnreadAlertCount == 0 ? "disabled" : null)>
+                    Mark all as read
+                </button>
+            </form>
+            <form asp-controller="Notifications" asp-action="DeleteAll" method="post" class="d-inline-flex">
+                @Html.AntiForgeryToken()
+                <button type="submit"
+                        class="btn btn-outline-danger btn-sm"
+                        @(hasAlerts ? null : "disabled")>
+                    Delete all
+                </button>
+            </form>
+        </div>
     </div>
     <div class="card-body">
-        @if (!Model.Alerts.Any())
+        @if (!hasAlerts)
         {
             <p class="text-muted mb-0">No alerts yet. New mentions and notifications will show up here.</p>
         }
@@ -43,16 +54,33 @@
                                 <div class="fw-semibold">@alert.Title</div>
                                 <div class="text-muted small">@alert.CreatedAt.ToString("g")</div>
                             </div>
-                            <div class="d-flex align-items-center gap-2">
+                            <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                                 <span class="badge rounded-pill @badgeClass">@((alert.Type ?? "alert").ToUpperInvariant())</span>
                                 @if (!alert.IsRead)
                                 {
                                     <span class="badge bg-warning text-dark">Unread</span>
                                 }
-                                @if (!string.IsNullOrWhiteSpace(alert.LinkUrl))
-                                {
-                                    <a class="btn btn-outline-primary btn-sm" href="@alert.LinkUrl">Open</a>
-                                }
+                                <div class="d-flex align-items-center gap-2">
+                                    @if (!string.IsNullOrWhiteSpace(alert.LinkUrl))
+                                    {
+                                        <form asp-controller="Notifications"
+                                              asp-action="Open"
+                                              asp-route-id="@alert.Id"
+                                              method="post"
+                                              class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-outline-primary btn-sm">Open</button>
+                                        </form>
+                                    }
+                                    <form asp-controller="Notifications"
+                                          asp-action="Delete"
+                                          asp-route-id="@alert.Id"
+                                          method="post"
+                                          class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                         @if (!string.IsNullOrWhiteSpace(alert.Content))

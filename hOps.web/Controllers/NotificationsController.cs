@@ -92,5 +92,64 @@ namespace hOps.web.Controllers
             await _messageService.MarkAllAlertsReadAsync(currentUser.Id);
             return RedirectToAction("Alerts", "DirectMessages");
         }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            await _messageService.DeleteAlertAsync(id, currentUser.Id);
+            return RedirectToAction("Alerts", "DirectMessages");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteAll()
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            await _messageService.DeleteAllAlertsAsync(currentUser.Id);
+            return RedirectToAction("Alerts", "DirectMessages");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Open(int id)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            var alert = await _messageService.GetAlertAsync(id, currentUser.Id);
+            if (alert == null)
+            {
+                return RedirectToAction("Alerts", "DirectMessages");
+            }
+
+            if (!alert.IsRead)
+            {
+                await _messageService.MarkNotificationAsReadAsync(id, currentUser.Id);
+            }
+
+            if (string.IsNullOrWhiteSpace(alert.LinkUrl))
+            {
+                return RedirectToAction("Alerts", "DirectMessages");
+            }
+
+            return Url.IsLocalUrl(alert.LinkUrl)
+                ? LocalRedirect(alert.LinkUrl)
+                : Redirect(alert.LinkUrl);
+        }
     }
 }
