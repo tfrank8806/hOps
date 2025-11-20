@@ -45,6 +45,7 @@ namespace hOps.web.Models
 
         public ICollection<ManagerAnnouncement> ManagerAnnouncements { get; set; } = new List<ManagerAnnouncement>();
         public ICollection<SalesContact> SalesContacts { get; set; } = new List<SalesContact>();
+        public ICollection<SalesLeadSubmission> SalesLeadSubmissions { get; set; } = new List<SalesLeadSubmission>();
 
         public ICollection<BulletinPost> BulletinPosts { get; set; } = new List<BulletinPost>();
 

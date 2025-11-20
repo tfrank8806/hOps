@@ -25,5 +25,7 @@ namespace hOps.web.Models
         public ApplicationUser? CreatedByUser { get; set; }
 
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+        public ICollection<SalesLeadSubmission> SalesLeads { get; set; } = new List<SalesLeadSubmission>();
     }
 }

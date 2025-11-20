@@ -56,6 +56,7 @@ namespace hOps.web.Data
         public DbSet<DocumentFolderProperty> DocumentFolderProperties { get; set; }
         public DbSet<UserPropertyEmailSubscription> UserPropertyEmailSubscriptions { get; set; }
         public DbSet<SalesContact> SalesContacts { get; set; }
+        public DbSet<SalesLeadSubmission> SalesLeadSubmissions { get; set; }
         public DbSet<UserToDoItem> UserToDoItems { get; set; }
         public DbSet<ScheduleSettings> ScheduleSettings { get; set; }
         public DbSet<ScheduleShiftTemplate> ScheduleShiftTemplates { get; set; }
@@ -497,6 +498,35 @@ namespace hOps.web.Data
             builder.Entity<SalesContact>()
                 .HasIndex(sc => new { sc.PropertyId, sc.Email })
                 .IsUnique();
+
+            builder.Entity<SalesLeadSubmission>()
+                .HasOne(sl => sl.Property)
+                .WithMany(p => p.SalesLeadSubmissions)
+                .HasForeignKey(sl => sl.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<SalesLeadSubmission>()
+                .HasOne(sl => sl.SalesContact)
+                .WithMany(sc => sc.SalesLeads)
+                .HasForeignKey(sl => sl.SalesContactId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<SalesLeadSubmission>()
+                .HasOne(sl => sl.SubmittedByUser)
+                .WithMany()
+                .HasForeignKey(sl => sl.SubmittedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<SalesLeadSubmission>()
+                .HasIndex(sl => new { sl.PropertyId, sl.CreatedAtUtc });
+
+            builder.Entity<SalesLeadSubmission>()
+                .Property(sl => sl.BudgetMinimum)
+                .HasColumnType("decimal(18,2)");
+
+            builder.Entity<SalesLeadSubmission>()
+                .Property(sl => sl.BudgetMaximum)
+                .HasColumnType("decimal(18,2)");
 
             builder.Entity<ScheduleSettings>()
                 .HasOne(s => s.UpdatedByUser)

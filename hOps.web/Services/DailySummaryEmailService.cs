@@ -23,6 +23,14 @@ namespace hOps.web.Services
 
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DailySummaryEmailService> _logger;
+        private static readonly IReadOnlyDictionary<string, string> SalesInquiryLabels =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "group_rooms", "Group Rooms" },
+                { "corporate_rate", "Corporate Rate" },
+                { "meeting_room", "Meeting Room" },
+                { "other", "Other" }
+            };
 
         public DailySummaryEmailService(IServiceProvider serviceProvider, ILogger<DailySummaryEmailService> logger)
         {
@@ -135,13 +143,21 @@ namespace hOps.web.Services
                         (p.UpdatedAt.HasValue && p.UpdatedAt.Value >= dayStartUtc && p.UpdatedAt.Value < dayEndUtc))
                     .ToListAsync(cancellationToken);
 
-                if (!logs.Any() && !posts.Any())
+                var salesLeads = await context.SalesLeadSubmissions
+                    .AsNoTracking()
+                    .Include(sl => sl.Property)
+                    .Include(sl => sl.SalesContact)
+                    .Where(sl => propertyIds.Contains(sl.PropertyId))
+                    .Where(sl => sl.CreatedAtUtc >= dayStartUtc && sl.CreatedAtUtc < dayEndUtc)
+                    .ToListAsync(cancellationToken);
+
+                if (!logs.Any() && !posts.Any() && !salesLeads.Any())
                 {
                     user.DailySummaryLastSentUtc = dayStartUtc;
                     continue;
                 }
 
-                var body = BuildSummaryBody(user, summaryDate, logs, posts);
+                var body = BuildSummaryBody(user, summaryDate, logs, posts, salesLeads);
                 var subject = $"Daily summary for {summaryDate:MMM d, yyyy}";
 
                 try
@@ -158,7 +174,12 @@ namespace hOps.web.Services
             await context.SaveChangesAsync(cancellationToken);
         }
 
-        private static string BuildSummaryBody(ApplicationUser user, DateOnly summaryDate, List<PassOnLog> logs, List<BulletinPost> posts)
+        private static string BuildSummaryBody(
+            ApplicationUser user,
+            DateOnly summaryDate,
+            List<PassOnLog> logs,
+            List<BulletinPost> posts,
+            List<SalesLeadSubmission> salesLeads)
         {
             var builder = new StringBuilder();
             var userName = BuildUserDisplayName(user);
@@ -226,6 +247,46 @@ namespace hOps.web.Services
                 builder.AppendLine("</ul>");
             }
 
+            if (salesLeads.Any())
+            {
+                builder.AppendLine(@"<h3 style=""margin-top:1.5rem;"">Sales Leads</h3>");
+                builder.AppendLine("<ul>");
+                foreach (var lead in salesLeads.OrderBy(l => l.CreatedAtUtc))
+                {
+                    var propertyName = lead.Property?.Name ?? "Property";
+                    var safeProperty = WebUtility.HtmlEncode(propertyName);
+                    var submittedAt = FormatUserLocal(lead.CreatedAtUtc, userTimeZone, "MMM d, yyyy h:mm tt");
+                    var safeSubmitted = WebUtility.HtmlEncode(submittedAt);
+                    var submittedBy = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(lead.SubmittedByName) ? "Team Member" : lead.SubmittedByName);
+                    var groupName = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(lead.GroupName) ? "N/A" : lead.GroupName);
+                    var contactName = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(lead.ContactName) ? "Not provided" : lead.ContactName);
+                    var contactEmail = WebUtility.HtmlEncode(lead.ContactEmail);
+                    var contactPhone = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(lead.ContactPhone) ? "Not provided" : lead.ContactPhone!);
+                    var inquiryHtml = BuildInquiryListHtml(lead);
+                    var datesText = BuildDateRangeDescription(lead.EventStartDate, lead.EventEndDate, userTimeZone);
+                    var budgetText = BuildBudgetDescription(lead.BudgetMinimum, lead.BudgetMaximum);
+                    var detailsHtml = BuildPlainTextHtml(lead.AdditionalDetails);
+
+                    builder.Append($@"<li><strong>{safeProperty}</strong><br/><span style=""color:#555;"">Submitted {safeSubmitted} by {submittedBy}</span>");
+                    builder.Append($@"<div style=""margin:0.4rem 0;""><strong>Group:</strong> {groupName}<br/><strong>Contact:</strong> {contactName} &lt;<a href=""mailto:{contactEmail}"">{contactEmail}</a>&gt;<br/><strong>Phone:</strong> {contactPhone}</div>");
+
+                    if (!string.IsNullOrEmpty(inquiryHtml))
+                    {
+                        builder.Append($@"<div style=""margin-bottom:0.3rem;""><strong>Inquiry:</strong><br/>{inquiryHtml}</div>");
+                    }
+
+                    builder.Append($@"<div style=""margin-bottom:0.3rem;""><strong>Dates:</strong> {datesText}<br/><strong>Budget:</strong> {WebUtility.HtmlEncode(budgetText)}</div>");
+
+                    if (!string.IsNullOrEmpty(detailsHtml))
+                    {
+                        builder.Append($@"<div style=""margin-bottom:0.3rem;""><strong>Additional details:</strong><br/>{detailsHtml}</div>");
+                    }
+
+                    builder.AppendLine(@"<a href=""/Sales"">View sales tool</a></li>");
+                }
+                builder.AppendLine("</ul>");
+            }
+
             builder.AppendLine(@"<p style=""margin-top:1.5rem;"">You are receiving this email because daily summaries are enabled in your profile preferences.</p>");
 
             return builder.ToString();
@@ -254,6 +315,106 @@ namespace hOps.web.Services
             }
 
             return string.IsNullOrWhiteSpace(user.Email) ? "there" : user.Email!;
+        }
+
+        private static string BuildInquiryListHtml(SalesLeadSubmission lead)
+        {
+            var labels = (lead.InquiryTypes ?? string.Empty)
+                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(key => key.Trim())
+                .Where(key => !string.IsNullOrWhiteSpace(key))
+                .Select(GetInquiryLabel)
+                .Select(WebUtility.HtmlEncode)
+                .ToList();
+
+            if (labels.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var builder = new StringBuilder();
+            builder.Append(string.Join("<br/>", labels));
+
+            if (!string.IsNullOrWhiteSpace(lead.InquiryOtherDetails))
+            {
+                var encoded = WebUtility.HtmlEncode(lead.InquiryOtherDetails);
+                builder.Append("<br/><em>Other:</em> ").Append(encoded);
+            }
+
+            return builder.ToString();
+        }
+
+        private static string GetInquiryLabel(string key)
+        {
+            if (SalesInquiryLabels.TryGetValue(key, out var label))
+            {
+                return label;
+            }
+
+            return key;
+        }
+
+        private static string BuildDateRangeDescription(DateTime? start, DateTime? end, TimeZoneInfo timeZone)
+        {
+            if (!start.HasValue && !end.HasValue)
+            {
+                return "Not provided";
+            }
+
+            if (start.HasValue && end.HasValue)
+            {
+                var startText = FormatUserLocal(start.Value, timeZone, "MMM d");
+                var endText = FormatUserLocal(end.Value, timeZone, "MMM d");
+                return $"{startText} - {endText}";
+            }
+
+            if (start.HasValue)
+            {
+                var startText = FormatUserLocal(start.Value, timeZone, "MMM d");
+                return $"Starting {startText}";
+            }
+
+            var endTextOnly = FormatUserLocal(end!.Value, timeZone, "MMM d");
+            return $"Ending {endTextOnly}";
+        }
+
+        private static string BuildBudgetDescription(decimal? min, decimal? max)
+        {
+            if (!min.HasValue && !max.HasValue)
+            {
+                return "Not provided";
+            }
+
+            var culture = CultureInfo.CurrentCulture;
+            if (min.HasValue && max.HasValue)
+            {
+                var minText = min.Value.ToString("C0", culture);
+                var maxText = max.Value.ToString("C0", culture);
+                return $"{minText} - {maxText}";
+            }
+
+            if (min.HasValue)
+            {
+                var minText = min.Value.ToString("C0", culture);
+                return $"{minText}+";
+            }
+
+            var maxOnly = max!.Value.ToString("C0", culture);
+            return $"Up to {maxOnly}";
+        }
+
+        private static string BuildPlainTextHtml(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            var encoded = WebUtility.HtmlEncode(value);
+            return encoded
+                .Replace("\r\n", "<br />", StringComparison.Ordinal)
+                .Replace("\n", "<br />", StringComparison.Ordinal)
+                .Replace("\r", "<br />", StringComparison.Ordinal);
         }
 
         private static DateTimeOffset GetNextRun(DateTimeOffset from)

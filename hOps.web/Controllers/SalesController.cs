@@ -157,6 +157,31 @@ namespace hOps.web.Controllers
             var subject = $"Sales lead - {form.GroupName}".Trim();
             var body = BuildSalesLeadEmailBody(form, selectedContact!, currentProperty, user);
 
+            var leadSubmission = new SalesLeadSubmission
+            {
+                PropertyId = currentProperty.Id,
+                SalesContactId = selectedContact!.Id,
+                SubmittedByUserId = user.Id,
+                SubmittedByName = form.SubmittedByName,
+                GroupName = form.GroupName,
+                ContactName = form.ContactName,
+                ContactPhone = form.ContactPhone,
+                ContactEmail = form.ContactEmail,
+                NumberOfRooms = form.NumberOfRooms,
+                NumberOfGuests = form.NumberOfGuests,
+                BudgetMinimum = form.BudgetMinimum,
+                BudgetMaximum = form.BudgetMaximum,
+                EventStartDate = form.StartDate,
+                EventEndDate = form.EndDate,
+                InquiryTypes = string.Join(",", form.InquiryTypes ?? Enumerable.Empty<string>()),
+                InquiryOtherDetails = form.InquiryOtherDetails,
+                AdditionalDetails = form.AdditionalDetails,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            _context.SalesLeadSubmissions.Add(leadSubmission);
+            await _context.SaveChangesAsync();
+
             foreach (var email in recipients)
             {
                 try
