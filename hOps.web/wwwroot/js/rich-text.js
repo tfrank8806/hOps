@@ -369,8 +369,14 @@
 
     function populateEditorFromMarkup(context) {
         const { textarea, editor } = context;
-        const html = markupToHtml(textarea.value || '');
-        editor.innerHTML = html || '';
+        let initialHtml = textarea.dataset.initialHtml;
+        if (initialHtml) {
+            editor.innerHTML = initialHtml;
+            textarea.dataset.initialHtml = '';
+        } else {
+            const html = markupToHtml(textarea.value || '');
+            editor.innerHTML = html || '';
+        }
         normalizeEditorDom(editor);
         ensureEditorHasContent(editor);
     }
@@ -383,7 +389,13 @@
 
     function syncToTextarea(context) {
         const { editor, textarea } = context;
+        const shouldRestoreSelection = document.activeElement === editor;
+        const selectionState = shouldRestoreSelection ? saveSelectionState(editor) : null;
         normalizeEditorDom(editor);
+        ensureEditorHasContent(editor);
+        if (shouldRestoreSelection) {
+            restoreSelectionState(editor, selectionState);
+        }
         const markup = htmlToMarkup(editor);
         textarea.value = markup;
         triggerInput(textarea);
@@ -525,6 +537,77 @@
             }
         }
         toRemove.forEach(node => node.remove());
+    }
+
+    function saveSelectionState(root) {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) {
+            return null;
+        }
+        const range = selection.getRangeAt(0);
+        if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) {
+            return null;
+        }
+        return {
+            start: describeSelectionPosition(root, range.startContainer, range.startOffset),
+            end: describeSelectionPosition(root, range.endContainer, range.endOffset)
+        };
+    }
+
+    function describeSelectionPosition(root, node, offset) {
+        const path = [];
+        let current = node;
+        while (current && current !== root) {
+            const parent = current.parentNode;
+            if (!parent) {
+                break;
+            }
+            const index = Array.prototype.indexOf.call(parent.childNodes, current);
+            path.unshift(index);
+            current = parent;
+        }
+        return { path, offset };
+    }
+
+    function restoreSelectionState(root, savedState) {
+        if (!savedState) {
+            return;
+        }
+        const selection = window.getSelection();
+        if (!selection) {
+            return;
+        }
+        const startNode = locateSelectionNode(root, savedState.start);
+        const endNode = locateSelectionNode(root, savedState.end);
+        if (!startNode || !endNode) {
+            return;
+        }
+        const range = document.createRange();
+        range.setStart(startNode, Math.min(savedState.start.offset, getNodeLength(startNode)));
+        range.setEnd(endNode, Math.min(savedState.end.offset, getNodeLength(endNode)));
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
+    function locateSelectionNode(root, descriptor) {
+        if (!descriptor) {
+            return null;
+        }
+        let node = root;
+        for (const index of descriptor.path) {
+            if (!node || !node.childNodes || node.childNodes.length <= index) {
+                return null;
+            }
+            node = node.childNodes[index];
+        }
+        return node;
+    }
+
+    function getNodeLength(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            return node.textContent ? node.textContent.length : 0;
+        }
+        return node.childNodes.length;
     }
 
     function markupToHtml(markup) {
