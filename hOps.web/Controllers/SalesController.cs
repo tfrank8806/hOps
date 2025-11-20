@@ -70,6 +70,9 @@ namespace hOps.web.Controllers
             form.ContactName = form.ContactName?.Trim() ?? string.Empty;
             form.ContactPhone = string.IsNullOrWhiteSpace(form.ContactPhone) ? null : form.ContactPhone.Trim();
             form.ContactEmail = form.ContactEmail?.Trim() ?? string.Empty;
+            form.SubmittedByName = string.IsNullOrWhiteSpace(form.SubmittedByName)
+                ? BuildDisplayName(user) ?? user.Email ?? user.UserName ?? string.Empty
+                : form.SubmittedByName.Trim();
             form.InquiryOtherDetails = string.IsNullOrWhiteSpace(form.InquiryOtherDetails)
                 ? null
                 : form.InquiryOtherDetails.Trim();
@@ -258,14 +261,9 @@ namespace hOps.web.Controllers
             form ??= new SalesLeadFormViewModel();
             form.InquiryTypes ??= new List<string>();
 
-            if (string.IsNullOrWhiteSpace(form.ContactName) && user != null)
+            if (string.IsNullOrWhiteSpace(form.SubmittedByName) && user != null)
             {
-                form.ContactName = BuildDisplayName(user) ?? user.Email ?? user.UserName ?? string.Empty;
-            }
-
-            if (string.IsNullOrWhiteSpace(form.ContactEmail) && user != null && !string.IsNullOrWhiteSpace(user.Email))
-            {
-                form.ContactEmail = user.Email!;
+                form.SubmittedByName = BuildDisplayName(user) ?? user.Email ?? user.UserName ?? string.Empty;
             }
 
             var contactOptions = new List<SelectListItem>();
@@ -306,16 +304,21 @@ namespace hOps.web.Controllers
         {
             var builder = new StringBuilder();
             var culture = CultureInfo.CurrentCulture;
+            var submittedBy = string.IsNullOrWhiteSpace(form.SubmittedByName)
+                ? BuildDisplayName(submitter) ?? submitter.Email ?? "Unknown user"
+                : form.SubmittedByName;
 
             builder.Append("<p>A new sales lead was submitted in hOps.</p>");
             builder.Append("<table style=\"border-collapse:collapse; width:100%; max-width:720px;\">");
             AppendRow(builder, "Property", $"{property.Name} ({property.Code})");
             AppendRow(builder, "Sales contact", $"{contact.Name} ({contact.Email})");
-            AppendRow(builder, "Submitted by", BuildDisplayName(submitter) ?? submitter.Email ?? "Unknown user");
+            AppendRow(builder, "Submitted by", submittedBy);
             AppendRow(builder, "Group / Company", form.GroupName);
             AppendRow(builder, "Contact name", form.ContactName);
             AppendRow(builder, "Contact phone", string.IsNullOrWhiteSpace(form.ContactPhone) ? "Not provided" : form.ContactPhone!);
             AppendRow(builder, "Contact email", form.ContactEmail);
+            AppendRow(builder, "Number of rooms", FormatQuantity(form.NumberOfRooms, culture));
+            AppendRow(builder, "Number of guests", FormatQuantity(form.NumberOfGuests, culture));
 
             var inquiryLabels = form.InquiryTypes
                 .Select(SalesLeadFormViewModel.GetInquiryLabel)
@@ -383,6 +386,16 @@ namespace hOps.web.Controllers
 
             var value = minimum ?? maximum;
             return value?.ToString("C0", culture) ?? "Not provided";
+        }
+
+        private string FormatQuantity(int? value, CultureInfo culture)
+        {
+            if (!value.HasValue || value.Value <= 0)
+            {
+                return "Not provided";
+            }
+
+            return value.Value.ToString("N0", culture);
         }
 
         private void AppendRow(StringBuilder builder, string label, string value, bool encodeValue = true)

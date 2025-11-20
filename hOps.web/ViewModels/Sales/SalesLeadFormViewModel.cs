@@ -15,11 +15,14 @@ namespace hOps.web.ViewModels.Sales
         public static IReadOnlyList<SalesInquiryOption> InquiryOptions { get; } =
             new[]
             {
-                new SalesInquiryOption(GroupRoomsInquiryKey, "Group Rooms", "Room blocks for 10+ rooms."),
+                new SalesInquiryOption(GroupRoomsInquiryKey, "Group Rooms", "Room blocks for 5+ rooms."),
                 new SalesInquiryOption(CorporateRateInquiryKey, "Corporate Rate", "Negotiated company rate."),
                 new SalesInquiryOption(MeetingRoomInquiryKey, "Meeting Room", "Meeting, conference, or event space."),
                 new SalesInquiryOption(OtherInquiryKey, "Other", "Tell us more about the request.")
             };
+
+        [Display(Name = "Submitted by")]
+        public string? SubmittedByName { get; set; }
 
         [Required]
         [Display(Name = "Sales Contact")]
@@ -45,6 +48,14 @@ namespace hOps.web.ViewModels.Sales
         [StringLength(256)]
         [Display(Name = "Contact Email Address")]
         public string ContactEmail { get; set; } = string.Empty;
+
+        [Range(0, 10000)]
+        [Display(Name = "Number of rooms")]
+        public int? NumberOfRooms { get; set; }
+
+        [Range(0, 20000)]
+        [Display(Name = "Number of guests")]
+        public int? NumberOfGuests { get; set; }
 
         [Display(Name = "Type of inquiry")]
         public List<string> InquiryTypes { get; set; } = new();

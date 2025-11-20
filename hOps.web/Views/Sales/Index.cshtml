@@ -46,7 +46,14 @@
                                     <option value="">Select a sales contact</option>
                                     @foreach (var option in Model.SalesContactOptions)
                                     {
-                                        <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
+                                        var optionTag = new Microsoft.AspNetCore.Mvc.Rendering.TagBuilder("option");
+                                        optionTag.Attributes["value"] = option.Value ?? string.Empty;
+                                        if (option.Selected)
+                                        {
+                                            optionTag.Attributes["selected"] = "selected";
+                                        }
+                                        optionTag.InnerHtml.Append(option.Text ?? string.Empty);
+                                        @optionTag
                                     }
                                     <option value="__new">Add new sales contact...</option>
                                 </select>
@@ -80,6 +87,13 @@
                                 <label asp-for="Form.ContactEmail" class="form-label fw-semibold"></label>
                                 <input asp-for="Form.ContactEmail" class="form-control" placeholder="contact@example.com" />
                                 <span asp-validation-for="Form.ContactEmail" class="text-danger small"></span>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-0 mt-md-3">
+                            <div class="col-md-6">
+                                <label asp-for="Form.SubmittedByName" class="form-label fw-semibold"></label>
+                                <input asp-for="Form.SubmittedByName" class="form-control" readonly />
                             </div>
                         </div>
 
@@ -131,6 +145,19 @@
                                 </div>
                                 <span asp-validation-for="Form.BudgetMinimum" class="text-danger small"></span>
                                 <span asp-validation-for="Form.BudgetMaximum" class="text-danger small"></span>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-0 mt-md-3">
+                            <div class="col-md-6">
+                                <label asp-for="Form.NumberOfRooms" class="form-label fw-semibold"></label>
+                                <input asp-for="Form.NumberOfRooms" class="form-control" type="number" min="0" step="1" placeholder="Approximate rooms" />
+                                <span asp-validation-for="Form.NumberOfRooms" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="Form.NumberOfGuests" class="form-label fw-semibold"></label>
+                                <input asp-for="Form.NumberOfGuests" class="form-control" type="number" min="0" step="1" placeholder="Estimated attendees" />
+                                <span asp-validation-for="Form.NumberOfGuests" class="text-danger small"></span>
                             </div>
                         </div>
 
@@ -230,8 +257,20 @@
             const otherInputRow = document.getElementById('otherInquiryDetailsRow');
             const otherInput = document.getElementById('otherInquiryDetailsInput');
             const otherCheck = document.querySelector('input[data-inquiry-key="@SalesLeadFormViewModel.OtherInquiryKey"]');
-            const modal = addContactModalEl ? new bootstrap.Modal(addContactModalEl) : null;
             let lastValidContactValue = contactSelect?.value ?? '';
+
+            const getModalInstance = () => {
+                if (!addContactModalEl) {
+                    return null;
+                }
+
+                const bootstrapApi = window.bootstrap ?? null;
+                if (!bootstrapApi || !bootstrapApi.Modal) {
+                    return null;
+                }
+
+                return bootstrapApi.Modal.getOrCreateInstance(addContactModalEl);
+            };
 
             function toggleOtherInput() {
                 if (!otherInputRow || !otherInput || !otherCheck) {
@@ -251,8 +290,9 @@
                     addContactError?.classList.add('d-none');
                     addContactSuccess?.classList.add('d-none');
                     addContactForm?.reset();
-                    modal?.show();
-                    document.getElementById('newContactName')?.focus();
+                    const modalInstance = getModalInstance();
+                    modalInstance?.show();
+                    setTimeout(() => document.getElementById('newContactName')?.focus(), 150);
                     return;
                 }
                 lastValidContactValue = contactSelect.value;
@@ -309,7 +349,8 @@
                     }
 
                     setTimeout(() => {
-                        modal?.hide();
+                        const modalInstance = getModalInstance();
+                        modalInstance?.hide();
                         addContactForm.reset();
                         addContactSuccess?.classList.add('d-none');
                         addContactError?.classList.add('d-none');
