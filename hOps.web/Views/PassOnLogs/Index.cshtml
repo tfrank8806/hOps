@@ -136,24 +136,31 @@ else
         @foreach (var log in Model.Logs)
         {
             <a asp-action="Details" asp-route-id="@log.Id" class="list-group-item list-group-item-action log-list-item @(log.IsUnread ? "log-unread" : string.Empty)">
-                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-                    <div>
-                        <h5 class="mb-1">@log.Title</h5>
-                        @{
-                            var createdLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
-                        }
-                        <div class="text-muted small">By @log.CreatorName • @createdLocal.ToString("g")</div>
+                <div class="d-flex gap-3 align-items-start">
+                    <div class="flex-shrink-0">
+                        <partial name="_UserAvatar" model="log.CreatorAvatar" />
                     </div>
-                    @if (log.IsUnread)
-                    {
-                        <span class="badge bg-primary align-self-start">Unread</span>
-                    }
-                </div>
-                <p class="mb-2 text-muted">@log.Preview</p>
-                <div class="d-flex flex-wrap gap-2 small text-muted">
-                    <span><strong>Properties:</strong> @string.Join(", ", log.PropertyNames)</span>
-                    <span class="text-secondary">•</span>
-                    <span>@log.CommentCount comment@(log.CommentCount == 1 ? string.Empty : "s")</span>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                            <div>
+                                <h5 class="mb-1">@log.Title</h5>
+                                @{
+                                    var createdLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
+                                }
+                                <div class="text-muted small">By @log.CreatorName • @createdLocal.ToString("g")</div>
+                            </div>
+                            @if (log.IsUnread)
+                            {
+                                <span class="badge bg-primary align-self-start">Unread</span>
+                            }
+                        </div>
+                        <p class="mb-2 text-muted">@log.Preview</p>
+                        <div class="d-flex flex-wrap gap-2 small text-muted">
+                            <span><strong>Properties:</strong> @string.Join(", ", log.PropertyNames)</span>
+                            <span class="text-secondary">•</span>
+                            <span>@log.CommentCount comment@(log.CommentCount == 1 ? string.Empty : "s")</span>
+                        </div>
+                    </div>
                 </div>
             </a>
         }

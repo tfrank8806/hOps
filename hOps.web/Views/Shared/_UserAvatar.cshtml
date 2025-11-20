@@ -1,0 +1,31 @@
+@model hOps.web.ViewModels.UserAvatarViewModel
+@using System
+
+@{
+    if (Model == null)
+    {
+        throw new InvalidOperationException("UserAvatarViewModel is required.");
+    }
+
+    var size = string.IsNullOrWhiteSpace(Model.Size) ? "md" : Model.Size;
+    var classes = $"user-avatar user-avatar--{size}";
+    if (!string.IsNullOrWhiteSpace(Model.AdditionalCssClasses))
+    {
+        classes += $" {Model.AdditionalCssClasses}";
+    }
+
+    var hasImage = !string.IsNullOrWhiteSpace(Model.ImageUrl);
+    var altText = string.IsNullOrWhiteSpace(Model.Name) ? "User avatar" : $"{Model.Name} avatar";
+    var initials = string.IsNullOrWhiteSpace(Model.Initials) ? "UU" : Model.Initials;
+}
+
+@if (hasImage)
+{
+    <span class="@classes">
+        <img src="@Model.ImageUrl" alt="@altText" class="user-avatar__image" loading="lazy" />
+    </span>
+}
+else
+{
+    <span class="@classes" role="img" aria-label="@altText">@initials</span>
+}

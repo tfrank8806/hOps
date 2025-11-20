@@ -747,22 +747,32 @@ namespace hOps.web.Controllers
         {
             var logs = await _context.PassOnLogs
                 .Where(log => log.Properties.Any(lp => lp.PropertyId == propertyId))
+                .Include(log => log.CreatedBy)
+                .Include(log => log.Views)
                 .OrderByDescending(log => log.CreatedAt)
                 .Take(5)
-                .Select(log => new PassOnLogSummaryViewModel
-                {
-                    Id = log.Id,
-                    Title = log.Title,
-                    Preview = string.IsNullOrWhiteSpace(log.Body) ? string.Empty : TruncatePreview(MentionMarkupFormatter.ToDisplayText(log.Body ?? string.Empty)),
-                    CreatorName = log.CreatedBy != null ? BuildDisplayName(log.CreatedBy) : "Unknown",
-                    CreatedAt = log.CreatedAt,
-                    DetailUrl = Url.Action("Details", "PassOnLogs", new { id = log.Id }) ?? string.Empty,
-                    IsRead = log.CreatedById == currentUserId || log.Views.Any(v => v.ViewerId == currentUserId)
-                })
                 .AsNoTracking()
                 .ToListAsync();
 
-            viewModel.PassOnLogs = logs;
+            viewModel.PassOnLogs = logs.Select(log =>
+            {
+                var creatorName = log.CreatedBy != null ? BuildDisplayName(log.CreatedBy) : "Unknown";
+                var preview = string.IsNullOrWhiteSpace(log.Body)
+                    ? string.Empty
+                    : TruncatePreview(MentionMarkupFormatter.ToDisplayText(log.Body ?? string.Empty));
+
+                return new PassOnLogSummaryViewModel
+                {
+                    Id = log.Id,
+                    Title = log.Title,
+                    Preview = preview,
+                    CreatorName = creatorName,
+                    CreatorAvatar = UserAvatarHelper.BuildFromUser(log.CreatedBy, creatorName, "sm"),
+                    CreatedAt = log.CreatedAt,
+                    DetailUrl = Url.Action("Details", "PassOnLogs", new { id = log.Id }) ?? string.Empty,
+                    IsRead = log.CreatedById == currentUserId || log.Views.Any(v => v.ViewerId == currentUserId)
+                };
+            }).ToList();
         }
 
         private async Task PopulatePackageLogAsync(HomeIndexViewModel viewModel, int propertyId)

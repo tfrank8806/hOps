@@ -1221,3 +1221,45 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     opacity: 0;
     transform: translateY(10px);
 }
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #e5edff;
+    color: #1d4ed8;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+}
+
+.user-avatar--sm {
+    width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
+}
+
+.user-avatar--lg {
+    width: 48px;
+    height: 48px;
+    font-size: 1.05rem;
+}
+
+.user-avatar--xl {
+    width: 60px;
+    height: 60px;
+    font-size: 1.2rem;
+}
+
+.user-avatar__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    display: block;
+}

@@ -1,7 +1,7 @@
 using System;
-using System;
 using System.Collections.Generic;
 using hOps.web.Models;
+using hOps.web.ViewModels;
 
 namespace hOps.web.ViewModels.Home
 {
@@ -137,6 +137,7 @@ namespace hOps.web.ViewModels.Home
         public string Title { get; set; } = string.Empty;
         public string Preview { get; set; } = string.Empty;
         public string CreatorName { get; set; } = string.Empty;
+        public UserAvatarViewModel CreatorAvatar { get; set; } = new();
         public DateTime CreatedAt { get; set; }
         public string DetailUrl { get; set; } = string.Empty;
         public bool IsRead { get; set; }

@@ -4,19 +4,24 @@
     ViewData["Title"] = Model.Title;
 }
 
-<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
-    <div>
-        <h2>@Model.Title</h2>
-    @{
-        var createdLocal = TimeZoneService.ConvertToUserTime(Model.CreatedAt);
-        var updatedLocal = Model.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(Model.UpdatedAt.Value) : (DateTime?)null;
-    }
-    <div class="text-muted">Posted by @Model.CreatorName on @createdLocal.ToString("f")</div>
-    @if (updatedLocal.HasValue)
-    {
-        <div class="text-muted">Updated @updatedLocal.Value.ToString("g")</div>
-    }
-        <div class="text-muted">Properties: @string.Join(", ", Model.PropertyNames)</div>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div class="d-flex align-items-start gap-3 flex-grow-1 flex-wrap">
+        <div class="flex-shrink-0">
+            <partial name="_UserAvatar" model="Model.CreatorAvatar" />
+        </div>
+        <div>
+            <h2>@Model.Title</h2>
+            @{
+                var createdLocal = TimeZoneService.ConvertToUserTime(Model.CreatedAt);
+                var updatedLocal = Model.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(Model.UpdatedAt.Value) : (DateTime?)null;
+            }
+            <div class="text-muted">Posted by @Model.CreatorName on @createdLocal.ToString("f")</div>
+            @if (updatedLocal.HasValue)
+            {
+                <div class="text-muted">Updated @updatedLocal.Value.ToString("g")</div>
+            }
+            <div class="text-muted">Properties: @string.Join(", ", Model.PropertyNames)</div>
+        </div>
     </div>
     <div class="d-flex gap-2 flex-wrap">
         @if (Model.NextLogId.HasValue)
@@ -73,14 +78,21 @@
                         @foreach (var comment in Model.Comments)
                         {
                             <li class="passon-comment mb-3">
-                                @{
-                                    var commentLocal = TimeZoneService.ConvertToUserTime(comment.CreatedAt);
-                                }
-                                <div class="passon-comment__header">
-                                    <div class="fw-semibold mb-0">@comment.CreatorName</div>
-                                    <div class="text-muted small">@commentLocal.ToString("g")</div>
+                                <div class="d-flex gap-3">
+                                    <div class="flex-shrink-0">
+                                        <partial name="_UserAvatar" model="comment.CreatorAvatar" />
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        @{
+                                            var commentLocal = TimeZoneService.ConvertToUserTime(comment.CreatedAt);
+                                        }
+                                        <div class="passon-comment__header">
+                                            <div class="fw-semibold mb-0">@comment.CreatorName</div>
+                                            <div class="text-muted small">@commentLocal.ToString("g")</div>
+                                        </div>
+                                        <div class="passon-comment__body rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(comment.Body))</div>
+                                    </div>
                                 </div>
-                                <div class="passon-comment__body rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(comment.Body))</div>
                             </li>
                         }
                     </ul>

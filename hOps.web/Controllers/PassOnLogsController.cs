@@ -167,16 +167,22 @@ namespace hOps.web.Controllers
 
             var logs = await logsQuery.AsNoTracking().ToListAsync();
 
-            var logItems = logs.Select(log => new PassOnLogListItemViewModel
+            var logItems = logs.Select(log =>
             {
-                Id = log.Id,
-                Title = log.Title,
-                CreatorName = FormatUserName(log.CreatedBy?.FirstName, log.CreatedBy?.LastName, log.CreatedBy?.Email ?? string.Empty),
-                CreatedAt = log.CreatedAt,
-                IsUnread = IsLogUnread(log, currentUser.Id),
-                PropertyNames = log.Properties.Select(lp => lp.Property.Name).Distinct().OrderBy(name => name).ToList(),
-                CommentCount = log.Comments.Count,
-                Preview = BuildPreview(log.Body)
+                var creatorName = FormatUserName(log.CreatedBy?.FirstName, log.CreatedBy?.LastName, log.CreatedBy?.Email ?? string.Empty);
+
+                return new PassOnLogListItemViewModel
+                {
+                    Id = log.Id,
+                    Title = log.Title,
+                    CreatorName = creatorName,
+                    CreatorAvatar = UserAvatarHelper.BuildFromUser(log.CreatedBy, creatorName, "lg"),
+                    CreatedAt = log.CreatedAt,
+                    IsUnread = IsLogUnread(log, currentUser.Id),
+                    PropertyNames = log.Properties.Select(lp => lp.Property.Name).Distinct().OrderBy(name => name).ToList(),
+                    CommentCount = log.Comments.Count,
+                    Preview = BuildPreview(log.Body)
+                };
             }).ToList();
 
             var model = new PassOnLogIndexViewModel
@@ -923,24 +929,32 @@ namespace hOps.web.Controllers
 
         private PassOnLogDetailsViewModel BuildDetailsViewModel(PassOnLog log, string currentUserId, int? nextLogId, int? previousLogId)
         {
+            var creatorName = FormatUserName(log.CreatedBy?.FirstName, log.CreatedBy?.LastName, log.CreatedBy?.Email ?? string.Empty);
+
             var vm = new PassOnLogDetailsViewModel
             {
                 Id = log.Id,
                 Title = log.Title,
                 Body = log.Body,
-                CreatorName = FormatUserName(log.CreatedBy?.FirstName, log.CreatedBy?.LastName, log.CreatedBy?.Email ?? string.Empty),
+                CreatorName = creatorName,
+                CreatorAvatar = UserAvatarHelper.BuildFromUser(log.CreatedBy, creatorName, "xl"),
                 CreatedAt = log.CreatedAt,
                 UpdatedAt = log.UpdatedAt,
                 PropertyNames = log.Properties.Select(lp => lp.Property.Name).Distinct().OrderBy(name => name).ToList(),
                 CanEdit = log.CreatedById == currentUserId,
                 Comments = log.Comments
                     .OrderBy(c => c.CreatedAt)
-                    .Select(c => new PassOnLogCommentViewModel
+                    .Select(c =>
                     {
-                        Id = c.Id,
-                        Body = c.Body,
-                        CreatedAt = c.CreatedAt,
-                        CreatorName = FormatUserName(c.CreatedBy?.FirstName, c.CreatedBy?.LastName, c.CreatedBy?.Email ?? string.Empty)
+                        var commentCreatorName = FormatUserName(c.CreatedBy?.FirstName, c.CreatedBy?.LastName, c.CreatedBy?.Email ?? string.Empty);
+                        return new PassOnLogCommentViewModel
+                        {
+                            Id = c.Id,
+                            Body = c.Body,
+                            CreatedAt = c.CreatedAt,
+                            CreatorName = commentCreatorName,
+                            CreatorAvatar = UserAvatarHelper.BuildFromUser(c.CreatedBy, commentCreatorName, "sm")
+                        };
                     })
                     .ToList(),
                 Viewers = log.Views

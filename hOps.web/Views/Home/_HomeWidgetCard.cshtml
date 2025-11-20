@@ -262,23 +262,30 @@
                     var statusBadgeClass = log.IsRead ? "badge rounded-pill bg-success-subtle text-success" : "badge rounded-pill bg-primary text-white";
                     var statusText = log.IsRead ? "Read" : "Unread";
                     <li class="widget-item">
-                        <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
-                            @if (hasLink)
-                            {
-                                <a class="fw-semibold" href="@log.DetailUrl">@log.Title</a>
-                            }
-                            else
-                            {
-                                <span class="fw-semibold">@log.Title</span>
-                            }
-                            <span class="@statusBadgeClass">@statusText</span>
+                        <div class="d-flex gap-3 align-items-start">
+                            <div class="flex-shrink-0">
+                                <partial name="_UserAvatar" model="log.CreatorAvatar" />
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                                    @if (hasLink)
+                                    {
+                                        <a class="fw-semibold" href="@log.DetailUrl">@log.Title</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="fw-semibold">@log.Title</span>
+                                    }
+                                    <span class="@statusBadgeClass">@statusText</span>
+                                </div>
+                                <div class="text-muted small">By @authorName</div>
+                                @if (!string.IsNullOrWhiteSpace(log.Preview))
+                                {
+                                    <div class="small text-muted mt-1">@log.Preview</div>
+                                }
+                                <div class="small mt-1" style="color:@GetDateColor(log.CreatedAt);">Posted @postedLocal.ToString("g")</div>
+                            </div>
                         </div>
-                        <div class="text-muted small">By @authorName</div>
-                        @if (!string.IsNullOrWhiteSpace(log.Preview))
-                        {
-                            <div class="small text-muted mt-1">@log.Preview</div>
-                        }
-                        <div class="small mt-1" style="color:@GetDateColor(log.CreatedAt);">Posted @postedLocal.ToString("g")</div>
                     </li>
                 }
             </ul>
