@@ -28,6 +28,8 @@ namespace hOps.web.Models
         [Required]
         public BookmarkSection Section { get; set; }
 
+        public bool ShowInQuickMenu { get; set; }
+
         [Required]
         public string CreatedById { get; set; } = string.Empty;
 

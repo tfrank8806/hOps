@@ -28,6 +28,9 @@ namespace hOps.web.ViewModels
         public int Id { get; set; }
 
         [Required]
+        public BookmarkSection Section { get; set; }
+
+        [Required]
         [StringLength(200)]
         public string Name { get; set; } = string.Empty;
 
@@ -38,6 +41,8 @@ namespace hOps.web.ViewModels
 
         [StringLength(500)]
         public string? Description { get; set; }
+
+        public bool ShowInQuickMenu { get; set; }
     }
 
     public class BookmarksIndexViewModel

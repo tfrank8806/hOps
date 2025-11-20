@@ -49,22 +49,16 @@ namespace hOps.web.Controllers
             var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
             var canManagePropertyBookmarks = roles.Contains("Manager") || roles.Contains("Admin");
 
-            if (!ModelState.IsValid)
-            {
-                var invalidVm = await BuildIndexViewModel(currentUser, roles, currentPropertyId, form);
-                return View("Index", invalidVm);
-            }
-
             if (form.Section == BookmarkSection.Property && !canManagePropertyBookmarks)
             {
                 ModelState.AddModelError(nameof(form.Section), "You do not have permission to add property bookmarks.");
             }
 
-            if ((form.Section == BookmarkSection.Property || form.Section == BookmarkSection.Team))
+            if (form.Section == BookmarkSection.Property || form.Section == BookmarkSection.Team)
             {
                 if (!currentPropertyId.HasValue)
                 {
-                    ModelState.AddModelError(string.Empty, "Please select a property before adding bookmarks to this section.");
+                    ModelState.AddModelError(string.Empty, "Select a property before adding bookmarks to this section.");
                 }
                 else
                 {
@@ -80,8 +74,8 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                var vm = await BuildIndexViewModel(currentUser, roles, currentPropertyId, form);
-                return View("Index", vm);
+                var invalidVm = await BuildIndexViewModel(currentUser, roles, currentPropertyId, form);
+                return View("Index", invalidVm);
             }
 
             var bookmark = new Bookmark
@@ -91,7 +85,8 @@ namespace hOps.web.Controllers
                 Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
                 Section = form.Section,
                 CreatedById = currentUser.Id,
-                PropertyId = form.Section == BookmarkSection.User ? null : currentPropertyId
+                PropertyId = form.Section == BookmarkSection.User ? null : currentPropertyId,
+                ShowInQuickMenu = false
             };
 
             _context.Bookmarks.Add(bookmark);
@@ -119,6 +114,7 @@ namespace hOps.web.Controllers
 
             var roles = await _userManager.GetRolesAsync(currentUser);
             var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+            var canManagePropertyBookmarks = roles.Contains("Manager") || roles.Contains("Admin");
 
             var bookmark = await _context.Bookmarks.FirstOrDefaultAsync(b => b.Id == form.Id);
             if (bookmark == null)
@@ -131,9 +127,41 @@ namespace hOps.web.Controllers
                 return Forbid();
             }
 
+            if (form.Section == BookmarkSection.Property && !canManagePropertyBookmarks)
+            {
+                TempData["BookmarkError"] = "You do not have permission to save property bookmarks.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (form.Section == BookmarkSection.Property || form.Section == BookmarkSection.Team)
+            {
+                if (!currentPropertyId.HasValue)
+                {
+                    TempData["BookmarkError"] = "Select a property before assigning bookmarks to that section.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                var hasAccess = await _context.UserPropertyAccesses
+                    .AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == currentPropertyId.Value);
+
+                if (!hasAccess)
+                {
+                    TempData["BookmarkError"] = "You do not have access to the selected property.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                bookmark.PropertyId = currentPropertyId.Value;
+            }
+            else
+            {
+                bookmark.PropertyId = null;
+            }
+
             bookmark.Name = form.Name.Trim();
             bookmark.Url = form.Url.Trim();
             bookmark.Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim();
+            bookmark.Section = form.Section;
+            bookmark.ShowInQuickMenu = form.ShowInQuickMenu;
 
             await _context.SaveChangesAsync();
 
@@ -169,6 +197,37 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
 
             TempData["BookmarkSuccess"] = "Bookmark deleted successfully.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleQuick(int id, bool showInQuickMenu)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+
+            var bookmark = await _context.Bookmarks.FirstOrDefaultAsync(b => b.Id == id);
+            if (bookmark == null)
+            {
+                return NotFound();
+            }
+
+            if (!await CanModifyBookmarkAsync(bookmark, currentUser, roles, currentPropertyId))
+            {
+                return Forbid();
+            }
+
+            bookmark.ShowInQuickMenu = showInQuickMenu;
+            await _context.SaveChangesAsync();
+
+            TempData["BookmarkSuccess"] = "Quick bookmarks updated.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -211,23 +270,17 @@ namespace hOps.web.Controllers
                 propertyBookmarksQuery = propertyBookmarksQuery.Where(b => false);
             }
 
-            var vm = new BookmarksIndexViewModel
+            return new BookmarksIndexViewModel
             {
                 UserBookmarks = userBookmarks,
-                TeamBookmarks = await teamBookmarksQuery
-                    .OrderBy(b => b.Name)
-                    .ToListAsync(),
-                PropertyBookmarks = await propertyBookmarksQuery
-                    .OrderBy(b => b.Name)
-                    .ToListAsync(),
+                TeamBookmarks = await teamBookmarksQuery.OrderBy(b => b.Name).ToListAsync(),
+                PropertyBookmarks = await propertyBookmarksQuery.OrderBy(b => b.Name).ToListAsync(),
                 Form = form,
                 CanManagePropertyBookmarks = roles.Contains("Manager") || roles.Contains("Admin"),
                 HasCurrentProperty = currentPropertyId.HasValue,
                 CurrentPropertyName = propertyName,
                 CurrentUserId = currentUser.Id
             };
-
-            return vm;
         }
 
         private async Task<bool> CanModifyBookmarkAsync(
@@ -284,20 +337,44 @@ namespace hOps.web.Controllers
             var canManagePropertyBookmarks = roles.Contains("Manager") || roles.Contains("Admin");
             var quickList = new List<object>();
 
-            var userBookmarks = await _context.Bookmarks
-                .Where(b => b.Section == BookmarkSection.User && b.CreatedById == currentUser.Id)
-                .OrderBy(b => b.Name)
-                .Take(5)
-                .ToListAsync();
-
-            quickList.AddRange(userBookmarks
-                .Where(b => !string.IsNullOrWhiteSpace(b.Url))
-                .Select(b => new
+            async Task<List<Bookmark>> LoadBookmarksAsync(IQueryable<Bookmark> query)
             {
-                name = b.Name,
-                url = b.Url,
-                section = "Personal"
-            }));
+                var flagged = await query.Where(b => b.ShowInQuickMenu).OrderBy(b => b.Name).ToListAsync();
+                if (flagged.Any())
+                {
+                    return flagged;
+                }
+
+                return await query.OrderBy(b => b.Name).Take(5).ToListAsync();
+            }
+
+            void AppendBookmarks(IEnumerable<Bookmark> bookmarks, string sectionLabel)
+            {
+                foreach (var bookmark in bookmarks)
+                {
+                    if (quickList.Count >= 12)
+                    {
+                        break;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(bookmark.Url))
+                    {
+                        continue;
+                    }
+
+                    quickList.Add(new
+                    {
+                        name = bookmark.Name,
+                        url = bookmark.Url,
+                        section = sectionLabel
+                    });
+                }
+            }
+
+            var userQuery = _context.Bookmarks
+                .Where(b => b.Section == BookmarkSection.User && b.CreatedById == currentUser.Id);
+
+            AppendBookmarks(await LoadBookmarksAsync(userQuery), "Personal");
 
             if (currentPropertyId.HasValue)
             {
@@ -310,41 +387,22 @@ namespace hOps.web.Controllers
                     ? "Current Property"
                     : propertyName;
 
-                var teamBookmarks = await _context.Bookmarks
-                    .Where(b => b.Section == BookmarkSection.Team && b.PropertyId == currentPropertyId.Value)
-                    .OrderBy(b => b.Name)
-                    .Take(5)
-                    .ToListAsync();
+                var teamQuery = _context.Bookmarks
+                    .Where(b => b.Section == BookmarkSection.Team && b.PropertyId == currentPropertyId.Value);
 
-                quickList.AddRange(teamBookmarks
-                    .Where(b => !string.IsNullOrWhiteSpace(b.Url))
-                    .Select(b => new
-                {
-                    name = b.Name,
-                    url = b.Url,
-                    section = $"Team · {propertyLabel}"
-                }));
+                AppendBookmarks(await LoadBookmarksAsync(teamQuery), $"Team - {propertyLabel}");
 
                 if (canManagePropertyBookmarks)
                 {
-                    var propertyBookmarks = await _context.Bookmarks
-                        .Where(b => b.Section == BookmarkSection.Property && b.PropertyId == currentPropertyId.Value)
-                        .OrderBy(b => b.Name)
-                        .Take(5)
-                        .ToListAsync();
+                    var propertyQuery = _context.Bookmarks
+                        .Where(b => b.Section == BookmarkSection.Property && b.PropertyId == currentPropertyId.Value);
 
-                    quickList.AddRange(propertyBookmarks
-                        .Where(b => !string.IsNullOrWhiteSpace(b.Url))
-                        .Select(b => new
-                    {
-                        name = b.Name,
-                        url = b.Url,
-                        section = $"Property · {propertyLabel}"
-                    }));
+                    AppendBookmarks(await LoadBookmarksAsync(propertyQuery), $"Property - {propertyLabel}");
                 }
             }
 
-            return Json(quickList.Take(12));
+            return Json(quickList);
         }
     }
 }
+

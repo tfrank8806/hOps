@@ -1,4 +1,5 @@
 @using hOps.web.Utilities
+@using Microsoft.AspNetCore.Mvc.Rendering
 @model BookmarksIndexViewModel
 @{ 
     ViewData["Title"] = "Bookmarks";
@@ -78,13 +79,19 @@
             <div class="col-12">
                 <div class="card h-100">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h2 class="h5 mb-0">Property Bookmarks</h2>
-                        @if (Model.HasCurrentProperty && Model.CurrentPropertyName is not null)
-                        {
-                            <span class="badge bg-light text-dark">@Model.CurrentPropertyName</span>
-                        }
+                        <div class="d-flex align-items-center gap-2">
+                            <h2 class="h5 mb-0">Property Bookmarks</h2>
+                            @if (Model.HasCurrentProperty && Model.CurrentPropertyName is not null)
+                            {
+                                <span class="badge bg-light text-dark">@Model.CurrentPropertyName</span>
+                            }
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#propertyBookmarksCollapse" aria-expanded="true" aria-controls="propertyBookmarksCollapse">
+                            Toggle
+                        </button>
                     </div>
-                    <div class="card-body">
+                    <div class="collapse show" id="propertyBookmarksCollapse">
+                        <div class="card-body">
                         @if (!Model.HasCurrentProperty)
                         {
                             <p class="text-muted mb-0">Select a property to view property bookmarks.</p>
@@ -120,17 +127,30 @@
                                                     <div class="text-muted small mt-1">Added by @displayName</div>
                                                 }
                                             </div>
-                                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                                                <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">Open</a>
+                                            <div class="d-flex align-items-center gap-3 flex-shrink-0 flex-wrap">
                                                 @if (Model.CanManagePropertyBookmarks)
                                                 {
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBookmarkModal-@bookmark.Id">Edit</button>
-                                                    <form asp-action="Delete" method="post" class="d-inline">
+                                                    <form asp-action="ToggleQuick" method="post" class="d-inline-flex align-items-center quick-toggle-form">
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="id" value="@bookmark.Id" />
-                                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete this bookmark?');">Delete</button>
+                                                        <div class="form-check form-switch mb-0">
+                                                            <input class="form-check-input" type="checkbox" id="property-quick-toggle-@bookmark.Id" name="showInQuickMenu" value="true" @(bookmark.ShowInQuickMenu ? "checked" : null) onchange="this.form.submit()" />
+                                                            <label class="form-check-label small" for="property-quick-toggle-@bookmark.Id">Quick</label>
+                                                        </div>
                                                     </form>
                                                 }
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">Open</a>
+                                                    @if (Model.CanManagePropertyBookmarks)
+                                                    {
+                                                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBookmarkModal-@bookmark.Id">Edit</button>
+                                                        <form asp-action="Delete" method="post" class="d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="id" value="@bookmark.Id" />
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete this bookmark?');">Delete</button>
+                                                        </form>
+                                                    }
+                                                </div>
                                             </div>
                                         </div>
                                         @if (Model.CanManagePropertyBookmarks)
@@ -158,6 +178,31 @@
                                                                     <label class="form-label" for="bookmark-edit-description-@bookmark.Id">Description</label>
                                                                     <textarea class="form-control" id="bookmark-edit-description-@bookmark.Id" name="Description" rows="3" maxlength="500" data-enable-mentions="true">@bookmark.Description</textarea>
                                                                 </div>
+                                                                <div class="mb-3">
+                                                                <label class="form-label" for="bookmark-edit-section-@bookmark.Id">Section</label>
+                                                                @{
+                                                                    var propertySectionOptions = new List<SelectListItem>
+                                                                    {
+                                                                        new SelectListItem("User Bookmarks", ((int)BookmarkSection.User).ToString(), bookmark.Section == BookmarkSection.User)
+                                                                    };
+
+                                                                    if (Model.HasCurrentProperty && Model.CanManagePropertyBookmarks)
+                                                                    {
+                                                                        propertySectionOptions.Add(new SelectListItem($"Property Bookmarks ({Model.CurrentPropertyName ?? "Current Property"})", ((int)BookmarkSection.Property).ToString(), bookmark.Section == BookmarkSection.Property));
+                                                                    }
+
+                                                                    if (Model.HasCurrentProperty)
+                                                                    {
+                                                                        propertySectionOptions.Add(new SelectListItem($"Team Bookmarks ({Model.CurrentPropertyName ?? "Current Property"})", ((int)BookmarkSection.Team).ToString(), bookmark.Section == BookmarkSection.Team));
+                                                                    }
+                                                                }
+                                                                <select class="form-select" id="bookmark-edit-section-@bookmark.Id" name="Section" asp-items="propertySectionOptions"></select>
+                                                                    <div class="form-text">Moving to a property or team section uses the currently selected property.</div>
+                                                                </div>
+                                                                <div class="form-check form-switch mb-3">
+                                                                    <input class="form-check-input" type="checkbox" id="bookmark-edit-quick-@bookmark.Id" name="ShowInQuickMenu" value="true" @(bookmark.ShowInQuickMenu ? "checked" : null) />
+                                                                    <label class="form-check-label" for="bookmark-edit-quick-@bookmark.Id">Show in Quick Bookmarks</label>
+                                                                </div>
                                                             </div>
                                                             <div class="modal-footer">
                                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -172,19 +217,26 @@
                                 }
                             </ul>
                         }
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-12">
                 <div class="card h-100">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h2 class="h5 mb-0">Team Bookmarks</h2>
-                        @if (Model.HasCurrentProperty && Model.CurrentPropertyName is not null)
-                        {
-                            <span class="badge bg-light text-dark">@Model.CurrentPropertyName</span>
-                        }
+                        <div class="d-flex align-items-center gap-2">
+                            <h2 class="h5 mb-0">Team Bookmarks</h2>
+                            @if (Model.HasCurrentProperty && Model.CurrentPropertyName is not null)
+                            {
+                                <span class="badge bg-light text-dark">@Model.CurrentPropertyName</span>
+                            }
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#teamBookmarksCollapse" aria-expanded="true" aria-controls="teamBookmarksCollapse">
+                            Toggle
+                        </button>
                     </div>
-                    <div class="card-body">
+                    <div class="collapse show" id="teamBookmarksCollapse">
+                        <div class="card-body">
                         @if (!Model.HasCurrentProperty)
                         {
                             <p class="text-muted mb-0">Select a property to view team bookmarks.</p>
@@ -220,17 +272,30 @@
                                                     <div class="text-muted small mt-1">Added by @displayName</div>
                                                 }
                                             </div>
-                                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                                                <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">Open</a>
+                                            <div class="d-flex align-items-center gap-3 flex-shrink-0 flex-wrap">
                                                 @if (bookmark.CreatedById == Model.CurrentUserId || Model.CanManagePropertyBookmarks)
                                                 {
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBookmarkModal-@bookmark.Id">Edit</button>
-                                                    <form asp-action="Delete" method="post" class="d-inline">
+                                                    <form asp-action="ToggleQuick" method="post" class="d-inline-flex align-items-center quick-toggle-form">
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="id" value="@bookmark.Id" />
-                                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete this bookmark?');">Delete</button>
+                                                        <div class="form-check form-switch mb-0">
+                                                            <input class="form-check-input" type="checkbox" id="team-quick-toggle-@bookmark.Id" name="showInQuickMenu" value="true" @(bookmark.ShowInQuickMenu ? "checked" : null) onchange="this.form.submit()" />
+                                                            <label class="form-check-label small" for="team-quick-toggle-@bookmark.Id">Quick</label>
+                                                        </div>
                                                     </form>
                                                 }
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">Open</a>
+                                                    @if (bookmark.CreatedById == Model.CurrentUserId || Model.CanManagePropertyBookmarks)
+                                                    {
+                                                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBookmarkModal-@bookmark.Id">Edit</button>
+                                                        <form asp-action="Delete" method="post" class="d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="id" value="@bookmark.Id" />
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete this bookmark?');">Delete</button>
+                                                        </form>
+                                                    }
+                                                </div>
                                             </div>
                                         </div>
                                         @if (bookmark.CreatedById == Model.CurrentUserId || Model.CanManagePropertyBookmarks)
@@ -277,10 +342,14 @@
             </div>
             <div class="col-12">
                 <div class="card h-100">
-                    <div class="card-header">
+                    <div class="card-header d-flex justify-content-between align-items-center">
                         <h2 class="h5 mb-0">Your Bookmarks</h2>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#userBookmarksCollapse" aria-expanded="true" aria-controls="userBookmarksCollapse">
+                            Toggle
+                        </button>
                     </div>
-                    <div class="card-body">
+                    <div class="collapse show" id="userBookmarksCollapse">
+                        <div class="card-body">
                         @if (Model.UserBookmarks.Count == 0)
                         {
                             <p class="text-muted mb-0">You haven't added any personal bookmarks yet.</p>
@@ -299,14 +368,24 @@
                                                     <div class="text-muted small mt-1">@Html.Raw(MentionMarkupFormatter.ToHtml(bookmark.Description))</div>
                                                 }
                                             </div>
-                                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                                                <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">Open</a>
-                                                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBookmarkModal-@bookmark.Id">Edit</button>
-                                                <form asp-action="Delete" method="post" class="d-inline">
+                                            <div class="d-flex align-items-center gap-3 flex-shrink-0 flex-wrap">
+                                                <form asp-action="ToggleQuick" method="post" class="d-inline-flex align-items-center quick-toggle-form">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="id" value="@bookmark.Id" />
-                                                    <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete this bookmark?');">Delete</button>
+                                                    <div class="form-check form-switch mb-0">
+                                                        <input class="form-check-input" type="checkbox" id="user-quick-toggle-@bookmark.Id" name="showInQuickMenu" value="true" @(bookmark.ShowInQuickMenu ? "checked" : null) onchange="this.form.submit()" />
+                                                        <label class="form-check-label small" for="user-quick-toggle-@bookmark.Id">Quick</label>
+                                                    </div>
                                                 </form>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">Open</a>
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBookmarkModal-@bookmark.Id">Edit</button>
+                                                    <form asp-action="Delete" method="post" class="d-inline">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@bookmark.Id" />
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete this bookmark?');">Delete</button>
+                                                    </form>
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="modal fade" id="editBookmarkModal-@bookmark.Id" tabindex="-1" aria-labelledby="editBookmarkModalLabel-@bookmark.Id" aria-hidden="true">
@@ -332,6 +411,30 @@
                                                                 <label class="form-label" for="bookmark-edit-description-@bookmark.Id">Description</label>
                                                                 <textarea class="form-control" id="bookmark-edit-description-@bookmark.Id" name="Description" rows="3" maxlength="500" data-enable-mentions="true">@bookmark.Description</textarea>
                                                             </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label" for="bookmark-edit-section-@bookmark.Id">Section</label>
+                                                                @{
+                                                                    var userSectionOptions = new List<SelectListItem>
+                                                                    {
+                                                                        new SelectListItem("User Bookmarks", ((int)BookmarkSection.User).ToString(), bookmark.Section == BookmarkSection.User)
+                                                                    };
+
+                                                                    if (Model.HasCurrentProperty && Model.CanManagePropertyBookmarks)
+                                                                    {
+                                                                        userSectionOptions.Add(new SelectListItem($"Property Bookmarks ({Model.CurrentPropertyName ?? "Current Property"})", ((int)BookmarkSection.Property).ToString(), bookmark.Section == BookmarkSection.Property));
+                                                                    }
+
+                                                                    if (Model.HasCurrentProperty)
+                                                                    {
+                                                                        userSectionOptions.Add(new SelectListItem($"Team Bookmarks ({Model.CurrentPropertyName ?? "Current Property"})", ((int)BookmarkSection.Team).ToString(), bookmark.Section == BookmarkSection.Team));
+                                                                    }
+                                                                }
+                                                                <select class="form-select" id="bookmark-edit-section-@bookmark.Id" name="Section" asp-items="userSectionOptions"></select>
+                                                            </div>
+                                                            <div class="form-check form-switch mb-3">
+                                                                <input class="form-check-input" type="checkbox" id="bookmark-edit-quick-@bookmark.Id" name="ShowInQuickMenu" value="true" @(bookmark.ShowInQuickMenu ? "checked" : null) />
+                                                                <label class="form-check-label" for="bookmark-edit-quick-@bookmark.Id">Show in Quick Bookmarks</label>
+                                                            </div>
                                                         </div>
                                                         <div class="modal-footer">
                                                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -345,8 +448,10 @@
                                 }
                             </ul>
                         }
+                        </div>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     </div>
@@ -355,3 +460,4 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
 }
+
