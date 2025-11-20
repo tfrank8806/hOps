@@ -14,6 +14,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
 
 namespace hOps.web.Controllers
 {
@@ -1538,6 +1540,16 @@ namespace hOps.web.Controllers
                 return View(model);
             }
 
+            sanitizedShifts = sanitizedShifts
+                .OrderBy(s => s.SortOrder)
+                .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+                .Select((shift, index) =>
+                {
+                    shift.SortOrder = index;
+                    return shift;
+                })
+                .ToList();
+
             var existingSettings = await _db.ScheduleSettings
                 .FirstOrDefaultAsync(s => s.PropertyId == model.SelectedPropertyId);
             var previousStartDay = existingSettings?.StartDayOfWeek;
@@ -1611,7 +1623,18 @@ namespace hOps.web.Controllers
                 _db.ScheduleShiftTemplates.RemoveRange(toRemove);
             }
 
-            await _db.SaveChangesAsync();
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (IsScheduleShiftSortOrderConflict(ex))
+            {
+                ModelState.AddModelError(string.Empty, "Unable to save shifts because two default shifts are using the same display order. Reorder the list and try again.");
+                model.ShiftTemplates = sanitizedShifts;
+                model.PropertyOptions = BuildPropertySelectList(properties, model.SelectedPropertyId, includeGlobal: false);
+                model.ManualEmployees = await BuildManualEmployeesAsync(model.SelectedPropertyId);
+                return View(model);
+            }
 
             if (!previousStartDay.HasValue || previousStartDay.Value != model.StartDayOfWeek)
             {
@@ -1620,6 +1643,25 @@ namespace hOps.web.Controllers
 
             TempData["ScheduleSetupMessage"] = "Schedule settings saved.";
             return RedirectToAction(nameof(ScheduleSetup), new { propertyId = model.SelectedPropertyId });
+        }
+
+        private static bool IsScheduleShiftSortOrderConflict(DbUpdateException ex)
+        {
+            if (ex.InnerException is SqliteException sqliteEx)
+            {
+                return sqliteEx.SqliteErrorCode == 19 &&
+                       sqliteEx.Message.Contains("ScheduleShiftTemplates", StringComparison.OrdinalIgnoreCase) &&
+                       sqliteEx.Message.Contains("SortOrder", StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (ex.InnerException is SqlException sqlEx)
+            {
+                return (sqlEx.Number == 2601 || sqlEx.Number == 2627) &&
+                       sqlEx.Message.Contains("ScheduleShiftTemplates", StringComparison.OrdinalIgnoreCase) &&
+                       sqlEx.Message.Contains("SortOrder", StringComparison.OrdinalIgnoreCase);
+            }
+
+            return false;
         }
 
         private async Task<ScheduleSetupViewModel> BuildScheduleSetupViewModelAsync(List<Property> properties, int propertyId)
