@@ -4,6 +4,77 @@
 @{ 
     ViewData["Title"] = "Bookmarks";
     ViewData["MainContainerClass"] = "main-inner--wide";
+
+    string? GetFaviconUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return null;
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return null;
+        }
+
+        var scheme = uri.Scheme;
+        if (string.IsNullOrWhiteSpace(scheme))
+        {
+            return null;
+        }
+
+        var builder = new UriBuilder(scheme, uri.Host)
+        {
+            Path = "/favicon.ico",
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+
+        if (!uri.IsDefaultPort)
+        {
+            builder.Port = uri.Port;
+        }
+
+        return builder.Uri.ToString();
+    }
+}
+
+@section Styles {
+    <style>
+        .bookmark-entry {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .bookmark-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #dee2e6;
+            background-color: #fff;
+            overflow: hidden;
+        }
+
+        .bookmark-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 2px;
+        }
+
+        .bookmark-icon span {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .bookmark-icon-fallback {
+            font-size: 0.95rem;
+        }
+    </style>
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -105,27 +176,38 @@
                             <ul class="list-group list-group-flush">
                                 @foreach (var bookmark in Model.PropertyBookmarks)
                                 {
+                                    var faviconUrl = GetFaviconUrl(bookmark.Url);
                                     <li class="list-group-item px-0">
                                         <div class="d-flex justify-content-between align-items-start gap-3">
-                                            <div>
-                                                <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
-                                                @if (!string.IsNullOrWhiteSpace(bookmark.Description))
-                                                {
-                                                    <div class="text-muted small mt-1">@Html.Raw(MentionMarkupFormatter.ToHtml(bookmark.Description))</div>
-                                                }
-                                                @if (bookmark.CreatedBy is not null)
-                                                {
-                                                    var first = bookmark.CreatedBy.FirstName;
-                                                    var last = bookmark.CreatedBy.LastName;
-                                                    var displayName = !string.IsNullOrWhiteSpace(first) && !string.IsNullOrWhiteSpace(last)
-                                                        ? $"{first} {last}"
-                                                        : !string.IsNullOrWhiteSpace(first)
-                                                            ? first!
-                                                            : !string.IsNullOrWhiteSpace(last)
-                                                                ? last!
-                                                                : bookmark.CreatedBy.Email ?? "Unknown";
-                                                    <div class="text-muted small mt-1">Added by @displayName</div>
-                                                }
+                                            <div class="bookmark-entry flex-grow-1">
+                                                <div class="bookmark-icon">
+                                                    @if (!string.IsNullOrWhiteSpace(faviconUrl))
+                                                    {
+                                                        <img src="@faviconUrl" alt="" loading="lazy" onerror="this.style.display='none'; var fallback=this.nextElementSibling; if(fallback){ fallback.classList.remove('visually-hidden'); }" />
+                                                    }
+                                                    <span class="bookmark-icon-fallback @(string.IsNullOrWhiteSpace(faviconUrl) ? string.Empty : "visually-hidden")" aria-hidden="true">🔗</span>
+                                                    <span class="visually-hidden">Website icon</span>
+                                                </div>
+                                                <div>
+                                                    <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
+                                                    @if (!string.IsNullOrWhiteSpace(bookmark.Description))
+                                                    {
+                                                        <div class="text-muted small mt-1">@Html.Raw(MentionMarkupFormatter.ToHtml(bookmark.Description))</div>
+                                                    }
+                                                    @if (bookmark.CreatedBy is not null)
+                                                    {
+                                                        var first = bookmark.CreatedBy.FirstName;
+                                                        var last = bookmark.CreatedBy.LastName;
+                                                        var displayName = !string.IsNullOrWhiteSpace(first) && !string.IsNullOrWhiteSpace(last)
+                                                            ? $"{first} {last}"
+                                                            : !string.IsNullOrWhiteSpace(first)
+                                                                ? first!
+                                                                : !string.IsNullOrWhiteSpace(last)
+                                                                    ? last!
+                                                                    : bookmark.CreatedBy.Email ?? "Unknown";
+                                                        <div class="text-muted small mt-1">Added by @displayName</div>
+                                                    }
+                                                </div>
                                             </div>
                                             <div class="d-flex align-items-center gap-3 flex-shrink-0 flex-wrap">
                                                 @if (Model.CanManagePropertyBookmarks)
@@ -250,27 +332,38 @@
                             <ul class="list-group list-group-flush">
                                 @foreach (var bookmark in Model.TeamBookmarks)
                                 {
+                                    var faviconUrl = GetFaviconUrl(bookmark.Url);
                                     <li class="list-group-item px-0">
                                         <div class="d-flex justify-content-between align-items-start gap-3">
-                                            <div>
-                                                <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
-                                                @if (!string.IsNullOrWhiteSpace(bookmark.Description))
-                                                {
-                                                    <div class="text-muted small mt-1">@Html.Raw(MentionMarkupFormatter.ToHtml(bookmark.Description))</div>
-                                                }
-                                                @if (bookmark.CreatedBy is not null)
-                                                {
-                                                    var first = bookmark.CreatedBy.FirstName;
-                                                    var last = bookmark.CreatedBy.LastName;
-                                                    var displayName = !string.IsNullOrWhiteSpace(first) && !string.IsNullOrWhiteSpace(last)
-                                                        ? $"{first} {last}"
-                                                        : !string.IsNullOrWhiteSpace(first)
-                                                            ? first!
-                                                            : !string.IsNullOrWhiteSpace(last)
-                                                                ? last!
-                                                                : bookmark.CreatedBy.Email ?? "Unknown";
-                                                    <div class="text-muted small mt-1">Added by @displayName</div>
-                                                }
+                                            <div class="bookmark-entry flex-grow-1">
+                                                <div class="bookmark-icon">
+                                                    @if (!string.IsNullOrWhiteSpace(faviconUrl))
+                                                    {
+                                                        <img src="@faviconUrl" alt="" loading="lazy" onerror="this.style.display='none'; var fallback=this.nextElementSibling; if(fallback){ fallback.classList.remove('visually-hidden'); }" />
+                                                    }
+                                                    <span class="bookmark-icon-fallback @(string.IsNullOrWhiteSpace(faviconUrl) ? string.Empty : "visually-hidden")" aria-hidden="true">🔗</span>
+                                                    <span class="visually-hidden">Website icon</span>
+                                                </div>
+                                                <div>
+                                                    <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
+                                                    @if (!string.IsNullOrWhiteSpace(bookmark.Description))
+                                                    {
+                                                        <div class="text-muted small mt-1">@Html.Raw(MentionMarkupFormatter.ToHtml(bookmark.Description))</div>
+                                                    }
+                                                    @if (bookmark.CreatedBy is not null)
+                                                    {
+                                                        var first = bookmark.CreatedBy.FirstName;
+                                                        var last = bookmark.CreatedBy.LastName;
+                                                        var displayName = !string.IsNullOrWhiteSpace(first) && !string.IsNullOrWhiteSpace(last)
+                                                            ? $"{first} {last}"
+                                                            : !string.IsNullOrWhiteSpace(first)
+                                                                ? first!
+                                                                : !string.IsNullOrWhiteSpace(last)
+                                                                    ? last!
+                                                                    : bookmark.CreatedBy.Email ?? "Unknown";
+                                                        <div class="text-muted small mt-1">Added by @displayName</div>
+                                                    }
+                                                </div>
                                             </div>
                                             <div class="d-flex align-items-center gap-3 flex-shrink-0 flex-wrap">
                                                 @if (bookmark.CreatedById == Model.CurrentUserId || Model.CanManagePropertyBookmarks)
@@ -359,14 +452,25 @@
                             <ul class="list-group list-group-flush">
                                 @foreach (var bookmark in Model.UserBookmarks)
                                 {
+                                    var faviconUrl = GetFaviconUrl(bookmark.Url);
                                     <li class="list-group-item px-0">
                                         <div class="d-flex justify-content-between align-items-start gap-3">
-                                            <div>
-                                                <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
-                                                @if (!string.IsNullOrWhiteSpace(bookmark.Description))
-                                                {
-                                                    <div class="text-muted small mt-1">@Html.Raw(MentionMarkupFormatter.ToHtml(bookmark.Description))</div>
-                                                }
+                                            <div class="bookmark-entry flex-grow-1">
+                                                <div class="bookmark-icon">
+                                                    @if (!string.IsNullOrWhiteSpace(faviconUrl))
+                                                    {
+                                                        <img src="@faviconUrl" alt="" loading="lazy" onerror="this.style.display='none'; var fallback=this.nextElementSibling; if(fallback){ fallback.classList.remove('visually-hidden'); }" />
+                                                    }
+                                                    <span class="bookmark-icon-fallback @(string.IsNullOrWhiteSpace(faviconUrl) ? string.Empty : "visually-hidden")" aria-hidden="true">🔗</span>
+                                                    <span class="visually-hidden">Website icon</span>
+                                                </div>
+                                                <div>
+                                                    <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
+                                                    @if (!string.IsNullOrWhiteSpace(bookmark.Description))
+                                                    {
+                                                        <div class="text-muted small mt-1">@Html.Raw(MentionMarkupFormatter.ToHtml(bookmark.Description))</div>
+                                                    }
+                                                </div>
                                             </div>
                                             <div class="d-flex align-items-center gap-3 flex-shrink-0 flex-wrap">
                                                 <form asp-action="ToggleQuick" method="post" class="d-inline-flex align-items-center quick-toggle-form">
