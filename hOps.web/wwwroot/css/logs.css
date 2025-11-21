@@ -275,6 +275,78 @@
     flex-direction: column;
 }
 
+#logTabsBar {
+    border: 1px solid #e3e6eb;
+    border-radius: 0.65rem;
+    padding: 0.25rem 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: #fdfdff;
+}
+
+.log-tabs-bar--empty #logTabs {
+    display: none;
+}
+
+.log-tabs-scroll {
+    flex: 1 1 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.log-tabs {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 0.35rem;
+    min-height: 2.2rem;
+}
+
+.log-tab {
+    border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
+    border-radius: 0.55rem 0.55rem 0 0;
+    background-color: transparent;
+    padding: 0.35rem 0.85rem;
+    font-weight: 500;
+    color: #475467;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.log-tab:hover,
+.log-tab:focus-visible {
+    background-color: rgba(59, 130, 246, 0.08);
+    color: #1d4ed8;
+    border-color: rgba(59, 130, 246, 0.35);
+}
+
+.log-tab.active {
+    background-color: #ffffff;
+    border-color: #cfd4e6;
+    border-bottom-color: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 -2px 6px rgba(15, 23, 42, 0.15);
+}
+
+.log-tabs-add {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.log-tabs-empty {
+    padding: 0.25rem 0.5rem;
+}
+
+.log-tabs-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+
+.log-tabs-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.7);
+    border-radius: 999px;
+}
+
 #spreadsheetWrapper {
     position: relative;
     flex: 1 1 auto;
@@ -471,5 +543,15 @@
 
     .spreadsheet-table tbody td {
         min-width: 100px;
+    }
+
+    #logTabsBar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .log-tabs {
+        min-height: 0;
     }
 }

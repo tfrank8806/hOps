@@ -2,6 +2,7 @@
     const storageKey = 'hops.logs.v1';
     const defaultRows = 10;
     const defaultColumns = 6;
+    const storageActiveLogKey = `${storageKey}.active`;
 
     const logListEl = document.getElementById('logList');
     const logEmptyStateEl = document.getElementById('logEmptyState');
@@ -58,6 +59,11 @@
     const undoButton = document.getElementById('undoBtn');
     const zoomInButton = document.getElementById('zoomInBtn');
     const zoomOutButton = document.getElementById('zoomOutBtn');
+    const logTabsContainer = document.getElementById('logTabs');
+    const logTabsBarElement = document.getElementById('logTabsBar');
+    const logTabsEmptyStateElement = document.getElementById('logTabsEmptyState');
+    const logTabsScrollElement = document.getElementById('logTabsScroll');
+    const addLogTabButton = document.getElementById('addTabBtn');
 
     const HEX_COLOR_REGEX = /^#(?:[0-9a-f]{3}){1,2}$/i;
     const SINGLE_CELL_REFERENCE_REGEX = /^([A-Za-z]+)(\d+)$/;
@@ -125,7 +131,7 @@
     }
 
     let logs = loadLogs();
-    let currentLogId = null;
+    let currentLogId = restoreActiveLogId();
     let selectionRange = null;
     let anchorCell = null;
     let activeEditingCell = null;
@@ -540,6 +546,56 @@
         return candidate;
     }
 
+    function generateDefaultLogName() {
+        const baseName = 'Log';
+        const existingNames = new Set(
+            logs
+                .map((log) => (typeof log.name === 'string' ? log.name.trim() : ''))
+                .filter((name) => name.length)
+        );
+
+        if (!existingNames.has(`${baseName} 1`)) {
+            return `${baseName} 1`;
+        }
+
+        let counter = 2;
+        let candidate = `${baseName} ${counter}`;
+        while (existingNames.has(candidate)) {
+            counter += 1;
+            candidate = `${baseName} ${counter}`;
+        }
+        return candidate;
+    }
+
+    function restoreActiveLogId() {
+        try {
+            const stored = localStorage.getItem(storageActiveLogKey);
+            if (!stored) {
+                return null;
+            }
+            const trimmed = stored.trim();
+            if (!trimmed) {
+                return null;
+            }
+            return logs.some((log) => log.id === trimmed) ? trimmed : null;
+        } catch (error) {
+            console.warn('Unable to restore previously active log id', error);
+            return null;
+        }
+    }
+
+    function persistActiveLogId() {
+        try {
+            if (currentLogId) {
+                localStorage.setItem(storageActiveLogKey, currentLogId);
+            } else {
+                localStorage.removeItem(storageActiveLogKey);
+            }
+        } catch (error) {
+            console.warn('Unable to persist active log id', error);
+        }
+    }
+
     function loadLogs() {
         try {
             const stored = localStorage.getItem(storageKey);
@@ -781,6 +837,7 @@
 
         if (!logs.length) {
             logEmptyStateEl?.classList.remove('d-none');
+            renderLogTabs();
             updateLogManagementButtons();
             return;
         }
@@ -818,27 +875,149 @@
             logListEl.appendChild(item);
         });
 
+        renderLogTabs();
         updateLogManagementButtons();
+    }
+
+    function renderLogTabs() {
+        if (!logTabsContainer) {
+            return;
+        }
+
+        logTabsContainer.innerHTML = '';
+
+        if (!logs.length) {
+            logTabsBarElement?.classList.add('log-tabs-bar--empty');
+            logTabsEmptyStateElement?.classList.remove('d-none');
+            return;
+        }
+
+        logTabsBarElement?.classList.remove('log-tabs-bar--empty');
+        logTabsEmptyStateElement?.classList.add('d-none');
+
+        logs.forEach((log, index) => {
+            const tabButton = document.createElement('button');
+            tabButton.type = 'button';
+            tabButton.className = 'log-tab';
+            tabButton.textContent = log.name || `Log ${index + 1}`;
+            tabButton.title = log.name || 'Unnamed log';
+            tabButton.setAttribute('role', 'tab');
+            tabButton.setAttribute('aria-selected', log.id === currentLogId ? 'true' : 'false');
+            tabButton.tabIndex = 0;
+            if (log.id === currentLogId) {
+                tabButton.classList.add('active');
+            }
+
+            tabButton.addEventListener('click', () => {
+                if (log.id !== currentLogId) {
+                    selectLog(log.id);
+                }
+            });
+
+            tabButton.addEventListener('dblclick', (event) => {
+                event.preventDefault();
+                renameLog(log.id);
+            });
+
+            tabButton.addEventListener('keydown', (event) => handleTabKeyNavigation(event, index));
+
+            logTabsContainer.appendChild(tabButton);
+        });
+
+        scrollActiveTabIntoView();
+    }
+
+    function handleTabKeyNavigation(event, tabIndex) {
+        if (!logs.length) {
+            return;
+        }
+
+        const key = event.key;
+        if (!key) {
+            return;
+        }
+
+        if (key === 'ArrowRight') {
+            event.preventDefault();
+            const nextIndex = (tabIndex + 1) % logs.length;
+            selectLog(logs[nextIndex].id);
+            return;
+        }
+
+        if (key === 'ArrowLeft') {
+            event.preventDefault();
+            const previousIndex = (tabIndex - 1 + logs.length) % logs.length;
+            selectLog(logs[previousIndex].id);
+            return;
+        }
+
+        if (key === 'Home') {
+            event.preventDefault();
+            selectLog(logs[0].id);
+            return;
+        }
+
+        if (key === 'End') {
+            event.preventDefault();
+            selectLog(logs[logs.length - 1].id);
+        }
+    }
+
+    function scrollActiveTabIntoView(behavior = 'auto') {
+        if (!(logTabsContainer instanceof HTMLElement) || !(logTabsScrollElement instanceof HTMLElement)) {
+            return;
+        }
+
+        const activeTab = logTabsContainer.querySelector('.log-tab.active');
+        if (!(activeTab instanceof HTMLElement)) {
+            return;
+        }
+
+        const tabLeft = activeTab.offsetLeft;
+        const tabRight = tabLeft + activeTab.offsetWidth;
+        const visibleLeft = logTabsScrollElement.scrollLeft;
+        const visibleRight = visibleLeft + logTabsScrollElement.clientWidth;
+
+        if (tabLeft >= visibleLeft && tabRight <= visibleRight) {
+            return;
+        }
+
+        const targetLeft = Math.max(tabLeft - 16, 0);
+        logTabsScrollElement.scrollTo({
+            left: targetLeft,
+            behavior
+        });
     }
 
     function getCurrentLog() {
         return logs.find((log) => log.id === currentLogId) ?? null;
     }
 
-    function selectLog(logId) {
-        currentLogId = logId;
+    function selectLog(logId, options = {}) {
         selectionRange = null;
         anchorCell = null;
+
+        const targetLog = logs.find((entry) => entry.id === logId) ?? null;
+        currentLogId = targetLog?.id ?? null;
+
         renderLogList();
-        const log = getCurrentLog();
-        if (!log) {
+
+        if (!targetLog) {
+            persistActiveLogId();
             showPlaceholder();
             return;
         }
-        if (!logHistory.has(log.id)) {
-            logHistory.set(log.id, []);
+
+        persistActiveLogId();
+
+        if (options.scrollTab !== false) {
+            scrollActiveTabIntoView('smooth');
         }
-        logTitleEl.textContent = log.name;
+
+        if (!logHistory.has(targetLog.id)) {
+            logHistory.set(targetLog.id, []);
+        }
+        logTitleEl.textContent = targetLog.name;
         logSubtitleEl.textContent = 'Changes are saved automatically in this browser.';
         addRowButton.disabled = false;
         insertRowButton.disabled = false;
@@ -854,7 +1033,7 @@
         applyZoomLevel();
         spreadsheetPlaceholderEl.classList.add('d-none');
         spreadsheetWrapperEl.classList.remove('d-none');
-        renderSpreadsheet(log);
+        renderSpreadsheet(targetLog);
         focusFirstCell();
     }
 
@@ -2612,6 +2791,16 @@
         selectLog(newLog.id);
     }
 
+    function handleAddTabClick() {
+        const name = generateDefaultLogName();
+        const newLog = createLog(name);
+        logs.push(newLog);
+        logHistory.set(newLog.id, []);
+        recordAudit(newLog, 'Log created', 'New tab added from tabs bar.');
+        persistLogs();
+        selectLog(newLog.id);
+    }
+
     function triggerImportLogPicker() {
         if (!importLogInput) {
             return;
@@ -2747,6 +2936,7 @@
                 selectLog(nextLogId);
             } else {
                 renderLogList();
+                persistActiveLogId();
                 showPlaceholder();
             }
         } else {
@@ -4640,6 +4830,7 @@
     deleteLogButton?.addEventListener('click', () => deleteLog());
     renameLogButton?.addEventListener('click', () => renameLog());
     viewAuditLogButton?.addEventListener('click', openAuditLogModal);
+    addLogTabButton?.addEventListener('click', handleAddTabClick);
     toggleSidebarButton?.addEventListener('click', handleSidebarToggle);
     closeSidebarButton?.addEventListener('click', closeSidebar);
     logsSidebarOverlayElement?.addEventListener('click', closeSidebar);
@@ -4664,8 +4855,10 @@
     updateZoomButtonState();
     updateUndoButtonState();
     renderLogList();
-    if (logs.length) {
-        selectLog(logs[0].id);
+    if (currentLogId) {
+        selectLog(currentLogId, { scrollTab: false });
+    } else if (logs.length) {
+        selectLog(logs[0].id, { scrollTab: false });
     } else {
         showPlaceholder();
     }

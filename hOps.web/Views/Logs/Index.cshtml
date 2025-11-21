@@ -221,6 +221,16 @@
                             </table>
                         </div>
                     </div>
+                    <div class="log-tabs-bar mt-3 pt-2 border-top" id="logTabsBar" aria-label="Open logs tabs">
+                        <div class="log-tabs-scroll flex-grow-1" id="logTabsScroll">
+                            <div class="log-tabs" id="logTabs" role="tablist" aria-label="Available logs"></div>
+                            <div class="log-tabs-empty text-muted small d-none" id="logTabsEmptyState">No tabs yet. Select a log or use + to create one.</div>
+                        </div>
+                        <button class="btn btn-outline-secondary btn-sm log-tabs-add" type="button" id="addTabBtn">
+                            <span aria-hidden="true">+</span>
+                            <span class="visually-hidden">Add new log tab</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
