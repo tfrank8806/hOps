@@ -959,6 +959,33 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     padding-bottom: 0.1rem;
 }
 
+.home-widget-card {
+    max-height: 360px;
+    display: flex;
+    flex-direction: column;
+}
+
+.home-widget-card__header {
+    flex: 0 0 auto;
+    padding-bottom: 0.65rem;
+}
+
+.home-widget-card__body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding-top: 0.5rem;
+}
+
+@media (max-width: 767.98px) {
+    .home-widget-card {
+        max-height: none;
+    }
+
+    .home-widget-card__body {
+        overflow-y: visible;
+    }
+}
+
 .content-surface--flush {
     padding: 0;
     border-radius: 0;
