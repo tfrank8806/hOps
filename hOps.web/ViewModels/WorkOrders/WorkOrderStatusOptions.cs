@@ -6,6 +6,8 @@ namespace hOps.web.ViewModels.WorkOrders
 {
     public static class WorkOrderStatusOptions
     {
+        public const string DefaultStatus = "New";
+
         public static IReadOnlyList<WorkOrderStatusOption> All { get; } = new List<WorkOrderStatusOption>
         {
             new() { Key = "New", Label = "Open", ColorHex = "#0d6efd" },

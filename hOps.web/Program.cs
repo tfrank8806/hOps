@@ -2,6 +2,8 @@ using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Hubs;
 using hOps.web.Services;
+using hOps.web.Options;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using System;
 using Microsoft.AspNetCore.Identity.UI.Services;
@@ -12,6 +14,8 @@ using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using System.Linq;
 using Microsoft.Data.SqlClient;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -107,6 +111,27 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 builder.Services.AddSignalR();
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Authentication:Jwt"));
+builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
+
+var jwtSettings = builder.Configuration.GetSection("Authentication:Jwt").Get<JwtOptions>() ?? new JwtOptions();
+var jwtSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SigningKey));
+
+builder.Services.AddAuthentication()
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSettings.Issuer,
+            ValidAudience = jwtSettings.Audience,
+            IssuerSigningKey = jwtSigningKey,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
 
 // Register email sender
 builder.Services.AddTransient<EmailSender>();
@@ -115,6 +140,7 @@ builder.Services.AddTransient<IExtendedEmailSender>(sp => sp.GetRequiredService<
 builder.Services.AddScoped<DirectMessageService>();
 builder.Services.AddScoped<MentionService>();
 builder.Services.AddScoped<IRealtimeNotificationService, RealtimeNotificationService>();
+builder.Services.AddScoped<IPropertyAccessService, PropertyAccessService>();
 builder.Services.AddSingleton<SchedulePdfRenderer>();
 builder.Services.AddScoped<SchedulePublicationService>();
 builder.Services.AddHostedService<DailySummaryEmailService>();
