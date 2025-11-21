@@ -960,7 +960,7 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 }
 
 .home-widget-card {
-    max-height: 360px;
+    max-height: 340px;
     display: flex;
     flex-direction: column;
 }
@@ -974,6 +974,18 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     flex: 1 1 auto;
     overflow-y: auto;
     padding-top: 0.5rem;
+}
+
+.home-widget-row--top .home-widget-card {
+    max-height: 260px;
+}
+
+.home-widget-row--second .home-widget-card {
+    max-height: 420px;
+}
+
+.home-widget-row--third .home-widget-card {
+    max-height: 360px;
 }
 
 @media (max-width: 767.98px) {
