@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using hOps.Mobile.Models;
 using hOps.Mobile.Services;
+using System.Windows.Input;
 
 namespace hOps.Mobile.ViewModels;
 
@@ -10,15 +11,19 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
 {
     private readonly IPassOnLogService _passOnLogService;
     private readonly IWorkOrderService _workOrderService;
+    private readonly IAuthService _authService;
 
-    public DashboardViewModel(IPassOnLogService passOnLogService, IWorkOrderService workOrderService)
+    public DashboardViewModel(IPassOnLogService passOnLogService, IWorkOrderService workOrderService, IAuthService authService)
     {
         _passOnLogService = passOnLogService;
         _workOrderService = workOrderService;
+        _authService = authService;
+        LogoutCommand = new Command(async () => await LogoutAsync());
     }
 
     public ObservableCollection<PassOnLogListItem> Logs { get; } = new();
     public ObservableCollection<WorkOrderListItem> WorkOrders { get; } = new();
+    public ICommand LogoutCommand { get; }
 
     public async Task LoadAsync()
     {
@@ -43,5 +48,11 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         {
             collection.Add(item);
         }
+    }
+
+    private async Task LogoutAsync()
+    {
+        await _authService.LogoutAsync();
+        await Shell.Current.GoToAsync("//LoginPage");
     }
 }

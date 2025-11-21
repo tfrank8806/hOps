@@ -5,17 +5,21 @@ namespace hOps.Mobile.Services
     public interface IAuthService
     {
         Task<LoginResponse?> LoginAsync(string usernameOrEmail, string password, CancellationToken cancellationToken = default);
+        Task LogoutAsync();
+        Task<bool> HasTokenAsync();
     }
 
     internal sealed class AuthService : IAuthService
     {
         private readonly HttpClient _httpClient;
         private readonly ISecureTokenStore _tokenStore;
+        private readonly ICurrentUserStore _currentUserStore;
 
-        public AuthService(HttpClient httpClient, ISecureTokenStore tokenStore)
+        public AuthService(HttpClient httpClient, ISecureTokenStore tokenStore, ICurrentUserStore currentUserStore)
         {
             _httpClient = httpClient;
             _tokenStore = tokenStore;
+            _currentUserStore = currentUserStore;
         }
 
         public async Task<LoginResponse?> LoginAsync(string usernameOrEmail, string password, CancellationToken cancellationToken = default)
@@ -33,9 +37,21 @@ namespace hOps.Mobile.Services
             if (!string.IsNullOrWhiteSpace(login?.AccessToken))
             {
                 await _tokenStore.SaveTokenAsync(login.AccessToken);
+                await _currentUserStore.SetUserAsync(login.User);
             }
 
             return login;
+        }
+
+        public async Task LogoutAsync()
+        {
+            await _tokenStore.ClearAsync();
+            await _currentUserStore.ClearAsync();
+        }
+
+        public Task<bool> HasTokenAsync()
+        {
+            return _tokenStore.HasTokenAsync();
         }
     }
 
@@ -59,4 +75,5 @@ namespace hOps.Mobile.Services
         public string Email { get; set; } = string.Empty;
         public string? ProfilePhotoUrl { get; set; }
     }
+
 }

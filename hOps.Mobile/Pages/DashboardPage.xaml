@@ -45,6 +45,10 @@
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
+
+            <Button Text="Logout"
+                    Command="{Binding LogoutCommand}"
+                    Margin="0,24,0,0" />
         </VerticalStackLayout>
     </ContentPage.Content>
 </ContentPage>

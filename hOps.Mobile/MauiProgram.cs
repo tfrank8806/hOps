@@ -18,9 +18,7 @@ public static class MauiProgram
 
         builder.Services.AddSingleton(new ApiOptions());
         builder.Services.AddSingleton<ISecureTokenStore, SecureTokenStore>();
-        builder.Services.AddSingleton(new ApiOptions());
-        builder.Services.AddSingleton<ISecureTokenStore, SecureTokenStore>();
-        builder.Services.AddSingleton<ISecureTokenStore, SecureTokenStore>();
+        builder.Services.AddSingleton<ICurrentUserStore, CurrentUserStore>();
         builder.Services.AddSingleton(new HttpClient());
         builder.Services.AddTransient<IApiClient, ApiClient>(sp =>
         {
@@ -34,7 +32,7 @@ public static class MauiProgram
             var options = sp.GetRequiredService<ApiOptions>();
             var http = sp.GetRequiredService<HttpClient>();
             http.BaseAddress = new Uri(options.BaseUrl);
-            return new AuthService(http, sp.GetRequiredService<ISecureTokenStore>());
+            return new AuthService(http, sp.GetRequiredService<ISecureTokenStore>(), sp.GetRequiredService<ICurrentUserStore>());
         });
         builder.Services.AddTransient<ViewModels.LoginViewModel>();
         builder.Services.AddTransient<ViewModels.DashboardViewModel>();
