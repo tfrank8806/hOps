@@ -916,9 +916,9 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 .home-main-container {
     width: 100%;
-    max-width: 1600px;
+    max-width: 1500px;
     margin-inline: auto;
-    padding-inline: clamp(1rem, 4vw, 3rem);
+    padding-inline: clamp(0.75rem, 3vw, 2.25rem);
 }
 
 .home-main-container .content-surface.content-surface--flush {
@@ -926,20 +926,37 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 }
 
 .home-dashboard {
-    padding: clamp(1.25rem, 3vw, 3rem);
+    padding: clamp(0.85rem, 2.5vw, 2.25rem);
     background: rgba(255, 255, 255, 0.96);
-    border-radius: 1.5rem;
-    box-shadow: 0 28px 45px rgba(15, 46, 97, 0.08);
+    border-radius: 1rem;
+    box-shadow: 0 20px 35px rgba(15, 46, 97, 0.07);
 }
 
 .home-dashboard > .row + .row {
-    margin-top: clamp(1.5rem, 3vw, 2.5rem);
+    margin-top: clamp(1rem, 2vw, 1.75rem);
 }
 
 @media (max-width: 575.98px) {
     .home-dashboard {
-        padding: 1.25rem;
+        padding: 1rem;
     }
+}
+
+.home-dashboard .card-header,
+.home-dashboard .card-body {
+    padding: 0.85rem 1rem;
+}
+
+.home-dashboard .card-body > :last-child {
+    margin-bottom: 0;
+}
+
+.home-dashboard .widget-list .widget-item + .widget-item {
+    margin-top: 0.5rem;
+}
+
+.home-dashboard .widget-list .widget-item {
+    padding-bottom: 0.1rem;
 }
 
 .content-surface--flush {
