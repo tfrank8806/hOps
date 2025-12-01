@@ -27,7 +27,7 @@ namespace hOps.web.Migrations
                 column: "PassOnLogId",
                 principalTable: "PassOnLogs",
                 principalColumn: "Id",
-                onDelete: ReferentialAction.Cascade);
+                onDelete: ReferentialAction.Restrict);
         }
 
         /// <inheritdoc />

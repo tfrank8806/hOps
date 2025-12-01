@@ -370,7 +370,7 @@ namespace hOps.web.Data
                 .HasOne(n => n.PassOnLog)
                 .WithMany()
                 .HasForeignKey(n => n.PassOnLogId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<UserToDoItem>()
                 .HasOne(t => t.User)
