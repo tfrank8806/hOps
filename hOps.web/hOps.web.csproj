@@ -25,7 +25,7 @@
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.7" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="Exists('hOps.db')">
     <Content Include="hOps.db">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
