@@ -36,9 +36,11 @@ public static class MauiProgram
         });
         builder.Services.AddTransient<ViewModels.LoginViewModel>();
         builder.Services.AddTransient<ViewModels.DashboardViewModel>();
+        builder.Services.AddTransient<ViewModels.ProfileViewModel>();
         builder.Services.AddSingleton<IPassOnLogService, PassOnLogService>();
         builder.Services.AddTransient<Pages.LoginPage>();
         builder.Services.AddTransient<Pages.DashboardPage>();
+        builder.Services.AddTransient<Pages.ProfilePage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

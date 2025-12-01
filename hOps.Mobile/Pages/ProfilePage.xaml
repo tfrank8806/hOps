@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:hOps.Mobile.ViewModels"
+             x:Class="hOps.Mobile.Pages.ProfilePage"
+             x:DataType="viewmodels:ProfileViewModel"
+             Title="Profile">
+
+    <ContentPage.Content>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Label Text="Your Profile"
+                   FontSize="28"
+                   FontAttributes="Bold" />
+
+            <Label Text="{Binding User.FullName}" FontSize="20" />
+            <Label Text="{Binding User.Email}" FontSize="16" TextColor="Gray" />
+
+            <Button Text="Logout"
+                    Command="{Binding LogoutCommand}" />
+        </VerticalStackLayout>
+    </ContentPage.Content>
+</ContentPage>

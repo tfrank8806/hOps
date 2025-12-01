@@ -366,6 +366,12 @@ namespace hOps.web.Data
                 .HasForeignKey(n => n.DirectMessageId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            builder.Entity<UserNotification>()
+                .HasOne(n => n.PassOnLog)
+                .WithMany()
+                .HasForeignKey(n => n.PassOnLogId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             builder.Entity<UserToDoItem>()
                 .HasOne(t => t.User)
                 .WithMany(u => u.ToDoItems)

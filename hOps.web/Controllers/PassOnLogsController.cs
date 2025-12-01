@@ -16,6 +16,7 @@ using System;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace hOps.web.Controllers
 {
@@ -374,6 +375,7 @@ namespace hOps.web.Controllers
                     Title = "New pass-on log",
                     Content = $"{actorName} posted \"{log.Title}\"",
                     LinkUrl = linkUrl,
+                    PassOnLogId = log.Id,
                     CreatedAt = now,
                     IsRead = false
                 });
@@ -672,6 +674,8 @@ namespace hOps.web.Controllers
 
             var (nextLogId, previousLogId) = await GetNeighborLogIdsAsync(log, accessiblePropertyIds);
 
+            var hasChanges = false;
+
             if (log.CreatedById != currentUser.Id && !log.Views.Any(v => v.ViewerId == currentUser.Id))
             {
                 log.Views.Add(new PassOnLogView
@@ -681,6 +685,16 @@ namespace hOps.web.Controllers
                     Viewer = currentUser,
                     ViewedAt = DateTime.UtcNow
                 });
+                hasChanges = true;
+            }
+
+            if (await MarkPassOnLogAlertsAsReadAsync(log.Id, currentUser.Id))
+            {
+                hasChanges = true;
+            }
+
+            if (hasChanges)
+            {
                 await _context.SaveChangesAsync();
             }
 
@@ -925,6 +939,61 @@ namespace hOps.web.Controllers
             }
 
             return Path.GetFileName(attachment.FilePath);
+        }
+
+        private async Task<bool> MarkPassOnLogAlertsAsReadAsync(int logId, string userId)
+        {
+            var notifications = await _context.UserNotifications
+                .Where(n => n.UserId == userId && n.Type == "passon-log" && !n.IsRead)
+                .Where(n => n.PassOnLogId == logId || (n.PassOnLogId == null && n.LinkUrl != null))
+                .ToListAsync();
+
+            if (!notifications.Any())
+            {
+                return false;
+            }
+
+            var updated = false;
+            var now = DateTime.UtcNow;
+
+            foreach (var notification in notifications)
+            {
+                var matches = notification.PassOnLogId == logId;
+
+                if (!matches && TryResolveLogIdFromLink(notification.LinkUrl, out var parsedId))
+                {
+                    notification.PassOnLogId = parsedId;
+                    matches = parsedId == logId;
+                }
+
+                if (!matches)
+                {
+                    continue;
+                }
+
+                notification.IsRead = true;
+                notification.ReadAt = now;
+                updated = true;
+            }
+
+            return updated;
+        }
+
+        private static bool TryResolveLogIdFromLink(string? linkUrl, out int logId)
+        {
+            logId = default;
+            if (string.IsNullOrWhiteSpace(linkUrl))
+            {
+                return false;
+            }
+
+            var match = Regex.Match(linkUrl, @"PassOnLogs\/Details\/(?<id>\d+)", RegexOptions.IgnoreCase);
+            if (!match.Success)
+            {
+                return false;
+            }
+
+            return int.TryParse(match.Groups["id"].Value, out logId);
         }
 
         private PassOnLogDetailsViewModel BuildDetailsViewModel(PassOnLog log, string currentUserId, int? nextLogId, int? previousLogId)
