@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "f2NahSR+UJg=",
+  "dgSpecHash": "n+RiJS9Qpnk=",
   "success": true,
-  "projectFilePath": "C:\\hops\\hOps.Mobile\\hOps.Mobile.csproj",
+  "projectFilePath": "C:\\hOps\\hOps.Mobile\\hOps.Mobile.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\googlegson\\2.13.0.1\\googlegson.2.13.0.1.nupkg.sha512",
     "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\microsoft.extensions.configuration\\9.0.8\\microsoft.extensions.configuration.9.0.8.nupkg.sha512",
