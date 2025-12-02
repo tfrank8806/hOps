@@ -97,7 +97,7 @@ namespace hOps.web.Services
 
             var now = DateTime.UtcNow;
             var preview = string.IsNullOrWhiteSpace(excerpt)
-                ? MentionMarkupFormatter.ToDisplayText(content)
+                ? RichTextRenderer.ToPlainText(content)
                 : excerpt!;
             if (!string.IsNullOrWhiteSpace(preview) && preview.Length > 240)
             {

@@ -330,7 +330,7 @@ namespace hOps.web.Controllers.Api
 
         private static string BuildPreview(string? body)
         {
-            var preview = MentionMarkupFormatter.ToDisplayText(body ?? string.Empty)
+            var preview = RichTextRenderer.ToPlainText(body ?? string.Empty)
                 .ReplaceLineEndings(" ")
                 .Trim();
 

@@ -31,7 +31,7 @@
     string? latestMessageSnippet = null;
     if (!string.IsNullOrWhiteSpace(latestMessageBody))
     {
-        latestMessageSnippet = MentionMarkupFormatter.ToDisplayText(latestMessageBody);
+        latestMessageSnippet = RichTextRenderer.ToPlainText(latestMessageBody);
         if (!string.IsNullOrWhiteSpace(latestMessageSnippet) && latestMessageSnippet.Length > 80)
         {
             latestMessageSnippet = latestMessageSnippet.Substring(0, 80) + "...";

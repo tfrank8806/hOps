@@ -414,7 +414,7 @@ namespace hOps.web.Controllers
 
             var actorName = FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
             var subject = $"New log: {log.Title}";
-            var preview = MentionMarkupFormatter.ToDisplayText(log.Body ?? string.Empty);
+            var preview = RichTextRenderer.ToPlainText(log.Body ?? string.Empty);
             if (!string.IsNullOrWhiteSpace(preview) && preview.Length > 500)
             {
                 preview = $"{preview[..500]}...";
@@ -774,7 +774,7 @@ namespace hOps.web.Controllers
 
         private static string BuildPreview(string body)
         {
-            var preview = MentionMarkupFormatter.ToDisplayText(body ?? string.Empty)
+            var preview = RichTextRenderer.ToPlainText(body ?? string.Empty)
                 .ReplaceLineEndings(" ")
                 .Trim();
 

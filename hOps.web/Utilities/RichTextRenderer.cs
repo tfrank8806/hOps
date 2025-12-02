@@ -30,6 +30,9 @@ namespace hOps.web.Utilities
         };
 
         private static readonly Regex ColorTagRegex = new(@"\{\{(/?color(?::(?<name>[a-z0-9-]+))?)\}\}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex HtmlBreakTagRegex = new(@"(<br\s*/?>|</p>|</div>|</li>|</ul>|</ol>)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex HtmlTagRegex = new(@"<[^>]+>", RegexOptions.Compiled);
+        private static readonly Regex CollapseWhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
 
         public static string ToHtml(string? content)
         {
@@ -164,6 +167,26 @@ namespace hOps.web.Utilities
             }
 
             return html;
+        }
+
+        public static string ToPlainText(string? content)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return string.Empty;
+            }
+
+            var html = ToHtml(content);
+            if (string.IsNullOrWhiteSpace(html))
+            {
+                return string.Empty;
+            }
+
+            var withBreaks = HtmlBreakTagRegex.Replace(html, "\n");
+            var stripped = HtmlTagRegex.Replace(withBreaks, " ");
+            var decoded = WebUtility.HtmlDecode(stripped);
+            var collapsed = CollapseWhitespaceRegex.Replace(decoded, " ").Trim();
+            return collapsed;
         }
 
         private sealed class ColorToken

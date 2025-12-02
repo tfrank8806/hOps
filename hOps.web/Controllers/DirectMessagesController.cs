@@ -317,7 +317,7 @@ namespace hOps.web.Controllers
                             : null,
                         LastMessagePreview = string.IsNullOrWhiteSpace(summary.LastMessagePreview)
                             ? null
-                            : MentionMarkupFormatter.ToDisplayText(summary.LastMessagePreview),
+                            : RichTextRenderer.ToPlainText(summary.LastMessagePreview),
                         LastMessageAt = summary.LastMessageAt,
                         HasUnread = summary.UnreadCount > 0,
                         UnreadCount = summary.UnreadCount
@@ -392,7 +392,7 @@ namespace hOps.web.Controllers
                                 : null,
                             LastMessagePreview = string.IsNullOrWhiteSpace(summary.LastMessagePreview)
                                 ? null
-                                : MentionMarkupFormatter.ToDisplayText(summary.LastMessagePreview),
+                                : RichTextRenderer.ToPlainText(summary.LastMessagePreview),
                             LastMessageAt = summary.LastMessageAt,
                             HasUnread = summary.UnreadCount > 0,
                             UnreadCount = summary.UnreadCount

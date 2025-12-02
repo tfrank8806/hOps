@@ -436,7 +436,7 @@ namespace hOps.web.Services
                 return string.Empty;
             }
 
-            var displayText = MentionMarkupFormatter.ToDisplayText(content);
+            var displayText = RichTextRenderer.ToPlainText(content);
             if (string.IsNullOrWhiteSpace(displayText))
             {
                 return string.Empty;

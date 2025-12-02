@@ -759,7 +759,7 @@ namespace hOps.web.Controllers
                 var creatorName = log.CreatedBy != null ? BuildDisplayName(log.CreatedBy) : "Unknown";
                 var preview = string.IsNullOrWhiteSpace(log.Body)
                     ? string.Empty
-                    : TruncatePreview(MentionMarkupFormatter.ToDisplayText(log.Body ?? string.Empty));
+                    : TruncatePreview(RichTextRenderer.ToPlainText(log.Body ?? string.Empty));
 
                 return new PassOnLogSummaryViewModel
                 {
