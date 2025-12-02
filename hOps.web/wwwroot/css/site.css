@@ -981,7 +981,7 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 }
 
 .home-widget-row--top .home-widget-card {
-    max-height: 220px;
+    max-height: 180px;
 }
 
 .home-widget-row--second .home-widget-card {
