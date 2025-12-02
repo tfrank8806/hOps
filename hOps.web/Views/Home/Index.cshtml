@@ -1,7 +1,9 @@
 @using System.Globalization
 @using System.Linq
 @using System.Text.Json
+@using System.Text.Json.Serialization
 @using hOps.web.Utilities
+@using hOps.web.ViewModels.Home
 @model hOps.web.ViewModels.Home.HomeIndexViewModel
 
 @{
@@ -10,12 +12,19 @@
     var hasProperty = property != null;
     ViewData["MainContainerClass"] = "main-inner--wide home-main-container";
     ViewData["ContentSurfaceClass"] = "content-surface--flush";
-    string EscapeTextareaValue(string? value) => string.IsNullOrEmpty(value)
-        ? string.Empty
-        : value.Replace("</textarea>", "&lt;/textarea&gt;");
-    var announcementMarkup = Model.Announcement?.Content ?? string.Empty;
-    var announcementInitialHtml = RichTextRenderer.ToHtml(announcementMarkup);
+    var layoutOptions = new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+    };
+    var initialLayoutJson = JsonSerializer.Serialize(Model.WidgetLayout ?? new List<HomeWidgetLayoutEntry>(), layoutOptions);
+    var sizeOptionsPayload = (Model.WidgetSizeClasses ?? new Dictionary<HomeWidgetSize, string>()).ToDictionary(kvp => kvp.Key.ToString().ToLowerInvariant(), kvp => kvp.Value);
+    var sizeOptionsJson = JsonSerializer.Serialize(sizeOptionsPayload);
 }
+
+<form id="homeLayoutAntiforgery" method="post" class="d-none">
+    @Html.AntiForgeryToken()
+</form>
 
 <div class="home-dashboard">
     @if (TempData["HomeMessage"] is string successMessage)
@@ -33,707 +42,306 @@
         </div>
     }
 
-    <div class="row g-3 g-xl-4 home-widget-row home-widget-row--top">
-        <div class="col-12 col-lg-4">
-            <div class="card shadow-sm h-100">
-                <div class="card-header d-flex align-items-center justify-content-between">
-                    <h2 class="h5 mb-0">Manager Notes &amp; Announcements</h2>
-                    @if (Model.CanManageAnnouncements && hasProperty)
-                    {
-                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#announcementEditor" aria-expanded="false" aria-controls="announcementEditor">
-                            Edit
-                        </button>
-                    }
-                </div>
-                <div class="card-body">
-                    @if (!hasProperty)
-                    {
-                        <p class="text-muted mb-0">Select a property to view announcements.</p>
-                    }
-                    else if (string.IsNullOrWhiteSpace(Model.Announcement.Content))
-                    {
-                        <p class="text-muted mb-0">No announcements yet. Managers and admins can add one using the edit button.</p>
-                    }
-                    else
-                    {
-                        <div class="announcement-content rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(Model.Announcement.Content))</div>
-                        @if (Model.Announcement.UpdatedAt.HasValue)
-                        {
-                            var updatedLocal = TimeZoneService.ConvertToUserTime(Model.Announcement.UpdatedAt.Value);
-                            <p class="text-muted small mb-0 mt-2">Last updated @updatedLocal.ToString("g") @if (!string.IsNullOrWhiteSpace(Model.Announcement.UpdatedByName)){<text> by @Model.Announcement.UpdatedByName</text>}</p>
-                        }
-                    }
-
-                    @if (hasProperty && Model.Announcement.Attachments.Any())
-                    {
-                        <div class="mt-3">
-                            <h3 class="h6 mb-2">Attachments</h3>
-                            <ul class="list-unstyled mb-0">
-                                @foreach (var attachment in Model.Announcement.Attachments)
-                                {
-                                    <li class="mb-2">
-                                        <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
-                                    </li>
-                                }
-                            </ul>
-                        </div>
-                    }
-
-                    @if (Model.CanManageAnnouncements && hasProperty)
-                    {
-                        <div class="collapse mt-3" id="announcementEditor">
-                            <form asp-action="UpdateAnnouncement" method="post" enctype="multipart/form-data">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="PropertyId" value="@property!.Id" />
-                                <div class="mb-3">
-                                    <label for="announcementContent" class="form-label">Announcement</label>
-                                    <textarea class="form-control"
-                                              id="announcementContent"
-                                              name="Content"
-                                              rows="6"
-                                              maxlength="4000"
-                                              data-enable-mentions="true"
-                                              data-rich-text="true"
-                                              data-initial-html="@announcementInitialHtml">@Html.Raw(EscapeTextareaValue(announcementMarkup))</textarea>
-                                    <div class="form-text">Use the toolbar for bold, italic, underline, lists, and quotes. Markdown shortcuts also work.</div>
-                                </div>
-                                @if (Model.Announcement.Attachments.Any())
-                                {
-                                    <div class="mb-3">
-                                        <label class="form-label">Current Attachments</label>
-                                        <ul class="list-unstyled mb-2">
-                                            @foreach (var attachment in Model.Announcement.Attachments)
-                                            {
-                                                var checkboxId = $"announcementRemove_{attachment.Id}";
-                                                <li class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-2">
-                                                    <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
-                                                    <div class="form-check mb-0">
-                                                        <input class="form-check-input" type="checkbox" name="AttachmentsToDelete" value="@attachment.Id" id="@checkboxId" />
-                                                        <label class="form-check-label" for="@checkboxId">Remove</label>
-                                                    </div>
-                                                </li>
-                                            }
-                                        </ul>
-                                        <div class="form-text">Select remove to delete files when you save.</div>
-                                    </div>
-                                }
-                                <div class="mb-3">
-                                    <label class="form-label" for="announcementFiles">Add Attachments</label>
-                                    <input class="form-control" type="file" id="announcementFiles" name="Files" multiple />
-                                    <div class="form-text">Upload photos or documents to share with your team.</div>
-                                </div>
-                                <div class="d-flex justify-content-end gap-2">
-                                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#announcementEditor">Cancel</button>
-                                    <button type="submit" class="btn btn-primary">Save Announcement</button>
-                                </div>
-                            </form>
-                        </div>
-                    }
-
-                    <div id="layoutRoomMenu" class="layout-room-menu shadow" aria-hidden="true">
-                        <div class="layout-room-menu__header d-flex align-items-start justify-content-between">
-                            <div>
-                                <div class="layout-room-menu__title" data-room-name>Select a room</div>
-                                <div class="layout-room-menu__meta text-muted small" data-room-floor></div>
-                            </div>
-                            <button type="button" class="btn-close" aria-label="Close room menu" data-close-room-menu></button>
-                        </div>
-                        <div class="layout-room-menu__body">
-                            <div class="layout-room-menu__section">
-                                <h6 class="layout-room-menu__section-title">Open Work Orders</h6>
-                                <div class="layout-room-menu__workorders text-muted small" data-room-workorders>
-                                    Select a room to review open work orders.
-                                </div>
-                            </div>
-                            <div class="layout-room-menu__actions d-flex flex-column flex-sm-row gap-2">
-                                <a class="btn btn-outline-primary btn-sm"
-                                   href="@((Url.Action("Index", "WorkOrders") ?? "/WorkOrders"))"
-                                   target="_blank"
-                                   rel="noopener"
-                                   data-view-workorders>
-                                    View in Work Orders
-                                </a>
-                                <button type="button" class="btn btn-primary btn-sm" data-create-workorder disabled>
-                                    Create Work Order
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="modal fade" id="layoutWorkOrderModal" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered modal-lg">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Create Work Order</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <form id="layoutWorkOrderForm" method="post" novalidate>
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="PropertyId" value="@(property?.Id ?? 0)" />
-                                        <input type="hidden" name="RoomNumber" />
-                                        <input type="hidden" name="RoomLabel" />
-                                        <div class="mb-3">
-                                            <label class="form-label">Room</label>
-                                            <div class="form-control-plaintext fw-semibold" data-room-display>
-                                                Select a room from the layout.
-                                            </div>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label" for="layoutWorkOrderIssue">Issue<span class="text-danger">*</span></label>
-                                            <textarea class="form-control" id="layoutWorkOrderIssue" name="Issue" rows="3" required></textarea>
-                                        </div>
-                                        <div class="row g-3">
-                                            <div class="col-sm-6">
-                                                <label class="form-label" for="layoutWorkOrderType">Work Order Type</label>
-                                                <select class="form-select" id="layoutWorkOrderType" name="WorkOrderTypeId">
-                                                    <option value="">Unspecified</option>
-                                                    @foreach (var type in Model.WorkOrderTypeOptions)
-                                                    {
-                                                        <option value="@type.Id">@type.Name</option>
-                                                    }
-                                                </select>
-                                            </div>
-                                            <div class="col-sm-6">
-                                                <label class="form-label" for="layoutWorkOrderDepartment">Assign To</label>
-                                                <select class="form-select" id="layoutWorkOrderDepartment" name="DepartmentId">
-                                                    <option value="">Unassigned</option>
-                                                    @foreach (var department in Model.DepartmentOptions)
-                                                    {
-                                                        <option value="@department.Id">@department.Name</option>
-                                                    }
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="row g-3 mt-0">
-                                            <div class="col-sm-6">
-                                                <label class="form-label" for="layoutWorkOrderDueDate">Due Date</label>
-                                                <input type="date"
-                                                       class="form-control"
-                                                       id="layoutWorkOrderDueDate"
-                                                       name="DueDate"
-                                                       value="@DateTime.Today.ToString("yyyy-MM-dd")"
-                                                       data-default-value="@DateTime.Today.ToString("yyyy-MM-dd")" />
-                                            </div>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label" for="layoutWorkOrderDetails">Details</label>
-                                            <textarea class="form-control" id="layoutWorkOrderDetails" name="Details" rows="3"></textarea>
-                                        </div>
-                                        <div class="alert d-none" role="alert" data-form-status></div>
-                                        <div class="d-flex justify-content-end gap-2">
-                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                            <button type="submit" class="btn btn-primary">Submit Work Order</button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <div class="home-layout-controls d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div class="d-flex gap-2 align-items-center">
+            <button type="button" class="btn btn-outline-secondary" data-layout-action="start">Customize Layout</button>
+            <div class="btn-group d-none" data-layout-editor>
+                <button type="button" class="btn btn-primary" data-layout-action="save">Save Layout</button>
+                <button type="button" class="btn btn-outline-secondary" data-layout-action="cancel">Cancel</button>
             </div>
         </div>
+        <div class="text-muted small d-none" data-layout-hint>Drag cards to reorder. Use the width selector to resize widgets.</div>
+    </div>
 
-        <div class="col-12 col-lg-4">
-            @{
-                var showBulletinForm = TempData["ShowBulletinForm"] is bool showFlag && showFlag;
-                var bulletinCollapseId = "bulletinFormCollapse";
+    <div class="row g-3 g-xl-4 home-widget-grid" id="homeWidgetGrid"
+         data-initial-layout='@Html.Raw(initialLayoutJson)'
+         data-save-url="@(Url.Action("SaveWidgetLayout", "Home") ?? "#")"
+         data-size-options='@Html.Raw(sizeOptionsJson)'>
+        @foreach (var widget in Model.WidgetLayout)
+        {
+            if (!Model.WidgetSizeClasses.TryGetValue(widget.Size, out var cssClass))
+            {
+                cssClass = Model.WidgetSizeClasses.ContainsKey(HomeWidgetSize.Third)
+                    ? Model.WidgetSizeClasses[HomeWidgetSize.Third]
+                    : "col-12 col-lg-6 col-xl-4";
             }
-            <div class="card shadow-sm h-100">
-                <div class="card-header d-flex flex-column flex-md-row gap-2 align-items-start align-items-md-center justify-content-between">
-                    <div>
-                        <h2 class="h5 mb-0">Bulletin Board</h2>
-                        @if (hasProperty)
-                        {
-                            <span class="text-muted small">Visible to everyone at @property!.Name</span>
-                        }
-                    </div>
-                    <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#@bulletinCollapseId" aria-expanded="@(showBulletinForm ? "true" : "false")" aria-controls="@bulletinCollapseId" @(hasProperty ? string.Empty : "disabled")>
-                        <span class="me-1" aria-hidden="true">+</span>
-                        <span>New Bulletin</span>
-                    </button>
+            var sizeValue = widget.Size.ToString().ToLowerInvariant();
+            <div class="col-12 @cssClass home-widget" data-widget-id="@widget.WidgetId" data-widget-size="@sizeValue" data-size-class="@cssClass" draggable="false">
+                <div class="home-widget__editor d-flex align-items-center gap-2">
+                    <label class="visually-hidden" for="widget-size-@widget.WidgetId">Widget width</label>
+                    <select id="widget-size-@widget.WidgetId" class="form-select form-select-sm home-widget__size-select" data-size-select>
+                        <option value="full" selected="@(widget.Size == HomeWidgetSize.Full)">Full width</option>
+                        <option value="half" selected="@(widget.Size == HomeWidgetSize.Half)">Half width</option>
+                        <option value="third" selected="@(widget.Size == HomeWidgetSize.Third)">One third</option>
+                        <option value="quarter" selected="@(widget.Size == HomeWidgetSize.Quarter)">One quarter</option>
+                    </select>
+                    <span class="home-widget__drag-handle" role="button" tabindex="0" aria-label="Drag widget" title="Drag widget">??</span>
                 </div>
-                <div class="card-body"
-                     id="layoutWidget"
-                     data-property-id="@(property?.Id ?? 0)"
-                     data-room-summary-url="@Url.Action("GetRoomWorkOrders", "WorkOrders")"
-                     data-room-create-url="@Url.Action("CreateFromLayout", "WorkOrders")"
-                     data-workorders-url="@Url.Action("Index", "WorkOrders")">
-                    @if (!hasProperty)
+                <div class="home-widget__content">
+                    @switch (widget.WidgetId)
                     {
-                        <p class="text-muted mb-0">Select a property to collaborate with your team.</p>
-                    }
-                    else
-                    {
-                        <div class="collapse bulletin-form-collapse @(showBulletinForm ? "show" : string.Empty)" id="@bulletinCollapseId">
-                            <div class="border rounded-3 bg-light-subtle p-3 p-md-4 mb-4">
-                                <form asp-action="CreateBulletin" method="post" enctype="multipart/form-data">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="PropertyId" value="@property!.Id" />
-                                    <div class="mb-3">
-                                        <label for="newBulletinContent" class="form-label">Share an update</label>
-                                        <textarea class="form-control" id="newBulletinContent" name="Content" rows="3" maxlength="2000" placeholder="Add a note for the team" required data-enable-mentions="true" data-rich-text="true"></textarea>
-                                        <div class="form-text">Formatting supports bold, italic, underline, lists, and quotes to highlight key details. Use Shift + Enter to create a new line.</div>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label" for="newBulletinFiles">Attachments (optional)</label>
-                                        <input class="form-control" type="file" id="newBulletinFiles" name="Files" multiple />
-                                        <div class="form-text">Add photos or documents to give more context.</div>
-                                    </div>
-                                    <div class="d-flex justify-content-end gap-2">
-                                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#@bulletinCollapseId" aria-controls="@bulletinCollapseId">Cancel</button>
-                                        <button type="submit" class="btn btn-primary">Post to Bulletin</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-
-                        @if (!Model.BulletinPosts.Any())
-                        {
-                            <p class="text-muted mb-0">No bulletin posts yet. Start the conversation above.</p>
-                        }
-                        else
-                        {
-                            <div class="bulletin-list">
-                                @foreach (var post in Model.BulletinPosts)
-                                {
-                                    var collapseId = $"editBulletin_{post.Id}";
-                                    <article class="bulletin-item mb-4 p-3 border rounded-3">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div>
-                                                <h3 class="h6 mb-1">@(!string.IsNullOrWhiteSpace(post.CreatedByName) ? post.CreatedByName : "Team Member")</h3>
-                                                @{
-                                                    var createdLocal = TimeZoneService.ConvertToUserTime(post.CreatedAt);
-                                                    var updatedLocal = post.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(post.UpdatedAt.Value) : (DateTime?)null;
-                                                }
-                                                <p class="mb-2 text-muted small">Posted @createdLocal.ToString("g")
-                                                @if (post.UpdatedAt.HasValue)
-                                                {
-                                                    <span class="ms-2">· Updated @updatedLocal?.ToString("g") @if (!string.IsNullOrWhiteSpace(post.UpdatedByName)){<text>by @post.UpdatedByName</text>}</span>
-                                                }
-                                                </p>
-                                            </div>
-                                            @if (post.CanEdit)
-                                            {
-                                                <div class="btn-group">
-                                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">Edit</button>
-                                                    <form asp-action="DeleteBulletin" method="post" onsubmit="return confirm('Remove this bulletin entry?');">
-                                                        @Html.AntiForgeryToken()
-                                                        <input type="hidden" name="id" value="@post.Id" />
-                                                        <input type="hidden" name="propertyId" value="@property!.Id" />
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                                    </form>
-                                                </div>
-                                            }
-                                        </div>
-                                        <div class="bulletin-content rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(post.Content))</div>
-
-                                        @if (post.Attachments.Any())
-                                        {
-                                            <div class="mt-2">
-                                                <ul class="list-unstyled small mb-0">
-                                                    @foreach (var attachment in post.Attachments)
-                                                    {
-                                                        <li class="mb-1">
-                                                            <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
-                                                        </li>
-                                                    }
-                                                </ul>
-                                            </div>
-                                        }
-
-                                        @if (post.CanEdit)
-                                        {
-                                            <div class="collapse mt-3" id="@collapseId">
-                                                <form asp-action="UpdateBulletin" method="post" enctype="multipart/form-data" class="border-top pt-3">
-                                                    @Html.AntiForgeryToken()
-                                                    <input type="hidden" name="Id" value="@post.Id" />
-                                                    <input type="hidden" name="PropertyId" value="@property!.Id" />
-                                                    <div class="mb-3">
-                                                        <label class="form-label" for="bulletinContent_@post.Id">Edit message</label>
-                                                    @{
-                                                        var postInitialHtml = RichTextRenderer.ToHtml(post.Content);
-                                                    }
-                                                    <textarea class="form-control"
-                                                              id="bulletinContent_@post.Id"
-                                                              name="Content"
-                                                              rows="3"
-                                                              maxlength="2000"
-                                                              data-enable-mentions="true"
-                                                              data-rich-text="true"
-                                                              data-initial-html="@postInitialHtml">@Html.Raw(EscapeTextareaValue(post.Content))</textarea>
-                                                        <div class="form-text">Use the toolbar to emphasize changes before saving.</div>
-                                                    </div>
-                                                    @if (post.Attachments.Any())
-                                                    {
-                                                        <div class="mb-3">
-                                                            <label class="form-label">Current Attachments</label>
-                                                            <ul class="list-unstyled mb-2">
-                                                                @foreach (var attachment in post.Attachments)
-                                                                {
-                                                                    var checkboxId = $"bulletinRemove_{post.Id}_{attachment.Id}";
-                                                                    <li class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-2">
-                                                                        <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
-                                                                        <div class="form-check mb-0">
-                                                                            <input class="form-check-input" type="checkbox" name="AttachmentsToDelete" value="@attachment.Id" id="@checkboxId" />
-                                                                            <label class="form-check-label" for="@checkboxId">Remove</label>
-                                                                        </div>
-                                                                    </li>
-                                                                }
-                                                            </ul>
-                                                            <div class="form-text">Select remove to delete existing files before saving.</div>
-                                                        </div>
-                                                    }
-                                                    <div class="mb-3">
-                                                        <label class="form-label" for="bulletinFiles_@post.Id">Add Attachments</label>
-                                                        <input class="form-control" type="file" id="bulletinFiles_@post.Id" name="Files" multiple />
-                                                        <div class="form-text">Attach additional files to share updated details.</div>
-                                                    </div>
-                                                    <div class="d-flex justify-content-end gap-2">
-                                                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#@collapseId">Cancel</button>
-                                                        <button type="submit" class="btn btn-primary">Save Changes</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        }
-                                    </article>
-                                }
-                            </div>
-                        }
+                        case HomeWidgetIds.Announcements:
+                            @await Html.PartialAsync("Home/Widgets/_AnnouncementsWidget", Model)
+                            break;
+                        case HomeWidgetIds.Bulletins:
+                            @await Html.PartialAsync("Home/Widgets/_BulletinWidget", Model)
+                            break;
+                        case HomeWidgetIds.PassOnLogs:
+                            @await Html.PartialAsync("Home/Widgets/_PassOnLogsWidget", Model)
+                            break;
+                        case HomeWidgetIds.PackageLog:
+                            @await Html.PartialAsync("_HomeWidgetCard", new HomeWidgetViewModel(
+                                "Package Log",
+                                Model.PackageLogs.Cast<object>().ToList(),
+                                "MailLog",
+                                "Index",
+                                createControllerName: "MailLog",
+                                createActionName: "Index",
+                                createButtonText: "+ New Package",
+                                createFragment: "mailLogCreateForm"))
+                            break;
+                        case HomeWidgetIds.UpcomingEvents:
+                            @await Html.PartialAsync("_HomeWidgetCard", new HomeWidgetViewModel(
+                                "Upcoming Events",
+                                Model.UpcomingEvents.Cast<object>().ToList(),
+                                "Calendar",
+                                "Index",
+                                createControllerName: "Calendar",
+                                createActionName: "Index",
+                                createButtonText: "+ New Event",
+                                createFragment: "calendarCreateForm"))
+                            break;
+                        case HomeWidgetIds.WorkOrders:
+                            @await Html.PartialAsync("_HomeWidgetCard", new HomeWidgetViewModel(
+                                "Work Orders",
+                                Model.WorkOrders.Cast<object>().ToList(),
+                                "WorkOrders",
+                                "Index",
+                                createControllerName: "WorkOrders",
+                                createActionName: "Index",
+                                createButtonText: "+ New Work Order",
+                                createFragment: "workOrdersForm"))
+                            break;
+                        case HomeWidgetIds.LostFound:
+                            @await Html.PartialAsync("_HomeWidgetCard", new HomeWidgetViewModel(
+                                "Lost & Found",
+                                Model.LostFoundEntries.Cast<object>().ToList(),
+                                "LostAndFound",
+                                "Index",
+                                createControllerName: "LostAndFound",
+                                createActionName: "Index",
+                                createButtonText: "+ New L&F Entry",
+                                createFragment: "lostFoundEntryForm"))
+                            break;
+                        case HomeWidgetIds.HotelLayout:
+                            @await Html.PartialAsync("Home/Widgets/_HotelLayoutWidget", Model)
+                            break;
+                        default:
+                            <div class="card shadow-sm"><div class="card-body"><p class="text-muted mb-0">This widget is not supported.</p></div></div>
+                            break;
                     }
                 </div>
             </div>
-        </div>
-
-        <div class="col-12 col-lg-4">
-            <div class="card shadow-sm h-100">
-                <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-                    <h2 class="h5 mb-0">Pass On Logs</h2>
-                    <div class="d-flex gap-2 flex-wrap">
-                        <a class="btn btn-outline-primary btn-sm" href="@(Url.Action("Create", "PassOnLogs") ?? "/PassOnLogs/Create")">
-                            + New Pass On
-                        </a>
-                        <a class="btn btn-outline-secondary btn-sm" href="@(Url.Action("Index", "PassOnLogs") ?? "/PassOnLogs")">
-                            View All
-                        </a>
-                    </div>
-                </div>
-                <div class="card-body">
-                    @if (!hasProperty)
-                    {
-                        <p class="text-muted mb-0">Select a property to review pass on log updates.</p>
-                    }
-                    else if (!Model.PassOnLogs.Any())
-                    {
-                        <p class="text-muted mb-0">No entries yet. Capture the latest shift updates in the pass on log.</p>
-                    }
-                    else
-                    {
-                        <ul class="list-unstyled mb-0">
-                            @foreach (var log in Model.PassOnLogs)
-                            {
-                                var createdLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
-                                <li class="mb-3 pb-3 border-bottom">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div>
-                                            <div class="fw-semibold">@log.Title</div>
-                                            <div class="text-muted small">@createdLocal.ToString("g")</div>
-                                        </div>
-                                        @if (!string.IsNullOrWhiteSpace(log.DetailUrl))
-                                        {
-                                            <a class="btn btn-link btn-sm p-0" href="@log.DetailUrl">Open</a>
-                                        }
-                                    </div>
-                                    @if (!string.IsNullOrWhiteSpace(log.Preview))
-                                    {
-                                        <p class="mb-0 small text-muted">@log.Preview</p>
-                                    }
-                                </li>
-                            }
-                        </ul>
-                    }
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3 g-xl-4 mt-1 home-widget-row home-widget-row--second">
-        <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel(
-                "Package Log",
-                Model.PackageLogs.Cast<object>().ToList(),
-                "MailLog",
-                "Index",
-                createControllerName: "MailLog",
-                createActionName: "Index",
-                createButtonText: "+ New Package",
-                createFragment: "mailLogCreateForm")' />
-        </div>
-        <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel(
-                "Upcoming Events",
-                Model.UpcomingEvents.Cast<object>().ToList(),
-                "Calendar",
-                "Index",
-                createControllerName: "Calendar",
-                createActionName: "Index",
-                createButtonText: "+ New Event",
-                createFragment: "calendarCreateForm")' />
-        </div>
-        <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel(
-                "Work Orders",
-                Model.WorkOrders.Cast<object>().ToList(),
-                "WorkOrders",
-                "Index",
-                createControllerName: "WorkOrders",
-                createActionName: "Index",
-                createButtonText: "+ New Work Order",
-                createFragment: "workOrdersForm")' />
-        </div>
-        <div class="col-12 col-xl-3">
-            <partial name="_HomeWidgetCard" model='new hOps.web.ViewModels.HomeWidgetViewModel(
-                "Lost & Found",
-                Model.LostFoundEntries.Cast<object>().ToList(),
-                "LostAndFound",
-                "Index",
-                createControllerName: "LostAndFound",
-                createActionName: "Index",
-                createButtonText: "+ New L&F Entry",
-                createFragment: "lostFoundEntryForm")' />
-        </div>
-    </div>
-
-    <div class="row g-3 g-xl-4 mt-1 home-widget-row home-widget-row--third">
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-header d-flex align-items-center justify-content-between">
-                    <h2 class="h5 mb-0">Hotel Layout</h2>
-                </div>
-                <div class="card-body">
-                    @if (!hasProperty)
-                    {
-                        <p class="text-muted mb-0">Select a property to view room layouts and open items.</p>
-                    }
-                    else if (!Model.RoomTiles.Any())
-                    {
-                        <p class="text-muted mb-0">No layout has been configured for this property yet.</p>
-                    }
-                    else
-                    {
-                        var tilesByFloor = Model.RoomTiles.GroupBy(t => t.Floor).OrderBy(g => g.Key).ToList();
-                        var floorLegend = tilesByFloor
-                            .Select(g => new
-                            {
-                                Floor = g.Key,
-                                Color = g.First().FloorColor,
-                                AlertCount = g.Sum(tile => tile.Badges?.Count ?? 0)
-                            })
-                            .ToList();
-                        var totalAlerts = floorLegend.Sum(f => f.AlertCount);
-                        var maxWidthAll = Math.Max(1, tilesByFloor.SelectMany(g => g).Max(t => t.X + t.Width));
-                        var maxHeightAll = Math.Max(1, tilesByFloor.SelectMany(g => g).Max(t => t.Y + t.Height));
-                        var defaultFloor = tilesByFloor.First().Key;
-
-                        <div class="layout-controls d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-3">
-                            <div class="btn-group btn-group-sm layout-view-toggle" role="group" aria-label="Layout view mode">
-                                <input class="btn-check" type="radio" name="layoutViewMode" id="layoutView_all" value="all" checked autocomplete="off">
-                                <label class="btn btn-outline-primary layout-view-toggle__btn" for="layoutView_all">
-                                    All Floors
-                                    @if (totalAlerts > 0)
-                                    {
-                                        <span class="layout-floor-badge">@totalAlerts</span>
-                                    }
-                                </label>
-                                @foreach (var floorInfo in floorLegend)
-                                {
-                                    var floorId = floorInfo.Floor;
-                                    var badgeCount = floorInfo.AlertCount;
-                                    <input class="btn-check" type="radio" name="layoutViewMode" id="layoutView_@floorId" value="@floorId" autocomplete="off">
-                                    <label class="btn btn-outline-primary layout-view-toggle__btn" for="layoutView_@floorId">
-                                        Floor @floorId
-                                        @if (badgeCount > 0)
-                                        {
-                                            <span class="layout-floor-badge">@badgeCount</span>
-                                        }
-                                    </label>
-                                }
-                            </div>
-                            <div class="layout-legends d-flex flex-column flex-lg-row gap-3 text-muted small">
-                                <div class="d-flex align-items-center gap-3">
-                                    <span><span class="legend-swatch workorder"></span> Work Orders</span>
-                                    <span><span class="legend-swatch lostfound"></span> Lost &amp; Found</span>
-                                </div>
-                                <div class="layout-floor-legend d-flex align-items-center gap-2 flex-wrap">
-                                    @foreach (var floorInfo in floorLegend)
-                                    {
-                                        <span class="layout-floor-pill" style="--floor-color:@floorInfo.Color">Floor @floorInfo.Floor</span>
-                                    }
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="layoutOverlayView" class="layout-view">
-                            <div class="layout-canvas multi-floor" style="--layout-width:@maxWidthAll; --layout-height:@maxHeightAll;">
-                                @foreach (var tile in Model.RoomTiles)
-                                {
-                                    var left = Math.Round((double)tile.X / maxWidthAll * 100, 2);
-                                    var top = Math.Round((double)tile.Y / maxHeightAll * 100, 2);
-                                    var width = Math.Round((double)tile.Width / maxWidthAll * 100, 2);
-                                    var height = Math.Round((double)tile.Height / maxHeightAll * 100, 2);
-                                    var overlayBg = $"{tile.FloorColor}33";
-                                    var navigateUrl = tile.Badges.FirstOrDefault(b => !string.IsNullOrWhiteSpace(b.Url))?.Url ?? string.Empty;
-                                    var isConnector = string.Equals(tile.ShapeType, "connector", StringComparison.OrdinalIgnoreCase);
-                                    var isCustom = !isConnector && tile.RoomId == 0;
-                                    var hasLabel = !string.IsNullOrWhiteSpace(tile.RoomNumber);
-                                    var connectorDirection = string.Equals(tile.ShapeData, "horizontal", StringComparison.OrdinalIgnoreCase)
-                                        ? "horizontal"
-                                        : "vertical";
-                                    var connectorDisplay = isConnector
-                                        ? (hasLabel ? tile.RoomNumber : "||")
-                                        : string.Empty;
-                                    var ariaLabelBase = tile.RoomId == 0
-                                        ? (isConnector
-                                            ? $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} {connectorDirection} connector"
-                                            : (hasLabel
-                                                ? $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} {tile.RoomNumber}"
-                                                : $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} custom area"))
-                                        : (hasLabel
-                                            ? $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} room {tile.RoomNumber}"
-                                            : $"Floor {tile.Floor.ToString(CultureInfo.InvariantCulture)} room");
-                                    var ariaLabel = tile.Badges.Any()
-                                        ? $"{ariaLabelBase} with {string.Join(", ", tile.Badges.Select(b => b.Text))}"
-                                        : ariaLabelBase;
-                                    var isInteractiveRoom = tile.RoomId > 0 && !string.IsNullOrWhiteSpace(tile.LocationKey);
-                                    <div class="@($"{tile.CssClass} room-tile-overlay{(isInteractiveRoom ? " room-tile-overlay--actionable" : string.Empty)}")"
-                                         data-floor="@tile.Floor"
-                                         data-shape-type="@tile.ShapeType"
-                                         data-shape-data="@tile.ShapeData"
-                                         data-room-id="@tile.RoomId"
-                                     data-room-label="@tile.RoomNumber"
-                                     data-room-number="@tile.LocationKey"
-                                     data-room-floor="@tile.Floor"
-                                     data-text-rotation="@tile.TextRotation"
-                                     data-navigate-url="@navigateUrl"
-                                     style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%;border-color:@tile.FloorColor;background-color:@overlayBg; --tile-text-rotation:@($"{tile.TextRotation}deg");"
-                                     aria-label="@ariaLabel"
-                                     tabindex="@(isInteractiveRoom || !string.IsNullOrWhiteSpace(navigateUrl) ? "0" : "-1")"
-                                     @(isInteractiveRoom ? "role=\"button\" aria-haspopup=\"dialog\"" : (string.IsNullOrWhiteSpace(navigateUrl) ? null : "role=\"link\""))>
-                                        @if (tile.Badges.Any())
-                                        {
-                                            <div class="tile-badges tile-badges--overlay">
-                                                @foreach (var badge in tile.Badges)
-                                                {
-                                                    if (!string.IsNullOrWhiteSpace(badge.Url))
-                                                    {
-                                                        <a class="badge rounded-pill text-bg-@badge.Variant" href="@badge.Url">@badge.Text</a>
-                                                    }
-                                                    else
-                                                    {
-                                                        <span class="badge rounded-pill text-bg-@badge.Variant">@badge.Text</span>
-                                                    }
-                                                }
-                                            </div>
-                                        }
-                                        @if (isConnector)
-                                        {
-                                            <span class="tile-label">@connectorDisplay</span>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                        </div>
-
-                        <div id="layoutPerFloorView" class="layout-view d-none">
-                            @foreach (var floorGroup in tilesByFloor)
-                            {
-                                var maxWidth = Math.Max(1, floorGroup.Max(t => t.X + t.Width));
-                                var maxHeight = Math.Max(1, floorGroup.Max(t => t.Y + t.Height));
-                                var isActive = floorGroup.Key == defaultFloor;
-                                <section class="layout-floor-section mb-4 @(isActive ? string.Empty : "d-none")" data-floor="@floorGroup.Key">
-                                    <header class="d-flex align-items-center justify-content-between mb-2">
-                                        <h3 class="h6 mb-0">Floor @floorGroup.Key</h3>
-                                        <span class="text-muted small">@floorGroup.Count() tile@(floorGroup.Count() == 1 ? string.Empty : "s")</span>
-                                    </header>
-                                    <div class="layout-canvas" style="--layout-width:@maxWidth; --layout-height:@maxHeight;">
-                                        @foreach (var tile in floorGroup)
-                                        {
-                                            var left = Math.Round((double)tile.X / maxWidth * 100, 2);
-                                            var top = Math.Round((double)tile.Y / maxHeight * 100, 2);
-                                            var width = Math.Round((double)tile.Width / maxWidth * 100, 2);
-                                            var height = Math.Round((double)tile.Height / maxHeight * 100, 2);
-                                        var isConnector = string.Equals(tile.ShapeType, "connector", StringComparison.OrdinalIgnoreCase);
-                                        var isCustom = !isConnector && tile.RoomId == 0;
-                                        var hasTileLabel = !string.IsNullOrWhiteSpace(tile.RoomNumber);
-                                        var connectorDirection = string.Equals(tile.ShapeData, "horizontal", StringComparison.OrdinalIgnoreCase) ? "horizontal" : "vertical";
-                                        var connectorDisplay = isConnector
-                                            ? (hasTileLabel ? tile.RoomNumber : "||")
-                                            : string.Empty;
-                                        var headerHasContent = hasTileLabel || (!isCustom && !string.IsNullOrWhiteSpace(tile.RoomType));
-                                        var isInteractiveRoom = !isConnector && tile.RoomId > 0 && !string.IsNullOrWhiteSpace(tile.LocationKey);
-                                        var tileClasses = isInteractiveRoom ? $"{tile.CssClass} room-tile--actionable" : tile.CssClass;
-                                            <div class="@tileClasses"
-                                                 data-shape-type="@tile.ShapeType"
-                                                 data-shape-data="@tile.ShapeData"
-                                                 data-room-id="@tile.RoomId"
-                                                 data-room-label="@tile.RoomNumber"
-                                                 data-room-number="@tile.LocationKey"
-                                                 data-room-floor="@tile.Floor"
-                                                 data-text-rotation="@tile.TextRotation"
-                                                 tabindex="@(isInteractiveRoom ? "0" : "-1")"
-                                                 @(isInteractiveRoom ? "role=\"button\" aria-haspopup=\"dialog\"" : null)
-                                                 style="left:@left.ToString("0.##", CultureInfo.InvariantCulture)%;top:@top.ToString("0.##", CultureInfo.InvariantCulture)%;width:@width.ToString("0.##", CultureInfo.InvariantCulture)%;height:@height.ToString("0.##", CultureInfo.InvariantCulture)%; --tile-text-rotation:@($"{tile.TextRotation}deg");">
-                                                @if (isConnector)
-                                                {
-                                                    <span class="tile-connector-icon tile-connector-icon--@connectorDirection">@connectorDisplay</span>
-                                                }
-                                                else
-                                                {
-                                                    @if (headerHasContent)
-                                                    {
-                                                        <div class="tile-header">
-                                                            @if (hasTileLabel)
-                                                            {
-                                                                <span class="tile-room">@tile.RoomNumber</span>
-                                                            }
-                                                            @if (!isCustom && !string.IsNullOrWhiteSpace(tile.RoomType))
-                                                            {
-                                                                <span class="tile-type">@tile.RoomType</span>
-                                                            }
-                                                        </div>
-                                                    }
-                                                    @if (tile.Badges.Any())
-                                                    {
-                                                        <div class="tile-badges">
-                                                            @foreach (var badge in tile.Badges)
-                                                            {
-                                                                if (!string.IsNullOrEmpty(badge.Url))
-                                                                {
-                                                                    <a class="badge rounded-pill text-bg-@badge.Variant" href="@badge.Url">@badge.Text</a>
-                                                                }
-                                                                else
-                                                                {
-                                                                    <span class="badge rounded-pill text-bg-@badge.Variant">@badge.Text</span>
-                                                                }
-                                                            }
-                                                        </div>
-                                                    }
-                                                }
-                                            </div>
-                                        }
-                                    </div>
-                                </section>
-                            }
-                        </div>
-                    }
-                </div>
-            </div>
-        </div>
+        }
     </div>
 </div>
+<script>
+    (() => {
+        const grid = document.getElementById('homeWidgetGrid');
+        if (!grid) {
+            return;
+        }
 
-@section Styles {
-    <style>
+        const dashboard = grid.closest('.home-dashboard');
+        const startButton = document.querySelector('[data-layout-action="start"]');
+        const editorGroup = document.querySelector('[data-layout-editor]');
+        const saveButton = document.querySelector('[data-layout-action="save"]');
+        const cancelButton = document.querySelector('[data-layout-action="cancel"]');
+        const hint = document.querySelector('[data-layout-hint]');
+        const sizeOptions = (() => {
+            try {
+                return JSON.parse(grid.dataset.sizeOptions || '{}');
+            } catch {
+                return {};
+            }
+        })();
+
+        let isEditing = false;
+        let originalLayout = (() => {
+            try {
+                return JSON.parse(grid.dataset.initialLayout || '[]');
+            } catch {
+                return [];
+            }
+        })();
+
+        const getAntiforgeryToken = () => {
+            const form = document.getElementById('homeLayoutAntiforgery');
+            return form?.querySelector('input[name="__RequestVerificationToken"]')?.value;
+        };
+
+        const setEditingState = (enabled) => {
+            isEditing = enabled;
+            grid.querySelectorAll('.home-widget').forEach(widget => {
+                widget.setAttribute('draggable', enabled ? 'true' : 'false');
+                widget.classList.toggle('home-widget--editing', enabled);
+            });
+            dashboard?.classList.toggle('home-dashboard--editing', enabled);
+            if (enabled) {
+                startButton?.classList.add('d-none');
+                editorGroup?.classList.remove('d-none');
+                hint?.classList.remove('d-none');
+            } else {
+                startButton?.classList.remove('d-none');
+                editorGroup?.classList.add('d-none');
+                hint?.classList.add('d-none');
+            }
+        };
+
+        const getCurrentLayout = () => {
+            const layout = [];
+            grid.querySelectorAll('.home-widget').forEach(widget => {
+                layout.push({
+                    widgetId: widget.dataset.widgetId,
+                    size: widget.dataset.widgetSize
+                });
+            });
+            return layout;
+        };
+
+        const applyLayout = (layout) => {
+            const widgetMap = {};
+            grid.querySelectorAll('.home-widget').forEach(widget => {
+                widgetMap[widget.dataset.widgetId] = widget;
+            });
+
+            layout.forEach(entry => {
+                const widget = widgetMap[entry.widgetId];
+                if (!widget) {
+                    return;
+                }
+                updateWidgetSize(widget, entry.size);
+                grid.appendChild(widget);
+            });
+        };
+
+        const updateWidgetSize = (widget, sizeKey) => {
+            if (!widget) {
+                return;
+            }
+            const previousClasses = widget.dataset.sizeClass?.split(' ') ?? [];
+            previousClasses.forEach(cls => {
+                if (cls) {
+                    widget.classList.remove(cls);
+                }
+            });
+
+            const nextClasses = (sizeOptions[sizeKey] || '').split(' ').filter(Boolean);
+            nextClasses.forEach(cls => widget.classList.add(cls));
+            widget.dataset.sizeClass = nextClasses.join(' ');
+            widget.dataset.widgetSize = sizeKey;
+        };
+
+        grid.addEventListener('change', (event) => {
+            if (!isEditing) {
+                return;
+            }
+            const select = event.target.closest('[data-size-select]');
+            if (!select) {
+                return;
+            }
+            const widget = select.closest('.home-widget');
+            if (!widget) {
+                return;
+            }
+            updateWidgetSize(widget, select.value);
+        });
+
+        let dragSource = null;
+
+        grid.addEventListener('dragstart', (event) => {
+            if (!isEditing) {
+                event.preventDefault();
+                return;
+            }
+            const widget = event.target.closest('.home-widget');
+            if (!widget) {
+                event.preventDefault();
+                return;
+            }
+            dragSource = widget;
+            widget.classList.add('home-widget--dragging');
+            event.dataTransfer.effectAllowed = 'move';
+        });
+
+        grid.addEventListener('dragend', () => {
+            const dragging = grid.querySelector('.home-widget--dragging');
+            dragging?.classList.remove('home-widget--dragging');
+            dragSource = null;
+        });
+
+        grid.addEventListener('dragover', (event) => {
+            if (!isEditing) {
+                return;
+            }
+            event.preventDefault();
+            const target = event.target.closest('.home-widget');
+            if (!dragSource || !target || dragSource === target) {
+                return;
+            }
+
+            const bounding = target.getBoundingClientRect();
+            const offset = event.clientY - bounding.top;
+            const shouldInsertBefore = offset < bounding.height / 2;
+            grid.insertBefore(dragSource, shouldInsertBefore ? target : target.nextSibling);
+        });
+
+        startButton?.addEventListener('click', () => {
+            originalLayout = getCurrentLayout();
+            setEditingState(true);
+        });
+
+        cancelButton?.addEventListener('click', () => {
+            applyLayout(originalLayout);
+            setEditingState(false);
+        });
+
+        saveButton?.addEventListener('click', async () => {
+            const payload = {
+                widgets: getCurrentLayout()
+            };
+            const token = getAntiforgeryToken();
+            const saveUrl = grid.dataset.saveUrl;
+            if (!saveUrl) {
+                setEditingState(false);
+                return;
+            }
+
+            try {
+                const response = await fetch(saveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token || ''
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error('Unable to save layout.');
+                }
+
+                originalLayout = payload.widgets;
+                grid.dataset.initialLayout = JSON.stringify(originalLayout);
+                setEditingState(false);
+            }
+            catch {
+                alert('Unable to save your layout changes. Please try again.');
+            }
+        });
+    })();
+</script>
+<style>
         .bulletin-item .btn-group {
             gap: 0.5rem;
         }

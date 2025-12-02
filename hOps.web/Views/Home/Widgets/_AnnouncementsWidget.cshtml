@@ -1,0 +1,115 @@
+@using hOps.web.Utilities
+@model hOps.web.ViewModels.Home.HomeIndexViewModel
+
+@{
+    var property = Model.CurrentProperty;
+    var hasProperty = property != null;
+    string EscapeTextareaValue(string? value) => string.IsNullOrEmpty(value)
+        ? string.Empty
+        : value.Replace("</textarea>", "&lt;/textarea&gt;");
+    var announcementMarkup = Model.Announcement?.Content ?? string.Empty;
+    var announcementInitialHtml = RichTextRenderer.ToHtml(announcementMarkup);
+}
+
+<div class="card shadow-sm h-100">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="h5 mb-0">Manager Notes &amp; Announcements</h2>
+        @if (Model.CanManageAnnouncements && hasProperty)
+        {
+            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#announcementEditor" aria-expanded="false" aria-controls="announcementEditor">
+                Edit
+            </button>
+        }
+    </div>
+    <div class="card-body">
+        @if (!hasProperty)
+        {
+            <p class="text-muted mb-0">Select a property to view announcements.</p>
+        }
+        else if (string.IsNullOrWhiteSpace(Model.Announcement.Content))
+        {
+            <p class="text-muted mb-0">No announcements yet. Managers and admins can add one using the edit button.</p>
+        }
+        else
+        {
+            <div class="announcement-content rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(Model.Announcement.Content))</div>
+            @if (Model.Announcement.UpdatedAt.HasValue)
+            {
+                var updatedLocal = TimeZoneService.ConvertToUserTime(Model.Announcement.UpdatedAt.Value);
+                <p class="text-muted small mb-0 mt-2">
+                    Last updated @updatedLocal.ToString("g")
+                    @if (!string.IsNullOrWhiteSpace(Model.Announcement.UpdatedByName))
+                    {
+                        <text> by @Model.Announcement.UpdatedByName</text>
+                    }
+                </p>
+            }
+        }
+
+        @if (hasProperty && Model.Announcement.Attachments.Any())
+        {
+            <div class="mt-3">
+                <h3 class="h6 mb-2">Attachments</h3>
+                <ul class="list-unstyled mb-0">
+                    @foreach (var attachment in Model.Announcement.Attachments)
+                    {
+                        <li class="mb-2">
+                            <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (Model.CanManageAnnouncements && hasProperty)
+        {
+            <div class="collapse mt-3" id="announcementEditor">
+                <form asp-action="UpdateAnnouncement" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="PropertyId" value="@property!.Id" />
+                    <div class="mb-3">
+                        <label for="announcementContent" class="form-label">Announcement</label>
+                        <textarea class="form-control"
+                                  id="announcementContent"
+                                  name="Content"
+                                  rows="6"
+                                  maxlength="4000"
+                                  data-enable-mentions="true"
+                                  data-rich-text="true"
+                                  data-initial-html="@announcementInitialHtml">@Html.Raw(EscapeTextareaValue(announcementMarkup))</textarea>
+                        <div class="form-text">Use the toolbar for bold, italic, underline, lists, and quotes. Markdown shortcuts also work.</div>
+                    </div>
+                    @if (Model.Announcement.Attachments.Any())
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Current Attachments</label>
+                            <ul class="list-unstyled mb-2">
+                                @foreach (var attachment in Model.Announcement.Attachments)
+                                {
+                                    var checkboxId = $"announcementRemove_{attachment.Id}";
+                                    <li class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-2">
+                                        <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
+                                        <div class="form-check mb-0">
+                                            <input class="form-check-input" type="checkbox" name="AttachmentsToDelete" value="@attachment.Id" id="@checkboxId" />
+                                            <label class="form-check-label" for="@checkboxId">Remove</label>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                            <div class="form-text">Select remove to delete files when you save.</div>
+                        </div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label" for="announcementFiles">Add Attachments</label>
+                        <input class="form-control" type="file" id="announcementFiles" name="Files" multiple />
+                        <div class="form-text">Upload photos or documents to share with your team.</div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#announcementEditor">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Announcement</button>
+                    </div>
+                </form>
+            </div>
+        }
+    </div>
+</div>

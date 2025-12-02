@@ -388,3 +388,4 @@ C:\hops\hOps.web.Tests\bin\Debug\net8.0\SixLabors.ImageSharp.dll
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\de\PdfSharpCore.resources.dll
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\web.config
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+C:\hops\hOps.web.Tests\bin\Debug\net8.0\hOps.db

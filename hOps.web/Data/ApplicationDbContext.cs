@@ -49,6 +49,7 @@ namespace hOps.web.Data
         public DbSet<DirectMessageConversation> DirectMessageConversations { get; set; }
         public DbSet<DirectMessage> DirectMessages { get; set; }
         public DbSet<UserNotification> UserNotifications { get; set; }
+        public DbSet<UserHomeLayout> UserHomeLayouts { get; set; }
         public DbSet<UserDepartmentSubscription> UserDepartmentSubscriptions { get; set; }
         public DbSet<Document> Documents { get; set; }
         public DbSet<DocumentFolder> DocumentFolders { get; set; }
@@ -371,6 +372,16 @@ namespace hOps.web.Data
                 .WithMany()
                 .HasForeignKey(n => n.PassOnLogId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<UserHomeLayout>()
+                .HasIndex(l => l.UserId)
+                .IsUnique();
+
+            builder.Entity<UserHomeLayout>()
+                .HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(l => l.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<UserToDoItem>()
                 .HasOne(t => t.User)

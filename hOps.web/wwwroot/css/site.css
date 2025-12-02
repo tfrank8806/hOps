@@ -960,6 +960,15 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     font-size: 0.9rem;
 }
 
+.home-widget-grid {
+    position: relative;
+}
+
+.home-widget {
+    position: relative;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
 .home-widget-card {
     max-height: 300px;
     display: flex;
@@ -978,6 +987,29 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     flex: 1 1 auto;
     overflow-y: auto;
     padding-top: 0.35rem;
+}
+
+.home-widget__editor {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.home-dashboard--editing .home-widget__editor {
+    display: flex;
+}
+
+.home-widget__drag-handle {
+    font-weight: 700;
+    letter-spacing: 0.2rem;
+    cursor: grab;
+    user-select: none;
+}
+
+.home-widget--dragging {
+    opacity: 0.65;
 }
 
 .home-widget-row--top .home-widget-card {

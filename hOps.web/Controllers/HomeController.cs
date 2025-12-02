@@ -4,6 +4,8 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
@@ -27,6 +29,32 @@ namespace hOps.web.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<HomeController> _logger;
         private readonly IConfiguration _configuration;
+
+        private static readonly IReadOnlyList<HomeWidgetDefinition> WidgetDefinitions = new[]
+        {
+            new HomeWidgetDefinition { Id = HomeWidgetIds.Announcements, DefaultSize = HomeWidgetSize.Third },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.Bulletins, DefaultSize = HomeWidgetSize.Third },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.PassOnLogs, DefaultSize = HomeWidgetSize.Third },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.PackageLog, DefaultSize = HomeWidgetSize.Quarter },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.UpcomingEvents, DefaultSize = HomeWidgetSize.Quarter },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.WorkOrders, DefaultSize = HomeWidgetSize.Quarter },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.LostFound, DefaultSize = HomeWidgetSize.Quarter },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.HotelLayout, DefaultSize = HomeWidgetSize.Full }
+        };
+
+        private static readonly Dictionary<HomeWidgetSize, string> WidgetSizeClasses = new()
+        {
+            [HomeWidgetSize.Full] = "col-12",
+            [HomeWidgetSize.Half] = "col-12 col-xl-6",
+            [HomeWidgetSize.Third] = "col-12 col-lg-6 col-xl-4",
+            [HomeWidgetSize.Quarter] = "col-12 col-md-6 col-xl-3"
+        };
+
+        private static readonly JsonSerializerOptions LayoutSerializerOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+        };
 
         public HomeController(
             ApplicationDbContext context,
@@ -56,6 +84,9 @@ namespace hOps.web.Controllers
             {
                 return View(viewModel);
             }
+
+            viewModel.WidgetLayout = await BuildWidgetLayoutAsync(user.Id);
+            viewModel.WidgetSizeClasses = WidgetSizeClasses.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
             var userRoles = await _userManager.GetRolesAsync(user);
             var roleSet = new HashSet<string>(userRoles, StringComparer.OrdinalIgnoreCase);
@@ -116,6 +147,83 @@ namespace hOps.web.Controllers
             return Url.IsLocalUrl(target)
                 ? Redirect(target)
                 : RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveWidgetLayout([FromBody] UpdateHomeLayoutRequest request)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            if (request?.Widgets == null || request.Widgets.Count == 0)
+            {
+                return BadRequest(new { message = "No widgets were provided." });
+            }
+
+            var definitions = WidgetDefinitions.ToDictionary(d => d.Id, d => d, StringComparer.OrdinalIgnoreCase);
+            var normalized = new List<HomeWidgetLayoutEntry>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var widget in request.Widgets)
+            {
+                if (string.IsNullOrWhiteSpace(widget.WidgetId) || !definitions.TryGetValue(widget.WidgetId, out var definition))
+                {
+                    continue;
+                }
+
+                if (!Enum.TryParse(widget.Size, true, out HomeWidgetSize parsedSize))
+                {
+                    parsedSize = definition.DefaultSize;
+                }
+
+                if (!seen.Add(widget.WidgetId))
+                {
+                    continue;
+                }
+
+                normalized.Add(new HomeWidgetLayoutEntry
+                {
+                    WidgetId = widget.WidgetId,
+                    Size = parsedSize
+                });
+            }
+
+            foreach (var definition in WidgetDefinitions)
+            {
+                if (seen.Add(definition.Id))
+                {
+                    normalized.Add(new HomeWidgetLayoutEntry
+                    {
+                        WidgetId = definition.Id,
+                        Size = definition.DefaultSize
+                    });
+                }
+            }
+
+            var serialized = JsonSerializer.Serialize(normalized, LayoutSerializerOptions);
+            var layout = await _context.UserHomeLayouts.FirstOrDefaultAsync(l => l.UserId == currentUser.Id);
+            if (layout == null)
+            {
+                layout = new UserHomeLayout
+                {
+                    UserId = currentUser.Id,
+                    LayoutJson = serialized,
+                    UpdatedAtUtc = DateTime.UtcNow
+                };
+                _context.UserHomeLayouts.Add(layout);
+            }
+            else
+            {
+                layout.LayoutJson = serialized;
+                layout.UpdatedAtUtc = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true });
         }
 
         [HttpPost]
@@ -1066,6 +1174,85 @@ namespace hOps.web.Controllers
             }
 
             return destination.IsDefaultPort;
+        }
+
+        private async Task<List<HomeWidgetLayoutEntry>> BuildWidgetLayoutAsync(string userId)
+        {
+            var layoutRecord = await _context.UserHomeLayouts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(l => l.UserId == userId);
+
+            List<HomeWidgetLayoutEntry>? storedLayout = null;
+            if (layoutRecord != null && !string.IsNullOrWhiteSpace(layoutRecord.LayoutJson))
+            {
+                try
+                {
+                    storedLayout = JsonSerializer.Deserialize<List<HomeWidgetLayoutEntry>>(layoutRecord.LayoutJson, LayoutSerializerOptions);
+                }
+                catch
+                {
+                    storedLayout = null;
+                }
+            }
+
+            var definitions = WidgetDefinitions.ToDictionary(d => d.Id, d => d, StringComparer.OrdinalIgnoreCase);
+            var finalLayout = new List<HomeWidgetLayoutEntry>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (storedLayout != null)
+            {
+                foreach (var entry in storedLayout)
+                {
+                    if (entry == null || string.IsNullOrWhiteSpace(entry.WidgetId))
+                    {
+                        continue;
+                    }
+
+                    if (!definitions.TryGetValue(entry.WidgetId, out var definition))
+                    {
+                        continue;
+                    }
+
+                    if (!Enum.IsDefined(typeof(HomeWidgetSize), entry.Size))
+                    {
+                        entry.Size = definition.DefaultSize;
+                    }
+
+                    if (seen.Add(entry.WidgetId))
+                    {
+                        finalLayout.Add(new HomeWidgetLayoutEntry
+                        {
+                            WidgetId = entry.WidgetId,
+                            Size = entry.Size
+                        });
+                    }
+                }
+            }
+
+            foreach (var definition in WidgetDefinitions)
+            {
+                if (seen.Add(definition.Id))
+                {
+                    finalLayout.Add(new HomeWidgetLayoutEntry
+                    {
+                        WidgetId = definition.Id,
+                        Size = definition.DefaultSize
+                    });
+                }
+            }
+
+            return finalLayout;
+        }
+
+        public class UpdateHomeLayoutRequest
+        {
+            public List<UpdateHomeLayoutItem> Widgets { get; set; } = new();
+        }
+
+        public class UpdateHomeLayoutItem
+        {
+            public string WidgetId { get; set; } = string.Empty;
+            public string Size { get; set; } = string.Empty;
         }
 
         public class ManagerAnnouncementForm

@@ -29,6 +29,9 @@ namespace hOps.web.ViewModels.Home
         public List<QuickSelectOptionViewModel> WorkOrderTypeOptions { get; set; } = new();
         public List<QuickSelectOptionViewModel> DepartmentOptions { get; set; } = new();
         public string DefaultWorkOrderStatus { get; set; } = "New";
+
+        public List<HomeWidgetLayoutEntry> WidgetLayout { get; set; } = new();
+        public Dictionary<HomeWidgetSize, string> WidgetSizeClasses { get; set; } = new();
     }
 
     public class ManagerAnnouncementViewModel
@@ -154,5 +157,37 @@ namespace hOps.web.ViewModels.Home
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
+    }
+
+    public class HomeWidgetLayoutEntry
+    {
+        public string WidgetId { get; set; } = string.Empty;
+        public HomeWidgetSize Size { get; set; } = HomeWidgetSize.Third;
+    }
+
+    public enum HomeWidgetSize
+    {
+        Full,
+        Half,
+        Third,
+        Quarter
+    }
+
+    public class HomeWidgetDefinition
+    {
+        public string Id { get; init; } = string.Empty;
+        public HomeWidgetSize DefaultSize { get; init; } = HomeWidgetSize.Third;
+    }
+
+    public static class HomeWidgetIds
+    {
+        public const string Announcements = "announcements";
+        public const string Bulletins = "bulletins";
+        public const string PassOnLogs = "passOnLogs";
+        public const string PackageLog = "packageLog";
+        public const string UpcomingEvents = "upcomingEvents";
+        public const string WorkOrders = "workOrders";
+        public const string LostFound = "lostFound";
+        public const string HotelLayout = "hotelLayout";
     }
 }
