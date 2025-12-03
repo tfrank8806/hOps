@@ -93,7 +93,7 @@
         setText(fields.department, data.department);
         setText(fields.dueDate, data.dueDateText);
         setText(fields.created, data.createdAtText);
-        setText(fields.creator, data.creator, '');
+        setText(fields.creator, data.creator, 'Unknown');
         setBadge(fields.status, data.status, data.statusColor);
         setBadge(fields.type, data.workOrderType, '', true);
 
