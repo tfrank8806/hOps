@@ -81,13 +81,13 @@
                     @switch (widget.WidgetId)
                     {
                         case HomeWidgetIds.Announcements:
-                            @await Html.PartialAsync("Home/Widgets/_AnnouncementsWidget", Model)
+                            @await Html.PartialAsync("~/Views/Home/Widgets/_AnnouncementsWidget.cshtml", Model)
                             break;
                         case HomeWidgetIds.Bulletins:
-                            @await Html.PartialAsync("Home/Widgets/_BulletinWidget", Model)
+                            @await Html.PartialAsync("~/Views/Home/Widgets/_BulletinWidget.cshtml", Model)
                             break;
                         case HomeWidgetIds.PassOnLogs:
-                            @await Html.PartialAsync("Home/Widgets/_PassOnLogsWidget", Model)
+                            @await Html.PartialAsync("~/Views/Home/Widgets/_PassOnLogsWidget.cshtml", Model)
                             break;
                         case HomeWidgetIds.PackageLog:
                             @await Html.PartialAsync("_HomeWidgetCard", new HomeWidgetViewModel(
@@ -134,7 +134,7 @@
                                 createFragment: "lostFoundEntryForm"))
                             break;
                         case HomeWidgetIds.HotelLayout:
-                            @await Html.PartialAsync("Home/Widgets/_HotelLayoutWidget", Model)
+                            @await Html.PartialAsync("~/Views/Home/Widgets/_HotelLayoutWidget.cshtml", Model)
                             break;
                         default:
                             <div class="card shadow-sm"><div class="card-body"><p class="text-muted mb-0">This widget is not supported.</p></div></div>
