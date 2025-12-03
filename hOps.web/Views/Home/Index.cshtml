@@ -526,6 +526,12 @@
             isolation: isolate;
         }
 
+        .layout-canvas.multi-floor .tile-label,
+        .layout-canvas.multi-floor .tile-room,
+        .layout-canvas.multi-floor .tile-type {
+            display: none;
+        }
+
         .layout-controls .layout-view-toggle .btn {
             min-width: 120px;
         }
@@ -605,6 +611,9 @@
             word-break: break-word;
             transform: rotate(var(--tile-text-rotation, 0deg));
             transform-origin: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .room-tile-overlay.room-tile--connector {
@@ -679,11 +688,17 @@
             word-break: break-word;
             transform: rotate(var(--tile-text-rotation, 0deg));
             transform-origin: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .tile-type {
             font-size: 0.85rem;
             color: #64748b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .tile-badges {

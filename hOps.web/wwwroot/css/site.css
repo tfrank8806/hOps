@@ -1017,6 +1017,16 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     letter-spacing: 0.2rem;
     cursor: grab;
     user-select: none;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+.home-dashboard--editing .home-widget__drag-handle {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .home-widget__size-label {
