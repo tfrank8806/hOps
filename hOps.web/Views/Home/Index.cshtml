@@ -1086,23 +1086,94 @@
                 roomMenuList.appendChild(list);
             };
 
-            const fetchRoomWorkOrders = async (roomNumber) => {
-                if (!roomMenuList || !summaryUrl || !roomNumber) {
+            const escapeCssIdentifier = (value) => {
+                if (typeof value !== 'string' || !value) {
+                    return '';
+                }
+                if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+                    return CSS.escape(value);
+                }
+                return value.replace(/([!"#$%&'()*+,.\/:;<=>?@@\[\\\]^`{|}~])/g, '\\$1');
+            };
+
+            const getRoomNumbersForTile = (tile) => {
+                if (!(tile instanceof HTMLElement)) {
+                    return [];
+                }
+
+                const baseNumber = tile.dataset.roomNumber?.trim();
+                const locationKey = tile.dataset.locationKey?.trim();
+                const isOverlaySelection = tile.classList.contains('room-tile-overlay') && !overlayView?.classList.contains('d-none');
+
+                if (!isOverlaySelection || !locationKey) {
+                    return baseNumber ? [baseNumber] : [];
+                }
+
+                const selector = `[data-location-key="${escapeCssIdentifier(locationKey)}"]`;
+                const matches = document.querySelectorAll(selector);
+                const numbers = new Set();
+                matches.forEach(node => {
+                    const number = node.dataset.roomNumber?.trim();
+                    if (number) {
+                        numbers.add(number);
+                    }
+                });
+
+                if (numbers.size > 0) {
+                    return Array.from(numbers);
+                }
+
+                return baseNumber ? [baseNumber] : [];
+            };
+
+            const fetchRoomWorkOrders = async (roomIdentifiers) => {
+                if (!roomMenuList || !summaryUrl) {
+                    return;
+                }
+                const identifiers = Array.isArray(roomIdentifiers)
+                    ? roomIdentifiers.filter(value => typeof value === 'string' && value.trim().length > 0)
+                    : (roomIdentifiers ? [roomIdentifiers] : []).filter(value => typeof value === 'string' && value.trim().length > 0);
+                if (!identifiers.length) {
                     return;
                 }
                 roomMenuList.innerHTML = '<div class="text-muted small py-2">Loading open work orders...</div>';
                 try {
-                    const params = new URLSearchParams({
-                        propertyId: propertyId.toString(),
-                        roomNumber
+                    const requests = identifiers.map(identifier => {
+                        const params = new URLSearchParams({
+                            propertyId: propertyId.toString(),
+                            roomNumber: identifier.trim()
+                        });
+                        return fetch(`${summaryUrl}?${params.toString()}`).then(response => {
+                            if (!response.ok) {
+                                throw new Error('Request failed');
+                            }
+                            return response.json();
+                        }).then(data => Array.isArray(data?.workOrders) ? data.workOrders : []);
                     });
-                    const response = await fetch(`${summaryUrl}?${params.toString()}`);
-                    if (!response.ok) {
-                        throw new Error('Request failed');
-                    }
-                    const data = await response.json();
-                    const orders = Array.isArray(data?.workOrders) ? data.workOrders : [];
-                    renderWorkOrders(orders);
+
+                    const results = await Promise.allSettled(requests);
+                    const aggregated = [];
+                    results.forEach(result => {
+                        if (result.status === 'fulfilled') {
+                            aggregated.push(...result.value);
+                        }
+                    });
+
+                    const uniqueOrders = [];
+                    const seen = new Set();
+                    aggregated.forEach(order => {
+                        if (!order) {
+                            return;
+                        }
+                        const orderId = order.id ?? order.Id;
+                        if (orderId == null || seen.has(orderId)) {
+                            return;
+                        }
+                        seen.add(orderId);
+                        uniqueOrders.push(order);
+                    });
+
+                    renderWorkOrders(uniqueOrders);
                 } catch (error) {
                     roomMenuList.innerHTML = '<p class="text-danger small mb-0">Unable to load work orders.</p>';
                 }
@@ -1113,14 +1184,22 @@
                     return;
                 }
 
-                const roomNumber = tile.dataset.roomNumber?.trim();
-                const roomLabel = tile.dataset.roomLabel?.trim() || roomNumber || 'Room';
-                const floorLabel = tile.dataset.roomFloor ? `Floor ${tile.dataset.roomFloor}` : '';
+                const roomLabel = tile.dataset.roomLabel?.trim() || tile.dataset.roomNumber?.trim() || 'Room';
+                const aggregatedRooms = getRoomNumbersForTile(tile);
+                const primaryRoom = aggregatedRooms[0] || tile.dataset.roomNumber?.trim() || '';
+                const isAllFloorsSelection = tile.classList.contains('room-tile-overlay') &&
+                    !overlayView?.classList.contains('d-none') &&
+                    aggregatedRooms.length > 1;
+                const floorValue = tile.dataset.roomFloor?.trim();
+                const floorLabel = isAllFloorsSelection
+                    ? 'All Floors'
+                    : (floorValue ? `Floor ${floorValue}` : '');
 
                 currentRoom = {
-                    roomNumber,
+                    roomNumber: primaryRoom,
+                    roomNumbers: aggregatedRooms.length ? aggregatedRooms : (primaryRoom ? [primaryRoom] : []),
                     roomLabel,
-                    floor: tile.dataset.roomFloor
+                    floor: floorValue
                 };
 
                 if (roomMenuTitle && roomLabel) {
@@ -1131,9 +1210,9 @@
                     roomMenuFloor.classList.toggle('d-none', !floorLabel);
                 }
                 if (viewOrdersLink) {
-                    const viewUrl = buildWorkOrdersLink(roomNumber || '');
+                    const viewUrl = buildWorkOrdersLink(primaryRoom || '');
                     viewOrdersLink.href = viewUrl || (workOrdersUrl || '#');
-                    const disabled = !roomNumber;
+                    const disabled = !primaryRoom;
                     viewOrdersLink.classList.toggle('disabled', disabled);
                     viewOrdersLink.setAttribute('aria-disabled', disabled.toString());
                 }
@@ -1145,7 +1224,7 @@
                 setActiveTile(tile);
                 roomMenu.classList.add('show');
                 positionMenu(tile);
-                fetchRoomWorkOrders(roomNumber);
+                fetchRoomWorkOrders(currentRoom.roomNumbers);
             };
 
             const handleTileActivation = (tile, event) => {
@@ -1224,7 +1303,8 @@
                 }
                 if (roomDisplay) {
                     const label = selectedRoom.roomLabel ?? selectedRoom.roomNumber ?? 'Selected Room';
-                    const floor = selectedRoom.floor ? `Floor ${selectedRoom.floor}` : '';
+                    const multiFloor = Array.isArray(selectedRoom.roomNumbers) && selectedRoom.roomNumbers.length > 1;
+                    const floor = multiFloor ? 'All Floors' : (selectedRoom.floor ? `Floor ${selectedRoom.floor}` : '');
                     roomDisplay.textContent = floor ? `${label} · ${floor}` : label;
                 }
                 if (dueDateInput) {
@@ -1318,8 +1398,8 @@
                         dueDateInput.value = dueDateInput.dataset.defaultValue || '';
                     }
 
-                    if (currentRoom?.roomNumber) {
-                        fetchRoomWorkOrders(currentRoom.roomNumber);
+                    if (currentRoom?.roomNumbers?.length) {
+                        fetchRoomWorkOrders(currentRoom.roomNumbers);
                     }
 
                     setTimeout(() => {

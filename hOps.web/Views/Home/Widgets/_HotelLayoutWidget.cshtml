@@ -91,7 +91,8 @@
                              data-room-id="@tile.RoomId"
                              data-room-number="@tile.RoomNumber"
                              data-room-label="@label"
-                             data-floor="@tile.Floor">
+                             data-room-floor="@tile.Floor"
+                             data-location-key="@tile.LocationKey">
                             <strong class="tile-label">@label</strong>
                             @if (!string.IsNullOrWhiteSpace(tile.RoomType))
                             {
@@ -134,7 +135,9 @@
                                      style="--tile-left:@left%; --tile-top:@top%; --tile-width:@width%; --tile-height:@height%; --tile-text-rotation:@(tile.TextRotation)deg;"
                                      data-room-number="@tile.RoomNumber"
                                      data-room-label="@label"
-                                     data-room-id="@tile.RoomId">
+                                     data-room-id="@tile.RoomId"
+                                     data-room-floor="@tile.Floor"
+                                     data-location-key="@tile.LocationKey">
                                     <span class="tile-room">@label</span>
                                     @if (!string.IsNullOrWhiteSpace(tile.RoomType))
                                     {
