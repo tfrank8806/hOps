@@ -65,8 +65,11 @@
          data-size-options='@Html.Raw(sizeOptionsJson)'>
         @foreach (var widget in Model.WidgetLayout)
         {
-            var sizeValue = widget.Size.ToString().ToLowerInvariant();
-            var gridSpan = widget.Size switch
+            var widgetId = widget.WidgetId ?? string.Empty;
+            var forceFullWidth = string.Equals(widgetId, HomeWidgetIds.HotelLayout, StringComparison.OrdinalIgnoreCase);
+            var effectiveSize = forceFullWidth ? HomeWidgetSize.Full : widget.Size;
+            var sizeValue = effectiveSize.ToString().ToLowerInvariant();
+            var gridSpan = effectiveSize switch
             {
                 HomeWidgetSize.Full => 12,
                 HomeWidgetSize.Half => 6,
@@ -74,7 +77,7 @@
                 HomeWidgetSize.Quarter => 3,
                 _ => 4
             };
-            var sizeLabel = GetSizeLabel(widget.Size);
+            var sizeLabel = GetSizeLabel(effectiveSize);
             <div class="home-widget" data-widget-id="@widget.WidgetId" data-widget-size="@sizeValue" data-grid-span="@gridSpan" style="grid-column: span @gridSpan;" draggable="false">
                 <div class="home-widget__editor d-flex align-items-center gap-2">
                     <span class="home-widget__drag-handle" role="button" tabindex="0" aria-label="Drag widget" title="Drag widget">⋮⋮</span>
@@ -144,7 +147,10 @@
                             break;
                     }
                 </div>
-                <button type="button" class="home-widget__resizer" data-resize-handle aria-label="Resize widget"></button>
+                @if (!forceFullWidth)
+                {
+                    <button type="button" class="home-widget__resizer" data-resize-handle aria-label="Resize widget"></button>
+                }
             </div>
         }
     </div>

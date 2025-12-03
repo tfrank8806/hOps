@@ -1020,8 +1020,13 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 }
 
 .home-widget__size-label {
+    display: none;
     font-size: 0.85rem;
     color: #6c757d;
+}
+
+.home-dashboard--editing .home-widget__size-label {
+    display: inline;
 }
 
 .home-widget--dragging {
