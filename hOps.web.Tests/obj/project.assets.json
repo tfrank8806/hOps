@@ -9550,8 +9550,8 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "C:\\hOps\\hOps.web\\hOps.web.csproj": {
-              "projectPath": "C:\\hOps\\hOps.web\\hOps.web.csproj"
+            "C:\\hops\\hOps.web\\hOps.web.csproj": {
+              "projectPath": "C:\\hops\\hOps.web\\hOps.web.csproj"
             }
           }
         }

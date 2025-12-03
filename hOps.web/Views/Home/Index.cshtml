@@ -18,7 +18,13 @@
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
     };
     var initialLayoutJson = JsonSerializer.Serialize(Model.WidgetLayout ?? new List<HomeWidgetLayoutEntry>(), layoutOptions);
-    var sizeOptionsPayload = (Model.WidgetSizeClasses ?? new Dictionary<HomeWidgetSize, string>()).ToDictionary(kvp => kvp.Key.ToString().ToLowerInvariant(), kvp => kvp.Value);
+    var sizeOptionsPayload = new Dictionary<string, int>
+    {
+        ["full"] = 12,
+        ["half"] = 6,
+        ["third"] = 4,
+        ["quarter"] = 3
+    };
     var sizeOptionsJson = JsonSerializer.Serialize(sizeOptionsPayload);
 }
 
@@ -50,32 +56,29 @@
                 <button type="button" class="btn btn-outline-secondary" data-layout-action="cancel">Cancel</button>
             </div>
         </div>
-        <div class="text-muted small d-none" data-layout-hint>Drag cards to reorder. Use the width selector to resize widgets.</div>
+        <div class="text-muted small d-none" data-layout-hint>Drag cards to reorder. Drag the corner handle to resize widgets.</div>
     </div>
 
-    <div class="row g-3 g-xl-4 home-widget-grid" id="homeWidgetGrid"
+    <div class="home-widget-grid" id="homeWidgetGrid"
          data-initial-layout='@Html.Raw(initialLayoutJson)'
          data-save-url="@(Url.Action("SaveWidgetLayout", "Home") ?? "#")"
          data-size-options='@Html.Raw(sizeOptionsJson)'>
         @foreach (var widget in Model.WidgetLayout)
         {
-            if (!Model.WidgetSizeClasses.TryGetValue(widget.Size, out var cssClass))
-            {
-                cssClass = Model.WidgetSizeClasses.ContainsKey(HomeWidgetSize.Third)
-                    ? Model.WidgetSizeClasses[HomeWidgetSize.Third]
-                    : "col-12 col-lg-6 col-xl-4";
-            }
             var sizeValue = widget.Size.ToString().ToLowerInvariant();
-            <div class="col-12 @cssClass home-widget" data-widget-id="@widget.WidgetId" data-widget-size="@sizeValue" data-size-class="@cssClass" draggable="false">
+            var gridSpan = widget.Size switch
+            {
+                HomeWidgetSize.Full => 12,
+                HomeWidgetSize.Half => 6,
+                HomeWidgetSize.Third => 4,
+                HomeWidgetSize.Quarter => 3,
+                _ => 4
+            };
+            var sizeLabel = GetSizeLabel(widget.Size);
+            <div class="home-widget" data-widget-id="@widget.WidgetId" data-widget-size="@sizeValue" data-grid-span="@gridSpan" style="grid-column: span @gridSpan;" draggable="false">
                 <div class="home-widget__editor d-flex align-items-center gap-2">
-                    <label class="visually-hidden" for="widget-size-@widget.WidgetId">Widget width</label>
-                    <select id="widget-size-@widget.WidgetId" class="form-select form-select-sm home-widget__size-select" data-size-select>
-                        <option value="full" selected="@(widget.Size == HomeWidgetSize.Full)">Full width</option>
-                        <option value="half" selected="@(widget.Size == HomeWidgetSize.Half)">Half width</option>
-                        <option value="third" selected="@(widget.Size == HomeWidgetSize.Third)">One third</option>
-                        <option value="quarter" selected="@(widget.Size == HomeWidgetSize.Quarter)">One quarter</option>
-                    </select>
-                    <span class="home-widget__drag-handle" role="button" tabindex="0" aria-label="Drag widget" title="Drag widget">??</span>
+                    <span class="home-widget__drag-handle" role="button" tabindex="0" aria-label="Drag widget" title="Drag widget">⋮⋮</span>
+                    <span class="home-widget__size-label" data-size-label>@sizeLabel</span>
                 </div>
                 <div class="home-widget__content">
                     @switch (widget.WidgetId)
@@ -141,10 +144,22 @@
                             break;
                     }
                 </div>
+                <button type="button" class="home-widget__resizer" data-resize-handle aria-label="Resize widget"></button>
             </div>
         }
     </div>
 </div>
+
+@functions {
+    private static string GetSizeLabel(HomeWidgetSize size) => size switch
+    {
+        HomeWidgetSize.Full => "Full width",
+        HomeWidgetSize.Half => "Half width",
+        HomeWidgetSize.Third => "One third",
+        HomeWidgetSize.Quarter => "One quarter",
+        _ => "Custom width"
+    };
+}
 <script>
     (() => {
         const grid = document.getElementById('homeWidgetGrid');
@@ -165,6 +180,24 @@
                 return {};
             }
         })();
+        const sizeLabelMap = {
+            full: 'Full width',
+            half: 'Half width',
+            third: 'One third',
+            quarter: 'One quarter'
+        };
+        const sizeEntries = Object.entries(sizeOptions).map(([key, span]) => ({
+            key,
+            span: Number(span) || 4
+        }));
+        if (sizeEntries.length === 0) {
+            sizeEntries.push(
+                { key: 'full', span: 12 },
+                { key: 'half', span: 6 },
+                { key: 'third', span: 4 },
+                { key: 'quarter', span: 3 }
+            );
+        }
 
         let isEditing = false;
         let originalLayout = (() => {
@@ -229,35 +262,76 @@
             if (!widget) {
                 return;
             }
-            const previousClasses = widget.dataset.sizeClass?.split(' ') ?? [];
-            previousClasses.forEach(cls => {
-                if (cls) {
-                    widget.classList.remove(cls);
-                }
-            });
-
-            const nextClasses = (sizeOptions[sizeKey] || '').split(' ').filter(Boolean);
-            nextClasses.forEach(cls => widget.classList.add(cls));
-            widget.dataset.sizeClass = nextClasses.join(' ');
+            const span = Number(sizeOptions[sizeKey]) || 4;
             widget.dataset.widgetSize = sizeKey;
+            widget.dataset.gridSpan = span;
+            widget.style.gridColumn = `span ${span}`;
+            const label = widget.querySelector('[data-size-label]');
+            if (label) {
+                label.textContent = sizeLabelMap[sizeKey] ?? `~${span} cols`;
+            }
         };
 
-        grid.addEventListener('change', (event) => {
-            if (!isEditing) {
-                return;
+        let dragSource = null;
+
+        const getNearestSizeKey = (span) => {
+            if (sizeEntries.length === 0) {
+                return 'third';
             }
-            const select = event.target.closest('[data-size-select]');
-            if (!select) {
-                return;
+
+            let best = sizeEntries[0];
+            for (const entry of sizeEntries) {
+                if (Math.abs(entry.span - span) < Math.abs(best.span - span)) {
+                    best = entry;
+                }
             }
-            const widget = select.closest('.home-widget');
+
+            return best.key;
+        };
+
+        const beginResize = (widget, pointerDownEvent) => {
             if (!widget) {
                 return;
             }
-            updateWidgetSize(widget, select.value);
-        });
 
-        let dragSource = null;
+            pointerDownEvent.preventDefault();
+            const startX = pointerDownEvent.clientX;
+            const initialSpan = Number(widget.dataset.gridSpan || 4);
+            const gridRect = grid.getBoundingClientRect();
+            const columnWidth = gridRect.width / 12;
+
+            const handlePointerMove = (event) => {
+                const delta = event.clientX - startX;
+                const rawSpan = initialSpan + (delta / columnWidth);
+                const constrained = Math.min(12, Math.max(3, rawSpan));
+                const sizeKey = getNearestSizeKey(constrained);
+                updateWidgetSize(widget, sizeKey);
+            };
+
+            const stopResize = () => {
+                document.removeEventListener('pointermove', handlePointerMove);
+                document.removeEventListener('pointerup', stopResize);
+                document.removeEventListener('pointercancel', stopResize);
+            };
+
+            document.addEventListener('pointermove', handlePointerMove);
+            document.addEventListener('pointerup', stopResize);
+            document.addEventListener('pointercancel', stopResize);
+        };
+
+        grid.querySelectorAll('[data-resize-handle]').forEach(handle => {
+            handle.addEventListener('pointerdown', (event) => {
+                if (!isEditing) {
+                    return;
+                }
+                const widget = handle.closest('.home-widget');
+                if (!widget) {
+                    return;
+                }
+
+                beginResize(widget, event);
+            });
+        });
 
         grid.addEventListener('dragstart', (event) => {
             if (!isEditing) {
