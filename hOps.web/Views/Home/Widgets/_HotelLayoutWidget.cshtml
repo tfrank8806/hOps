@@ -112,21 +112,6 @@
             </div>
 
             <div id="layoutFloorView" class="layout-view d-none">
-                <div class="layout-floor-selector btn-group btn-group-sm mb-3" role="group">
-                    @foreach (var floorInfo in floorLegend)
-                    {
-                        var floorValue = floorInfo.Floor;
-                        var isActive = floorValue == defaultFloor;
-                        <input type="radio" class="btn-check" name="floorSelector" id="floorSelector_@floorValue" value="@floorValue" @(isActive ? "checked" : string.Empty) autocomplete="off" />
-                        <label class="btn btn-outline-primary" for="floorSelector_@floorValue">
-                            Floor @floorValue
-                            @if (floorInfo.AlertCount > 0)
-                            {
-                                <span class="layout-floor-badge">@floorInfo.AlertCount</span>
-                            }
-                        </label>
-                    }
-                </div>
                 @foreach (var floorGroup in tilesByFloor)
                 {
                     var maxWidth = Math.Max(1, floorGroup.Max(t => t.X + t.Width));
