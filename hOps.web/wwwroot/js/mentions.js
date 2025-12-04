@@ -1,6 +1,10 @@
 (function () {
     const selector = '[data-enable-mentions="true"]';
     const trackedInputs = new Set();
+    const isContentEditableElement = (element) => element instanceof HTMLElement && element.isContentEditable;
+    const isTextualInput = (element) =>
+        element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement;
+    const shouldSkipElement = (element) => element?.dataset?.mentionsProxy === 'true';
 
     const START_MARKER = '\u200D';
     const END_MARKER = '\u200E';
@@ -80,7 +84,7 @@
     }
 
     function initMentionInput(input) {
-        if (!input || trackedInputs.has(input)) {
+        if (!input || trackedInputs.has(input) || shouldSkipElement(input)) {
             return;
         }
 
@@ -93,7 +97,8 @@
         state.set(input, {
             anchor: null,
             container: createSuggestionContainer(),
-            items: []
+            items: [],
+            kind: isContentEditableElement(input) ? 'editor' : 'text'
         });
     }
 
@@ -319,13 +324,25 @@
             return;
         }
 
+        const encodedId = encodeIdentifier(userId);
+        const mentionText = '@' + displayName + START_MARKER + encodedId + END_MARKER + ' ';
+
+        if (isContentEditableElement(input) && info.anchor.range) {
+            insertMentionIntoEditor(input, mentionText, info.anchor.range);
+            hideSuggestions(input);
+            return;
+        }
+
+        if (!isTextualInput(input)) {
+            hideSuggestions(input);
+            return;
+        }
+
         const value = input.value;
         const start = info.anchor.start;
         const end = info.anchor.end;
         const before = value.slice(0, start);
         const after = value.slice(end);
-        const encodedId = encodeIdentifier(userId);
-        const mentionText = '@' + displayName + START_MARKER + encodedId + END_MARKER + ' ';
 
         input.value = before + mentionText + after;
         input.focus();
@@ -335,7 +352,37 @@
         hideSuggestions(input);
     }
 
+    function insertMentionIntoEditor(editor, mentionText, range) {
+        const workingRange = range.cloneRange();
+        workingRange.deleteContents();
+        const textNode = document.createTextNode(mentionText);
+        workingRange.insertNode(textNode);
+
+        const selection = window.getSelection();
+        if (selection) {
+            selection.removeAllRanges();
+            const caretRange = document.createRange();
+            caretRange.setStart(textNode, textNode.length);
+            caretRange.collapse(true);
+            selection.addRange(caretRange);
+        }
+
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
     function getMentionContext(input) {
+        if (isContentEditableElement(input)) {
+            return getMentionContextFromEditor(input);
+        }
+
+        if (!isTextualInput(input)) {
+            return null;
+        }
+
+        return getMentionContextFromTextInput(input);
+    }
+
+    function getMentionContextFromTextInput(input) {
         const value = input.value;
         const cursor = input.selectionStart == null ? value.length : input.selectionStart;
         const beforeCursor = value.slice(0, cursor);
@@ -376,6 +423,56 @@
         };
     }
 
+    function getMentionContextFromEditor(editor) {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) {
+            return null;
+        }
+
+        const caretRange = selection.getRangeAt(0);
+        if (!editor.contains(caretRange.startContainer)) {
+            return null;
+        }
+
+        const workingRange = caretRange.cloneRange();
+        workingRange.collapse(true);
+
+        const termChars = [];
+        while (true) {
+            const step = moveRangeStartBackwardOneCharacter(editor, workingRange);
+            if (!step) {
+                return null;
+            }
+
+            const char = step.char;
+            if (char === '@') {
+                const term = termChars.join('');
+                if (!term.length || /[^a-zA-Z0-9_.-]/.test(term)) {
+                    return null;
+                }
+                const mentionRange = workingRange.cloneRange();
+                mentionRange.setEnd(caretRange.startContainer, caretRange.startOffset);
+                return {
+                    term,
+                    range: mentionRange
+                };
+            }
+
+            if (/\s|\(|\[|\{|\n/.test(char) || char === START_MARKER || char === END_MARKER) {
+                return null;
+            }
+
+            if (char === ZERO_WIDTH_ZERO || char === ZERO_WIDTH_ONE) {
+                return null;
+            }
+
+            termChars.unshift(char);
+            if (termChars.length > 30) {
+                return null;
+            }
+        }
+    }
+
     function encodeIdentifier(id) {
         let bits = '';
         for (let i = 0; i < id.length; i++) {
@@ -388,6 +485,72 @@
             encoded += bits[i] === '0' ? ZERO_WIDTH_ZERO : ZERO_WIDTH_ONE;
         }
         return encoded;
+    }
+
+    function moveRangeStartBackwardOneCharacter(root, range) {
+        let container = range.startContainer;
+        let offset = range.startOffset;
+
+        while (container) {
+            if (container.nodeType === Node.TEXT_NODE) {
+                if (offset > 0) {
+                    const newOffset = offset - 1;
+                    range.setStart(container, newOffset);
+                    return { char: container.data[newOffset] };
+                }
+
+                const parent = container.parentNode;
+                if (!parent) {
+                    return null;
+                }
+                offset = Array.prototype.indexOf.call(parent.childNodes, container);
+                container = parent;
+                continue;
+            }
+
+            if (offset > 0) {
+                let node = container.childNodes[offset - 1];
+                while (node && node.lastChild) {
+                    node = node.lastChild;
+                }
+
+                if (!node) {
+                    return null;
+                }
+
+                if (node.nodeType === Node.TEXT_NODE) {
+                    container = node;
+                    offset = node.data.length;
+                    continue;
+                }
+
+                if (isLineBreakNode(node)) {
+                    range.setStartBefore(node);
+                    return { char: '\n' };
+                }
+
+                container = node;
+                offset = node.childNodes.length;
+                continue;
+            }
+
+            if (container === root) {
+                return null;
+            }
+
+            const parent = container.parentNode;
+            if (!parent) {
+                return null;
+            }
+            offset = Array.prototype.indexOf.call(parent.childNodes, container);
+            container = parent;
+        }
+
+        return null;
+    }
+
+    function isLineBreakNode(node) {
+        return node && node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR';
     }
 
     function repositionActiveSuggestions() {

@@ -33,6 +33,7 @@
     const DEFAULT_TEXT_COLOR = '#212529';
     const HIGHLIGHT_COLOR = '#fff2a8';
     const contexts = new WeakMap();
+    let richTextIdCounter = 0;
 
     elements.forEach(initializeEditor);
 
@@ -52,6 +53,16 @@
         editor.setAttribute('contenteditable', 'true');
         editor.setAttribute('role', 'textbox');
         editor.setAttribute('aria-multiline', 'true');
+
+        if (textarea.dataset.enableMentions === 'true') {
+            editor.dataset.enableMentions = 'true';
+            editor.dataset.richTextEditor = 'true';
+            textarea.dataset.mentionsProxy = 'true';
+            if (!textarea.id) {
+                textarea.id = `richTextField_${++richTextIdCounter}`;
+            }
+            editor.dataset.mentionsSource = textarea.id;
+        }
 
         if (textarea.placeholder) {
             editor.dataset.placeholder = textarea.placeholder;
