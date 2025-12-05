@@ -30,6 +30,15 @@
         gray: '#334155'
     };
 
+    const MENTION_START = '\u200D';
+    const MENTION_END = '\u200E';
+    const ZERO_WIDTH_ZERO = '\u200B';
+    const ZERO_WIDTH_ONE = '\u200C';
+    const mentionPattern = new RegExp(
+        `@([^${MENTION_START}${MENTION_END}]+)${MENTION_START}[${ZERO_WIDTH_ZERO}${ZERO_WIDTH_ONE}]+${MENTION_END}`,
+        'g'
+    );
+
     const DEFAULT_TEXT_COLOR = '#212529';
     const HIGHLIGHT_COLOR = '#fff2a8';
     const contexts = new WeakMap();
@@ -390,12 +399,76 @@
         }
         normalizeEditorDom(editor);
         ensureEditorHasContent(editor);
+        decorateMentions(editor);
     }
 
     function ensureEditorHasContent(editor) {
         if (!editor.textContent.trim()) {
             editor.innerHTML = '';
         }
+    }
+
+    function decorateMentions(root) {
+        if (!root) {
+            return;
+        }
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+        const targets = [];
+        while (walker.nextNode()) {
+            const node = walker.currentNode;
+            if (!node.nodeValue) {
+                continue;
+            }
+            if (node.parentElement && node.parentElement.closest('.rich-text-mention')) {
+                continue;
+            }
+            mentionPattern.lastIndex = 0;
+            if (mentionPattern.test(node.nodeValue)) {
+                targets.push(node);
+            }
+        }
+
+        targets.forEach(textNode => wrapMentionTextNode(textNode));
+        mentionPattern.lastIndex = 0;
+    }
+
+    function wrapMentionTextNode(textNode) {
+        const text = textNode.nodeValue || '';
+        mentionPattern.lastIndex = 0;
+        let lastIndex = 0;
+        let match;
+        const fragment = document.createDocumentFragment();
+        let replaced = false;
+
+        while ((match = mentionPattern.exec(text)) !== null) {
+            const before = text.slice(lastIndex, match.index);
+            if (before) {
+                fragment.appendChild(document.createTextNode(before));
+            }
+            fragment.appendChild(createMentionElement(match[0]));
+            lastIndex = match.index + match[0].length;
+            replaced = true;
+        }
+
+        if (!replaced) {
+            return;
+        }
+
+        if (lastIndex < text.length) {
+            fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+        }
+
+        textNode.parentNode?.replaceChild(fragment, textNode);
+    }
+
+    function createMentionElement(mentionText) {
+        const span = document.createElement('span');
+        span.className = 'rich-text-mention';
+        span.setAttribute('contenteditable', 'false');
+        span.dataset.mention = 'true';
+        span.tabIndex = -1;
+        span.textContent = mentionText;
+        return span;
     }
 
     function syncToTextarea(context) {
@@ -920,4 +993,6 @@
         const event = new Event('input', { bubbles: true });
         element.dispatchEvent(event);
     }
+
+    window.hOpsCreateMentionElement = createMentionElement;
 })();

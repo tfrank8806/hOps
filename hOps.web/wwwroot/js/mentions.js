@@ -253,7 +253,9 @@
 
     function positionSuggestions(input, container) {
         const rect = input.getBoundingClientRect();
-        const caret = getCaretCoordinates(input);
+        const caret = isContentEditableElement(input)
+            ? getEditorCaretCoordinates(input)
+            : getInputCaretCoordinates(input);
         const width = Math.min(Math.max(rect.width, 220), 360);
         container.style.width = width + 'px';
         if (caret) {
@@ -276,7 +278,7 @@
         });
     }
 
-    function getCaretCoordinates(input) {
+    function getInputCaretCoordinates(input) {
         if (!(input instanceof HTMLInputElement) && !(input instanceof HTMLTextAreaElement)) {
             return null;
         }
@@ -302,6 +304,39 @@
         return { top, left, height: lineHeight };
     }
 
+    function getEditorCaretCoordinates(editor) {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) {
+            return null;
+        }
+
+        const range = selection.getRangeAt(0).cloneRange();
+        if (!editor.contains(range.startContainer)) {
+            return null;
+        }
+
+        const marker = document.createElement('span');
+        marker.textContent = '\u200b';
+        range.insertNode(marker);
+        const editorRect = editor.getBoundingClientRect();
+        const markerRect = marker.getBoundingClientRect();
+        const style = window.getComputedStyle(editor);
+        const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) || 16;
+
+        const top = markerRect.top - editorRect.top;
+        const left = markerRect.left - editorRect.left;
+
+        const newRange = document.createRange();
+        newRange.setStartAfter(marker);
+        newRange.collapse(true);
+
+        marker.parentNode?.removeChild(marker);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+
+        return { top, left, height: markerRect.height || lineHeight };
+    }
+
     function copyCaretStyles(input) {
         const style = window.getComputedStyle(input);
         CARET_STYLE_PROPERTIES.forEach((prop) => {
@@ -325,10 +360,11 @@
         }
 
         const encodedId = encodeIdentifier(userId);
-        const mentionText = '@' + displayName + START_MARKER + encodedId + END_MARKER + ' ';
+        const mentionCore = '@' + displayName + START_MARKER + encodedId + END_MARKER;
 
         if (isContentEditableElement(input) && info.anchor.range) {
-            insertMentionIntoEditor(input, mentionText, info.anchor.range);
+            insertMentionIntoEditor(input, mentionCore, info.anchor.range);
+            info.anchor = null;
             hideSuggestions(input);
             return;
         }
@@ -338,6 +374,7 @@
             return;
         }
 
+        const mentionText = mentionCore + ' ';
         const value = input.value;
         const start = info.anchor.start;
         const end = info.anchor.end;
@@ -349,20 +386,30 @@
         const caretPosition = before.length + mentionText.length;
         input.setSelectionRange(caretPosition, caretPosition);
         input.dispatchEvent(new Event('input', { bubbles: true }));
+        info.anchor = null;
         hideSuggestions(input);
     }
 
-    function insertMentionIntoEditor(editor, mentionText, range) {
+    function insertMentionIntoEditor(editor, mentionCore, range) {
         const workingRange = range.cloneRange();
         workingRange.deleteContents();
-        const textNode = document.createTextNode(mentionText);
-        workingRange.insertNode(textNode);
+        const builder = typeof window.hOpsCreateMentionElement === 'function'
+            ? window.hOpsCreateMentionElement
+            : (text) => {
+                const span = document.createElement('span');
+                span.textContent = text;
+                return span;
+            };
+        const mentionEl = builder(mentionCore);
+        workingRange.insertNode(mentionEl);
+        const spaceNode = document.createTextNode(' ');
+        mentionEl.after(spaceNode);
 
         const selection = window.getSelection();
         if (selection) {
             selection.removeAllRanges();
             const caretRange = document.createRange();
-            caretRange.setStart(textNode, textNode.length);
+            caretRange.setStartAfter(spaceNode);
             caretRange.collapse(true);
             selection.addRange(caretRange);
         }
