@@ -48,21 +48,66 @@
         </div>
     }
 
-    <div class="home-layout-controls d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <div class="d-flex gap-2 align-items-center">
+    <div class="home-layout-controls d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
             <button type="button" class="btn btn-outline-secondary" data-layout-action="start">Customize Layout</button>
             <div class="btn-group d-none" data-layout-editor>
                 <button type="button" class="btn btn-primary" data-layout-action="save">Save Layout</button>
                 <button type="button" class="btn btn-outline-secondary" data-layout-action="cancel">Cancel</button>
             </div>
+            <div class="text-muted small d-none" data-layout-hint>Drag cards to reorder. Drag the corner handle to resize widgets.</div>
         </div>
-        <div class="text-muted small d-none" data-layout-hint>Drag cards to reorder. Drag the corner handle to resize widgets.</div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="form-label mb-0 text-muted small" for="layoutPersonaSelect">Persona</label>
+            <select id="layoutPersonaSelect"
+                    class="form-select form-select-sm"
+                    data-base-url="@Url.Action("Index", "Home")">
+                @foreach (var persona in Model.LayoutPersonas)
+                {
+                    <option value="@persona.Key" selected="@(persona.IsSelected ? "selected" : null)">@persona.Name</option>
+                }
+            </select>
+        </div>
     </div>
+
+    @if (Model.CanManageWidgets && Model.MarketplaceModules.Any())
+    {
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <h2 class="h6 mb-0">Widget Marketplace</h2>
+                    <div class="text-muted small">Enable or disable dashboard modules for everyone.</div>
+                </div>
+            </div>
+            <div class="card-body">
+                <form asp-action="UpdateWidgets" method="post" class="row g-3">
+                    @Html.AntiForgeryToken()
+                    @foreach (var module in Model.MarketplaceModules)
+                    {
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="WidgetIds" value="@module.WidgetId" id="marketplace_@module.WidgetId" @(module.IsEnabled ? "checked" : string.Empty) />
+                                <label class="form-check-label fw-semibold" for="marketplace_@module.WidgetId">@module.DisplayName</label>
+                                @if (!string.IsNullOrWhiteSpace(module.Description))
+                                {
+                                    <div class="text-muted small">@module.Description</div>
+                                }
+                            </div>
+                        </div>
+                    }
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-sm btn-primary">Save Modules</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
 
     <div class="home-widget-grid" id="homeWidgetGrid"
          data-initial-layout='@Html.Raw(initialLayoutJson)'
          data-save-url="@(Url.Action("SaveWidgetLayout", "Home") ?? "#")"
-         data-size-options='@Html.Raw(sizeOptionsJson)'>
+         data-size-options='@Html.Raw(sizeOptionsJson)'
+         data-persona="@Model.SelectedPersona">
         @foreach (var widget in Model.WidgetLayout)
         {
             var widgetId = widget.WidgetId ?? string.Empty;
@@ -204,6 +249,7 @@
             third: 'One third',
             quarter: 'One quarter'
         };
+        const selectedPersona = grid.dataset.persona || 'default';
         const sizeEntries = Object.entries(sizeOptions).map(([key, span]) => ({
             key,
             span: Number(span) || 4
@@ -431,6 +477,19 @@
             grid.insertBefore(dragSource, shouldInsertBefore ? target : target.nextSibling);
         });
 
+        const personaSelect = document.getElementById('layoutPersonaSelect');
+        if (personaSelect) {
+            personaSelect.value = selectedPersona;
+            personaSelect.addEventListener('change', () => {
+                const baseUrl = personaSelect.dataset.baseUrl || window.location.pathname;
+                const url = new URL(baseUrl, window.location.origin);
+                if (personaSelect.value) {
+                    url.searchParams.set('persona', personaSelect.value);
+                }
+                window.location.href = url.toString();
+            });
+        }
+
         startButton?.addEventListener('click', () => {
             originalLayout = getCurrentLayout();
             setEditingState(true);
@@ -443,6 +502,7 @@
 
         saveButton?.addEventListener('click', async () => {
             const payload = {
+                persona: selectedPersona,
                 widgets: getCurrentLayout()
             };
             const token = getAntiforgeryToken();

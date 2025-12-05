@@ -30,17 +30,27 @@ namespace hOps.web.Controllers
         private readonly ILogger<HomeController> _logger;
         private readonly IConfiguration _configuration;
 
+        private const string PersonaSessionKey = "HomeLayoutPersona";
+
         private static readonly IReadOnlyList<HomeWidgetDefinition> WidgetDefinitions = new[]
         {
-            new HomeWidgetDefinition { Id = HomeWidgetIds.Announcements, DefaultSize = HomeWidgetSize.Third },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.Bulletins, DefaultSize = HomeWidgetSize.Third },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.OpsFeed, DefaultSize = HomeWidgetSize.Full },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.PassOnLogs, DefaultSize = HomeWidgetSize.Third },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.PackageLog, DefaultSize = HomeWidgetSize.Quarter },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.UpcomingEvents, DefaultSize = HomeWidgetSize.Quarter },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.WorkOrders, DefaultSize = HomeWidgetSize.Quarter },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.LostFound, DefaultSize = HomeWidgetSize.Quarter },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.HotelLayout, DefaultSize = HomeWidgetSize.Full }
+            new HomeWidgetDefinition { Id = HomeWidgetIds.Announcements, DisplayName = "Announcements", Description = "Manager notes & attachments", DefaultSize = HomeWidgetSize.Third },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.Bulletins, DisplayName = "Bulletin Board", Description = "Team conversations & reminders", DefaultSize = HomeWidgetSize.Third },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.OpsFeed, DisplayName = "Ops Feed", Description = "Unified activity and replies", DefaultSize = HomeWidgetSize.Full },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.PassOnLogs, DisplayName = "Pass On Logs", Description = "Recent pass on entries", DefaultSize = HomeWidgetSize.Third },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.PackageLog, DisplayName = "Package Log", Description = "Undelivered packages", DefaultSize = HomeWidgetSize.Quarter },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.UpcomingEvents, DisplayName = "Upcoming Events", Description = "Calendar highlights", DefaultSize = HomeWidgetSize.Quarter },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.WorkOrders, DisplayName = "Work Orders", Description = "Active tickets and SLAs", DefaultSize = HomeWidgetSize.Quarter },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.LostFound, DisplayName = "Lost & Found", Description = "Items awaiting resolution", DefaultSize = HomeWidgetSize.Quarter },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.HotelLayout, DisplayName = "Hotel Layout", Description = "Interactive property map", DefaultSize = HomeWidgetSize.Full }
+        };
+
+        private static readonly LayoutPersonaOption[] PersonaOptions = new[]
+        {
+            new LayoutPersonaOption("default", "Standard", "Balanced dashboard for everyone"),
+            new LayoutPersonaOption("frontDesk", "Front Desk", "Front-of-house focus"),
+            new LayoutPersonaOption("engineering", "Engineering", "Maintenance & SLAs"),
+            new LayoutPersonaOption("housekeeping", "Housekeeping", "Rooms, lost & found, packages")
         };
 
         private static readonly Dictionary<HomeWidgetSize, string> WidgetSizeClasses = new()
@@ -86,12 +96,29 @@ namespace hOps.web.Controllers
                 return View(viewModel);
             }
 
-            viewModel.WidgetLayout = await BuildWidgetLayoutAsync(user.Id);
+            var personaKey = ResolvePersonaKey(Request.Query["persona"]);
+            viewModel.SelectedPersona = personaKey;
+            viewModel.LayoutPersonas = PersonaOptions
+                .Select(option => new LayoutPersonaViewModel
+                {
+                    Key = option.Key,
+                    Name = option.Name,
+                    Description = option.Description,
+                    IsSelected = option.Key.Equals(personaKey, StringComparison.OrdinalIgnoreCase)
+                })
+                .ToList();
+
+            var activeWidgetDefinitions = await GetActiveWidgetDefinitionsAsync();
+
+            viewModel.WidgetLayout = await BuildWidgetLayoutAsync(user.Id, personaKey, activeWidgetDefinitions);
             viewModel.WidgetSizeClasses = WidgetSizeClasses.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
             var userRoles = await _userManager.GetRolesAsync(user);
             var roleSet = new HashSet<string>(userRoles, StringComparer.OrdinalIgnoreCase);
-            viewModel.CanManageAnnouncements = roleSet.Contains("Admin") || roleSet.Contains("Manager");
+            var canManage = roleSet.Contains("Admin") || roleSet.Contains("Manager");
+            viewModel.CanManageAnnouncements = canManage;
+            viewModel.CanManageWidgets = canManage;
+            viewModel.MarketplaceModules = await BuildMarketplaceViewModelAsync(activeWidgetDefinitions);
 
             if (currentProperty == null)
             {
@@ -167,7 +194,9 @@ namespace hOps.web.Controllers
                 return BadRequest(new { message = "No widgets were provided." });
             }
 
-            var definitions = WidgetDefinitions.ToDictionary(d => d.Id, d => d, StringComparer.OrdinalIgnoreCase);
+            var personaKey = ResolvePersonaKey(request.Persona);
+            var activeDefinitions = await GetActiveWidgetDefinitionsAsync();
+            var definitions = activeDefinitions.ToDictionary(d => d.Id, d => d, StringComparer.OrdinalIgnoreCase);
             var normalized = new List<HomeWidgetLayoutEntry>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -212,7 +241,7 @@ namespace hOps.web.Controllers
                 });
             }
 
-            foreach (var definition in WidgetDefinitions)
+            foreach (var definition in activeDefinitions)
             {
                 if (seen.Add(definition.Id))
                 {
@@ -225,12 +254,13 @@ namespace hOps.web.Controllers
             }
 
             var serialized = JsonSerializer.Serialize(normalized, LayoutSerializerOptions);
-            var layout = await _context.UserHomeLayouts.FirstOrDefaultAsync(l => l.UserId == currentUser.Id);
+            var layout = await _context.UserHomeLayouts.FirstOrDefaultAsync(l => l.UserId == currentUser.Id && l.PersonaKey == personaKey);
             if (layout == null)
             {
                 layout = new UserHomeLayout
                 {
                     UserId = currentUser.Id,
+                    PersonaKey = personaKey,
                     LayoutJson = serialized,
                     UpdatedAtUtc = DateTime.UtcNow
                 };
@@ -238,12 +268,40 @@ namespace hOps.web.Controllers
             }
             else
             {
+                layout.PersonaKey = personaKey;
                 layout.LayoutJson = serialized;
                 layout.UpdatedAtUtc = DateTime.UtcNow;
             }
+            layout.IsDefault = personaKey.Equals(PersonaOptions[0].Key, StringComparison.OrdinalIgnoreCase);
 
             await _context.SaveChangesAsync();
             return Ok(new { success = true });
+        }
+
+        [Authorize(Roles = "Admin,Manager")]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateWidgets(WidgetMarketplaceForm form)
+        {
+            await EnsureMarketplaceSeedAsync();
+            var enabledSet = form?.WidgetIds != null
+                ? new HashSet<string>(form.WidgetIds.Where(x => !string.IsNullOrWhiteSpace(x)), StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (enabledSet.Count == 0)
+            {
+                enabledSet.UnionWith(WidgetDefinitions.Select(d => d.Id));
+            }
+
+            var modules = await _context.WidgetMarketplaceModules.ToListAsync();
+            foreach (var module in modules)
+            {
+                module.IsEnabled = enabledSet.Contains(module.WidgetId);
+                module.UpdatedAtUtc = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+            return RedirectToAction(nameof(Index));
         }
 
         [HttpPost]
@@ -1388,11 +1446,22 @@ namespace hOps.web.Controllers
             return destination.IsDefaultPort;
         }
 
-        private async Task<List<HomeWidgetLayoutEntry>> BuildWidgetLayoutAsync(string userId)
+        private async Task<List<HomeWidgetLayoutEntry>> BuildWidgetLayoutAsync(string userId, string personaKey, IReadOnlyList<HomeWidgetDefinition> activeDefinitions)
         {
             var layoutRecord = await _context.UserHomeLayouts
                 .AsNoTracking()
-                .FirstOrDefaultAsync(l => l.UserId == userId);
+                .Where(l => l.UserId == userId && l.PersonaKey == personaKey)
+                .OrderByDescending(l => l.UpdatedAtUtc)
+                .FirstOrDefaultAsync();
+
+            if (layoutRecord == null && !personaKey.Equals(PersonaOptions[0].Key, StringComparison.OrdinalIgnoreCase))
+            {
+                layoutRecord = await _context.UserHomeLayouts
+                    .AsNoTracking()
+                    .Where(l => l.UserId == userId && l.PersonaKey == PersonaOptions[0].Key)
+                    .OrderByDescending(l => l.UpdatedAtUtc)
+                    .FirstOrDefaultAsync();
+            }
 
             List<HomeWidgetLayoutEntry>? storedLayout = null;
             if (layoutRecord != null && !string.IsNullOrWhiteSpace(layoutRecord.LayoutJson))
@@ -1407,7 +1476,7 @@ namespace hOps.web.Controllers
                 }
             }
 
-            var definitions = WidgetDefinitions.ToDictionary(d => d.Id, d => d, StringComparer.OrdinalIgnoreCase);
+            var definitions = activeDefinitions.ToDictionary(d => d.Id, d => d, StringComparer.OrdinalIgnoreCase);
             var finalLayout = new List<HomeWidgetLayoutEntry>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -1452,7 +1521,7 @@ namespace hOps.web.Controllers
                 }
             }
 
-            foreach (var definition in WidgetDefinitions)
+            foreach (var definition in activeDefinitions)
             {
                 if (seen.Add(definition.Id))
                 {
@@ -1478,8 +1547,102 @@ namespace hOps.web.Controllers
 
         private static int ClampSpan(int span) => Math.Clamp(span, 1, 12);
 
+        private sealed record LayoutPersonaOption(string Key, string Name, string Description);
+
+        public class WidgetMarketplaceForm
+        {
+            public List<string> WidgetIds { get; set; } = new();
+        }
+
+        private string ResolvePersonaKey(string? requested)
+        {
+            var candidate = string.IsNullOrWhiteSpace(requested) ? null : requested.Trim();
+            if (!PersonaOptions.Any(p => p.Key.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                candidate = HttpContext.Session.GetString(PersonaSessionKey);
+            }
+
+            if (string.IsNullOrWhiteSpace(candidate) || !PersonaOptions.Any(p => p.Key.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                candidate = PersonaOptions[0].Key;
+            }
+
+            HttpContext.Session.SetString(PersonaSessionKey, candidate);
+            return candidate;
+        }
+
+        private async Task<IReadOnlyList<HomeWidgetDefinition>> GetActiveWidgetDefinitionsAsync()
+        {
+            await EnsureMarketplaceSeedAsync();
+            var modules = await _context.WidgetMarketplaceModules
+                .AsNoTracking()
+                .ToListAsync();
+
+            var enabled = modules
+                .Where(m => m.IsEnabled)
+                .Select(m => m.WidgetId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (enabled.Count == 0)
+            {
+                enabled.UnionWith(WidgetDefinitions.Select(d => d.Id));
+            }
+
+            return WidgetDefinitions
+                .Where(def => enabled.Contains(def.Id))
+                .ToList();
+        }
+
+        private async Task EnsureMarketplaceSeedAsync()
+        {
+            var existing = await _context.WidgetMarketplaceModules
+                .Select(m => m.WidgetId)
+                .ToListAsync();
+            var existingSet = new HashSet<string>(existing, StringComparer.OrdinalIgnoreCase);
+
+            var newModules = WidgetDefinitions
+                .Where(def => !existingSet.Contains(def.Id))
+                .Select(def => new WidgetMarketplaceModule
+                {
+                    WidgetId = def.Id,
+                    IsEnabled = true
+                })
+                .ToList();
+
+            if (newModules.Count > 0)
+            {
+                _context.WidgetMarketplaceModules.AddRange(newModules);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        private async Task<List<WidgetMarketplaceItemViewModel>> BuildMarketplaceViewModelAsync(IEnumerable<HomeWidgetDefinition> activeDefinitions)
+        {
+            await EnsureMarketplaceSeedAsync();
+            var modules = await _context.WidgetMarketplaceModules
+                .AsNoTracking()
+                .ToListAsync();
+
+            var definitionLookup = WidgetDefinitions.ToDictionary(d => d.Id, d => d, StringComparer.OrdinalIgnoreCase);
+            return modules
+                .Select(module =>
+                {
+                    definitionLookup.TryGetValue(module.WidgetId, out var definition);
+                    return new WidgetMarketplaceItemViewModel
+                    {
+                        WidgetId = module.WidgetId,
+                        DisplayName = definition?.DisplayName ?? module.WidgetId,
+                        Description = definition?.Description,
+                        IsEnabled = module.IsEnabled
+                    };
+                })
+                .OrderBy(m => m.DisplayName)
+                .ToList();
+        }
+
         public class UpdateHomeLayoutRequest
         {
+            public string? Persona { get; set; }
             public List<UpdateHomeLayoutItem> Widgets { get; set; } = new();
         }
 

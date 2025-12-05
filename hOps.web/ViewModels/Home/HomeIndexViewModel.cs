@@ -18,6 +18,10 @@ namespace hOps.web.ViewModels.Home
 
         public List<WorkOrderSummaryViewModel> WorkOrders { get; set; } = new();
         public List<ActivityFeedItemViewModel> ActivityFeed { get; set; } = new();
+        public List<LayoutPersonaViewModel> LayoutPersonas { get; set; } = new();
+        public string SelectedPersona { get; set; } = "default";
+        public bool CanManageWidgets { get; set; }
+        public List<WidgetMarketplaceItemViewModel> MarketplaceModules { get; set; } = new();
 
         public List<LostFoundSummaryViewModel> LostFoundEntries { get; set; } = new();
 
@@ -185,6 +189,8 @@ namespace hOps.web.ViewModels.Home
     public class HomeWidgetDefinition
     {
         public string Id { get; init; } = string.Empty;
+        public string DisplayName { get; init; } = string.Empty;
+        public string? Description { get; init; }
         public HomeWidgetSize DefaultSize { get; init; } = HomeWidgetSize.Third;
     }
 
@@ -216,5 +222,21 @@ namespace hOps.web.ViewModels.Home
         public int? PassOnLogId { get; set; }
         public string ReplyPlaceholder { get; set; } = "Add a quick reply…";
         public string? ReplyReturnUrl { get; set; }
+    }
+
+    public class LayoutPersonaViewModel
+    {
+        public string Key { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public bool IsSelected { get; set; }
+    }
+
+    public class WidgetMarketplaceItemViewModel
+    {
+        public string WidgetId { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsEnabled { get; set; }
     }
 }

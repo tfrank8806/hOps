@@ -50,6 +50,7 @@ namespace hOps.web.Data
         public DbSet<DirectMessage> DirectMessages { get; set; }
         public DbSet<UserNotification> UserNotifications { get; set; }
         public DbSet<UserHomeLayout> UserHomeLayouts { get; set; }
+        public DbSet<WidgetMarketplaceModule> WidgetMarketplaceModules { get; set; }
         public DbSet<UserDepartmentSubscription> UserDepartmentSubscriptions { get; set; }
         public DbSet<Document> Documents { get; set; }
         public DbSet<DocumentFolder> DocumentFolders { get; set; }
@@ -374,14 +375,18 @@ namespace hOps.web.Data
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<UserHomeLayout>()
-                .HasIndex(l => l.UserId)
-                .IsUnique();
-
-            builder.Entity<UserHomeLayout>()
                 .HasOne<ApplicationUser>()
                 .WithMany()
                 .HasForeignKey(l => l.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<UserHomeLayout>()
+                .HasIndex(l => new { l.UserId, l.PersonaKey })
+                .IsUnique();
+
+            builder.Entity<WidgetMarketplaceModule>()
+                .HasIndex(m => m.WidgetId)
+                .IsUnique();
 
             builder.Entity<UserToDoItem>()
                 .HasOne(t => t.User)
