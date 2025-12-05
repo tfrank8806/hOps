@@ -17,6 +17,7 @@ namespace hOps.web.ViewModels.Home
         public List<RoomLayoutTileViewModel> RoomTiles { get; set; } = new();
 
         public List<WorkOrderSummaryViewModel> WorkOrders { get; set; } = new();
+        public List<ActivityFeedItemViewModel> ActivityFeed { get; set; } = new();
 
         public List<LostFoundSummaryViewModel> LostFoundEntries { get; set; } = new();
 
@@ -91,6 +92,13 @@ namespace hOps.web.ViewModels.Home
         public string? DepartmentName { get; set; }
         public string? DepartmentColor { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DateTime DueDate { get; set; }
+        public string PriorityLabel { get; set; } = string.Empty;
+        public string PriorityClass { get; set; } = "badge bg-light text-dark border";
+        public string SlaStatus { get; set; } = string.Empty;
+        public string SlaStatusClass { get; set; } = string.Empty;
+        public string SlaSummary { get; set; } = string.Empty;
+        public bool IsOverdue { get; set; }
         public string DetailUrl { get; set; } = string.Empty;
     }
 
@@ -190,5 +198,23 @@ namespace hOps.web.ViewModels.Home
         public const string WorkOrders = "workOrders";
         public const string LostFound = "lostFound";
         public const string HotelLayout = "hotelLayout";
+        public const string OpsFeed = "opsFeed";
+    }
+
+    public class ActivityFeedItemViewModel
+    {
+        public string ItemType { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Preview { get; set; } = string.Empty;
+        public string? Meta { get; set; }
+        public string? LinkUrl { get; set; }
+        public string? BadgeText { get; set; }
+        public string? BadgeClass { get; set; }
+        public DateTime OccurredAt { get; set; }
+        public UserAvatarViewModel? Avatar { get; set; }
+        public bool CanReply { get; set; }
+        public int? PassOnLogId { get; set; }
+        public string ReplyPlaceholder { get; set; } = "Add a quick reply…";
+        public string? ReplyReturnUrl { get; set; }
     }
 }

@@ -137,6 +137,9 @@
                                 createButtonText: "+ New Work Order",
                                 createFragment: "workOrdersForm"))
                             break;
+                        case HomeWidgetIds.OpsFeed:
+                            @await Html.PartialAsync("~/Views/Home/Widgets/_OpsFeedWidget.cshtml", Model)
+                            break;
                         case HomeWidgetIds.LostFound:
                             @await Html.PartialAsync("_HomeWidgetCard", new HomeWidgetViewModel(
                                 "Lost & Found",

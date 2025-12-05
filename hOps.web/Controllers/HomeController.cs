@@ -34,6 +34,7 @@ namespace hOps.web.Controllers
         {
             new HomeWidgetDefinition { Id = HomeWidgetIds.Announcements, DefaultSize = HomeWidgetSize.Third },
             new HomeWidgetDefinition { Id = HomeWidgetIds.Bulletins, DefaultSize = HomeWidgetSize.Third },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.OpsFeed, DefaultSize = HomeWidgetSize.Full },
             new HomeWidgetDefinition { Id = HomeWidgetIds.PassOnLogs, DefaultSize = HomeWidgetSize.Third },
             new HomeWidgetDefinition { Id = HomeWidgetIds.PackageLog, DefaultSize = HomeWidgetSize.Quarter },
             new HomeWidgetDefinition { Id = HomeWidgetIds.UpcomingEvents, DefaultSize = HomeWidgetSize.Quarter },
@@ -98,6 +99,7 @@ namespace hOps.web.Controllers
             }
 
             var propertyId = currentProperty.Id;
+            await EnsureWorkOrderEscalationsAsync(currentProperty, user);
 
             await PopulateAnnouncementAsync(viewModel, propertyId);
             await PopulateBulletinAsync(viewModel, propertyId, user, roleSet);
@@ -108,6 +110,7 @@ namespace hOps.web.Controllers
             await PopulatePackageLogAsync(viewModel, propertyId);
             await PopulateUpcomingEventsAsync(viewModel, propertyId);
             await PopulateQuickWorkOrderOptionsAsync(viewModel, propertyId);
+            await PopulateActivityFeedAsync(viewModel, propertyId, user.Id);
 
             return View(viewModel);
         }
@@ -820,29 +823,119 @@ namespace hOps.web.Controllers
         }
         private async Task PopulateWorkOrdersAsync(HomeIndexViewModel viewModel, int propertyId)
         {
+            var now = DateTime.UtcNow;
             var recentWorkOrders = await _context.WorkOrderProperties
                 .Where(wp => wp.PropertyId == propertyId)
                 .Select(wp => wp.WorkOrder)
-                .Where(wo => wo.Status == "New" || wo.Status == "In Progress")
+                .Where(wo => wo.Status == "New" || wo.Status == "In Progress" || wo.Status == "Escalated")
                 .OrderByDescending(wo => wo.CreatedAt)
                 .Take(5)
-                .Select(wo => new WorkOrderSummaryViewModel
+                .Select(wo => new
                 {
-                    Id = wo.Id,
-                    Status = wo.Status,
-                    Issue = wo.Issue,
-                    Location = wo.Location,
+                    WorkOrder = wo,
                     DepartmentName = wo.Department != null ? wo.Department.Name : null,
                     DepartmentColor = wo.Department != null && !string.IsNullOrWhiteSpace(wo.Department.Color)
                         ? wo.Department.Color
                         : null,
-                    CreatedAt = wo.CreatedAt,
                     DetailUrl = Url.Action("Edit", "WorkOrders", new { id = wo.Id }) ?? string.Empty
                 })
                 .AsNoTracking()
                 .ToListAsync();
 
-            viewModel.WorkOrders = recentWorkOrders;
+            viewModel.WorkOrders = recentWorkOrders.Select(entry =>
+            {
+                var sla = WorkOrderSlaHelper.Calculate(entry.WorkOrder.DueDate, now);
+                return new WorkOrderSummaryViewModel
+                {
+                    Id = entry.WorkOrder.Id,
+                    Status = entry.WorkOrder.Status,
+                    Issue = entry.WorkOrder.Issue,
+                    Location = entry.WorkOrder.Location,
+                    DepartmentName = entry.DepartmentName,
+                    DepartmentColor = entry.DepartmentColor,
+                    CreatedAt = entry.WorkOrder.CreatedAt,
+                    DueDate = entry.WorkOrder.DueDate,
+                    PriorityLabel = sla.PriorityLabel,
+                    PriorityClass = sla.PriorityClass,
+                    SlaStatus = sla.SlaStatus,
+                    SlaStatusClass = sla.SlaStatusClass,
+                    SlaSummary = WorkOrderSlaHelper.BuildSummaryText(sla),
+                    IsOverdue = sla.IsOverdue,
+                    DetailUrl = entry.DetailUrl
+                };
+            }).ToList();
+        }
+
+        private async Task EnsureWorkOrderEscalationsAsync(Property property, ApplicationUser actor)
+        {
+            var propertyId = property.Id;
+            var now = DateTime.UtcNow;
+
+            var overdueOrders = await _context.WorkOrders
+                .Include(wo => wo.Properties)
+                .Where(wo =>
+                    (wo.Status == "New" || wo.Status == "In Progress" || wo.Status == "Escalated") &&
+                    wo.DueDate < now &&
+                    wo.Properties.Any(p => p.PropertyId == propertyId))
+                .Select(wo => new
+                {
+                    wo.Id,
+                    wo.Issue,
+                    wo.Location,
+                    wo.DueDate
+                })
+                .AsNoTracking()
+                .ToListAsync();
+
+            if (!overdueOrders.Any())
+            {
+                return;
+            }
+
+            var titlesToMatch = overdueOrders
+                .Select(o => $"[Auto] Work Order Escalation #{o.Id}")
+                .ToList();
+
+            var existingTitles = await _context.PassOnLogs
+                .Where(log => log.Properties.Any(lp => lp.PropertyId == propertyId) && titlesToMatch.Contains(log.Title))
+                .Select(log => log.Title)
+                .ToListAsync();
+
+            var existingSet = new HashSet<string>(existingTitles, StringComparer.OrdinalIgnoreCase);
+            var newLogs = new List<PassOnLog>();
+
+            foreach (var order in overdueOrders)
+            {
+                var title = $"[Auto] Work Order Escalation #{order.Id}";
+                if (existingSet.Contains(title))
+                {
+                    continue;
+                }
+
+                var builder = new StringBuilder();
+                builder.AppendLine($"Work order #{order.Id} \"{order.Issue}\" is overdue.");
+                if (!string.IsNullOrWhiteSpace(order.Location))
+                {
+                    builder.AppendLine($"Location: {order.Location}");
+                }
+                builder.AppendLine($"Due: {order.DueDate:g}");
+
+                var log = new PassOnLog
+                {
+                    Title = title,
+                    Body = builder.ToString(),
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedById = actor.Id
+                };
+                log.Properties.Add(new PassOnLogProperty { PropertyId = propertyId });
+                newLogs.Add(log);
+            }
+
+            if (newLogs.Count > 0)
+            {
+                _context.PassOnLogs.AddRange(newLogs);
+                await _context.SaveChangesAsync();
+            }
         }
 
         private async Task PopulateLostFoundAsync(HomeIndexViewModel viewModel, int propertyId)
@@ -898,6 +991,108 @@ namespace hOps.web.Controllers
                     IsRead = log.CreatedById == currentUserId || log.Views.Any(v => v.ViewerId == currentUserId)
                 };
             }).ToList();
+        }
+
+        private async Task PopulateActivityFeedAsync(HomeIndexViewModel viewModel, int propertyId, string currentUserId)
+        {
+            var feedItems = new List<ActivityFeedItemViewModel>();
+
+            var bulletinPosts = await _context.BulletinPosts
+                .Where(post => post.PropertyId == propertyId)
+                .Include(post => post.CreatedBy)
+                .OrderByDescending(post => post.UpdatedAt ?? post.CreatedAt)
+                .Take(5)
+                .AsNoTracking()
+                .ToListAsync();
+
+            foreach (var post in bulletinPosts)
+            {
+                var author = post.CreatedBy != null ? BuildDisplayName(post.CreatedBy) : "Team Member";
+                feedItems.Add(new ActivityFeedItemViewModel
+                {
+                    ItemType = "bulletin",
+                    Title = "Bulletin Update",
+                    Preview = TruncatePreview(RichTextRenderer.ToPlainText(post.Content)),
+                    Meta = $"by {author}",
+                    BadgeText = "Bulletin",
+                    BadgeClass = "badge bg-primary",
+                    OccurredAt = post.UpdatedAt ?? post.CreatedAt,
+                    LinkUrl = $"{Url.Action(nameof(Index), "Home") ?? "/"}#bulletins",
+                    Avatar = UserAvatarHelper.BuildFromUser(post.CreatedBy, author, "sm")
+                });
+            }
+
+            foreach (var log in viewModel.PassOnLogs.Take(5))
+            {
+                feedItems.Add(new ActivityFeedItemViewModel
+                {
+                    ItemType = "passon",
+                    Title = log.Title,
+                    Preview = log.Preview,
+                    Meta = $"by {log.CreatorName}",
+                    BadgeText = "Pass On",
+                    BadgeClass = "badge bg-success text-white",
+                    OccurredAt = log.CreatedAt,
+                    LinkUrl = log.DetailUrl,
+                    CanReply = true,
+                    PassOnLogId = log.Id,
+                    ReplyReturnUrl = $"{Url.Action(nameof(Index), "Home") ?? "/"}#opsFeed",
+                    Avatar = log.CreatorAvatar
+                });
+            }
+
+            var activeWorkOrders = await _context.WorkOrderProperties
+                .Where(wp => wp.PropertyId == propertyId)
+                .Select(wp => wp.WorkOrder)
+                .Where(wo => wo.Status == "New" || wo.Status == "In Progress" || wo.Status == "Escalated")
+                .Include(wo => wo.CreatedBy)
+                .OrderByDescending(wo => wo.CreatedAt)
+                .Take(5)
+                .AsNoTracking()
+                .ToListAsync();
+
+            foreach (var order in activeWorkOrders)
+            {
+                feedItems.Add(new ActivityFeedItemViewModel
+                {
+                    ItemType = "workorder",
+                    Title = $"Work Order #{order.Id}",
+                    Preview = order.Issue,
+                    Meta = order.Location,
+                    BadgeText = order.Status,
+                    BadgeClass = "badge bg-secondary",
+                    OccurredAt = order.CreatedAt,
+                    LinkUrl = Url.Action("Edit", "WorkOrders", new { id = order.Id }),
+                    Avatar = UserAvatarHelper.BuildFromUser(order.CreatedBy, BuildDisplayName(order.CreatedBy), "sm")
+                });
+            }
+
+            var mentionAlerts = await _context.UserNotifications
+                .Where(n => n.UserId == currentUserId && n.Type == "mention")
+                .OrderByDescending(n => n.CreatedAt)
+                .Take(5)
+                .AsNoTracking()
+                .ToListAsync();
+
+            foreach (var alert in mentionAlerts)
+            {
+                feedItems.Add(new ActivityFeedItemViewModel
+                {
+                    ItemType = "mention",
+                    Title = alert.Title,
+                    Preview = alert.Content ?? string.Empty,
+                    Meta = "Mention",
+                    BadgeText = "Mention",
+                    BadgeClass = "badge bg-info text-dark",
+                    OccurredAt = alert.CreatedAt,
+                    LinkUrl = alert.LinkUrl
+                });
+            }
+
+            viewModel.ActivityFeed = feedItems
+                .OrderByDescending(item => item.OccurredAt)
+                .Take(12)
+                .ToList();
         }
 
         private async Task PopulatePackageLogAsync(HomeIndexViewModel viewModel, int propertyId)

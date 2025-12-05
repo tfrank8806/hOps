@@ -10,6 +10,7 @@ using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
 using hOps.web.ViewModels.WorkOrders;
+using hOps.web.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -1091,29 +1092,40 @@ namespace hOps.web.Controllers
             }
 
             var workOrders = await query.ToListAsync();
+            var now = DateTime.UtcNow;
 
-            var listItems = workOrders.Select(wo => new WorkOrderListItemViewModel
+            var listItems = workOrders.Select(wo =>
             {
-                Id = wo.Id,
-                Status = wo.Status,
-                StatusColor = WorkOrderStatusOptions.GetColor(wo.Status),
-                Location = wo.Location,
-                WorkOrderType = wo.WorkOrderType?.Name,
-                Issue = wo.Issue,
-                Details = wo.Details,
-                DueDate = wo.DueDate,
-                CreatedAt = wo.CreatedAt,
-                Department = wo.Department?.Name,
-                DepartmentColor = wo.Department?.Color,
-                Creator = wo.CreatedBy != null
-                    ? string.Join(" ", new[] { wo.CreatedBy.FirstName, wo.CreatedBy.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)))
-                    : null,
-                Properties = wo.Properties.Select(p => $"{p.Property.Name} ({p.Property.Code})").ToList(),
-                Attachments = wo.Attachments.Select(a => new WorkOrderAttachmentViewModel
+                var sla = WorkOrderSlaHelper.Calculate(wo.DueDate, now);
+                return new WorkOrderListItemViewModel
                 {
-                    FilePath = a.FilePath,
-                    FileName = string.IsNullOrWhiteSpace(a.OriginalFileName) ? Path.GetFileName(a.FilePath) : a.OriginalFileName
-                }).ToList()
+                    Id = wo.Id,
+                    Status = wo.Status,
+                    StatusColor = WorkOrderStatusOptions.GetColor(wo.Status),
+                    Location = wo.Location,
+                    WorkOrderType = wo.WorkOrderType?.Name,
+                    Issue = wo.Issue,
+                    Details = wo.Details,
+                    DueDate = wo.DueDate,
+                    CreatedAt = wo.CreatedAt,
+                    Department = wo.Department?.Name,
+                    DepartmentColor = wo.Department?.Color,
+                    Creator = wo.CreatedBy != null
+                        ? string.Join(" ", new[] { wo.CreatedBy.FirstName, wo.CreatedBy.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)))
+                        : null,
+                    PriorityLabel = sla.PriorityLabel,
+                    PriorityClass = sla.PriorityClass,
+                    SlaStatus = sla.SlaStatus,
+                    SlaStatusClass = sla.SlaStatusClass,
+                    SlaSummary = WorkOrderSlaHelper.BuildSummaryText(sla),
+                    IsOverdue = sla.IsOverdue,
+                    Properties = wo.Properties.Select(p => $"{p.Property.Name} ({p.Property.Code})").ToList(),
+                    Attachments = wo.Attachments.Select(a => new WorkOrderAttachmentViewModel
+                    {
+                        FilePath = a.FilePath,
+                        FileName = string.IsNullOrWhiteSpace(a.OriginalFileName) ? Path.GetFileName(a.FilePath) : a.OriginalFileName
+                    }).ToList()
+                };
             }).ToList();
 
             var departmentQuery = _context.Departments.AsQueryable();

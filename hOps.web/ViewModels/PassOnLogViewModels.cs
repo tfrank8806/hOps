@@ -146,6 +146,7 @@ namespace hOps.web.ViewModels
         [MaxLength(2000)]
         [Display(Name = "Comment")]
         public string Body { get; set; } = string.Empty;
+        public string? ReturnUrl { get; set; }
     }
 
     public class PassOnLogAttachmentViewModel

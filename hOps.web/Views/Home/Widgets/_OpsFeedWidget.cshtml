@@ -1,0 +1,73 @@
+@model hOps.web.ViewModels.Home.HomeIndexViewModel
+
+<div class="card shadow-sm h-100" id="opsFeed">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h2 class="h5 mb-0">Ops Feed</h2>
+        <a class="btn btn-sm btn-outline-primary" asp-controller="PassOnLogs" asp-action="Create">Post Update</a>
+    </div>
+    <div class="card-body">
+        @if (!Model.ActivityFeed.Any())
+        {
+            <p class="text-muted mb-0">No recent activity yet. Updates from bulletins, pass on logs, mentions, and work orders will appear here.</p>
+        }
+        else
+        {
+            <div class="ops-feed">
+                @foreach (var item in Model.ActivityFeed)
+                {
+                    <article class="ops-feed__item">
+                        <div class="ops-feed__avatar">
+                            @if (item.Avatar != null)
+                            {
+                                <partial name="_UserAvatar" model="item.Avatar" />
+                            }
+                            else
+                            {
+                                <span class="ops-feed__avatar-fallback">@item.Title?.FirstOrDefault()</span>
+                            }
+                        </div>
+                        <div class="ops-feed__body">
+                            <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+                                <div class="fw-semibold">@item.Title</div>
+                                @if (!string.IsNullOrWhiteSpace(item.BadgeText))
+                                {
+                                    var badgeClass = string.IsNullOrWhiteSpace(item.BadgeClass) ? "badge bg-secondary" : item.BadgeClass;
+                                    <span class="@badgeClass">@item.BadgeText</span>
+                                }
+                            </div>
+                            <div class="text-muted small">
+                                @TimeZoneService.ConvertToUserTime(item.OccurredAt).ToString("g")
+                                @if (!string.IsNullOrWhiteSpace(item.Meta))
+                                {
+                                    <span class="ms-1">· @item.Meta</span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(item.Preview))
+                            {
+                                <p class="mb-2 text-body-secondary ops-feed__preview">@item.Preview</p>
+                            }
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                @if (!string.IsNullOrWhiteSpace(item.LinkUrl))
+                                {
+                                    <a class="btn btn-sm btn-outline-primary" href="@item.LinkUrl">Open</a>
+                                }
+                            </div>
+                            @if (item.CanReply && item.PassOnLogId.HasValue)
+                            {
+                                <form method="post" asp-controller="PassOnLogs" asp-action="AddComment" class="ops-feed__reply-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="NewComment.LogId" value="@item.PassOnLogId" />
+                                    <input type="hidden" name="NewComment.ReturnUrl" value="@(item.ReplyReturnUrl ?? $"{Url.Action("Index", "Home") ?? "/"}#opsFeed")" />
+                                    <textarea class="form-control" name="NewComment.Body" rows="2" maxlength="2000" placeholder="@item.ReplyPlaceholder" required></textarea>
+                                    <div class="text-end mt-2">
+                                        <button type="submit" class="btn btn-sm btn-primary">Reply</button>
+                                    </div>
+                                </form>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </div>
+</div>

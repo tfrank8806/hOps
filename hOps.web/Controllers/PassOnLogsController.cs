@@ -745,6 +745,7 @@ namespace hOps.web.Controllers
                 var (nextLogId, previousLogId) = await GetNeighborLogIdsAsync(log, accessiblePropertyIds);
                 var modelWithErrors = BuildDetailsViewModel(log, currentUser.Id, nextLogId, previousLogId);
                 modelWithErrors.NewComment = input;
+                modelWithErrors.NewComment.ReturnUrl = input.ReturnUrl;
                 return View("Details", modelWithErrors);
             }
 
@@ -768,6 +769,11 @@ namespace hOps.web.Controllers
                 $"Pass On Log Comment: {log.Title}",
                 link,
                 comment.Body);
+
+            if (!string.IsNullOrWhiteSpace(input.ReturnUrl) && Url.IsLocalUrl(input.ReturnUrl))
+            {
+                return Redirect(input.ReturnUrl);
+            }
 
             return RedirectToAction(nameof(Details), new { id = log.Id });
         }

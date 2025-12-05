@@ -300,6 +300,10 @@
             cursor: default;
         }
 
+        .workorder-row--overdue {
+            background-color: rgba(220, 53, 69, 0.04);
+        }
+
         .workorder-attachment-img {
             width: 100%;
             height: auto;
@@ -598,11 +602,15 @@
                                         createdAtText = createdLocal.ToString("MM-dd-yy h:mm tt"),
                                         creator = string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator,
                                         properties = order.Properties,
-                                        attachments = attachmentsPayload
+                                        attachments = attachmentsPayload,
+                                        priority = order.PriorityLabel,
+                                        priorityClass = order.PriorityClass,
+                                        slaStatus = order.SlaStatus,
+                                        slaSummary = order.SlaSummary
                                     };
                                     var workOrderPayloadJson = JsonSerializer.Serialize(workOrderPayload);
 
-                <tr class="workorder-row @(isEditingRow ? "table-active" : string.Empty)"
+                <tr class="workorder-row @(isEditingRow ? "table-active" : string.Empty) @(order.IsOverdue ? "workorder-row--overdue" : string.Empty)"
                     style="border-left: 4px solid @order.StatusColor;"
                     data-workorder="@workOrderPayloadJson">
                     <td class="col-actions text-center">
@@ -624,7 +632,10 @@
                         </div>
                     </td>
                     <td class="col-status">
-                        <span class="badge" style="background-color:@order.StatusColor;">@statusDisplay</span>
+                        <div class="d-flex flex-column gap-1">
+                            <span class="badge" style="background-color:@order.StatusColor;">@statusDisplay</span>
+                            <span class="@order.PriorityClass">@order.PriorityLabel</span>
+                        </div>
                     </td>
                     <td class="col-location">
                         <div class="fw-semibold workorder-location">@order.Location</div>
@@ -647,7 +658,10 @@
                     <td class="col-issue">
                         <div class="workorder-issue">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Issue))</div>
                     </td>
-                    <td class="col-due @(isPastDue ? "fw-bold text-danger" : string.Empty)">@order.DueDate.ToString("MM-dd-yy")</td>
+                    <td class="col-due @(isPastDue ? "fw-bold text-danger" : string.Empty)">
+                        @order.DueDate.ToString("MM-dd-yy")
+                        <div class="@order.SlaStatusClass">@order.SlaSummary</div>
+                    </td>
                     <td class="col-created">@createdLocal.ToString("MM-dd-yy")</td>
                     <td class="col-attachments text-center">
                         @if (order.Attachments.Any())
