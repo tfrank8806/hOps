@@ -163,6 +163,7 @@ namespace hOps.web.ViewModels.Home
     {
         public string WidgetId { get; set; } = string.Empty;
         public HomeWidgetSize Size { get; set; } = HomeWidgetSize.Third;
+        public int? CustomSpan { get; set; }
     }
 
     public enum HomeWidgetSize

@@ -69,7 +69,7 @@
             var forceFullWidth = string.Equals(widgetId, HomeWidgetIds.HotelLayout, StringComparison.OrdinalIgnoreCase);
             var effectiveSize = forceFullWidth ? HomeWidgetSize.Full : widget.Size;
             var sizeValue = effectiveSize.ToString().ToLowerInvariant();
-            var gridSpan = effectiveSize switch
+            var defaultSpan = effectiveSize switch
             {
                 HomeWidgetSize.Full => 12,
                 HomeWidgetSize.Half => 6,
@@ -77,8 +77,17 @@
                 HomeWidgetSize.Quarter => 3,
                 _ => 4
             };
-            var sizeLabel = GetSizeLabel(effectiveSize);
-            <div class="home-widget" data-widget-id="@widget.WidgetId" data-widget-size="@sizeValue" data-grid-span="@gridSpan" style="grid-column: span @gridSpan;" draggable="false">
+            var storedSpan = widget.CustomSpan.HasValue ? Math.Clamp(widget.CustomSpan.Value, 1, 12) : (int?)null;
+            var appliedSpan = forceFullWidth ? 12 : storedSpan ?? defaultSpan;
+            var showCustomLabel = !forceFullWidth && storedSpan.HasValue && appliedSpan != defaultSpan;
+            var sizeLabel = showCustomLabel ? $"Custom ({appliedSpan}/12)" : GetSizeLabel(effectiveSize);
+            <div class="home-widget"
+                 data-widget-id="@widget.WidgetId"
+                 data-widget-size="@sizeValue"
+                 data-grid-span="@appliedSpan"
+                 @(storedSpan.HasValue ? $"data-custom-span=\"{appliedSpan}\"" : string.Empty)
+                 style="grid-column: span @appliedSpan;"
+                 draggable="false">
                 <div class="home-widget__editor d-flex align-items-center gap-2">
                     <span class="home-widget__drag-handle" role="button" tabindex="0" aria-label="Drag widget" title="Drag widget">⋮⋮</span>
                     <span class="home-widget__size-label" data-size-label>@sizeLabel</span>
@@ -205,6 +214,40 @@
             );
         }
 
+        const MIN_COLUMNS = 1;
+        const MAX_COLUMNS = 12;
+        const DEFAULT_SPAN = 4;
+
+        const normalizeSizeKey = (key) => (key || 'third').toLowerCase();
+        const clampSpan = (value) => {
+            const numeric = Number(value);
+            if (!Number.isFinite(numeric)) {
+                return DEFAULT_SPAN;
+            }
+            return Math.min(MAX_COLUMNS, Math.max(MIN_COLUMNS, numeric));
+        };
+        const getDefaultSpanForSize = (sizeKey) => {
+            const normalized = normalizeSizeKey(sizeKey);
+            const span = Number(sizeOptions[normalized]);
+            if (!Number.isFinite(span)) {
+                return DEFAULT_SPAN;
+            }
+            return clampSpan(span);
+        };
+        const setSizeLabelText = (widget, span) => {
+            const label = widget.querySelector('[data-size-label]');
+            if (!label) {
+                return;
+            }
+            const sizeKey = normalizeSizeKey(widget.dataset.widgetSize);
+            const defaultSpan = getDefaultSpanForSize(sizeKey);
+            if (span === defaultSpan) {
+                label.textContent = sizeLabelMap[sizeKey] ?? `~${span} cols`;
+            } else {
+                label.textContent = `Custom (${span}/12)`;
+            }
+        };
+
         let isEditing = false;
         let originalLayout = (() => {
             try {
@@ -240,9 +283,11 @@
         const getCurrentLayout = () => {
             const layout = [];
             grid.querySelectorAll('.home-widget').forEach(widget => {
+                const spanValue = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
                 layout.push({
                     widgetId: widget.dataset.widgetId,
-                    size: widget.dataset.widgetSize
+                    size: widget.dataset.widgetSize,
+                    customSpan: clampSpan(spanValue)
                 });
             });
             return layout;
@@ -259,23 +304,29 @@
                 if (!widget) {
                     return;
                 }
-                updateWidgetSize(widget, entry.size);
+                updateWidgetSize(widget, entry.size ?? widget.dataset.widgetSize ?? 'third', typeof entry.customSpan === 'number' ? entry.customSpan : undefined);
                 grid.appendChild(widget);
             });
         };
 
-        const updateWidgetSize = (widget, sizeKey) => {
+        const updateWidgetSize = (widget, sizeKey, overrideSpan) => {
             if (!widget) {
                 return;
             }
-            const span = Number(sizeOptions[sizeKey]) || 4;
-            widget.dataset.widgetSize = sizeKey;
-            widget.dataset.gridSpan = span;
-            widget.style.gridColumn = `span ${span}`;
-            const label = widget.querySelector('[data-size-label]');
-            if (label) {
-                label.textContent = sizeLabelMap[sizeKey] ?? `~${span} cols`;
+            const normalized = normalizeSizeKey(sizeKey);
+            widget.dataset.widgetSize = normalized;
+            const defaultSpan = getDefaultSpanForSize(normalized);
+            const spanToApply = typeof overrideSpan === 'number' && Number.isFinite(overrideSpan)
+                ? clampSpan(overrideSpan)
+                : defaultSpan;
+            if (spanToApply === defaultSpan) {
+                delete widget.dataset.customSpan;
+            } else {
+                widget.dataset.customSpan = spanToApply;
             }
+            widget.dataset.gridSpan = spanToApply;
+            widget.style.gridColumn = `span ${spanToApply}`;
+            setSizeLabelText(widget, spanToApply);
         };
 
         let dragSource = null;
@@ -302,16 +353,17 @@
 
             pointerDownEvent.preventDefault();
             const startX = pointerDownEvent.clientX;
-            const initialSpan = Number(widget.dataset.gridSpan || 4);
+            const initialSpan = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
             const gridRect = grid.getBoundingClientRect();
             const columnWidth = gridRect.width / 12;
 
             const handlePointerMove = (event) => {
                 const delta = event.clientX - startX;
                 const rawSpan = initialSpan + (delta / columnWidth);
-                const constrained = Math.min(12, Math.max(3, rawSpan));
-                const sizeKey = getNearestSizeKey(constrained);
-                updateWidgetSize(widget, sizeKey);
+                const constrained = clampSpan(rawSpan);
+                const snapped = clampSpan(Math.round(constrained));
+                const sizeKey = getNearestSizeKey(snapped);
+                updateWidgetSize(widget, sizeKey, snapped);
             };
 
             const stopResize = () => {

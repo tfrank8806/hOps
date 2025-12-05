@@ -180,6 +180,22 @@ namespace hOps.web.Controllers
                     parsedSize = definition.DefaultSize;
                 }
 
+                var requestedSpan = widget.CustomSpan;
+                int? normalizedSpan = null;
+                if (requestedSpan.HasValue)
+                {
+                    normalizedSpan = ClampSpan(requestedSpan.Value);
+                }
+
+                if (string.Equals(widget.WidgetId, HomeWidgetIds.HotelLayout, StringComparison.OrdinalIgnoreCase))
+                {
+                    normalizedSpan = GetSpanForSize(HomeWidgetSize.Full);
+                }
+                else if (normalizedSpan.HasValue && normalizedSpan.Value == GetSpanForSize(parsedSize))
+                {
+                    normalizedSpan = null;
+                }
+
                 if (!seen.Add(widget.WidgetId))
                 {
                     continue;
@@ -188,7 +204,8 @@ namespace hOps.web.Controllers
                 normalized.Add(new HomeWidgetLayoutEntry
                 {
                     WidgetId = widget.WidgetId,
-                    Size = parsedSize
+                    Size = parsedSize,
+                    CustomSpan = normalizedSpan
                 });
             }
 
@@ -1220,10 +1237,21 @@ namespace hOps.web.Controllers
 
                     if (seen.Add(entry.WidgetId))
                     {
+                        var sanitizedSpan = entry.CustomSpan.HasValue ? ClampSpan(entry.CustomSpan.Value) : (int?)null;
+                        if (string.Equals(entry.WidgetId, HomeWidgetIds.HotelLayout, StringComparison.OrdinalIgnoreCase))
+                        {
+                            sanitizedSpan = GetSpanForSize(HomeWidgetSize.Full);
+                        }
+                        else if (sanitizedSpan.HasValue && sanitizedSpan.Value == GetSpanForSize(entry.Size))
+                        {
+                            sanitizedSpan = null;
+                        }
+
                         finalLayout.Add(new HomeWidgetLayoutEntry
                         {
                             WidgetId = entry.WidgetId,
-                            Size = entry.Size
+                            Size = entry.Size,
+                            CustomSpan = sanitizedSpan
                         });
                     }
                 }
@@ -1244,6 +1272,17 @@ namespace hOps.web.Controllers
             return finalLayout;
         }
 
+        private static int GetSpanForSize(HomeWidgetSize size) => size switch
+        {
+            HomeWidgetSize.Full => 12,
+            HomeWidgetSize.Half => 6,
+            HomeWidgetSize.Third => 4,
+            HomeWidgetSize.Quarter => 3,
+            _ => 4
+        };
+
+        private static int ClampSpan(int span) => Math.Clamp(span, 1, 12);
+
         public class UpdateHomeLayoutRequest
         {
             public List<UpdateHomeLayoutItem> Widgets { get; set; } = new();
@@ -1253,6 +1292,7 @@ namespace hOps.web.Controllers
         {
             public string WidgetId { get; set; } = string.Empty;
             public string Size { get; set; } = string.Empty;
+            public int? CustomSpan { get; set; }
         }
 
         public class ManagerAnnouncementForm
