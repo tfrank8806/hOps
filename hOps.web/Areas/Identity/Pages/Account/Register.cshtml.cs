@@ -17,6 +17,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+using hOps.web.Options;
+using hOps.web.Services;
+using Microsoft.Extensions.Options;
 
 namespace hOps.web.Areas.Identity.Pages.Account
 {
@@ -29,6 +32,8 @@ namespace hOps.web.Areas.Identity.Pages.Account
         private readonly ILogger<RegisterModel> _logger;
         private readonly IEmailSender _emailSender;
         private readonly ApplicationDbContext _dbContext;
+        private readonly ICaptchaValidator _captchaValidator;
+        private readonly CaptchaOptions _captchaOptions;
 
         public RegisterModel(
             UserManager<ApplicationUser> userManager,
@@ -36,7 +41,9 @@ namespace hOps.web.Areas.Identity.Pages.Account
             SignInManager<ApplicationUser> signInManager,
             ILogger<RegisterModel> logger,
             IEmailSender emailSender,
-            ApplicationDbContext dbContext)
+            ApplicationDbContext dbContext,
+            ICaptchaValidator captchaValidator,
+            IOptions<CaptchaOptions> captchaOptions)
         {
             _userManager = userManager;
             _userStore = userStore;
@@ -45,6 +52,8 @@ namespace hOps.web.Areas.Identity.Pages.Account
             _logger = logger;
             _emailSender = emailSender;
             _dbContext = dbContext;
+            _captchaValidator = captchaValidator;
+            _captchaOptions = captchaOptions.Value ?? new CaptchaOptions();
         }
 
         [BindProperty]
@@ -52,6 +61,8 @@ namespace hOps.web.Areas.Identity.Pages.Account
 
         public string ReturnUrl { get; set; }
         public IList<AuthenticationScheme> ExternalLogins { get; set; }
+        public bool IsCaptchaEnabled { get; private set; }
+        public string CaptchaSiteKey { get; private set; } = string.Empty;
 
         public class InputModel
         {
@@ -82,12 +93,36 @@ namespace hOps.web.Areas.Identity.Pages.Account
         {
             ReturnUrl = returnUrl;
             ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
+            RefreshCaptchaSettings();
         }
 
         public async Task<IActionResult> OnPostAsync(string returnUrl = null)
         {
             ReturnUrl = returnUrl ?? Url.Content("~/");
             ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
+            RefreshCaptchaSettings();
+
+            if (IsCaptchaEnabled)
+            {
+                var captchaToken = Request.Form["g-recaptcha-response"].ToString();
+                if (string.IsNullOrWhiteSpace(captchaToken))
+                {
+                    ModelState.AddModelError(string.Empty, "Please complete the CAPTCHA challenge.");
+                }
+                else
+                {
+                    var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+                    var captchaValid = await _captchaValidator.ValidateAsync(
+                        captchaToken,
+                        remoteIp,
+                        HttpContext.RequestAborted);
+
+                    if (!captchaValid)
+                    {
+                        ModelState.AddModelError(string.Empty, "CAPTCHA validation failed. Please try again.");
+                    }
+                }
+            }
 
             if (ModelState.IsValid)
             {
@@ -157,6 +192,15 @@ Please <a href='{encodedApproveUrl}'>review pending requests</a>.
             }
 
             return Page();
+        }
+
+        private void RefreshCaptchaSettings()
+        {
+            var hasKeys = !string.IsNullOrWhiteSpace(_captchaOptions.SiteKey)
+                && !string.IsNullOrWhiteSpace(_captchaOptions.SecretKey);
+
+            IsCaptchaEnabled = _captchaOptions.Enabled && hasKeys;
+            CaptchaSiteKey = _captchaOptions.SiteKey ?? string.Empty;
         }
 
         private IUserEmailStore<ApplicationUser> GetEmailStore()

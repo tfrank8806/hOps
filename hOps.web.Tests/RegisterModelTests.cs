@@ -5,6 +5,8 @@ using hOps.web.Areas.Identity.Pages.Account;
 using hOps.web.Controllers;
 using hOps.web.Data;
 using hOps.web.Models;
+using hOps.web.Options;
+using hOps.web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -16,6 +18,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -82,6 +85,17 @@ public class RegisterModelTests
             .Returns(Task.CompletedTask);
 
         var loggerMock = new Mock<ILogger<RegisterModel>>();
+        var captchaValidatorMock = new Mock<ICaptchaValidator>();
+        captchaValidatorMock
+            .Setup(v => v.ValidateAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var captchaOptions = Microsoft.Extensions.Options.Options.Create(new CaptchaOptions
+        {
+            Enabled = false,
+            SiteKey = string.Empty,
+            SecretKey = string.Empty
+        });
 
         var urlHelperMock = new Mock<IUrlHelper>(MockBehavior.Strict);
         var encodedUrlTarget = "https://example.com/Admin/AccessRequests?token=abc&value=1";
@@ -105,7 +119,9 @@ public class RegisterModelTests
             signInManagerMock.Object,
             loggerMock.Object,
             emailSenderMock.Object,
-            dbContext)
+            dbContext,
+            captchaValidatorMock.Object,
+            captchaOptions)
         {
             PageContext = pageContext,
             Url = urlHelperMock.Object,
@@ -194,6 +210,17 @@ public class RegisterModelTests
             .Returns(Task.CompletedTask);
 
         var loggerMock = new Mock<ILogger<RegisterModel>>();
+        var captchaValidatorMock = new Mock<ICaptchaValidator>();
+        captchaValidatorMock
+            .Setup(v => v.ValidateAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var captchaOptions = Microsoft.Extensions.Options.Options.Create(new CaptchaOptions
+        {
+            Enabled = false,
+            SiteKey = string.Empty,
+            SecretKey = string.Empty
+        });
 
         var urlHelperMock = new Mock<IUrlHelper>(MockBehavior.Strict);
         var encodedUrlTarget = "https://example.com/Admin/AccessRequests?token=abc&value=1";
@@ -217,7 +244,9 @@ public class RegisterModelTests
             signInManagerMock.Object,
             loggerMock.Object,
             emailSenderMock.Object,
-            dbContext)
+            dbContext,
+            captchaValidatorMock.Object,
+            captchaOptions)
         {
             PageContext = pageContext,
             Url = urlHelperMock.Object,

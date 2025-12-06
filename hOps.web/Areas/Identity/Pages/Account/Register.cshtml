@@ -48,7 +48,22 @@
                 once your account is approved.
             </p>
 
+            @if (Model.IsCaptchaEnabled)
+            {
+                <div class="form-group mb-3">
+                    <div class="g-recaptcha" data-sitekey="@Model.CaptchaSiteKey"></div>
+                </div>
+            }
+
             <button type="submit" class="btn btn-primary">Submit Request</button>
         </form>
     </div>
 </div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    @if (Model.IsCaptchaEnabled)
+    {
+        <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    }
+}

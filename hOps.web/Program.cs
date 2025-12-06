@@ -112,7 +112,9 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 builder.Services.AddSignalR();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Authentication:Jwt"));
+builder.Services.Configure<CaptchaOptions>(builder.Configuration.GetSection("Captcha"));
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
+builder.Services.AddHttpClient<ICaptchaValidator, GoogleRecaptchaValidator>();
 
 var jwtSettings = builder.Configuration.GetSection("Authentication:Jwt").Get<JwtOptions>() ?? new JwtOptions();
 var jwtSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SigningKey));
