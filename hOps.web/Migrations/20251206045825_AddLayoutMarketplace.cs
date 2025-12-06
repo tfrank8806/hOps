@@ -1,14 +1,20 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace hOps.web.Migrations
 {
+    /// <inheritdoc />
     public partial class AddLayoutMarketplace : Migration
     {
+        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropIndex(
+                name: "IX_UserHomeLayouts_UserId",
+                table: "UserHomeLayouts");
+
             migrationBuilder.AddColumn<bool>(
                 name: "IsDefault",
                 table: "UserHomeLayouts",
@@ -52,6 +58,7 @@ namespace hOps.web.Migrations
                 unique: true);
         }
 
+        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
@@ -68,6 +75,12 @@ namespace hOps.web.Migrations
             migrationBuilder.DropColumn(
                 name: "PersonaKey",
                 table: "UserHomeLayouts");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserHomeLayouts_UserId",
+                table: "UserHomeLayouts",
+                column: "UserId",
+                unique: true);
         }
     }
 }
