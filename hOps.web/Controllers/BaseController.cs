@@ -11,6 +11,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 
 public class BaseController : Controller
 {
@@ -25,65 +28,100 @@ public class BaseController : Controller
 
     public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        ViewBag.UnreadDirectMessageCount = 0;
-        ViewBag.LatestDirectMessageParticipant = null;
-        ViewBag.LatestDirectMessageBody = null;
-        ViewBag.LatestDirectMessageSentAt = null;
-        ViewBag.LatestDirectMessageConversationId = null;
+        InitializeViewBagDefaults();
 
-        var user = await _userManager.GetUserAsync(User);
-        if (user != null)
+        var httpContext = context.HttpContext;
+
+        try
         {
-            var props = await _context.UserPropertyAccesses
-                .Where(upa => upa.ApplicationUserId == user.Id)
-                .Include(upa => upa.Property)
-                .Select(upa => upa.Property)
-                .ToListAsync();
-
-            var userProperties = props
-                .Where(p => p != null)
-                .Select(p => p!)
-                .ToList();
-
-            ViewBag.UserProperties = userProperties;
-            ViewBag.CurrentUserId = user.Id;
-
-            int? currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
-            Property? currentProperty = currentPropertyId.HasValue
-                ? userProperties.FirstOrDefault(p => p.Id == currentPropertyId.Value)
-                : null;
-
-            if (currentProperty == null && user.DefaultPropertyId.HasValue)
+            var user = await _userManager.GetUserAsync(User);
+            if (user != null)
             {
-                currentProperty = userProperties.FirstOrDefault(p => p.Id == user.DefaultPropertyId.Value);
-                if (currentProperty != null)
+                var props = await _context.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == user.Id)
+                    .Include(upa => upa.Property)
+                    .Select(upa => upa.Property)
+                    .ToListAsync();
+
+                var userProperties = props
+                    .Where(p => p != null)
+                    .Select(p => p!)
+                    .ToList();
+
+                ViewBag.UserProperties = userProperties;
+                ViewBag.CurrentUserId = user.Id;
+
+                int? currentPropertyId = httpContext.Session.GetInt32("CurrentPropertyId");
+                Property? currentProperty = currentPropertyId.HasValue
+                    ? userProperties.FirstOrDefault(p => p.Id == currentPropertyId.Value)
+                    : null;
+
+                if (currentProperty == null && user.DefaultPropertyId.HasValue)
                 {
-                    HttpContext.Session.SetInt32("CurrentPropertyId", currentProperty.Id);
+                    currentProperty = userProperties.FirstOrDefault(p => p.Id == user.DefaultPropertyId.Value);
+                    if (currentProperty != null)
+                    {
+                        httpContext.Session.SetInt32("CurrentPropertyId", currentProperty.Id);
+                    }
+                }
+
+                if (currentProperty == null && userProperties.Any())
+                {
+                    currentProperty = userProperties.First();
+                    httpContext.Session.SetInt32("CurrentPropertyId", currentProperty.Id);
+                }
+                else if (currentProperty == null)
+                {
+                    httpContext.Session.Remove("CurrentPropertyId");
+                }
+
+                ViewBag.CurrentProperty = currentProperty;
+
+                var normalizedTimeZoneId = DefaultTimeZoneProvider.NormalizeForStorage(user.TimeZoneId);
+                httpContext.Items["UserTimeZoneId"] = normalizedTimeZoneId;
+                httpContext.Session.SetString("UserTimeZoneId", normalizedTimeZoneId);
+
+                var shouldLoadSidebarChrome = ShouldLoadSidebarChrome(httpContext);
+
+                if (shouldLoadSidebarChrome)
+                {
+                    await PopulateDirectMessageBadgeSafelyAsync(user, httpContext);
+                    await BuildToDoSidebarSafelyAsync(user, userProperties, httpContext);
                 }
             }
-
-            if (currentProperty == null && userProperties.Any())
-            {
-                currentProperty = userProperties.First();
-                HttpContext.Session.SetInt32("CurrentPropertyId", currentProperty.Id);
-            }
-            else if (currentProperty == null)
-            {
-                HttpContext.Session.Remove("CurrentPropertyId");
-            }
-
-            ViewBag.CurrentProperty = currentProperty;
-
-            var normalizedTimeZoneId = DefaultTimeZoneProvider.NormalizeForStorage(user.TimeZoneId);
-            HttpContext.Items["UserTimeZoneId"] = normalizedTimeZoneId;
-            HttpContext.Session.SetString("UserTimeZoneId", normalizedTimeZoneId);
-
-            await PopulateDirectMessageBadgeAsync(user);
-
-            ViewBag.ToDoSidebarData = await BuildToDoSidebarAsync(user, userProperties);
+        }
+        catch (Exception ex)
+        {
+            LogLayoutError(httpContext, ex, "Failed to prepare shared layout state for {Path}", httpContext?.Request.Path.Value ?? "(unknown)");
         }
 
         await next();
+    }
+
+    private async Task PopulateDirectMessageBadgeSafelyAsync(ApplicationUser user, HttpContext httpContext)
+    {
+        try
+        {
+            await PopulateDirectMessageBadgeAsync(user);
+        }
+        catch (Exception ex)
+        {
+            LogLayoutError(httpContext, ex, "Unable to populate direct message badge for user {UserId}", user.Id);
+            InitializeDirectMessageDefaults();
+        }
+    }
+
+    private async Task BuildToDoSidebarSafelyAsync(ApplicationUser user, List<Property> userProperties, HttpContext httpContext)
+    {
+        try
+        {
+            ViewBag.ToDoSidebarData = await BuildToDoSidebarAsync(user, userProperties);
+        }
+        catch (Exception ex)
+        {
+            LogLayoutError(httpContext, ex, "Unable to build to-do sidebar for user {UserId}", user.Id);
+            ViewBag.ToDoSidebarData = new ToDoSidebarViewModel();
+        }
     }
 
         protected async Task PopulateDirectMessageBadgeAsync(ApplicationUser user)
@@ -256,6 +294,63 @@ public class BaseController : Controller
             .ToList();
 
         return model;
+    }
+
+    private void InitializeViewBagDefaults()
+    {
+        InitializeDirectMessageDefaults();
+        ViewBag.ToDoSidebarData = new ToDoSidebarViewModel();
+    }
+
+    private void InitializeDirectMessageDefaults()
+    {
+        ViewBag.UnreadDirectMessageCount = 0;
+        ViewBag.UnreadAlertCount = 0;
+        ViewBag.UnreadMessageCenterCount = 0;
+        ViewBag.LatestDirectMessageParticipant = null;
+        ViewBag.LatestDirectMessageBody = null;
+        ViewBag.LatestDirectMessageSentAt = null;
+        ViewBag.LatestDirectMessageConversationId = null;
+    }
+
+    private static bool ShouldLoadSidebarChrome(HttpContext? httpContext)
+    {
+        if (httpContext == null)
+        {
+            return false;
+        }
+
+        if (httpContext.Request.Headers.TryGetValue("X-Requested-With", out var requestedWith) &&
+            requestedWith.Any(value => value.Equals("XMLHttpRequest", StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        var accept = httpContext.Request.Headers["Accept"];
+        if (!StringValues.IsNullOrEmpty(accept))
+        {
+            var acceptsHtml = accept.Any(value =>
+                value != null &&
+                value.IndexOf("text/html", StringComparison.OrdinalIgnoreCase) >= 0);
+
+            if (!acceptsHtml)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void LogLayoutError(HttpContext? httpContext, Exception exception, string message, params object[] args)
+    {
+        if (httpContext == null)
+        {
+            return;
+        }
+
+        var logger = httpContext.RequestServices.GetService<ILogger<BaseController>>();
+        logger?.LogError(exception, message, args);
     }
 
     protected async Task<MessagingAccessContext> GetMessagingAccessContextAsync(ApplicationUser user)
