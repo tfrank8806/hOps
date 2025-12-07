@@ -159,13 +159,15 @@ namespace hOps.web.Areas.Identity.Pages.Account
                 var hasher = new PasswordHasher<ApplicationUser>();
                 var hashedPassword = hasher.HashPassword(new ApplicationUser(), "TempPassword@123");
 
+                var normalizedPropertyCode = Input.PropertyCode?.Trim();
+
                 var request = new UserAccessRequest
                 {
                     FirstName = Input.FirstName,
                     LastName = Input.LastName,
                     Email = Input.Email,
                     MobilePhone = Input.MobilePhone,
-                    PropertyCode = Input.PropertyCode,
+                    PropertyCode = normalizedPropertyCode ?? Input.PropertyCode,
                     PasswordHash = hashedPassword,
                     RequestedAt = DateTime.UtcNow,
                     IsApproved = false,
@@ -177,30 +179,42 @@ namespace hOps.web.Areas.Identity.Pages.Account
 
                 _logger.LogInformation("Access request submitted for approval.");
 
-                // Send email to all managers/admins
-                var adminRoleIds = _dbContext.Roles
-                    .Where(r => r.Name == "Manager" || r.Name == "Admin")
-                    .Select(r => r.Id)
-                    .ToList();
+                var (managerUsers, propertyFound) = await GetManagersForPropertyCodeAsync(normalizedPropertyCode);
+                if (!propertyFound && !string.IsNullOrWhiteSpace(normalizedPropertyCode))
+                {
+                    _logger.LogWarning("No property found for code {PropertyCode}. Managers will not be notified for this request.", normalizedPropertyCode);
+                }
 
-                var managerUsers = await (from ur in _dbContext.UserRoles
-                                          join u in _dbContext.Users on ur.UserId equals u.Id
-                                          where adminRoleIds.Contains(ur.RoleId)
-                                          select u).ToListAsync();
+                var adminUsers = await GetRoleMembersAsync("Admin");
 
-                foreach (var mgr in managerUsers)
+                _logger.LogInformation("Routing access request for property {PropertyCode}: {AdminCount} admins, {ManagerCount} managers.", request.PropertyCode ?? string.Empty, adminUsers.Count, managerUsers.Count);
+
+                var recipients = new Dictionary<string, ApplicationUser>(StringComparer.OrdinalIgnoreCase);
+                foreach (var admin in adminUsers)
+                {
+                    recipients.TryAdd(admin.Id, admin);
+                }
+
+                foreach (var manager in managerUsers)
+                {
+                    recipients.TryAdd(manager.Id, manager);
+                }
+
+                foreach (var recipient in recipients.Values)
                 {
                     var approveUrl = Url.Action(nameof(AdminController.AccessRequests), "Admin", null, Request.Scheme);
                     if (string.IsNullOrEmpty(approveUrl))
                     {
-                        _logger.LogWarning("Unable to generate approval URL for user {ManagerId}. Email not sent.", mgr.Id);
+                        _logger.LogWarning("Unable to generate approval URL for user {UserId}. Email not sent.", recipient.Id);
                         continue;
                     }
 
+                    _logger.LogInformation("Dispatching access request email to {RecipientId} ({RecipientEmail}).", recipient.Id, recipient.Email ?? "null");
+
                     var encoder = HtmlEncoder.Default;
-                    var managerDisplayName = encoder.Encode(string.IsNullOrWhiteSpace(mgr.UserName)
-                        ? (mgr.Email ?? "Manager")
-                        : mgr.UserName);
+                    var managerDisplayName = encoder.Encode(string.IsNullOrWhiteSpace(recipient.UserName)
+                        ? (recipient.Email ?? "Manager")
+                        : recipient.UserName);
                     var requestFirstName = encoder.Encode(request.FirstName ?? string.Empty);
                     var requestLastName = encoder.Encode(request.LastName ?? string.Empty);
                     var requestEmail = encoder.Encode(request.Email ?? string.Empty);
@@ -215,7 +229,7 @@ Email: {requestEmail}<br/>
 Property Code: {requestPropertyCode}<br/><br/>
 Please <a href='{encodedApproveUrl}'>review pending requests</a>.
 ";
-                    await _emailSender.SendEmailAsync(mgr.Email, "New Access Request", message);
+                    await _emailSender.SendEmailAsync(recipient.Email, "New Access Request", message);
                 }
 
                 return RedirectToPage("./RegisterConfirmation", new { email = Input.Email });
@@ -371,6 +385,63 @@ Please <a href='{encodedApproveUrl}'>review pending requests</a>.
                 throw new InvalidOperationException("The default UI requires a user store with email support.");
             }
             return (IUserEmailStore<ApplicationUser>)_userStore;
+        }
+
+        private async Task<List<ApplicationUser>> GetRoleMembersAsync(string roleName)
+        {
+            var roleIds = await _dbContext.Roles
+                .Where(r => r.Name == roleName)
+                .Select(r => r.Id)
+                .ToListAsync();
+
+            if (roleIds.Count == 0)
+            {
+                return new List<ApplicationUser>();
+            }
+
+            return await (from ur in _dbContext.UserRoles
+                          join u in _dbContext.Users on ur.UserId equals u.Id
+                          where roleIds.Contains(ur.RoleId)
+                          select u).ToListAsync();
+        }
+
+        private async Task<(List<ApplicationUser> Managers, bool PropertyFound)> GetManagersForPropertyCodeAsync(string propertyCode)
+        {
+            if (string.IsNullOrWhiteSpace(propertyCode))
+            {
+                return (new List<ApplicationUser>(), false);
+            }
+
+            var normalizedCode = propertyCode.Trim();
+            var property = await _dbContext.Properties
+                .AsNoTracking()
+                .Where(p => p.Code == normalizedCode)
+                .Select(p => new { p.Id })
+                .FirstOrDefaultAsync();
+
+            if (property == null)
+            {
+                return (new List<ApplicationUser>(), false);
+            }
+
+            var managerRoleIds = await _dbContext.Roles
+                .Where(r => r.Name == "Manager")
+                .Select(r => r.Id)
+                .ToListAsync();
+
+            if (managerRoleIds.Count == 0)
+            {
+                return (new List<ApplicationUser>(), true);
+            }
+
+            var managers = await (from ur in _dbContext.UserRoles
+                                  join u in _dbContext.Users on ur.UserId equals u.Id
+                                  join access in _dbContext.UserPropertyAccesses on u.Id equals access.ApplicationUserId
+                                  where managerRoleIds.Contains(ur.RoleId)
+                                        && access.PropertyId == property.Id
+                                  select u).ToListAsync();
+
+            return (managers, true);
         }
     }
 }
