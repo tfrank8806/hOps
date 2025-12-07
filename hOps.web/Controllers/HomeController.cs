@@ -1104,7 +1104,6 @@ namespace hOps.web.Controllers
                 .Where(wo => wo.Properties.Any(wp => wp.PropertyId == propertyId))
                 .OrderByDescending(wo => wo.CreatedAt)
                 .Take(5)
-                .AsNoTracking()
                 .Select(wo => new
                 {
                     wo.Id,
@@ -1112,35 +1111,27 @@ namespace hOps.web.Controllers
                     wo.Location,
                     wo.Status,
                     wo.CreatedAt,
-                    wo.CreatedById
+                    CreatorId = wo.CreatedById,
+                    CreatorFirstName = wo.CreatedBy != null ? wo.CreatedBy.FirstName : null,
+                    CreatorLastName = wo.CreatedBy != null ? wo.CreatedBy.LastName : null,
+                    CreatorEmail = wo.CreatedBy != null ? wo.CreatedBy.Email : null,
+                    CreatorUserName = wo.CreatedBy != null ? wo.CreatedBy.UserName : null
                 })
+                .AsNoTracking()
                 .ToListAsync();
-
-            var creatorIds = activeWorkOrders
-                .Select(order => order.CreatedById)
-                .Where(id => !string.IsNullOrEmpty(id))
-                .Select(id => id!)
-                .Distinct()
-                .ToList();
-
-            var creatorLookup = new Dictionary<string, ApplicationUser>();
-
-            if (creatorIds.Count > 0)
-            {
-                creatorLookup = await _userManager.Users
-                    .Where(user => creatorIds.Contains(user.Id))
-                    .AsNoTracking()
-                    .ToDictionaryAsync(user => user.Id);
-            }
 
             foreach (var order in activeWorkOrders)
             {
-                ApplicationUser? creator = null;
-
-                if (!string.IsNullOrEmpty(order.CreatedById))
-                {
-                    creatorLookup.TryGetValue(order.CreatedById!, out creator);
-                }
+                ApplicationUser? creator = !string.IsNullOrEmpty(order.CreatorId)
+                    ? new ApplicationUser
+                    {
+                        Id = order.CreatorId!,
+                        FirstName = order.CreatorFirstName ?? string.Empty,
+                        LastName = order.CreatorLastName ?? string.Empty,
+                        Email = order.CreatorEmail ?? string.Empty,
+                        UserName = order.CreatorUserName ?? string.Empty
+                    }
+                    : null;
 
                 feedItems.Add(new ActivityFeedItemViewModel
                 {
