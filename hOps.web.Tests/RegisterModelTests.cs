@@ -8,7 +8,9 @@ using hOps.web.Models;
 using hOps.web.Options;
 using hOps.web.Services;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +21,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 using Moq;
 using Xunit;
 
@@ -60,6 +63,13 @@ public class RegisterModelTests
 
         var httpContext = new DefaultHttpContext();
         httpContext.Request.Scheme = "https";
+        httpContext.Request.Method = "POST";
+        httpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        var formFeature = new TestFormFeature(new FormCollection(new Dictionary<string, StringValues>
+        {
+            ["g-recaptcha-response"] = "token"
+        }));
+        httpContext.Features.Set<IFormFeature>(formFeature);
 
         var httpContextAccessor = new Mock<IHttpContextAccessor>();
         httpContextAccessor.SetupGet(a => a.HttpContext).Returns(httpContext);
@@ -92,10 +102,11 @@ public class RegisterModelTests
 
         var captchaOptions = Microsoft.Extensions.Options.Options.Create(new CaptchaOptions
         {
-            Enabled = false,
-            SiteKey = string.Empty,
-            SecretKey = string.Empty
+            Enabled = true,
+            SiteKey = "site-key",
+            SecretKey = "secret-key"
         });
+        var dataProtectionProvider = new EphemeralDataProtectionProvider();
 
         var urlHelperMock = new Mock<IUrlHelper>(MockBehavior.Strict);
         var encodedUrlTarget = "https://example.com/Admin/AccessRequests?token=abc&value=1";
@@ -121,7 +132,8 @@ public class RegisterModelTests
             emailSenderMock.Object,
             dbContext,
             captchaValidatorMock.Object,
-            captchaOptions)
+            captchaOptions,
+            dataProtectionProvider)
         {
             PageContext = pageContext,
             Url = urlHelperMock.Object,
@@ -185,6 +197,13 @@ public class RegisterModelTests
 
         var httpContext = new DefaultHttpContext();
         httpContext.Request.Scheme = "https";
+        httpContext.Request.Method = "POST";
+        httpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        var formFeature = new TestFormFeature(new FormCollection(new Dictionary<string, StringValues>
+        {
+            ["g-recaptcha-response"] = "token"
+        }));
+        httpContext.Features.Set<IFormFeature>(formFeature);
 
         var httpContextAccessor = new Mock<IHttpContextAccessor>();
         httpContextAccessor.SetupGet(a => a.HttpContext).Returns(httpContext);
@@ -217,10 +236,11 @@ public class RegisterModelTests
 
         var captchaOptions = Microsoft.Extensions.Options.Options.Create(new CaptchaOptions
         {
-            Enabled = false,
-            SiteKey = string.Empty,
-            SecretKey = string.Empty
+            Enabled = true,
+            SiteKey = "site-key",
+            SecretKey = "secret-key"
         });
+        var dataProtectionProvider = new EphemeralDataProtectionProvider();
 
         var urlHelperMock = new Mock<IUrlHelper>(MockBehavior.Strict);
         var encodedUrlTarget = "https://example.com/Admin/AccessRequests?token=abc&value=1";
@@ -246,7 +266,8 @@ public class RegisterModelTests
             emailSenderMock.Object,
             dbContext,
             captchaValidatorMock.Object,
-            captchaOptions)
+            captchaOptions,
+            dataProtectionProvider)
         {
             PageContext = pageContext,
             Url = urlHelperMock.Object,
@@ -276,5 +297,27 @@ public class RegisterModelTests
         Assert.DoesNotContain("Property Code: PROP&1<br/><br/>", capturedBody, StringComparison.Ordinal);
 
         emailSenderMock.Verify(e => e.SendEmailAsync(managerUser.Email, "New Access Request", It.IsAny<string>()), Times.Once);
+    }
+
+    private sealed class TestFormFeature : IFormFeature
+    {
+        public TestFormFeature(IFormCollection form)
+        {
+            Form = form;
+        }
+
+        public bool HasFormContentType => true;
+
+        public IFormCollection Form { get; set; } = default!;
+
+        public IFormCollection ReadForm()
+        {
+            return Form;
+        }
+
+        public Task<IFormCollection> ReadFormAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Form);
+        }
     }
 }

@@ -54,6 +54,19 @@
                     <div class="g-recaptcha" data-sitekey="@Model.CaptchaSiteKey"></div>
                 </div>
             }
+            else
+            {
+                <div class="form-group">
+                    <label asp-for="SimpleCaptchaAnswer"></label>
+                    <div class="input-group">
+                        <span class="input-group-text">@Model.SimpleCaptchaQuestion</span>
+                        <input asp-for="SimpleCaptchaAnswer" class="form-control" autocomplete="off" />
+                    </div>
+                    <input type="hidden" asp-for="SimpleCaptchaToken" />
+                    <span asp-validation-for="SimpleCaptchaAnswer" class="text-danger"></span>
+                    <small class="form-text text-muted">Answer the question to confirm that you are human.</small>
+                </div>
+            }
 
             <button type="submit" class="btn btn-primary">Submit Request</button>
         </form>
