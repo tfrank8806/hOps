@@ -1100,16 +1100,48 @@ namespace hOps.web.Controllers
             }
 
             var activeWorkOrders = await _context.WorkOrders
-                .Include(wo => wo.CreatedBy)
                 .Where(wo => wo.Status == "New" || wo.Status == "In Progress" || wo.Status == "Escalated")
                 .Where(wo => wo.Properties.Any(wp => wp.PropertyId == propertyId))
                 .OrderByDescending(wo => wo.CreatedAt)
                 .Take(5)
                 .AsNoTracking()
+                .Select(wo => new
+                {
+                    wo.Id,
+                    wo.Issue,
+                    wo.Location,
+                    wo.Status,
+                    wo.CreatedAt,
+                    wo.CreatedById
+                })
                 .ToListAsync();
+
+            var creatorIds = activeWorkOrders
+                .Select(order => order.CreatedById)
+                .Where(id => !string.IsNullOrEmpty(id))
+                .Select(id => id!)
+                .Distinct()
+                .ToList();
+
+            var creatorLookup = new Dictionary<string, ApplicationUser>();
+
+            if (creatorIds.Count > 0)
+            {
+                creatorLookup = await _userManager.Users
+                    .Where(user => creatorIds.Contains(user.Id))
+                    .AsNoTracking()
+                    .ToDictionaryAsync(user => user.Id);
+            }
 
             foreach (var order in activeWorkOrders)
             {
+                ApplicationUser? creator = null;
+
+                if (!string.IsNullOrEmpty(order.CreatedById))
+                {
+                    creatorLookup.TryGetValue(order.CreatedById!, out creator);
+                }
+
                 feedItems.Add(new ActivityFeedItemViewModel
                 {
                     ItemType = "workorder",
@@ -1120,7 +1152,7 @@ namespace hOps.web.Controllers
                     BadgeClass = "badge bg-secondary",
                     OccurredAt = order.CreatedAt,
                     LinkUrl = Url.Action("Edit", "WorkOrders", new { id = order.Id }),
-                    Avatar = UserAvatarHelper.BuildFromUser(order.CreatedBy, BuildDisplayName(order.CreatedBy), "sm")
+                    Avatar = UserAvatarHelper.BuildFromUser(creator, BuildDisplayName(creator), "sm")
                 });
             }
 
