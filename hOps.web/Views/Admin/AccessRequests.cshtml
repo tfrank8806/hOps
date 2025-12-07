@@ -21,56 +21,101 @@
 }
 else
 {
-    <table class="table table-bordered table-striped">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Property Code</th>
-                <th>Requested At</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var req in Model)
-            {
-                <tr>
-                    <td>@req.FirstName @req.LastName</td>
-                    <td>@req.Email</td>
-                    <td>@req.MobilePhone</td>
-                    <td>@req.PropertyCode</td>
-                    <td>@req.RequestedAt.ToString("g")</td>
-                    <td>
-                        <form asp-action="Approve" asp-controller="Admin" method="post" class="mb-2">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="id" value="@req.Id" />
-                            <div class="mb-2">
-                                <label class="form-label small mb-1" for="approveComments_@req.Id">Comments (optional)</label>
-                                <textarea class="form-control form-control-sm"
-                                          id="approveComments_@req.Id"
-                                          name="comments"
-                                          rows="2"
-                                          placeholder="Included in approval email"></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-success btn-sm w-100">Approve</button>
-                        </form>
-                        <form asp-action="Reject" asp-controller="Admin" method="post">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="id" value="@req.Id" />
-                            <div class="mb-2">
-                                <label class="form-label small mb-1" for="rejectComments_@req.Id">Comments (optional)</label>
-                                <textarea class="form-control form-control-sm"
-                                          id="rejectComments_@req.Id"
-                                          name="comments"
-                                          rows="2"
-                                          placeholder="Included in rejection email"></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-danger btn-sm w-100">Reject</button>
-                        </form>
-                    </td>
-                </tr>
+    <form asp-action="ProcessAccessRequests" asp-controller="Admin" method="post" id="accessRequestsForm">
+        @Html.AntiForgeryToken()
+        <div class="card mb-3">
+            <div class="card-body row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label class="form-label" for="bulkComments">Comments (optional)</label>
+                    <textarea class="form-control"
+                              id="bulkComments"
+                              name="comments"
+                              rows="3"
+                              placeholder="Included in the approval/denial email for each selected request"></textarea>
+                </div>
+                <div class="col-md-4 d-flex flex-wrap gap-2 justify-content-md-end">
+                    <button type="submit"
+                            class="btn btn-success flex-grow-1"
+                            name="actionType"
+                            value="approve"
+                            disabled>
+                        Approve Selected
+                    </button>
+                    <button type="submit"
+                            class="btn btn-danger flex-grow-1"
+                            name="actionType"
+                            value="reject"
+                            disabled>
+                        Reject Selected
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   id="selectAllRequests" />
+                        </th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Property Code</th>
+                        <th>Requested At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var req in Model)
+                    {
+                        <tr>
+                            <td>
+                                <input type="checkbox"
+                                       class="form-check-input request-checkbox"
+                                       name="selectedRequestIds"
+                                       value="@req.Id" />
+                            </td>
+                            <td>@req.FirstName @req.LastName</td>
+                            <td>@req.Email</td>
+                            <td>@req.MobilePhone</td>
+                            <td>@req.PropertyCode</td>
+                            <td>@req.RequestedAt.ToString("g")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </form>
+}
+
+@section Scripts {
+    <script>
+        (() => {
+            const selectAll = document.getElementById('selectAllRequests');
+            const checkboxes = Array.from(document.querySelectorAll('.request-checkbox'));
+            const actionButtons = Array.from(document.querySelectorAll('#accessRequestsForm button[type="submit"]'));
+
+            const updateButtonState = () => {
+                const hasSelection = checkboxes.some(cb => cb.checked);
+                actionButtons.forEach(btn => btn.disabled = !hasSelection);
+            };
+
+            if (selectAll) {
+                selectAll.addEventListener('change', () => {
+                    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+                    updateButtonState();
+                });
             }
-        </tbody>
-    </table>
+
+            checkboxes.forEach(cb => cb.addEventListener('change', () => {
+                if (!cb.checked && selectAll) {
+                    selectAll.checked = false;
+                }
+                updateButtonState();
+            }));
+        })();
+    </script>
 }

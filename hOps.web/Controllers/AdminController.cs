@@ -770,36 +770,12 @@ HotelOps Admin Team
             if (request == null)
                 return NotFound();
 
-            var user = new ApplicationUser
+            var (success, user, error) = await ApproveAccessRequestAsync(request, comments);
+            if (!success || user == null)
             {
-                UserName = request.Email,
-                Email = request.Email,
-                FirstName = request.FirstName,
-                LastName = request.LastName,
-                MobilePhone = request.MobilePhone,
-                MustChangePassword = true
-            };
-
-            var tempPassword = GenerateTemporaryPassword();
-            var result = await _userManager.CreateAsync(user, tempPassword);
-            if (!result.Succeeded)
-            {
-                TempData["Error"] = "Failed to create user: " + string.Join(", ", result.Errors.Select(e => e.Description));
+                TempData["Error"] = $"Failed to approve request: {error ?? "Unknown error."}";
                 return RedirectToAction(nameof(AccessRequests));
             }
-
-            await _userManager.AddToRoleAsync(user, "User");
-
-            var commentsHtml = BuildCommentsHtml(comments);
-            var message = $@"
-Hi {user.FirstName},<br/><br/>
-Your access request for HotelOps has been <strong>approved</strong>.<br/>
-You can now log in using your email and temporary password:<br/>
-<strong>Password:</strong> {tempPassword}<br/><br/>
-Please change your password after login.<br/>{commentsHtml}<br/>
-HotelOps Admin Team
-";
-            await _emailSender.SendEmailAsync(user.Email, "HotelOps Access Approved", message);
 
             TempData["Success"] = "Access granted and a temporary password email has been sent. Assign properties for the user below.";
             return RedirectToAction(nameof(EditUserProperties), new { userId = user.Id });
@@ -812,19 +788,86 @@ HotelOps Admin Team
             if (req == null)
                 return NotFound();
 
-            req.IsRejected = true;
-            _context.UserAccessRequests.Update(req);
-            await _context.SaveChangesAsync();
-
-            var message = $@"
-Hi {req.FirstName},<br/><br/>
-Your access request for HotelOps was <strong>not approved</strong>.<br/>
-If you believe this is in error, please contact your property manager.<br/>{BuildCommentsHtml(comments)}<br/>
-Thank you,<br/>
-HotelOps Admin Team
-";
-            await _emailSender.SendEmailAsync(req.Email, "Access Request Denied", message);
+            await RejectAccessRequestAsync(req, comments);
             TempData["Success"] = "Request rejected and user notified.";
+
+            return RedirectToAction(nameof(AccessRequests));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ProcessAccessRequests(string actionType, List<int> selectedRequestIds, string? comments)
+        {
+            if (selectedRequestIds == null || selectedRequestIds.Count == 0)
+            {
+                TempData["Error"] = "Select at least one request before performing a bulk action.";
+                return RedirectToAction(nameof(AccessRequests));
+            }
+
+            var requests = await _context.UserAccessRequests
+                .Where(r => selectedRequestIds.Contains(r.Id))
+                .ToListAsync();
+
+            if (requests.Count == 0)
+            {
+                TempData["Error"] = "The selected access requests could not be found.";
+                return RedirectToAction(nameof(AccessRequests));
+            }
+
+            var failures = new List<string>();
+            var successCount = 0;
+            var action = actionType?.Trim().ToLowerInvariant();
+
+            if (action == "approve")
+            {
+                foreach (var request in requests)
+                {
+                    var (success, _, error) = await ApproveAccessRequestAsync(request, comments);
+                    if (success)
+                    {
+                        successCount++;
+                    }
+                    else
+                    {
+                        failures.Add($"{request.Email}: {error ?? "Failed to approve."}");
+                    }
+                }
+
+                if (successCount > 0)
+                {
+                    TempData["Success"] = $"Approved {successCount} access request(s). Assign properties for new users from the Users page.";
+                }
+            }
+            else if (action == "reject")
+            {
+                foreach (var request in requests)
+                {
+                    try
+                    {
+                        await RejectAccessRequestAsync(request, comments);
+                        successCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        failures.Add($"{request.Email}: {ex.Message}");
+                    }
+                }
+
+                if (successCount > 0)
+                {
+                    TempData["Success"] = $"Rejected {successCount} access request(s) and notified each user.";
+                }
+            }
+            else
+            {
+                TempData["Error"] = "Invalid bulk action.";
+                return RedirectToAction(nameof(AccessRequests));
+            }
+
+            if (failures.Count > 0)
+            {
+                TempData["Error"] = string.Join(" ", failures);
+            }
 
             return RedirectToAction(nameof(AccessRequests));
         }
@@ -843,6 +886,62 @@ HotelOps Admin Team
                 .Replace("\n", "<br/>");
 
             return $"<br/><strong>Comments:</strong><br/>{encoded}<br/>";
+        }
+
+        private async Task<(bool Success, ApplicationUser? CreatedUser, string? ErrorMessage)> ApproveAccessRequestAsync(UserAccessRequest request, string? comments)
+        {
+            var user = new ApplicationUser
+            {
+                UserName = request.Email,
+                Email = request.Email,
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                MobilePhone = request.MobilePhone,
+                MustChangePassword = true
+            };
+
+            var tempPassword = GenerateTemporaryPassword();
+            var result = await _userManager.CreateAsync(user, tempPassword);
+            if (!result.Succeeded)
+            {
+                return (false, null, string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+
+            await _userManager.AddToRoleAsync(user, "User");
+
+            var commentsHtml = BuildCommentsHtml(comments);
+            var message = $@"
+Hi {user.FirstName},<br/><br/>
+Your access request for HotelOps has been <strong>approved</strong>.<br/>
+You can now log in using your email and temporary password:<br/>
+<strong>Password:</strong> {tempPassword}<br/><br/>
+Please change your password after login.<br/>{commentsHtml}<br/>
+HotelOps Admin Team
+";
+            await _emailSender.SendEmailAsync(user.Email, "HotelOps Access Approved", message);
+
+            return (true, user, null);
+        }
+
+        private async Task RejectAccessRequestAsync(UserAccessRequest request, string? comments)
+        {
+            if (request.IsRejected)
+            {
+                return;
+            }
+
+            request.IsRejected = true;
+            _context.UserAccessRequests.Update(request);
+            await _context.SaveChangesAsync();
+
+            var message = $@"
+Hi {request.FirstName},<br/><br/>
+Your access request for HotelOps was <strong>not approved</strong>.<br/>
+If you believe this is in error, please contact your property manager.<br/>{BuildCommentsHtml(comments)}<br/>
+Thank you,<br/>
+HotelOps Admin Team
+";
+            await _emailSender.SendEmailAsync(request.Email, "Access Request Denied", message);
         }
 
         private static string GenerateTemporaryPassword()
