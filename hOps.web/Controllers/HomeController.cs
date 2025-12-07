@@ -1100,9 +1100,9 @@ namespace hOps.web.Controllers
             }
 
             var activeWorkOrders = await _context.WorkOrders
-                .Where(wo => wo.Properties.Any(wp => wp.PropertyId == propertyId))
-                .Where(wo => wo.Status == "New" || wo.Status == "In Progress" || wo.Status == "Escalated")
                 .Include(wo => wo.CreatedBy)
+                .Where(wo => wo.Status == "New" || wo.Status == "In Progress" || wo.Status == "Escalated")
+                .Where(wo => wo.Properties.Any(wp => wp.PropertyId == propertyId))
                 .OrderByDescending(wo => wo.CreatedAt)
                 .Take(5)
                 .AsNoTracking()
