@@ -804,9 +804,27 @@ HotelOps Admin Team
                 return RedirectToAction(nameof(AccessRequests));
             }
 
-            var requests = await _context.UserAccessRequests
-                .Where(r => selectedRequestIds.Contains(r.Id))
-                .ToListAsync();
+            var normalizedIds = selectedRequestIds
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+
+            if (normalizedIds.Count == 0)
+            {
+                TempData["Error"] = "Unable to determine which requests were selected.";
+                return RedirectToAction(nameof(AccessRequests));
+            }
+
+            var requests = new List<UserAccessRequest>();
+            const int batchSize = 500;
+
+            foreach (var batch in normalizedIds.Chunk(batchSize))
+            {
+                var batchResults = await _context.UserAccessRequests
+                    .Where(r => batch.Contains(r.Id))
+                    .ToListAsync();
+                requests.AddRange(batchResults);
+            }
 
             if (requests.Count == 0)
             {
