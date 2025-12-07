@@ -17,7 +17,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("hOps.Mobile")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0+54ce46f6c976e6b9e2c0a8d8db6f892475fffa68")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0+557a94b3fe57ef5c9ddf17c80ad79d34fbed702c")]
 [assembly: System.Reflection.AssemblyProductAttribute("hOps.Mobile")]
 [assembly: System.Reflection.AssemblyTitleAttribute("hOps.Mobile")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

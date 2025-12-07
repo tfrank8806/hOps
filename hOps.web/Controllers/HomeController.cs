@@ -1099,9 +1099,8 @@ namespace hOps.web.Controllers
                 });
             }
 
-            var activeWorkOrders = await _context.WorkOrderProperties
-                .Where(wp => wp.PropertyId == propertyId)
-                .Select(wp => wp.WorkOrder)
+            var activeWorkOrders = await _context.WorkOrders
+                .Where(wo => wo.Properties.Any(wp => wp.PropertyId == propertyId))
                 .Where(wo => wo.Status == "New" || wo.Status == "In Progress" || wo.Status == "Escalated")
                 .Include(wo => wo.CreatedBy)
                 .OrderByDescending(wo => wo.CreatedAt)
