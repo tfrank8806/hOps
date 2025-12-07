@@ -950,50 +950,59 @@ namespace hOps.web.Controllers
                 return;
             }
 
-            var titlesToMatch = overdueOrders
-                .Select(o => $"[Auto] Work Order Escalation #{o.Id}")
-                .ToList();
+            var summaryDate = now.Date;
+            var summaryTitle = $"[Auto] Work Order Escalations - {summaryDate:yyyy-MM-dd}";
+            var propertyName = string.IsNullOrWhiteSpace(property.Name)
+                ? $"Property #{property.Id}"
+                : property.Name;
 
-            var existingTitles = await _context.PassOnLogs
-                .Where(log => log.Properties.Any(lp => lp.PropertyId == propertyId) && titlesToMatch.Contains(log.Title))
-                .Select(log => log.Title)
-                .ToListAsync();
+            var builder = new StringBuilder();
+            builder.AppendLine($"Daily recap for {propertyName} - {summaryDate:MMMM d, yyyy}");
+            builder.AppendLine();
 
-            var existingSet = new HashSet<string>(existingTitles, StringComparer.OrdinalIgnoreCase);
-            var newLogs = new List<PassOnLog>();
-
-            foreach (var order in overdueOrders)
+            foreach (var order in overdueOrders.OrderBy(o => o.DueDate))
             {
-                var title = $"[Auto] Work Order Escalation #{order.Id}";
-                if (existingSet.Contains(title))
-                {
-                    continue;
-                }
-
-                var builder = new StringBuilder();
-                builder.AppendLine($"Work order #{order.Id} \"{order.Issue}\" is overdue.");
+                builder.Append($"- Work order #{order.Id} \"{order.Issue}\"");
                 if (!string.IsNullOrWhiteSpace(order.Location))
                 {
-                    builder.AppendLine($"Location: {order.Location}");
+                    builder.Append($" at {order.Location}");
                 }
-                builder.AppendLine($"Due: {order.DueDate:g}");
 
+                builder.AppendLine($" (Due {order.DueDate:g})");
+            }
+
+            var summaryBody = builder.ToString();
+
+            var existingSummary = await _context.PassOnLogs
+                .Include(log => log.Properties)
+                .FirstOrDefaultAsync(log =>
+                    log.Title == summaryTitle &&
+                    log.Properties.Any(lp => lp.PropertyId == propertyId));
+
+            if (existingSummary == null)
+            {
                 var log = new PassOnLog
                 {
-                    Title = title,
-                    Body = builder.ToString(),
-                    CreatedAt = DateTime.UtcNow,
+                    Title = summaryTitle,
+                    Body = summaryBody,
+                    CreatedAt = now,
                     CreatedById = actor.Id
                 };
                 log.Properties.Add(new PassOnLogProperty { PropertyId = propertyId });
-                newLogs.Add(log);
+                _context.PassOnLogs.Add(log);
+            }
+            else
+            {
+                existingSummary.Body = summaryBody;
+                existingSummary.UpdatedAt = now;
+
+                if (!existingSummary.Properties.Any(lp => lp.PropertyId == propertyId))
+                {
+                    existingSummary.Properties.Add(new PassOnLogProperty { PropertyId = propertyId });
+                }
             }
 
-            if (newLogs.Count > 0)
-            {
-                _context.PassOnLogs.AddRange(newLogs);
-                await _context.SaveChangesAsync();
-            }
+            await _context.SaveChangesAsync();
         }
 
         private async Task PopulateLostFoundAsync(HomeIndexViewModel viewModel, int propertyId)
