@@ -1,4 +1,4 @@
-﻿@model List<hOps.web.Models.UserAccessRequest>
+@model hOps.web.ViewModels.Admin.AccessRequestsPageViewModel
 
 @{
     ViewData["Title"] = "Access Requests";
@@ -15,7 +15,7 @@
     <div class="alert alert-danger">@TempData["Error"]</div>
 }
 
-@if (!Model.Any())
+@if (!Model.Requests.Any())
 {
     <p>No pending access requests.</p>
 }
@@ -23,6 +23,7 @@ else
 {
     <form asp-action="ProcessAccessRequests" asp-controller="Admin" method="post" id="accessRequestsForm">
         @Html.AntiForgeryToken()
+        <input type="hidden" name="page" value="@Model.PageNumber" />
         <div class="card mb-3">
             <div class="card-body row g-3 align-items-end">
                 <div class="col-md-8">
@@ -52,6 +53,27 @@ else
             </div>
         </div>
 
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+            <div class="text-muted small">
+                Showing page @Model.PageNumber of @Model.TotalPages (@Model.TotalCount total requests)
+            </div>
+            @if (Model.TotalPages > 1)
+            {
+                <div class="btn-group btn-group-sm" role="group" aria-label="Pagination controls">
+                    <a class="btn btn-outline-secondary @(Model.HasPreviousPage ? string.Empty : "disabled")"
+                       asp-action="AccessRequests"
+                       asp-route-page="@(Model.PreviousPage)">
+                        Previous
+                    </a>
+                    <a class="btn btn-outline-secondary @(Model.HasNextPage ? string.Empty : "disabled")"
+                       asp-action="AccessRequests"
+                       asp-route-page="@(Model.NextPage)">
+                        Next
+                    </a>
+                </div>
+            }
+        </div>
+
         <div class="table-responsive">
             <table class="table table-bordered table-striped align-middle">
                 <thead>
@@ -69,7 +91,7 @@ else
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var req in Model)
+                    @foreach (var req in Model.Requests)
                     {
                         <tr>
                             <td>

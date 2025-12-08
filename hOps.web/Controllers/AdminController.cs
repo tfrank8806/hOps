@@ -23,6 +23,7 @@ namespace hOps.web.Controllers
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IEmailSender _emailSender;
         private const string ExternalLoginUrl = "https://www.guestquest.net/Identity/Account/Login";
+        private const int AccessRequestsPageSize = 100;
 
         public AdminController(
             ApplicationDbContext db,
@@ -735,7 +736,7 @@ HotelOps Admin Team
                 .ToHashSet();
         }
 
-        public async Task<IActionResult> AccessRequests()
+        public async Task<IActionResult> AccessRequests(int page = 1)
         {
             var currentUser = await _userManager.GetUserAsync(User);
             if (currentUser == null)
@@ -746,7 +747,24 @@ HotelOps Admin Team
             var roles = await _userManager.GetRolesAsync(currentUser);
             var requests = await LoadVisibleAccessRequestsAsync(currentUser, roles);
 
-            return View(requests);
+            var totalCount = requests.Count;
+            var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)AccessRequestsPageSize));
+            var currentPage = Math.Clamp(page, 1, totalPages);
+            var pagedRequests = requests
+                .Skip((currentPage - 1) * AccessRequestsPageSize)
+                .Take(AccessRequestsPageSize)
+                .ToList();
+
+            var viewModel = new AccessRequestsPageViewModel
+            {
+                Requests = pagedRequests,
+                PageNumber = currentPage,
+                TotalPages = totalPages,
+                PageSize = AccessRequestsPageSize,
+                TotalCount = totalCount
+            };
+
+            return View(viewModel);
         }
 
         [HttpGet]
@@ -796,12 +814,12 @@ HotelOps Admin Team
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ProcessAccessRequests(string actionType, List<int> selectedRequestIds, string? comments)
+        public async Task<IActionResult> ProcessAccessRequests(string actionType, List<int> selectedRequestIds, string? comments, int? page)
         {
             if (selectedRequestIds == null || selectedRequestIds.Count == 0)
             {
                 TempData["Error"] = "Select at least one request before performing a bulk action.";
-                return RedirectToAction(nameof(AccessRequests));
+                return RedirectToAction(nameof(AccessRequests), new { page = page ?? 1 });
             }
 
             var normalizedIds = selectedRequestIds
@@ -829,7 +847,7 @@ HotelOps Admin Team
             if (requests.Count == 0)
             {
                 TempData["Error"] = "The selected access requests could not be found.";
-                return RedirectToAction(nameof(AccessRequests));
+                return RedirectToAction(nameof(AccessRequests), new { page = page ?? 1 });
             }
 
             var failures = new List<string>();
@@ -879,7 +897,7 @@ HotelOps Admin Team
             else
             {
                 TempData["Error"] = "Invalid bulk action.";
-                return RedirectToAction(nameof(AccessRequests));
+                return RedirectToAction(nameof(AccessRequests), new { page = page ?? 1 });
             }
 
             if (failures.Count > 0)
@@ -887,7 +905,7 @@ HotelOps Admin Team
                 TempData["Error"] = string.Join(" ", failures);
             }
 
-            return RedirectToAction(nameof(AccessRequests));
+            return RedirectToAction(nameof(AccessRequests), new { page = page ?? 1 });
         }
 
         private static string BuildCommentsHtml(string? comments)
