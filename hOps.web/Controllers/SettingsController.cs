@@ -24,6 +24,7 @@ namespace hOps.web.Controllers
     {
         private readonly ApplicationDbContext _db;
         private readonly UserManager<ApplicationUser> _userManager;
+        private const string DefaultShiftColor = "#3b82f6";
 
         public SettingsController(ApplicationDbContext db, UserManager<ApplicationUser> userManager)
         {
@@ -1495,7 +1496,7 @@ namespace hOps.web.Controllers
                     StartTime = t.StartTime ?? string.Empty,
                     EndTime = t.EndTime ?? string.Empty,
                     SortOrder = t.SortOrder == 0 ? index : t.SortOrder,
-                    ColorHex = t.ColorHex ?? "#3b82f6",
+                    ColorHex = (t.ColorHex ?? string.Empty).Trim(),
                     AlertIfMissing = t.AlertIfMissing,
                     IsDeleted = false
                 })
@@ -1523,13 +1524,23 @@ namespace hOps.web.Controllers
                     ModelState.AddModelError(string.Empty, $"Enter a valid end time for {shift.Name}.");
                 }
 
-                var normalizedColor = NormalizeColorHex(shift.ColorHex);
-                if (!string.IsNullOrWhiteSpace(shift.ColorHex) && normalizedColor == null)
+                if (string.IsNullOrWhiteSpace(shift.ColorHex))
                 {
-                    ModelState.AddModelError(string.Empty, $"Enter a valid color for {shift.Name}.");
+                    shift.ColorHex = DefaultShiftColor;
                 }
-
-                shift.ColorHex = normalizedColor ?? "#3b82f6";
+                else
+                {
+                    var normalizedColor = NormalizeColorHex(shift.ColorHex);
+                    if (normalizedColor == null)
+                    {
+                        ModelState.AddModelError(string.Empty, $"Enter a valid color for {shift.Name}.");
+                        shift.ColorHex = DefaultShiftColor;
+                    }
+                    else
+                    {
+                        shift.ColorHex = normalizedColor;
+                    }
+                }
             }
 
             if (!ModelState.IsValid)
@@ -1605,7 +1616,9 @@ namespace hOps.web.Controllers
                 entity.EndTime = endTime;
                 entity.SortOrder = shift.SortOrder;
                 entity.UpdatedAtUtc = DateTime.UtcNow;
-                entity.ColorHex = shift.ColorHex ?? "#3b82f6";
+                entity.ColorHex = string.IsNullOrWhiteSpace(shift.ColorHex)
+                    ? DefaultShiftColor
+                    : shift.ColorHex;
                 entity.AlertIfMissing = shift.AlertIfMissing;
 
                 if (entity.Id > 0)
@@ -1701,7 +1714,7 @@ namespace hOps.web.Controllers
                         StartTime = FormatTime(t.StartTime),
                         EndTime = FormatTime(t.EndTime),
                         SortOrder = t.SortOrder,
-                        ColorHex = string.IsNullOrWhiteSpace(t.ColorHex) ? "#3b82f6" : t.ColorHex,
+                        ColorHex = NormalizeColorHex(t.ColorHex) ?? DefaultShiftColor,
                         AlertIfMissing = t.AlertIfMissing,
                         IsDeleted = false
                     })
