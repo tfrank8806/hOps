@@ -1,0 +1,75 @@
+@using hOps.web.ViewModels.Home
+@model HomeIndexViewModel
+
+@{
+    var shifts = Model.MyScheduleShifts ?? new List<MyScheduleShiftViewModel>();
+
+    string FormatTimeSpan(TimeSpan? timeSpan)
+    {
+        if (!timeSpan.HasValue)
+        {
+            return "Time TBD";
+        }
+
+        return DateTime.Today.Add(timeSpan.Value).ToString("h:mm tt");
+    }
+
+    string BuildScheduleUrl(MyScheduleShiftViewModel shift)
+    {
+        var weekStart = shift.WeekStartDate.ToString("yyyy-MM-dd");
+        return Url.Action("Index", "Schedules", new { weekStart }) ?? Url.Action("Index", "Schedules") ?? "#";
+    }
+}
+
+<div class="card shadow-sm h-100 home-widget-card">
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h2 class="h6 mb-0">My Schedule</h2>
+            <div class="text-muted small">Upcoming shifts for @Model.CurrentProperty?.Name</div>
+        </div>
+        <a class="btn btn-sm btn-outline-primary" asp-controller="Schedules" asp-action="Index">Open Schedules</a>
+    </div>
+    <div class="card-body home-widget-card__body">
+        @if (!shifts.Any())
+        {
+            <p class="text-muted mb-0">No upcoming shifts have been published for you at this property.</p>
+        }
+        else
+        {
+            <ul class="list-unstyled mb-0 widget-list">
+                @foreach (var shift in shifts)
+                {
+                    var scheduleUrl = BuildScheduleUrl(shift);
+                    <li class="widget-item">
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <a class="fw-semibold" href="@scheduleUrl">@shift.ShiftName</a>
+                                    <span class="badge bg-primary-subtle text-primary">@shift.ShiftDate.ToString("ddd, MMM d")</span>
+                                </div>
+                                <div class="small text-muted">
+                                    @FormatTimeSpan(shift.ShiftStartTime)
+                                    @if (shift.ShiftEndTime.HasValue)
+                                    {
+                                        <text> - @FormatTimeSpan(shift.ShiftEndTime)</text>
+                                    }
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(shift.ScheduleTitle))
+                                {
+                                    <div class="small text-muted">From @shift.ScheduleTitle</div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(shift.Notes))
+                                {
+                                    <div class="small mt-1">@shift.Notes</div>
+                                }
+                            </div>
+                            <div class="text-end text-muted small flex-shrink-0">
+                                Week of @shift.WeekStartDate.ToString("MMM d")
+                            </div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>

@@ -185,6 +185,9 @@
                         case HomeWidgetIds.OpsFeed:
                             @await Html.PartialAsync("~/Views/Home/Widgets/_OpsFeedWidget.cshtml", Model)
                             break;
+                        case HomeWidgetIds.MySchedule:
+                            @await Html.PartialAsync("~/Views/Home/Widgets/_MyScheduleWidget.cshtml", Model)
+                            break;
                         case HomeWidgetIds.LostFound:
                             @await Html.PartialAsync("_HomeWidgetCard", new HomeWidgetViewModel(
                                 "Lost & Found",

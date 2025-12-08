@@ -31,6 +31,8 @@ namespace hOps.web.ViewModels.Home
 
         public List<PassOnLogSummaryViewModel> PassOnLogs { get; set; } = new();
 
+        public List<MyScheduleShiftViewModel> MyScheduleShifts { get; set; } = new();
+
         public List<QuickSelectOptionViewModel> WorkOrderTypeOptions { get; set; } = new();
         public List<QuickSelectOptionViewModel> DepartmentOptions { get; set; } = new();
         public string DefaultWorkOrderStatus { get; set; } = "New";
@@ -205,6 +207,7 @@ namespace hOps.web.ViewModels.Home
         public const string LostFound = "lostFound";
         public const string HotelLayout = "hotelLayout";
         public const string OpsFeed = "opsFeed";
+        public const string MySchedule = "mySchedule";
     }
 
     public class ActivityFeedItemViewModel
@@ -238,5 +241,19 @@ namespace hOps.web.ViewModels.Home
         public string DisplayName { get; set; } = string.Empty;
         public string? Description { get; set; }
         public bool IsEnabled { get; set; }
+    }
+
+    public class MyScheduleShiftViewModel
+    {
+        public int AssignmentId { get; set; }
+        public int ScheduleId { get; set; }
+        public int ScheduleEmployeeId { get; set; }
+        public DateTime ShiftDate { get; set; }
+        public string ShiftName { get; set; } = string.Empty;
+        public TimeSpan? ShiftStartTime { get; set; }
+        public TimeSpan? ShiftEndTime { get; set; }
+        public string? Notes { get; set; }
+        public string? ScheduleTitle { get; set; }
+        public DateTime WeekStartDate { get; set; }
     }
 }

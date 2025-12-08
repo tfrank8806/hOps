@@ -42,6 +42,7 @@ namespace hOps.web.Controllers
             new HomeWidgetDefinition { Id = HomeWidgetIds.UpcomingEvents, DisplayName = "Upcoming Events", Description = "Calendar highlights", DefaultSize = HomeWidgetSize.Quarter },
             new HomeWidgetDefinition { Id = HomeWidgetIds.WorkOrders, DisplayName = "Work Orders", Description = "Active tickets and SLAs", DefaultSize = HomeWidgetSize.Quarter },
             new HomeWidgetDefinition { Id = HomeWidgetIds.LostFound, DisplayName = "Lost & Found", Description = "Items awaiting resolution", DefaultSize = HomeWidgetSize.Quarter },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.MySchedule, DisplayName = "My Schedule", Description = "Upcoming shifts for you", DefaultSize = HomeWidgetSize.Quarter },
             new HomeWidgetDefinition { Id = HomeWidgetIds.HotelLayout, DisplayName = "Hotel Layout", Description = "Interactive property map", DefaultSize = HomeWidgetSize.Full }
         };
 
@@ -138,6 +139,7 @@ namespace hOps.web.Controllers
             await PopulateUpcomingEventsAsync(viewModel, propertyId);
             await PopulateQuickWorkOrderOptionsAsync(viewModel, propertyId);
             await PopulateActivityFeedAsync(viewModel, propertyId, user.Id);
+            await PopulateMyScheduleAsync(viewModel, propertyId, user.Id);
 
             return View(viewModel);
         }
@@ -1182,6 +1184,42 @@ namespace hOps.web.Controllers
                 .OrderByDescending(item => item.OccurredAt)
                 .Take(12)
                 .ToList();
+        }
+
+        private async Task PopulateMyScheduleAsync(HomeIndexViewModel viewModel, int propertyId, string currentUserId)
+        {
+            var startDate = DateTime.UtcNow.Date;
+            var endDate = startDate.AddDays(14);
+
+            var assignments = await _context.ScheduleAssignments
+                .AsNoTracking()
+                .Where(a =>
+                    a.Schedule.PropertyId == propertyId &&
+                    a.Schedule.Status == ScheduleStatus.Posted &&
+                    a.Employee.IsActive &&
+                    a.Employee.ApplicationUserId != null &&
+                    a.Employee.ApplicationUserId == currentUserId &&
+                    a.ShiftDate >= startDate &&
+                    a.ShiftDate <= endDate)
+                .OrderBy(a => a.ShiftDate)
+                .ThenBy(a => a.ShiftStartTime ?? TimeSpan.Zero)
+                .Take(10)
+                .Select(a => new MyScheduleShiftViewModel
+                {
+                    AssignmentId = a.Id,
+                    ScheduleId = a.ScheduleId,
+                    ScheduleEmployeeId = a.ScheduleEmployeeId,
+                    ShiftDate = a.ShiftDate,
+                    ShiftName = a.ShiftName,
+                    ShiftStartTime = a.ShiftStartTime,
+                    ShiftEndTime = a.ShiftEndTime,
+                    Notes = a.Notes,
+                    ScheduleTitle = string.IsNullOrWhiteSpace(a.Schedule.Title) ? "Weekly Schedule" : a.Schedule.Title,
+                    WeekStartDate = a.Schedule.WeekStartDate
+                })
+                .ToListAsync();
+
+            viewModel.MyScheduleShifts = assignments;
         }
 
         private async Task PopulatePackageLogAsync(HomeIndexViewModel viewModel, int propertyId)
