@@ -17,6 +17,7 @@ namespace hOps.web.ViewModels.Documents
         public int? SelectedFolderId { get; set; }
         public bool ShowingUnassignedOnly { get; set; }
         public List<DocumentFolderBreadcrumbItemViewModel> SelectedFolderBreadcrumb { get; set; } = new();
+        public bool CanDeleteDocuments { get; set; }
         public int UnassignedDocumentCount { get; set; }
         public int TotalDocumentCount { get; set; }
         public int? CurrentPropertyId { get; set; }

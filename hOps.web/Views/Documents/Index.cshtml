@@ -619,6 +619,21 @@
                                                 <button type="submit" class="btn btn-primary btn-sm">Save</button>
                                             </form>
                                             </div>
+                                            @if (Model.CanDeleteDocuments)
+                                            {
+                                                <form asp-action="DeleteDocument"
+                                                      method="post"
+                                                      class="d-inline-block ms-2 mt-2"
+                                                      onsubmit="return confirm('Delete this document permanently?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@doc.Id" />
+                                                    <input type="hidden" name="currentFolderId" value="@currentFolderRouteValueString" />
+                                                    <input type="hidden" name="currentSort" value="@safeSortField" />
+                                                    <input type="hidden" name="currentDirection" value="@safeSortDirection" />
+                                                    <input type="hidden" name="currentSearch" value="@searchQuery" />
+                                                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                                </form>
+                                            }
                                         </td>
                                     </tr>
                                 }

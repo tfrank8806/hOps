@@ -260,6 +260,62 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteDocument(int id, int? currentFolderId, string? currentSort, string? currentDirection, string? currentSearch)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            if (!User.IsInRole("Admin") && !User.IsInRole("Manager"))
+            {
+                return Forbid();
+            }
+
+            var (sortField, sortDirection) = NormalizeSort(currentSort, currentDirection);
+            var searchQuery = NormalizeSearch(currentSearch);
+
+            var document = await _context.Documents
+                .Include(d => d.DocumentProperties)
+                .FirstOrDefaultAsync(d => d.Id == id);
+
+            if (document == null)
+            {
+                return NotFound();
+            }
+
+            var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+            var accessiblePropertySet = accessiblePropertyIds.ToHashSet();
+            var accessibleFolderIds = (await GetAccessibleFoldersAsync(accessiblePropertySet)).AccessibleFolderIds;
+
+            if (!UserCanAccessDocument(document, accessiblePropertySet, accessibleFolderIds))
+            {
+                return Forbid();
+            }
+
+            if (document.DocumentProperties.Any())
+            {
+                _context.DocumentProperties.RemoveRange(document.DocumentProperties);
+            }
+
+            _context.Documents.Remove(document);
+            await _context.SaveChangesAsync();
+
+            TryDeleteDocumentFile(document.FilePath);
+
+            TempData["DocumentSuccess"] = "Document deleted successfully.";
+            return RedirectToAction(nameof(Index), new
+            {
+                folderId = currentFolderId,
+                sort = sortField,
+                direction = sortDirection,
+                search = searchQuery
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateFolder([Bind(Prefix = "FolderForm")] DocumentFolderFormViewModel form, int? currentFolderId, string? currentSort, string? currentDirection, string? currentSearch)
         {
             var user = await _userManager.GetUserAsync(User);
@@ -588,6 +644,7 @@ namespace hOps.web.Controllers
             string? searchQuery,
             DocumentFolderSettingsForm? folderSettingsForm = null)
         {
+            var canDeleteDocuments = User.IsInRole("Admin") || User.IsInRole("Manager");
             var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
             var accessiblePropertySet = accessiblePropertyIds.ToHashSet();
 
@@ -822,6 +879,7 @@ namespace hOps.web.Controllers
                 SelectedFolderId = actualSelectedFolderId,
                 ShowingUnassignedOnly = showUnassignedOnly,
                 SelectedFolderBreadcrumb = breadcrumb,
+                CanDeleteDocuments = canDeleteDocuments,
                 UnassignedDocumentCount = accessibleDocuments.Count(d => !d.FolderId.HasValue),
                 TotalDocumentCount = accessibleDocuments.Count,
                 PropertyOptions = propertyOptions,
@@ -1317,6 +1375,29 @@ namespace hOps.web.Controllers
             }
 
             return document.TargetProperties.Any(Contains);
+        }
+
+        private void TryDeleteDocumentFile(string? relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath) || string.IsNullOrWhiteSpace(_environment.WebRootPath))
+            {
+                return;
+            }
+
+            try
+            {
+                var trimmed = relativePath.TrimStart('~').TrimStart('/', '\\');
+                var normalized = trimmed.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+                var physicalPath = Path.Combine(_environment.WebRootPath, normalized);
+                if (System.IO.File.Exists(physicalPath))
+                {
+                    System.IO.File.Delete(physicalPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete document file at {Path}", relativePath);
+            }
         }
 
         private static void ApplyDocumentVisibility(Document document, DocumentAccessScope accessScope, int? propertyId, IEnumerable<int> selectedPropertyIds)
