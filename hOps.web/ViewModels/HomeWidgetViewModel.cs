@@ -12,7 +12,8 @@ namespace hOps.web.ViewModels
             string? createControllerName = null,
             string? createActionName = null,
             string? createButtonText = null,
-            string? createFragment = null)
+            string? createFragment = null,
+            string? cardCssClass = null)
         {
             Title = title;
             Items = items;
@@ -22,6 +23,7 @@ namespace hOps.web.ViewModels
             CreateActionName = createActionName;
             CreateButtonText = createButtonText;
             CreateFragment = createFragment;
+            CardCssClass = cardCssClass;
         }
 
         public string Title { get; }
@@ -32,5 +34,6 @@ namespace hOps.web.ViewModels
         public string? CreateActionName { get; }
         public string? CreateButtonText { get; }
         public string? CreateFragment { get; }
+        public string? CardCssClass { get; }
     }
 }

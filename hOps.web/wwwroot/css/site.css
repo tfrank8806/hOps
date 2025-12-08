@@ -981,10 +981,15 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 }
 
 .home-widget-card {
+    max-height: 300px;
     display: flex;
     flex-direction: column;
     font-size: 0.92rem;
     line-height: 1.35;
+}
+
+.home-widget-card--fill {
+    max-height: none;
     height: 100%;
 }
 

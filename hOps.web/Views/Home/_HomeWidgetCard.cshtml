@@ -37,7 +37,13 @@
     var createFragment = Model.CreateFragment ?? string.Empty;
 }
 
-<div class="card shadow-sm h-100 home-widget-card">
+@{
+    var cardClass = string.IsNullOrWhiteSpace(Model.CardCssClass)
+        ? "card shadow-sm h-100 home-widget-card"
+        : $"card shadow-sm h-100 home-widget-card {Model.CardCssClass}";
+}
+
+<div class="@cardClass">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2 home-widget-card__header">
         <h2 class="h6 mb-0">@Model.Title</h2>
         <div class="d-flex align-items-center gap-2 flex-wrap">

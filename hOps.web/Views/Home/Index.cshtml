@@ -180,7 +180,8 @@
                                 createControllerName: "WorkOrders",
                                 createActionName: "Index",
                                 createButtonText: "+ New Work Order",
-                                createFragment: "workOrdersForm"))
+                                createFragment: "workOrdersForm",
+                                cardCssClass: "home-widget-card--fill"))
                             break;
                         case HomeWidgetIds.OpsFeed:
                             @await Html.PartialAsync("~/Views/Home/Widgets/_OpsFeedWidget.cshtml", Model)
