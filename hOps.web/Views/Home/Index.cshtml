@@ -72,7 +72,7 @@
 
     @if (Model.CanManageWidgets && Model.MarketplaceModules.Any())
     {
-        <div class="card mb-3">
+        <div class="card mb-3 d-none" data-widget-marketplace>
             <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div>
                     <h2 class="h6 mb-0">Widget Marketplace</h2>
@@ -236,6 +236,7 @@
         const saveButton = document.querySelector('[data-layout-action="save"]');
         const cancelButton = document.querySelector('[data-layout-action="cancel"]');
         const hint = document.querySelector('[data-layout-hint]');
+        const marketplace = document.querySelector('[data-widget-marketplace]');
         const sizeOptions = (() => {
             try {
                 return JSON.parse(grid.dataset.sizeOptions || '{}');
@@ -318,6 +319,9 @@
                 widget.classList.toggle('home-widget--editing', enabled);
             });
             dashboard?.classList.toggle('home-dashboard--editing', enabled);
+            if (marketplace) {
+                marketplace.classList.toggle('d-none', !enabled);
+            }
             if (enabled) {
                 startButton?.classList.add('d-none');
                 editorGroup?.classList.remove('d-none');
