@@ -698,7 +698,8 @@ namespace hOps.web.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            var model = BuildDetailsViewModel(log, currentUser.Id, nextLogId, previousLogId);
+            var canDelete = User.IsInRole("Admin") || User.IsInRole("Manager");
+            var model = BuildDetailsViewModel(log, currentUser.Id, nextLogId, previousLogId, canDelete);
 
             return View(model);
         }
@@ -743,7 +744,8 @@ namespace hOps.web.Controllers
             if (!ModelState.IsValid)
             {
                 var (nextLogId, previousLogId) = await GetNeighborLogIdsAsync(log, accessiblePropertyIds);
-                var modelWithErrors = BuildDetailsViewModel(log, currentUser.Id, nextLogId, previousLogId);
+                var canDelete = User.IsInRole("Admin") || User.IsInRole("Manager");
+                var modelWithErrors = BuildDetailsViewModel(log, currentUser.Id, nextLogId, previousLogId, canDelete);
                 modelWithErrors.NewComment = input;
                 modelWithErrors.NewComment.ReturnUrl = input.ReturnUrl;
                 return View("Details", modelWithErrors);
@@ -776,6 +778,76 @@ namespace hOps.web.Controllers
             }
 
             return RedirectToAction(nameof(Details), new { id = log.Id });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var canManage = User.IsInRole("Admin") || User.IsInRole("Manager");
+            if (!canManage)
+            {
+                return Forbid();
+            }
+
+            var log = await _context.PassOnLogs
+                .Include(l => l.Properties)
+                .Include(l => l.Attachments)
+                .Include(l => l.Comments)
+                .Include(l => l.Views)
+                .FirstOrDefaultAsync(l => l.Id == id);
+
+            if (log == null)
+            {
+                return NotFound();
+            }
+
+            if (!User.IsInRole("Admin"))
+            {
+                var accessiblePropertyIds = (await GetAccessiblePropertiesAsync(currentUser.Id))
+                    .Select(p => p.Id)
+                    .ToList();
+
+                if (!log.Properties.Any(p => accessiblePropertyIds.Contains(p.PropertyId)))
+                {
+                    return Forbid();
+                }
+            }
+
+            var attachmentPaths = log.Attachments
+                .Select(a => GetPhysicalPathForAttachment(a.FilePath))
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .ToList();
+
+            var notifications = await _context.UserNotifications
+                .Where(n => n.PassOnLogId == log.Id)
+                .ToListAsync();
+
+            _context.PassOnLogComments.RemoveRange(log.Comments);
+            _context.PassOnLogAttachments.RemoveRange(log.Attachments);
+            _context.PassOnLogViews.RemoveRange(log.Views);
+            _context.PassOnLogProperties.RemoveRange(log.Properties);
+            if (notifications.Any())
+            {
+                _context.UserNotifications.RemoveRange(notifications);
+            }
+
+            _context.PassOnLogs.Remove(log);
+            await _context.SaveChangesAsync();
+
+            foreach (var path in attachmentPaths)
+            {
+                DeletePhysicalFile(path);
+            }
+
+            TempData["Success"] = "Pass on log deleted.";
+            return RedirectToAction(nameof(Index));
         }
 
         private static string BuildPreview(string body)
@@ -1002,7 +1074,7 @@ namespace hOps.web.Controllers
             return int.TryParse(match.Groups["id"].Value, out logId);
         }
 
-        private PassOnLogDetailsViewModel BuildDetailsViewModel(PassOnLog log, string currentUserId, int? nextLogId, int? previousLogId)
+        private PassOnLogDetailsViewModel BuildDetailsViewModel(PassOnLog log, string currentUserId, int? nextLogId, int? previousLogId, bool canDelete)
         {
             var creatorName = FormatUserName(log.CreatedBy?.FirstName, log.CreatedBy?.LastName, log.CreatedBy?.Email ?? string.Empty);
 
@@ -1056,6 +1128,8 @@ namespace hOps.web.Controllers
                 NextLogId = nextLogId,
                 PreviousLogId = previousLogId
             };
+
+            vm.CanDelete = canDelete;
 
             return vm;
         }

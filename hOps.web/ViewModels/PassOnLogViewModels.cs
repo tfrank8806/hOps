@@ -117,6 +117,7 @@ namespace hOps.web.ViewModels
         public List<PassOnLogCommentViewModel> Comments { get; set; } = new();
         public List<PassOnLogViewerViewModel> Viewers { get; set; } = new();
         public bool CanEdit { get; set; }
+        public bool CanDelete { get; set; }
         public PassOnLogCommentInputModel NewComment { get; set; } = new();
         public List<PassOnLogAttachmentViewModel> Attachments { get; set; } = new();
         public int? NextLogId { get; set; }
