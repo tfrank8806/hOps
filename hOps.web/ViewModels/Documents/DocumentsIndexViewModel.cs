@@ -16,6 +16,7 @@ namespace hOps.web.ViewModels.Documents
         public List<DocumentFolderListItemViewModel> ChildFolders { get; set; } = new();
         public int? SelectedFolderId { get; set; }
         public bool ShowingUnassignedOnly { get; set; }
+        public List<DocumentFolderBreadcrumbItemViewModel> SelectedFolderBreadcrumb { get; set; } = new();
         public int UnassignedDocumentCount { get; set; }
         public int TotalDocumentCount { get; set; }
         public int? CurrentPropertyId { get; set; }

@@ -806,6 +806,7 @@ namespace hOps.web.Controllers
                 .ToList();
 
             var childFolders = BuildChildFolderList(folderEntities, accessibleDocuments, actualSelectedFolderId, showUnassignedOnly, folderPathMap);
+            var breadcrumb = BuildFolderBreadcrumb(folderEntities, actualSelectedFolderId, showUnassignedOnly);
 
             return new DocumentsIndexViewModel
             {
@@ -820,6 +821,7 @@ namespace hOps.web.Controllers
                 ChildFolders = childFolders,
                 SelectedFolderId = actualSelectedFolderId,
                 ShowingUnassignedOnly = showUnassignedOnly,
+                SelectedFolderBreadcrumb = breadcrumb,
                 UnassignedDocumentCount = accessibleDocuments.Count(d => !d.FolderId.HasValue),
                 TotalDocumentCount = accessibleDocuments.Count,
                 PropertyOptions = propertyOptions,
@@ -987,6 +989,64 @@ namespace hOps.web.Controllers
 
             AddChildren(0, 0);
             return tree;
+        }
+
+        private static List<DocumentFolderBreadcrumbItemViewModel> BuildFolderBreadcrumb(
+            IReadOnlyCollection<DocumentFolder> folders,
+            int? selectedFolderId,
+            bool showingUnassignedOnly)
+        {
+            var breadcrumb = new List<DocumentFolderBreadcrumbItemViewModel>
+            {
+                new DocumentFolderBreadcrumbItemViewModel
+                {
+                    FolderId = null,
+                    Name = "All Documents",
+                    IsCurrent = !selectedFolderId.HasValue && !showingUnassignedOnly
+                }
+            };
+
+            if (showingUnassignedOnly)
+            {
+                breadcrumb.Add(new DocumentFolderBreadcrumbItemViewModel
+                {
+                    FolderId = -1,
+                    Name = "No folder",
+                    IsCurrent = true
+                });
+                return breadcrumb;
+            }
+
+            if (!selectedFolderId.HasValue)
+            {
+                return breadcrumb;
+            }
+
+            var lookup = folders.ToDictionary(f => f.Id);
+            var stack = new Stack<DocumentFolder>();
+            var currentId = selectedFolderId.Value;
+            while (lookup.TryGetValue(currentId, out var folder))
+            {
+                stack.Push(folder);
+                if (!folder.ParentFolderId.HasValue)
+                {
+                    break;
+                }
+                currentId = folder.ParentFolderId.Value;
+            }
+
+            while (stack.Count > 0)
+            {
+                var folder = stack.Pop();
+                breadcrumb.Add(new DocumentFolderBreadcrumbItemViewModel
+                {
+                    FolderId = folder.Id,
+                    Name = folder.Name,
+                    IsCurrent = folder.Id == selectedFolderId
+                });
+            }
+
+            return breadcrumb;
         }
 
         private static string FormatUserName(ApplicationUser? user)
