@@ -16,6 +16,7 @@ using System.Linq;
 using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +27,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
+
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        var sqlitePath = Path.Combine(AppContext.BaseDirectory, "hOps.db");
+        connectionString = $"Data Source={sqlitePath}";
+    }
 
     // Prefer SQL Server for cloud/remote connection strings; fall back to SQLite for local file-based strings.
     var lc = connectionString.ToLowerInvariant();
