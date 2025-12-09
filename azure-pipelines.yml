@@ -3,18 +3,18 @@
   # Add steps that publish symbols, save build artifacts, and more:
   # https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
 
-  trigger:
+trigger:
   - main
 
-  pool:
+pool:
     vmImage: 'windows-latest'
 
-  variables:
+variables:
     solution: '**/*.sln'
     buildPlatform: 'Any CPU'
     buildConfiguration: 'Release'
 
-  steps:
+steps:
   - task: AzureKeyVault@2
     displayName: Fetch secrets from Key Vault
     inputs:
