@@ -98,7 +98,8 @@
                                         </td>
                                         <td>
                                             <div class="form-check">
-                                                <input class="form-check-input" asp-for="ShiftTemplates[i].AlertIfMissing" />
+                                                <input type="hidden" name="@( $"ShiftTemplates[{i}].AlertIfMissing" )" value="false" />
+                                                <input class="form-check-input" asp-for="ShiftTemplates[i].AlertIfMissing" value="true" />
                                                 <label asp-for="ShiftTemplates[i].AlertIfMissing" class="form-check-label small text-muted">Alert if missing</label>
                                             </div>
                                         </td>
