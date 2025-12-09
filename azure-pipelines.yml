@@ -1,0 +1,49 @@
+# ASP.NET Core (.NET Framework)
+  # Build and test ASP.NET Core projects targeting the full .NET Framework.
+  # Add steps that publish symbols, save build artifacts, and more:
+  # https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+  trigger:
+  - main
+
+  pool:
+    vmImage: 'windows-latest'
+
+  variables:
+    solution: '**/*.sln'
+    buildPlatform: 'Any CPU'
+    buildConfiguration: 'Release'
+
+  steps:
+  - task: AzureKeyVault@2
+    displayName: Fetch secrets from Key Vault
+    inputs:
+      azureSubscription: 'GuestQuest-ARM'
+      KeyVaultName: 'HopsKeyVault'
+      SecretsFilter: 'ConnectionStrings--DefaultConnection,EmailSettings--SMTPUser,EmailSettings--SMTPPass'
+      RunAsPreJob: false
+
+  - powershell: |
+      Write-Host "##vso[task.setvariable variable=ConnectionStrings:DefaultConnection]$(ConnectionStrings--DefaultConnection)"
+      Write-Host "##vso[task.setvariable variable=EmailSettings:SMTPUser]$(EmailSettings--SMTPUser)"
+      Write-Host "##vso[task.setvariable variable=EmailSettings:SMTPPass]$(EmailSettings--SMTPPass)"
+    displayName: Map secrets to config keys
+
+  - task: NuGetToolInstaller@1
+
+  - task: NuGetCommand@2
+    inputs:
+      restoreSolution: '$(solution)'
+
+  - task: VSBuild@1
+    inputs:
+      solution: '$(solution)'
+      msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /
+  p:DesktopBuildPackageLocation="$(build.artifactStagingDirectory)\WebApp.zip" /p:DeployIisAppPath="Default Web Site"'
+      platform: '$(buildPlatform)'
+      configuration: '$(buildConfiguration)'
+
+  - task: VSTest@2
+    inputs:
+      platform: '$(buildPlatform)'
+      configuration: '$(buildConfiguration)'
