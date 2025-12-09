@@ -624,9 +624,21 @@
                                 var advanceUrl = $"{Url.Action("AdvanceStatus", new { id = order.Id })}{filterQueryString}";
                                 <form method="post" action="@advanceUrl" class="workorder-progress-form">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-outline-secondary btn-sm" title="Next status: @nextStatusFriendlyName">
-                                        Next Status
-                                    </button>
+                                    <label class="visually-hidden" for="workorder_status_@order.Id">Update Status</label>
+                                    <select id="workorder_status_@order.Id"
+                                            class="form-select form-select-sm workorder-status-select"
+                                            name="Status"
+                                            onchange="this.form.submit()"
+                                            title="Update status">
+                                        @foreach (var statusOption in Model.StatusOptions)
+                                        {
+                                            var isSelected = statusOption.Key.Equals(order.Status, StringComparison.OrdinalIgnoreCase) ||
+                                                (statusOption.Key.Equals("New", StringComparison.OrdinalIgnoreCase) && order.Status.Equals("Open", StringComparison.OrdinalIgnoreCase));
+                                            <option value="@statusOption.Key" selected="@(isSelected ? "selected" : null)">
+                                                @statusOption.Label
+                                            </option>
+                                        }
+                                    </select>
                                 </form>
                             }
                         </div>

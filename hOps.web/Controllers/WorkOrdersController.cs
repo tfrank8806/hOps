@@ -451,7 +451,7 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AdvanceStatus(int id)
+        public async Task<IActionResult> AdvanceStatus(int id, string? status)
         {
             var user = await _userManager.GetUserAsync(User);
             var roles = user != null
@@ -479,19 +479,39 @@ namespace hOps.web.Controllers
                 return Forbid();
             }
 
-            var currentIndex = Array.FindIndex(StatusProgression, status =>
-                status.Equals(workOrder.Status, StringComparison.OrdinalIgnoreCase) ||
-                (status.Equals("New", StringComparison.OrdinalIgnoreCase) && workOrder.Status.Equals("Open", StringComparison.OrdinalIgnoreCase)));
-
-            if (currentIndex < 0)
+            string nextStatus;
+            if (!string.IsNullOrWhiteSpace(status))
             {
-                currentIndex = 0;
+                nextStatus = StatusProgression.FirstOrDefault(s =>
+                    s.Equals(status, StringComparison.OrdinalIgnoreCase)) ?? string.Empty;
+
+                if (string.IsNullOrEmpty(nextStatus))
+                {
+                    return BadRequest("Invalid status selected.");
+                }
+            }
+            else
+            {
+                var currentIndex = Array.FindIndex(StatusProgression, currentStatus =>
+                    currentStatus.Equals(workOrder.Status, StringComparison.OrdinalIgnoreCase) ||
+                    (currentStatus.Equals("New", StringComparison.OrdinalIgnoreCase) && workOrder.Status.Equals("Open", StringComparison.OrdinalIgnoreCase)));
+
+                if (currentIndex < 0)
+                {
+                    currentIndex = 0;
+                }
+
+                nextStatus = StatusProgression[(currentIndex + 1) % StatusProgression.Length];
             }
 
-            var nextStatus = StatusProgression[(currentIndex + 1) % StatusProgression.Length];
+            var alreadyAtStatus = workOrder.Status.Equals(nextStatus, StringComparison.OrdinalIgnoreCase) ||
+                (nextStatus.Equals("New", StringComparison.OrdinalIgnoreCase) && workOrder.Status.Equals("Open", StringComparison.OrdinalIgnoreCase));
 
-            workOrder.Status = nextStatus;
-            await _context.SaveChangesAsync();
+            if (!alreadyAtStatus)
+            {
+                workOrder.Status = nextStatus;
+                await _context.SaveChangesAsync();
+            }
 
             return RedirectWithFilters(workOrder.Id);
         }
