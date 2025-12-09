@@ -7,18 +7,23 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h2 class="mb-0">Schedule Setup</h2>
-    @if (Model.PropertyOptions?.Any() == true)
-    {
-        <form method="get" class="d-flex gap-2">
-            <select name="propertyId" class="form-select" style="min-width: 220px;">
-                @foreach (var option in Model.PropertyOptions)
-                {
-                    <option value="@option.Value" selected="@(option.Selected)">@option.Text</option>
-                }
-            </select>
-            <button type="submit" class="btn btn-outline-secondary">Switch</button>
-        </form>
-    }
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+        <a class="btn btn-outline-secondary" asp-controller="Schedules" asp-action="Index">
+            &larr; Back to Schedule
+        </a>
+        @if (Model.PropertyOptions?.Any() == true)
+        {
+            <form method="get" class="d-flex gap-2">
+                <select name="propertyId" class="form-select" style="min-width: 220px;">
+                    @foreach (var option in Model.PropertyOptions)
+                    {
+                        <option value="@option.Value" selected="@(option.Selected)">@option.Text</option>
+                    }
+                </select>
+                <button type="submit" class="btn btn-outline-secondary">Switch</button>
+            </form>
+        }
+    </div>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(successMessage))

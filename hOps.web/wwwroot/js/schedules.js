@@ -27,7 +27,20 @@
         clipboardStatus.textContent = `Shift copied: ${clipboard.label}. Click another cell to paste.`;
     }
 
-    function applyTemplate(option) {
+    function getSelectedTemplateOption(select) {
+        if (!select) {
+            return null;
+        }
+
+        if (select.selectedOptions && select.selectedOptions.length > 0) {
+            return select.selectedOptions[0];
+        }
+
+        const index = typeof select.selectedIndex === 'number' ? select.selectedIndex : -1;
+        return index >= 0 ? select.options[index] : null;
+    }
+
+    function applyTemplate(option, force = false) {
         if (!option) {
             if (shiftColorInput) {
                 shiftColorInput.value = '';
@@ -40,7 +53,7 @@
         const templateEnd = option.getAttribute('data-end');
         const templateColor = option.getAttribute('data-color');
 
-        if (shiftNameInput && templateShiftName) {
+        if (shiftNameInput && templateShiftName && (force || !shiftNameInput.value.trim())) {
             shiftNameInput.value = templateShiftName;
         }
         if (shiftStartInput && templateStart) {
@@ -56,20 +69,29 @@
 
     if (templateSelect) {
         templateSelect.addEventListener('change', () => {
-            const option = templateSelect.selectedOptions[0];
+            const option = getSelectedTemplateOption(templateSelect);
             if (option && option.value) {
-                applyTemplate(option);
+                applyTemplate(option, true);
             } else if (shiftColorInput) {
                 shiftColorInput.value = '';
             }
         });
 
         if (templateSelect.value) {
-            const initialOption = templateSelect.selectedOptions[0];
+            const initialOption = getSelectedTemplateOption(templateSelect);
             if (initialOption) {
                 applyTemplate(initialOption);
             }
         }
+    }
+
+    if (addForm) {
+        addForm.addEventListener('submit', () => {
+            const option = getSelectedTemplateOption(templateSelect);
+            if (option && option.value && shiftNameInput && !shiftNameInput.value.trim()) {
+                applyTemplate(option);
+            }
+        });
     }
 
     function setAddFormTarget(employeeId, isoDate) {
