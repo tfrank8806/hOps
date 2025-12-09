@@ -33,6 +33,15 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         var sqlitePath = Path.Combine(AppContext.BaseDirectory, "hOps.db");
         connectionString = $"Data Source={sqlitePath}";
     }
+    else if (!connectionString.Contains('='))
+    {
+        var inferredPath = connectionString.Trim();
+        if (!Path.IsPathRooted(inferredPath))
+        {
+            inferredPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, inferredPath));
+        }
+        connectionString = $"Data Source={inferredPath}";
+    }
 
     // Prefer SQL Server for cloud/remote connection strings; fall back to SQLite for local file-based strings.
     var lc = connectionString.ToLowerInvariant();
