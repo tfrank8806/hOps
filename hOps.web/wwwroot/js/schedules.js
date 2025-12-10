@@ -1,13 +1,14 @@
 (() => {
     const templateSelect = document.getElementById('shiftTemplateSelect');
-    const shiftNameInput = document.querySelector('input[name="AssignmentForm.ShiftName"]');
-    const shiftStartInput = document.querySelector('input[name="AssignmentForm.ShiftStartTime"]');
-    const shiftEndInput = document.querySelector('input[name="AssignmentForm.ShiftEndTime"]');
-    const shiftColorInput = document.getElementById('shiftColorInput');
-
     const addForm = document.getElementById('addShiftForm');
+    const shiftNameInput = addForm ? addForm.querySelector('input[name="AssignmentForm.ShiftName"]') : null;
+    const shiftStartInput = addForm ? addForm.querySelector('input[name="AssignmentForm.ShiftStartTime"]') : null;
+    const shiftEndInput = addForm ? addForm.querySelector('input[name="AssignmentForm.ShiftEndTime"]') : null;
+    const shiftColorInput = document.getElementById('shiftColorInput');
     const employeeSelect = addForm ? addForm.querySelector('select[name="AssignmentForm.ScheduleEmployeeId"]') : null;
     const dateInput = addForm ? addForm.querySelector('input[name="AssignmentForm.ShiftDate"]') : null;
+    const repeatDayInputs = addForm ? Array.from(addForm.querySelectorAll('[data-repeat-day]')) : [];
+    const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     const clipboardStatus = document.getElementById('scheduleClipboardStatus');
     const pasteForm = document.getElementById('pasteShiftForm');
@@ -67,6 +68,45 @@
         }
     }
 
+    const getDayIndexFromIso = (isoDate) => {
+        if (!isoDate) {
+            return null;
+        }
+        const parsed = new Date(`${isoDate}T00:00:00`);
+        if (Number.isNaN(parsed.getTime())) {
+            return null;
+        }
+        return parsed.getUTCDay();
+    };
+
+    const setRepeatDaysForDate = (isoDate) => {
+        if (!repeatDayInputs.length || !isoDate) {
+            return;
+        }
+        const dayIndex = getDayIndexFromIso(isoDate);
+        if (dayIndex === null || !weekdayNames[dayIndex]) {
+            return;
+        }
+        const targetValue = weekdayNames[dayIndex];
+        repeatDayInputs.forEach(input => {
+            input.checked = input.value === targetValue;
+        });
+    };
+
+    const ensureRepeatDaySelection = () => {
+        if (!repeatDayInputs.length) {
+            return;
+        }
+        if (repeatDayInputs.some(input => input.checked)) {
+            return;
+        }
+        if (dateInput?.value) {
+            setRepeatDaysForDate(dateInput.value);
+            return;
+        }
+        repeatDayInputs[0].checked = true;
+    };
+
     if (templateSelect) {
         templateSelect.addEventListener('change', () => {
             const option = getSelectedTemplateOption(templateSelect);
@@ -86,7 +126,12 @@
     }
 
     if (addForm) {
+        if (dateInput?.value) {
+            setRepeatDaysForDate(dateInput.value);
+        }
+
         addForm.addEventListener('submit', () => {
+            ensureRepeatDaySelection();
             const option = getSelectedTemplateOption(templateSelect);
             if (option && option.value && shiftNameInput && !shiftNameInput.value.trim()) {
                 applyTemplate(option);
@@ -102,6 +147,7 @@
         employeeSelect.value = employeeId;
         employeeSelect.dispatchEvent(new Event('change'));
         dateInput.value = isoDate;
+        setRepeatDaysForDate(isoDate);
         addForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
         shiftNameInput?.focus();
     }

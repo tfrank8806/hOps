@@ -137,12 +137,8 @@ namespace hOps.web.ViewModels.Schedules
         [MaxLength(500)]
         public string? Notes { get; set; }
 
-        [Range(1, 21)]
-        [Display(Name = "Repeat for (days)")]
-        public int RepeatDays { get; set; } = 1;
-
-        [Display(Name = "Skip weekends")]
-        public bool RepeatSkipWeekends { get; set; }
+        [Display(Name = "Apply to days")]
+        public List<DayOfWeek> RepeatOnDays { get; set; } = new();
 
         public string? ShiftColorHex { get; set; }
     }

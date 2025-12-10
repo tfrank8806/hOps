@@ -235,7 +235,7 @@ namespace hOps.web.Controllers
                     ShiftName = shiftTemplates
                         .Select(t => string.IsNullOrWhiteSpace(t.ShiftName) ? t.Name : t.ShiftName)
                         .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? "Shift",
-                    RepeatDays = 1
+                    RepeatOnDays = new List<DayOfWeek> { alignedWeekStart.DayOfWeek }
                 },
                 EmployeeForm = new ScheduleEmployeeFormViewModel(),
                 TimeOffForm = new TimeOffRequestFormViewModel
@@ -494,26 +494,30 @@ namespace hOps.web.Controllers
             var normalizedShiftName = string.IsNullOrWhiteSpace(form.ShiftName) ? "Shift" : form.ShiftName.Trim();
             var resolvedColorHex = NormalizeColorHex(selectedTemplate?.ColorHex) ?? NormalizeColorHex(form.ShiftColorHex);
 
-            var repeatDays = form.RepeatDays < 1 ? 1 : Math.Min(form.RepeatDays, 21);
-            var repeatLimitDate = schedule.WeekEndDate.Date;
-            var firstDate = DateTime.SpecifyKind(form.ShiftDate.Date, DateTimeKind.Utc);
+            var selectedDays = form.RepeatOnDays?
+                .Distinct()
+                .Where(day => day >= DayOfWeek.Sunday && day <= DayOfWeek.Saturday)
+                .ToList() ?? new List<DayOfWeek>();
 
-            var assignmentsToInsert = new List<ScheduleAssignment>();
-            var processed = 0;
-            var candidateDate = firstDate;
-
-            while (processed < repeatDays && candidateDate <= repeatLimitDate)
+            if (selectedDays.Count == 0)
             {
-                if (form.RepeatSkipWeekends && (candidateDate.DayOfWeek == DayOfWeek.Saturday || candidateDate.DayOfWeek == DayOfWeek.Sunday))
+                selectedDays.Add(form.ShiftDate.DayOfWeek);
+            }
+
+            var weekStartDate = DateTime.SpecifyKind(schedule.WeekStartDate.Date, DateTimeKind.Utc);
+            var assignmentsToInsert = new List<ScheduleAssignment>();
+
+            foreach (var day in selectedDays)
+            {
+                var targetDate = ResolveWeekDate(weekStartDate, day);
+                if (targetDate < schedule.WeekStartDate || targetDate > schedule.WeekEndDate)
                 {
-                    candidateDate = candidateDate.AddDays(1);
-                    processed++;
                     continue;
                 }
 
                 var alreadyExists = schedule.Assignments.Any(a =>
                     a.ScheduleEmployeeId == employee.Id &&
-                    a.ShiftDate.Date == candidateDate.Date &&
+                    a.ShiftDate.Date == targetDate.Date &&
                     string.Equals(a.ShiftName, normalizedShiftName, StringComparison.OrdinalIgnoreCase));
 
                 if (!alreadyExists)
@@ -522,7 +526,7 @@ namespace hOps.web.Controllers
                     {
                         ScheduleId = schedule.Id,
                         ScheduleEmployeeId = employee.Id,
-                        ShiftDate = candidateDate,
+                        ShiftDate = targetDate,
                         ShiftName = normalizedShiftName,
                         ShiftStartTime = startTime,
                         ShiftEndTime = endTime,
@@ -530,9 +534,6 @@ namespace hOps.web.Controllers
                         ColorHex = resolvedColorHex
                     });
                 }
-
-                candidateDate = candidateDate.AddDays(1);
-                processed++;
             }
 
             if (!assignmentsToInsert.Any())
@@ -1369,6 +1370,13 @@ namespace hOps.web.Controllers
                 new SelectListItem("Employee name", ScheduleSortOption.EmployeeName.ToString(), selected == ScheduleSortOption.EmployeeName),
                 new SelectListItem("Shift name", ScheduleSortOption.ShiftName.ToString(), selected == ScheduleSortOption.ShiftName)
             };
+        }
+
+        private static DateTime ResolveWeekDate(DateTime weekStartUtc, DayOfWeek targetDay)
+        {
+            var baseDay = weekStartUtc.DayOfWeek;
+            var offset = ((int)targetDay - (int)baseDay + 7) % 7;
+            return DateTime.SpecifyKind(weekStartUtc.Date, DateTimeKind.Utc).AddDays(offset);
         }
 
         private static List<ScheduleShiftAlertViewModel> BuildShiftAlerts(

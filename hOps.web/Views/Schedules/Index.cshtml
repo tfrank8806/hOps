@@ -233,8 +233,6 @@
                                                                                 <input type="hidden" name="AssignmentForm.ScheduleId" value="@Model.ScheduleId" />
                                                                                 <input type="hidden" name="weekStart" value="@weekStartParam" />
                                                                                 <input type="hidden" name="AssignmentForm.ShiftColorHex" value="@assignment.ColorHex" />
-                                                                                <input type="hidden" name="AssignmentForm.RepeatDays" value="1" />
-                                                                                <input type="hidden" name="AssignmentForm.RepeatSkipWeekends" value="false" />
                                                                                 <div class="row g-2">
                                                                                 <div class="col-12">
                                                                                     <label class="form-label small">Employee</label>
@@ -390,16 +388,24 @@
                                 <label asp-for="AssignmentForm.ShiftName" class="form-label"></label>
                                 <input asp-for="AssignmentForm.ShiftName" class="form-control" />
                             </div>
-                            <div class="col-md-4">
-                                <label asp-for="AssignmentForm.RepeatDays" class="form-label"></label>
-                                <input asp-for="AssignmentForm.RepeatDays" class="form-control" type="number" min="1" max="21" />
-                                <small class="text-muted">Includes the first day (max 3 weeks).</small>
-                            </div>
-                            <div class="col-md-4 d-flex align-items-center">
-                                <div class="form-check mt-4">
-                                    <input asp-for="AssignmentForm.RepeatSkipWeekends" class="form-check-input" />
-                                    <label asp-for="AssignmentForm.RepeatSkipWeekends" class="form-check-label"></label>
+                            <div class="col-12">
+                                <label class="form-label">@Html.DisplayNameFor(m => m.AssignmentForm.RepeatOnDays)</label>
+                                <div class="d-flex flex-wrap gap-2" data-repeat-day-group>
+                                    @{
+                                        var repeatDays = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToList();
+                                        foreach (var day in repeatDays)
+                                        {
+                                            var checkboxId = $"repeatDay_{day}";
+                                            var isChecked = Model.AssignmentForm.RepeatOnDays?.Contains(day) ?? false;
+                                            var label = day.ToString().Substring(0, 3);
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <input class="btn-check" type="checkbox" value="@day" id="@checkboxId" name="AssignmentForm.RepeatOnDays" data-repeat-day @(isChecked ? "checked" : null) />
+                                                <label class="btn btn-outline-secondary" for="@checkboxId">@label</label>
+                                            </div>
+                                        }
+                                    }
                                 </div>
+                                <small class="text-muted">Select additional days in this week for this shift.</small>
                             </div>
                             <div class="col-12">
                                 <label asp-for="AssignmentForm.Notes" class="form-label"></label>
