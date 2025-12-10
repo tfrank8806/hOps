@@ -26,6 +26,17 @@
         ["quarter"] = 3
     };
     var sizeOptionsJson = JsonSerializer.Serialize(sizeOptionsPayload);
+    var definitionLookup = (Model.ActiveWidgetDefinitions ?? new List<HomeWidgetDefinition>())
+        .ToDictionary(d => d.Id, d => d, System.StringComparer.OrdinalIgnoreCase);
+    var heightOptionsPayload = new
+    {
+        minHeight = Model.WidgetHeightMin,
+        maxHeight = Model.WidgetHeightMax,
+        step = Model.WidgetHeightStep,
+        tolerance = Model.WidgetHeightResetThreshold,
+        defaultHeight = Model.WidgetHeightDefault
+    };
+    var heightOptionsJson = JsonSerializer.Serialize(heightOptionsPayload);
 }
 
 <form id="homeLayoutAntiforgery" method="post" class="d-none">
@@ -55,7 +66,7 @@
                 <button type="button" class="btn btn-primary" data-layout-action="save">Save Layout</button>
                 <button type="button" class="btn btn-outline-secondary" data-layout-action="cancel">Cancel</button>
             </div>
-            <div class="text-muted small d-none" data-layout-hint>Drag cards to reorder. Drag the corner handle to resize widgets.</div>
+            <div class="text-muted small d-none" data-layout-hint>Drag cards to reorder. Drag the corner handle to adjust width and height.</div>
         </div>
         <div class="d-flex align-items-center gap-2">
             <label class="form-label mb-0 text-muted small" for="layoutPersonaSelect">Persona</label>
@@ -107,6 +118,7 @@
          data-initial-layout='@Html.Raw(initialLayoutJson)'
          data-save-url="@(Url.Action("SaveWidgetLayout", "Home") ?? "#")"
          data-size-options='@Html.Raw(sizeOptionsJson)'
+         data-height-options='@Html.Raw(heightOptionsJson)'
          data-persona="@Model.SelectedPersona">
         @foreach (var widget in Model.WidgetLayout)
         {
@@ -126,16 +138,30 @@
             var appliedSpan = forceFullWidth ? 12 : storedSpan ?? defaultSpan;
             var showCustomLabel = !forceFullWidth && storedSpan.HasValue && appliedSpan != defaultSpan;
             var sizeLabel = showCustomLabel ? $"Custom ({appliedSpan}/12)" : GetSizeLabel(effectiveSize);
+            var defaultHeight = definitionLookup.TryGetValue(widgetId, out var definition) && definition?.DefaultHeight > 0
+                ? definition.DefaultHeight
+                : Model.WidgetHeightDefault;
+            var sanitizedDefaultHeight = Math.Clamp(defaultHeight, Model.WidgetHeightMin, Model.WidgetHeightMax);
+            var storedHeight = widget.CustomHeight.HasValue ? Math.Clamp(widget.CustomHeight.Value, Model.WidgetHeightMin, Model.WidgetHeightMax) : (int?)null;
+            var appliedHeight = storedHeight ?? sanitizedDefaultHeight;
+            var sizeLabelText = forceFullWidth ? $"{sizeLabel} (locked)" : sizeLabel;
+            var heightLabelText = GetHeightLabel(appliedHeight, sanitizedDefaultHeight, storedHeight.HasValue);
+            var widgetStyle = $"grid-column: span {appliedSpan}; --widget-height: {appliedHeight}px;";
             <div class="home-widget"
                  data-widget-id="@widget.WidgetId"
                  data-widget-size="@sizeValue"
                  data-grid-span="@appliedSpan"
+                 data-grid-height="@appliedHeight"
+                 data-default-height="@sanitizedDefaultHeight"
                  @(storedSpan.HasValue ? $"data-custom-span=\"{appliedSpan}\"" : string.Empty)
-                 style="grid-column: span @appliedSpan;"
+                 @(storedHeight.HasValue ? $"data-custom-height=\"{appliedHeight}\"" : string.Empty)
+                 @(forceFullWidth ? "data-lock-width=\"true\"" : string.Empty)
+                 style="@widgetStyle"
                  draggable="false">
                 <div class="home-widget__editor d-flex align-items-center gap-2">
                     <span class="home-widget__drag-handle" role="button" tabindex="0" aria-label="Drag widget" title="Drag widget">⋮⋮</span>
-                    <span class="home-widget__size-label" data-size-label>@sizeLabel</span>
+                    <span class="home-widget__size-label" data-size-label>@sizeLabelText</span>
+                    <span class="home-widget__height-label" data-height-label>@heightLabelText</span>
                 </div>
                 <div class="home-widget__content">
                     @switch (widget.WidgetId)
@@ -208,10 +234,7 @@
                             break;
                     }
                 </div>
-                @if (!forceFullWidth)
-                {
-                    <button type="button" class="home-widget__resizer" data-resize-handle aria-label="Resize widget"></button>
-                }
+                <button type="button" class="home-widget__resizer" data-resize-handle aria-label="Resize widget"></button>
             </div>
         }
     </div>
@@ -226,6 +249,8 @@
         HomeWidgetSize.Quarter => "One quarter",
         _ => "Custom width"
     };
+    private static string GetHeightLabel(int appliedHeight, int defaultHeight, bool hasCustom) =>
+        hasCustom ? $"Height: {appliedHeight}px" : $"Height: Default ({defaultHeight}px)";
 }
 <script>
     (() => {
@@ -267,6 +292,18 @@
                 { key: 'quarter', span: 3 }
             );
         }
+        const heightOptions = (() => {
+            try {
+                return JSON.parse(grid.dataset.heightOptions || '{}');
+            } catch {
+                return {};
+            }
+        })();
+        const MIN_HEIGHT = Number(heightOptions.minHeight) || 220;
+        const MAX_HEIGHT = Number(heightOptions.maxHeight) || 900;
+        const DEFAULT_HEIGHT = Number(heightOptions.defaultHeight) || 300;
+        const HEIGHT_STEP = Number(heightOptions.step) || 10;
+        const HEIGHT_TOLERANCE = Number(heightOptions.tolerance) || 6;
 
         const MIN_COLUMNS = 1;
         const MAX_COLUMNS = 12;
@@ -301,6 +338,61 @@
                 label.textContent = `Custom (${span}/12)`;
             }
         };
+        const clampHeight = (value) => {
+            const numeric = Number(value);
+            if (!Number.isFinite(numeric)) {
+                return DEFAULT_HEIGHT;
+            }
+            return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, numeric));
+        };
+        const getDefaultHeight = (widget) => {
+            if (!widget) {
+                return DEFAULT_HEIGHT;
+            }
+            const candidate = Number(widget.dataset.defaultHeight);
+            if (Number.isFinite(candidate) && candidate > 0) {
+                return clampHeight(candidate);
+            }
+            return DEFAULT_HEIGHT;
+        };
+        const setHeightLabelText = (widget, heightValue) => {
+            const label = widget.querySelector('[data-height-label]');
+            if (!label) {
+                return;
+            }
+            const defaultHeight = getDefaultHeight(widget);
+            if (Math.abs(heightValue - defaultHeight) <= HEIGHT_TOLERANCE) {
+                label.textContent = `Height: Default (${defaultHeight}px)`;
+            } else {
+                label.textContent = `Height: ${Math.round(heightValue)}px`;
+            }
+        };
+        const updateWidgetHeight = (widget, overrideHeight) => {
+            if (!widget) {
+                return;
+            }
+            const defaultHeight = getDefaultHeight(widget);
+            const heightToApply = typeof overrideHeight === 'number' && Number.isFinite(overrideHeight)
+                ? clampHeight(overrideHeight)
+                : defaultHeight;
+            if (Math.abs(heightToApply - defaultHeight) <= HEIGHT_TOLERANCE) {
+                delete widget.dataset.customHeight;
+            } else {
+                widget.dataset.customHeight = String(Math.round(heightToApply));
+            }
+            widget.dataset.gridHeight = String(Math.round(heightToApply));
+            widget.style.setProperty('--widget-height', `${heightToApply}px`);
+            setHeightLabelText(widget, heightToApply);
+        };
+
+        grid.querySelectorAll('.home-widget').forEach(widget => {
+            const initialHeight = Number(widget.dataset.customHeight || widget.dataset.gridHeight);
+            if (Number.isFinite(initialHeight)) {
+                updateWidgetHeight(widget, initialHeight);
+            } else {
+                updateWidgetHeight(widget);
+            }
+        });
 
         let isEditing = false;
         let originalLayout = (() => {
@@ -341,10 +433,12 @@
             const layout = [];
             grid.querySelectorAll('.home-widget').forEach(widget => {
                 const spanValue = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
+                const heightValue = Number(widget.dataset.customHeight);
                 layout.push({
                     widgetId: widget.dataset.widgetId,
                     size: widget.dataset.widgetSize,
-                    customSpan: clampSpan(spanValue)
+                    customSpan: clampSpan(spanValue),
+                    customHeight: Number.isFinite(heightValue) ? clampHeight(heightValue) : null
                 });
             });
             return layout;
@@ -362,6 +456,7 @@
                     return;
                 }
                 updateWidgetSize(widget, entry.size ?? widget.dataset.widgetSize ?? 'third', typeof entry.customSpan === 'number' ? entry.customSpan : undefined);
+                updateWidgetHeight(widget, typeof entry.customHeight === 'number' ? entry.customHeight : undefined);
                 grid.appendChild(widget);
             });
         };
@@ -410,17 +505,29 @@
 
             pointerDownEvent.preventDefault();
             const startX = pointerDownEvent.clientX;
+            const startY = pointerDownEvent.clientY;
             const initialSpan = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
+            const initialHeight = Number(widget.dataset.gridHeight || getDefaultHeight(widget));
             const gridRect = grid.getBoundingClientRect();
             const columnWidth = gridRect.width / 12;
+            const lockWidth = widget.dataset.lockWidth === 'true';
 
             const handlePointerMove = (event) => {
-                const delta = event.clientX - startX;
-                const rawSpan = initialSpan + (delta / columnWidth);
-                const constrained = clampSpan(rawSpan);
-                const snapped = clampSpan(Math.round(constrained));
-                const sizeKey = getNearestSizeKey(snapped);
-                updateWidgetSize(widget, sizeKey, snapped);
+                if (!lockWidth) {
+                    const deltaX = event.clientX - startX;
+                    const rawSpan = initialSpan + (deltaX / columnWidth);
+                    const constrained = clampSpan(rawSpan);
+                    const snapped = clampSpan(Math.round(constrained));
+                    const sizeKey = getNearestSizeKey(snapped);
+                    updateWidgetSize(widget, sizeKey, snapped);
+                }
+
+                const deltaY = event.clientY - startY;
+                if (Math.abs(deltaY) > 0.5) {
+                    const rawHeight = initialHeight + deltaY;
+                    const snappedHeight = clampHeight(Math.round(rawHeight / HEIGHT_STEP) * HEIGHT_STEP);
+                    updateWidgetHeight(widget, snappedHeight);
+                }
             };
 
             const stopResize = () => {

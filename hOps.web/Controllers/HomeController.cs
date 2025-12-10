@@ -31,19 +31,24 @@ namespace hOps.web.Controllers
         private readonly IConfiguration _configuration;
 
         private const string PersonaSessionKey = "HomeLayoutPersona";
+        private const int DefaultWidgetHeight = 300;
+        private const int MinWidgetHeight = 220;
+        private const int MaxWidgetHeight = 900;
+        private const int WidgetHeightStep = 10;
+        private const int WidgetHeightResetThreshold = 6;
 
         private static readonly IReadOnlyList<HomeWidgetDefinition> WidgetDefinitions = new[]
         {
-            new HomeWidgetDefinition { Id = HomeWidgetIds.Announcements, DisplayName = "Announcements", Description = "Manager notes & attachments", DefaultSize = HomeWidgetSize.Third },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.Bulletins, DisplayName = "Bulletin Board", Description = "Team conversations & reminders", DefaultSize = HomeWidgetSize.Third },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.OpsFeed, DisplayName = "Ops Feed", Description = "Unified activity and replies", DefaultSize = HomeWidgetSize.Full },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.PassOnLogs, DisplayName = "Pass On Logs", Description = "Recent pass on entries", DefaultSize = HomeWidgetSize.Third },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.PackageLog, DisplayName = "Package Log", Description = "Undelivered packages", DefaultSize = HomeWidgetSize.Quarter },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.UpcomingEvents, DisplayName = "Upcoming Events", Description = "Calendar highlights", DefaultSize = HomeWidgetSize.Quarter },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.WorkOrders, DisplayName = "Work Orders", Description = "Active tickets and SLAs", DefaultSize = HomeWidgetSize.Quarter },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.LostFound, DisplayName = "Lost & Found", Description = "Items awaiting resolution", DefaultSize = HomeWidgetSize.Quarter },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.MySchedule, DisplayName = "My Schedule", Description = "Upcoming shifts for you", DefaultSize = HomeWidgetSize.Quarter },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.HotelLayout, DisplayName = "Hotel Layout", Description = "Interactive property map", DefaultSize = HomeWidgetSize.Full }
+            new HomeWidgetDefinition { Id = HomeWidgetIds.Announcements, DisplayName = "Announcements", Description = "Manager notes & attachments", DefaultSize = HomeWidgetSize.Third, DefaultHeight = DefaultWidgetHeight },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.Bulletins, DisplayName = "Bulletin Board", Description = "Team conversations & reminders", DefaultSize = HomeWidgetSize.Third, DefaultHeight = DefaultWidgetHeight },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.OpsFeed, DisplayName = "Ops Feed", Description = "Unified activity and replies", DefaultSize = HomeWidgetSize.Full, DefaultHeight = DefaultWidgetHeight },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.PassOnLogs, DisplayName = "Pass On Logs", Description = "Recent pass on entries", DefaultSize = HomeWidgetSize.Third, DefaultHeight = DefaultWidgetHeight },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.PackageLog, DisplayName = "Package Log", Description = "Undelivered packages", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.UpcomingEvents, DisplayName = "Upcoming Events", Description = "Calendar highlights", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.WorkOrders, DisplayName = "Work Orders", Description = "Active tickets and SLAs", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.LostFound, DisplayName = "Lost & Found", Description = "Items awaiting resolution", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.MySchedule, DisplayName = "My Schedule", Description = "Upcoming shifts for you", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.HotelLayout, DisplayName = "Hotel Layout", Description = "Interactive property map", DefaultSize = HomeWidgetSize.Full, DefaultHeight = DefaultWidgetHeight }
         };
 
         private static readonly LayoutPersonaOption[] PersonaOptions = new[]
@@ -109,7 +114,14 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
-            var activeWidgetDefinitions = await GetActiveWidgetDefinitionsAsync();
+            var activeWidgetDefinitions = (await GetActiveWidgetDefinitionsAsync()).ToList();
+
+            viewModel.ActiveWidgetDefinitions = activeWidgetDefinitions;
+            viewModel.WidgetHeightDefault = DefaultWidgetHeight;
+            viewModel.WidgetHeightMin = MinWidgetHeight;
+            viewModel.WidgetHeightMax = MaxWidgetHeight;
+            viewModel.WidgetHeightStep = WidgetHeightStep;
+            viewModel.WidgetHeightResetThreshold = WidgetHeightResetThreshold;
 
             viewModel.WidgetLayout = await BuildWidgetLayoutAsync(user.Id, personaKey, activeWidgetDefinitions);
             viewModel.WidgetSizeClasses = WidgetSizeClasses.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
@@ -230,6 +242,18 @@ namespace hOps.web.Controllers
                     normalizedSpan = null;
                 }
 
+                var requestedHeight = widget.CustomHeight;
+                int? normalizedHeight = null;
+                if (requestedHeight.HasValue)
+                {
+                    var clamped = ClampHeight(requestedHeight.Value);
+                    var defaultHeight = definition.DefaultHeight > 0 ? definition.DefaultHeight : DefaultWidgetHeight;
+                    if (Math.Abs(clamped - defaultHeight) > WidgetHeightResetThreshold)
+                    {
+                        normalizedHeight = clamped;
+                    }
+                }
+
                 if (!seen.Add(widget.WidgetId))
                 {
                     continue;
@@ -239,7 +263,8 @@ namespace hOps.web.Controllers
                 {
                     WidgetId = widget.WidgetId,
                     Size = parsedSize,
-                    CustomSpan = normalizedSpan
+                    CustomSpan = normalizedSpan,
+                    CustomHeight = normalizedHeight
                 });
             }
 
@@ -1571,6 +1596,8 @@ namespace hOps.web.Controllers
                     if (seen.Add(entry.WidgetId))
                     {
                         var sanitizedSpan = entry.CustomSpan.HasValue ? ClampSpan(entry.CustomSpan.Value) : (int?)null;
+                        var defaultHeight = definition.DefaultHeight > 0 ? definition.DefaultHeight : DefaultWidgetHeight;
+                        var sanitizedHeight = entry.CustomHeight.HasValue ? ClampHeight(entry.CustomHeight.Value) : (int?)null;
                         if (string.Equals(entry.WidgetId, HomeWidgetIds.HotelLayout, StringComparison.OrdinalIgnoreCase))
                         {
                             sanitizedSpan = GetSpanForSize(HomeWidgetSize.Full);
@@ -1579,12 +1606,17 @@ namespace hOps.web.Controllers
                         {
                             sanitizedSpan = null;
                         }
+                        if (sanitizedHeight.HasValue && Math.Abs(sanitizedHeight.Value - defaultHeight) <= WidgetHeightResetThreshold)
+                        {
+                            sanitizedHeight = null;
+                        }
 
                         finalLayout.Add(new HomeWidgetLayoutEntry
                         {
                             WidgetId = entry.WidgetId,
                             Size = entry.Size,
-                            CustomSpan = sanitizedSpan
+                            CustomSpan = sanitizedSpan,
+                            CustomHeight = sanitizedHeight
                         });
                     }
                 }
@@ -1615,6 +1647,7 @@ namespace hOps.web.Controllers
         };
 
         private static int ClampSpan(int span) => Math.Clamp(span, 1, 12);
+        private static int ClampHeight(int height) => Math.Clamp(height, MinWidgetHeight, MaxWidgetHeight);
 
         private sealed record LayoutPersonaOption(string Key, string Name, string Description);
 
@@ -1720,6 +1753,7 @@ namespace hOps.web.Controllers
             public string WidgetId { get; set; } = string.Empty;
             public string Size { get; set; } = string.Empty;
             public int? CustomSpan { get; set; }
+            public int? CustomHeight { get; set; }
         }
 
         public class ManagerAnnouncementForm

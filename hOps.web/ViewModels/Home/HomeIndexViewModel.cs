@@ -39,6 +39,12 @@ namespace hOps.web.ViewModels.Home
 
         public List<HomeWidgetLayoutEntry> WidgetLayout { get; set; } = new();
         public Dictionary<HomeWidgetSize, string> WidgetSizeClasses { get; set; } = new();
+        public List<HomeWidgetDefinition> ActiveWidgetDefinitions { get; set; } = new();
+        public int WidgetHeightMin { get; set; } = 220;
+        public int WidgetHeightMax { get; set; } = 900;
+        public int WidgetHeightStep { get; set; } = 10;
+        public int WidgetHeightDefault { get; set; } = 300;
+        public int WidgetHeightResetThreshold { get; set; } = 5;
     }
 
     public class ManagerAnnouncementViewModel
@@ -178,6 +184,7 @@ namespace hOps.web.ViewModels.Home
         public string WidgetId { get; set; } = string.Empty;
         public HomeWidgetSize Size { get; set; } = HomeWidgetSize.Third;
         public int? CustomSpan { get; set; }
+        public int? CustomHeight { get; set; }
     }
 
     public enum HomeWidgetSize
@@ -194,6 +201,7 @@ namespace hOps.web.ViewModels.Home
         public string DisplayName { get; init; } = string.Empty;
         public string? Description { get; init; }
         public HomeWidgetSize DefaultSize { get; init; } = HomeWidgetSize.Third;
+        public int DefaultHeight { get; init; } = 300;
     }
 
     public static class HomeWidgetIds
