@@ -17,8 +17,10 @@ using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.IO;
+using Microsoft.Extensions.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
+var forceSqlite = ShouldForceSqlite(builder.Configuration);
 
 // ----------------------
 // 1. Services Registration
@@ -26,21 +28,22 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
+    var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
 
-    if (string.IsNullOrWhiteSpace(connectionString))
+    if (forceSqlite)
     {
-        var sqlitePath = Path.Combine(AppContext.BaseDirectory, "hOps.db");
-        connectionString = $"Data Source={sqlitePath}";
+        var sqliteConnectionString = ResolveSqliteConnectionString(configuredConnectionString);
+        options.UseSqlite(
+            sqliteConnectionString,
+            sqliteOptions => sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
+        return;
     }
-    else if (!connectionString.Contains('='))
+
+    var connectionString = configuredConnectionString;
+
+    if (string.IsNullOrWhiteSpace(connectionString) || !connectionString.Contains('='))
     {
-        var inferredPath = connectionString.Trim();
-        if (!Path.IsPathRooted(inferredPath))
-        {
-            inferredPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, inferredPath));
-        }
-        connectionString = $"Data Source={inferredPath}";
+        connectionString = ResolveSqliteConnectionString(connectionString);
     }
 
     // Prefer SQL Server for cloud/remote connection strings; fall back to SQLite for local file-based strings.
@@ -53,8 +56,10 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         return;
     }
 
+    var sqliteFallbackConnection = ResolveSqliteConnectionString(connectionString);
+
     options.UseSqlite(
-        connectionString,
+        sqliteFallbackConnection,
         sqliteOptions => sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
 });
 
@@ -113,6 +118,127 @@ static bool IsSqlServerConnectionString(string connectionString, string lowerCas
     }
 
     return false;
+}
+
+static bool ShouldForceSqlite(IConfiguration configuration)
+{
+    if (TryParseBooleanSetting(configuration["Database:ForceSqlite"], out var configuredValue))
+    {
+        return configuredValue;
+    }
+
+    if (TryParseBooleanSetting(Environment.GetEnvironmentVariable("HOPS_FORCE_SQLITE"), out var envOverride))
+    {
+        return envOverride;
+    }
+
+    if (TryParseBooleanSetting(Environment.GetEnvironmentVariable("FORCE_SQLITE"), out var genericOverride))
+    {
+        return genericOverride;
+    }
+
+    return IsCiBuild();
+}
+
+static bool TryParseBooleanSetting(string? value, out bool parsed)
+{
+    parsed = false;
+
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return false;
+    }
+
+    if (bool.TryParse(value, out parsed))
+    {
+        return true;
+    }
+
+    if (string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase))
+    {
+        parsed = true;
+        return true;
+    }
+
+    if (string.Equals(value, "0", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(value, "no", StringComparison.OrdinalIgnoreCase))
+    {
+        parsed = false;
+        return true;
+    }
+
+    return false;
+}
+
+static bool IsCiBuild()
+{
+    static bool MatchesTrue(string? candidate)
+        => string.Equals(candidate, "true", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(candidate, "1", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(candidate, "yes", StringComparison.OrdinalIgnoreCase);
+
+    if (MatchesTrue(Environment.GetEnvironmentVariable("TF_BUILD")))
+    {
+        return true;
+    }
+
+    if (MatchesTrue(Environment.GetEnvironmentVariable("CI")))
+    {
+        return true;
+    }
+
+    if (MatchesTrue(Environment.GetEnvironmentVariable("GITHUB_ACTIONS")))
+    {
+        return true;
+    }
+
+    return false;
+}
+
+static string ResolveSqliteConnectionString(string? configuredValue)
+{
+    if (!string.IsNullOrWhiteSpace(configuredValue))
+    {
+        var trimmed = configuredValue.Trim();
+        var lower = trimmed.ToLowerInvariant();
+
+        if (lower.Contains("data source=", StringComparison.Ordinal) ||
+            lower.Contains("mode=memory", StringComparison.Ordinal))
+        {
+            return trimmed;
+        }
+
+        if (!trimmed.Contains('=') && !trimmed.Contains(';'))
+        {
+            return BuildSqliteDataSourceFromPath(trimmed);
+        }
+
+        if (lower.Contains(".db", StringComparison.Ordinal) ||
+            lower.Contains(".sqlite", StringComparison.Ordinal))
+        {
+            return trimmed;
+        }
+    }
+
+    return BuildSqliteDataSourceFromPath("hOps.db");
+}
+
+static string BuildSqliteDataSourceFromPath(string? relativeOrAbsolutePath)
+{
+    var path = relativeOrAbsolutePath;
+
+    if (string.IsNullOrWhiteSpace(path))
+    {
+        path = "hOps.db";
+    }
+
+    if (!Path.IsPathRooted(path))
+    {
+        path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path));
+    }
+
+    return $"Data Source={path}";
 }
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
