@@ -1430,6 +1430,11 @@ static async Task EnsureMigrationsHistoryTableAsync(DbConnection connection)
 
 static async Task RemoveLegacyDuplicatePassOnLogSchemaEntriesAsync(DbConnection connection)
 {
+    if (connection is not SqliteConnection)
+    {
+        return;
+    }
+
     var tables = new[]
     {
         "PassOnLogs",
