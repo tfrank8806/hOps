@@ -1228,6 +1228,11 @@ static async Task ConsolidateLegacyWorkOrderTypeTableAsync(ApplicationDbContext 
 
 static async Task<bool> TableExistsAsync(DbConnection connection, string tableName)
 {
+    if (connection is not SqliteConnection)
+    {
+        throw new InvalidOperationException("TableExistsAsync should only be used with SQLite connections.");
+    }
+
     try
     {
         await using var checkCommand = connection.CreateCommand();
