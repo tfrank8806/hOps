@@ -173,27 +173,64 @@ static bool TryParseBooleanSetting(string? value, out bool parsed)
 
 static bool IsCiBuild()
 {
-    static bool MatchesTrue(string? candidate)
-        => string.Equals(candidate, "true", StringComparison.OrdinalIgnoreCase) ||
-           string.Equals(candidate, "1", StringComparison.OrdinalIgnoreCase) ||
-           string.Equals(candidate, "yes", StringComparison.OrdinalIgnoreCase);
-
-    if (MatchesTrue(Environment.GetEnvironmentVariable("TF_BUILD")))
+    if (EnvFlagEnabled("TF_BUILD", treatPresenceAsTrue: true))
     {
         return true;
     }
 
-    if (MatchesTrue(Environment.GetEnvironmentVariable("CI")))
+    if (EnvFlagEnabled("CI"))
     {
         return true;
     }
 
-    if (MatchesTrue(Environment.GetEnvironmentVariable("GITHUB_ACTIONS")))
+    if (EnvFlagEnabled("GITHUB_ACTIONS"))
+    {
+        return true;
+    }
+
+    var azureIndicators = new[]
+    {
+        "BUILD_BUILDID",
+        "BUILD_BUILDNUMBER",
+        "BUILD_DEFINITIONNAME",
+        "SYSTEM_TEAMPROJECTID",
+        "SYSTEM_COLLECTIONURI",
+        "AGENT_ID"
+    };
+
+    if (azureIndicators.Any(name => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(name))))
     {
         return true;
     }
 
     return false;
+}
+
+static bool EnvFlagEnabled(string name, bool treatPresenceAsTrue = false)
+{
+    var rawValue = Environment.GetEnvironmentVariable(name);
+    if (string.IsNullOrWhiteSpace(rawValue))
+    {
+        return false;
+    }
+
+    var value = rawValue.Trim();
+
+    if (string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase))
+    {
+        return true;
+    }
+
+    if (string.Equals(value, "false", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(value, "0", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(value, "no", StringComparison.OrdinalIgnoreCase))
+    {
+        return false;
+    }
+
+    return treatPresenceAsTrue;
 }
 
 static string ResolveSqliteConnectionString(string? configuredValue)
