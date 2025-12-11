@@ -199,14 +199,15 @@ using (var scope = app.Services.CreateScope())
     // Apply migrations with provider-specific handling; skip SQLite-only helpers for SQL Server.
     if (isSqlite)
     {
-        await ApplyMigrationsWithLegacySupportAsync(dbContext);
-        await EnsureProfilePhotoPathColumnAsync(dbContext);
-        await EnsureRoomLayoutShapeColumnsAsync(dbContext);
+        await dbContext.Database.EnsureCreatedAsync();
     }
     else
     {
-        await dbContext.Database.MigrateAsync();
+        await ApplyMigrationsWithLegacySupportAsync(dbContext);
     }
+
+    await EnsureProfilePhotoPathColumnAsync(dbContext);
+    await EnsureRoomLayoutShapeColumnsAsync(dbContext);
 
     await SeedRolesAsync(roleManager);
     await SeedAdminUserAsync(userManager, roleManager);
@@ -342,6 +343,11 @@ static async Task EnsureProfilePhotoPathColumnAsync(ApplicationDbContext dbConte
 
     try
     {
+        if (!await TableExistsAsync(connection, "AspNetUsers"))
+        {
+            return;
+        }
+
         await using var checkCommand = connection.CreateCommand();
         checkCommand.CommandText = "PRAGMA table_info('AspNetUsers');";
 
@@ -388,6 +394,11 @@ static async Task EnsureRoomLayoutShapeColumnsAsync(ApplicationDbContext dbConte
 
     try
     {
+        if (!await TableExistsAsync(connection, "RoomLayouts"))
+        {
+            return;
+        }
+
         var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         await using (var checkCommand = connection.CreateCommand())
@@ -436,6 +447,12 @@ static async Task EnsureRoomLayoutShapeColumnsAsync(ApplicationDbContext dbConte
 
 static async Task ApplyMigrationsWithLegacySupportAsync(ApplicationDbContext dbContext)
 {
+    if (dbContext.Database.ProviderName?.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) == true)
+    {
+        await dbContext.Database.EnsureCreatedAsync();
+        return;
+    }
+
     await EnsureLegacyPassOnLogMigrationAsync(dbContext);
 
     try
@@ -462,8 +479,441 @@ static async Task ApplyMigrationsWithLegacySupportAsync(ApplicationDbContext dbC
         await EnsureLegacyPassOnLogMigrationAsync(dbContext);
         await dbContext.Database.MigrateAsync();
     }
+    catch (SqliteException ex) when (IsDuplicateBookmarkQuickFlagColumnError(ex))
+    {
+        await EnsureBookmarkQuickFlagMigrationRecordedAsync(dbContext);
+        await dbContext.Database.MigrateAsync();
+    }
 
     await ConsolidateLegacyWorkOrderTypeTableAsync(dbContext);
+}
+
+static async Task EnsureBookmarksTableAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        if (await TableExistsAsync(connection, "Bookmarks"))
+        {
+            return;
+        }
+
+        const string createTableSql =
+            """
+            CREATE TABLE IF NOT EXISTS "Bookmarks" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_Bookmarks" PRIMARY KEY AUTOINCREMENT,
+                "Name" TEXT NOT NULL,
+                "Url" TEXT NOT NULL,
+                "Description" TEXT NULL,
+                "Section" INTEGER NOT NULL,
+                "ShowInQuickMenu" INTEGER NOT NULL DEFAULT 0,
+                "CreatedById" TEXT NOT NULL,
+                "PropertyId" INTEGER NULL,
+                CONSTRAINT "FK_Bookmarks_AspNetUsers_CreatedById" FOREIGN KEY ("CreatedById") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE,
+                CONSTRAINT "FK_Bookmarks_Properties_PropertyId" FOREIGN KEY ("PropertyId") REFERENCES "Properties" ("Id") ON DELETE CASCADE
+            );
+            """;
+
+        await using (var createCommand = connection.CreateCommand())
+        {
+            createCommand.CommandText = createTableSql;
+            await createCommand.ExecuteNonQueryAsync();
+        }
+
+        const string createCreatedByIndex =
+            """
+            CREATE INDEX IF NOT EXISTS "IX_Bookmarks_CreatedById"
+            ON "Bookmarks" ("CreatedById");
+            """;
+
+        const string createPropertyIndex =
+            """
+            CREATE INDEX IF NOT EXISTS "IX_Bookmarks_PropertyId"
+            ON "Bookmarks" ("PropertyId");
+            """;
+
+        await using (var createdByIndexCommand = connection.CreateCommand())
+        {
+            createdByIndexCommand.CommandText = createCreatedByIndex;
+            await createdByIndexCommand.ExecuteNonQueryAsync();
+        }
+
+        await using (var propertyIndexCommand = connection.CreateCommand())
+        {
+            propertyIndexCommand.CommandText = createPropertyIndex;
+            await propertyIndexCommand.ExecuteNonQueryAsync();
+        }
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
+        }
+    }
+}
+
+static async Task EnsureBookmarkQuickFlagMigrationRecordedAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        await EnsureMigrationRecordedAsync(connection, "20251120024344_AddBookmarkQuickFlag", "8.0.20");
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
+        }
+    }
+}
+
+static async Task EnsureSalesLeadSubmissionsTableAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        if (!await TableExistsAsync(connection, "SalesLeadSubmissions"))
+        {
+            const string createTableSql =
+                """
+                CREATE TABLE IF NOT EXISTS "SalesLeadSubmissions" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_SalesLeadSubmissions" PRIMARY KEY AUTOINCREMENT,
+                    "PropertyId" INTEGER NOT NULL,
+                    "SalesContactId" INTEGER NOT NULL,
+                    "SubmittedByUserId" TEXT NULL,
+                    "SubmittedByName" TEXT NOT NULL,
+                    "GroupName" TEXT NOT NULL,
+                    "ContactName" TEXT NOT NULL,
+                    "ContactPhone" TEXT NULL,
+                    "ContactEmail" TEXT NOT NULL,
+                    "NumberOfRooms" INTEGER NULL,
+                    "NumberOfGuests" INTEGER NULL,
+                    "BudgetMinimum" NUMERIC NULL,
+                    "BudgetMaximum" NUMERIC NULL,
+                    "EventStartDate" TEXT NULL,
+                    "EventEndDate" TEXT NULL,
+                    "InquiryTypes" TEXT NOT NULL,
+                    "InquiryOtherDetails" TEXT NULL,
+                    "AdditionalDetails" TEXT NULL,
+                    "CreatedAtUtc" TEXT NOT NULL DEFAULT (datetime('now')),
+                    CONSTRAINT "FK_SalesLeadSubmissions_Properties_PropertyId" FOREIGN KEY ("PropertyId") REFERENCES "Properties" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_SalesLeadSubmissions_SalesContacts_SalesContactId" FOREIGN KEY ("SalesContactId") REFERENCES "SalesContacts" ("Id") ON DELETE RESTRICT,
+                    CONSTRAINT "FK_SalesLeadSubmissions_AspNetUsers_SubmittedByUserId" FOREIGN KEY ("SubmittedByUserId") REFERENCES "AspNetUsers" ("Id") ON DELETE SET NULL
+                );
+                """;
+
+            await using (var createCommand = connection.CreateCommand())
+            {
+                createCommand.CommandText = createTableSql;
+                await createCommand.ExecuteNonQueryAsync();
+            }
+
+            const string propertyIndexSql =
+                """
+                CREATE INDEX IF NOT EXISTS "IX_SalesLeadSubmissions_PropertyId_CreatedAtUtc"
+                ON "SalesLeadSubmissions" ("PropertyId", "CreatedAtUtc");
+                """;
+
+            await using (var propertyIndexCommand = connection.CreateCommand())
+            {
+                propertyIndexCommand.CommandText = propertyIndexSql;
+                await propertyIndexCommand.ExecuteNonQueryAsync();
+            }
+
+            const string salesContactIndexSql =
+                """
+                CREATE INDEX IF NOT EXISTS "IX_SalesLeadSubmissions_SalesContactId"
+                ON "SalesLeadSubmissions" ("SalesContactId");
+                """;
+
+            await using (var salesContactIndexCommand = connection.CreateCommand())
+            {
+                salesContactIndexCommand.CommandText = salesContactIndexSql;
+                await salesContactIndexCommand.ExecuteNonQueryAsync();
+            }
+        }
+
+        await EnsureMigrationRecordedAsync(connection, "20251120200115_AddSalesLeadSubmissions", "8.0.20");
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
+        }
+    }
+}
+
+static async Task EnsureUserNotificationsTableAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        if (!await TableExistsAsync(connection, "UserNotifications"))
+        {
+            const string createTableSql =
+                """
+                CREATE TABLE IF NOT EXISTS "UserNotifications" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_UserNotifications" PRIMARY KEY AUTOINCREMENT,
+                    "UserId" TEXT NOT NULL,
+                    "Type" TEXT NOT NULL,
+                    "Title" TEXT NOT NULL,
+                    "Content" TEXT NULL,
+                    "LinkUrl" TEXT NULL,
+                    "DirectMessageId" INTEGER NULL,
+                    "PassOnLogId" INTEGER NULL,
+                    "IsRead" INTEGER NOT NULL DEFAULT 0,
+                    "CreatedAt" TEXT NOT NULL DEFAULT (datetime('now')),
+                    "ReadAt" TEXT NULL,
+                    CONSTRAINT "FK_UserNotifications_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_UserNotifications_DirectMessages_DirectMessageId" FOREIGN KEY ("DirectMessageId") REFERENCES "DirectMessages" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_UserNotifications_PassOnLogs_PassOnLogId" FOREIGN KEY ("PassOnLogId") REFERENCES "PassOnLogs" ("Id") ON DELETE RESTRICT
+                );
+                """;
+
+            await using (var createCommand = connection.CreateCommand())
+            {
+                createCommand.CommandText = createTableSql;
+                await createCommand.ExecuteNonQueryAsync();
+            }
+
+            const string userIndexSql =
+                """
+                CREATE INDEX IF NOT EXISTS "IX_UserNotifications_UserId"
+                ON "UserNotifications" ("UserId");
+                """;
+
+            const string directMessageIndexSql =
+                """
+                CREATE INDEX IF NOT EXISTS "IX_UserNotifications_DirectMessageId"
+                ON "UserNotifications" ("DirectMessageId");
+                """;
+
+            const string passOnLogIndexSql =
+                """
+                CREATE INDEX IF NOT EXISTS "IX_UserNotifications_PassOnLogId"
+                ON "UserNotifications" ("PassOnLogId");
+                """;
+
+            await using (var userIndexCommand = connection.CreateCommand())
+            {
+                userIndexCommand.CommandText = userIndexSql;
+                await userIndexCommand.ExecuteNonQueryAsync();
+            }
+
+            await using (var dmIndexCommand = connection.CreateCommand())
+            {
+                dmIndexCommand.CommandText = directMessageIndexSql;
+                await dmIndexCommand.ExecuteNonQueryAsync();
+            }
+
+            await using (var passOnLogIndexCommand = connection.CreateCommand())
+            {
+                passOnLogIndexCommand.CommandText = passOnLogIndexSql;
+                await passOnLogIndexCommand.ExecuteNonQueryAsync();
+            }
+        }
+
+        await EnsureMigrationRecordedAsync(connection, "20251201015127_AddPassOnLogNotificationLink", "8.0.20");
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
+        }
+    }
+}
+
+static async Task EnsureUserHomeLayoutsTableAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        if (!await TableExistsAsync(connection, "UserHomeLayouts"))
+        {
+            const string createTableSql =
+                """
+                CREATE TABLE IF NOT EXISTS "UserHomeLayouts" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_UserHomeLayouts" PRIMARY KEY AUTOINCREMENT,
+                    "UserId" TEXT NOT NULL,
+                    "PersonaKey" TEXT NOT NULL,
+                    "IsDefault" INTEGER NOT NULL DEFAULT 0,
+                    "LayoutJson" TEXT NOT NULL,
+                    "UpdatedAtUtc" TEXT NOT NULL DEFAULT (datetime('now')),
+                    CONSTRAINT "FK_UserHomeLayouts_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
+                );
+                """;
+
+            await using (var createCommand = connection.CreateCommand())
+            {
+                createCommand.CommandText = createTableSql;
+                await createCommand.ExecuteNonQueryAsync();
+            }
+
+            const string personaIndexSql =
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_UserHomeLayouts_UserId_PersonaKey"
+                ON "UserHomeLayouts" ("UserId", "PersonaKey");
+                """;
+
+            await using (var personaIndexCommand = connection.CreateCommand())
+            {
+                personaIndexCommand.CommandText = personaIndexSql;
+                await personaIndexCommand.ExecuteNonQueryAsync();
+            }
+        }
+
+        if (!await TableExistsAsync(connection, "WidgetMarketplaceModules"))
+        {
+            const string createMarketplaceSql =
+                """
+                CREATE TABLE IF NOT EXISTS "WidgetMarketplaceModules" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_WidgetMarketplaceModules" PRIMARY KEY AUTOINCREMENT,
+                    "WidgetId" TEXT NOT NULL,
+                    "IsEnabled" INTEGER NOT NULL DEFAULT 0,
+                    "UpdatedAtUtc" TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                """;
+
+            await using (var createMarketplaceCommand = connection.CreateCommand())
+            {
+                createMarketplaceCommand.CommandText = createMarketplaceSql;
+                await createMarketplaceCommand.ExecuteNonQueryAsync();
+            }
+
+            const string widgetIndexSql =
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_WidgetMarketplaceModules_WidgetId"
+                ON "WidgetMarketplaceModules" ("WidgetId");
+                """;
+
+            await using (var widgetIndexCommand = connection.CreateCommand())
+            {
+                widgetIndexCommand.CommandText = widgetIndexSql;
+                await widgetIndexCommand.ExecuteNonQueryAsync();
+            }
+        }
+
+        await EnsureMigrationRecordedAsync(connection, "20251202194530_AddUserHomeLayout", "8.0.20");
+        await EnsureMigrationRecordedAsync(connection, "20251206045825_AddLayoutMarketplace", "8.0.20");
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
+        }
+    }
+}
+
+static async Task EnsureDailySummaryLastSentColumnAsync(ApplicationDbContext dbContext)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+    if (shouldCloseConnection)
+    {
+        await connection.OpenAsync();
+    }
+
+    try
+    {
+        if (!await TableExistsAsync(connection, "AspNetUsers"))
+        {
+            return;
+        }
+
+        var hasDailySummaryColumn = false;
+        var hasDefaultPropertyColumn = false;
+
+        await using (var pragmaCommand = connection.CreateCommand())
+        {
+            pragmaCommand.CommandText = "PRAGMA table_info('AspNetUsers');";
+            await using var reader = await pragmaCommand.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var columnName = reader.GetString(1);
+                if (string.Equals(columnName, "DailySummaryLastSentUtc", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasDailySummaryColumn = true;
+                }
+                else if (string.Equals(columnName, "DefaultPropertyId", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasDefaultPropertyColumn = true;
+                }
+            }
+        }
+
+        if (!hasDailySummaryColumn)
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "ALTER TABLE \"AspNetUsers\" ADD COLUMN \"DailySummaryLastSentUtc\" TEXT NULL;";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        if (!hasDefaultPropertyColumn)
+        {
+            await using var addDefaultColumn = connection.CreateCommand();
+            addDefaultColumn.CommandText = "ALTER TABLE \"AspNetUsers\" ADD COLUMN \"DefaultPropertyId\" INTEGER NULL;";
+            await addDefaultColumn.ExecuteNonQueryAsync();
+        }
+
+        if (!await IndexExistsAsync(connection, "AspNetUsers", "IX_AspNetUsers_DefaultPropertyId"))
+        {
+            await using var createIndex = connection.CreateCommand();
+            createIndex.CommandText =
+                """
+                CREATE INDEX IF NOT EXISTS "IX_AspNetUsers_DefaultPropertyId"
+                ON "AspNetUsers" ("DefaultPropertyId");
+                """;
+            await createIndex.ExecuteNonQueryAsync();
+        }
+    }
+    finally
+    {
+        if (shouldCloseConnection)
+        {
+            await connection.CloseAsync();
+        }
+    }
 }
 
 static bool IsMissingWorkOrderTypeTableError(SqliteException ex)
@@ -475,6 +925,10 @@ static bool IsLegacyPassOnLogSchemaError(SqliteException ex)
 static bool IsDuplicateMustChangePasswordColumnError(SqliteException ex)
     => ex.SqliteErrorCode == 1
        && ex.Message.Contains("duplicate column name: MustChangePassword", StringComparison.OrdinalIgnoreCase);
+
+static bool IsDuplicateBookmarkQuickFlagColumnError(SqliteException ex)
+    => ex.SqliteErrorCode == 1
+       && ex.Message.Contains("duplicate column name: ShowInQuickMenu", StringComparison.OrdinalIgnoreCase);
 
 static async Task EnsureMustChangePasswordColumnAsync(ApplicationDbContext dbContext)
 {
@@ -648,6 +1102,23 @@ static bool IsDuplicateTableSchemaError(SqliteException ex, string tableName)
     }
 
         return message.Contains("already exists", StringComparison.OrdinalIgnoreCase);
+}
+
+static async Task<bool> IndexExistsAsync(DbConnection connection, string tableName, string indexName)
+{
+    await using var command = connection.CreateCommand();
+    command.CommandText = $"PRAGMA index_list('{tableName}');";
+
+    await using var reader = await command.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        if (string.Equals(reader.GetString(1), indexName, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static bool IsDuplicateTableCreateError(SqliteException ex, string tableName)
