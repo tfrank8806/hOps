@@ -240,6 +240,11 @@ static string ResolveSqliteConnectionString(string? configuredValue)
         var trimmed = configuredValue.Trim();
         var lower = trimmed.ToLowerInvariant();
 
+        if (IsSqlServerConnectionString(trimmed, lower))
+        {
+            return BuildSqliteDataSourceFromPath("hOps.db");
+        }
+
         if (lower.Contains("data source=", StringComparison.Ordinal) ||
             lower.Contains("mode=memory", StringComparison.Ordinal))
         {
@@ -1304,24 +1309,21 @@ static bool IsDuplicateTableCreateError(SqliteException ex, string tableName)
 
 static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbContext)
 {
-    var providerName = dbContext.Database.ProviderName;
-    if (string.IsNullOrWhiteSpace(providerName) ||
-        !providerName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+    if (dbContext.Database.GetDbConnection() is not SqliteConnection sqliteConnection)
     {
         return;
     }
 
-    var connection = dbContext.Database.GetDbConnection();
-    var shouldCloseConnection = connection.State != ConnectionState.Open;
+    var shouldCloseConnection = sqliteConnection.State != ConnectionState.Open;
 
     if (shouldCloseConnection)
     {
-        await connection.OpenAsync();
+        await sqliteConnection.OpenAsync();
     }
 
     try
     {
-        await RemoveLegacyDuplicatePassOnLogSchemaEntriesAsync(connection);
+        await RemoveLegacyDuplicatePassOnLogSchemaEntriesAsync(sqliteConnection);
 
         var requiredTables = new[]
         {
@@ -1333,17 +1335,17 @@ static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbCon
 
         foreach (var table in requiredTables)
         {
-            if (!await TableExistsAsync(connection, table))
+            if (!await TableExistsAsync(sqliteConnection, table))
             {
                 return;
             }
         }
 
-        await EnsureMigrationsHistoryTableAsync(connection);
+        await EnsureMigrationsHistoryTableAsync(sqliteConnection);
 
         const string migrationId = "20251018090000_AddPassOnLogs";
 
-        await using var insertCommand = connection.CreateCommand();
+        await using var insertCommand = sqliteConnection.CreateCommand();
         insertCommand.CommandText =
             """
             INSERT OR IGNORE INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
@@ -1375,7 +1377,7 @@ static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbCon
     {
         if (shouldCloseConnection)
         {
-            await connection.CloseAsync();
+            await sqliteConnection.CloseAsync();
         }
     }
 }
@@ -1465,13 +1467,8 @@ static async Task EnsureMigrationsHistoryTableAsync(DbConnection connection)
     }
 }
 
-static async Task RemoveLegacyDuplicatePassOnLogSchemaEntriesAsync(DbConnection connection)
+static async Task RemoveLegacyDuplicatePassOnLogSchemaEntriesAsync(SqliteConnection connection)
 {
-    if (connection is not SqliteConnection)
-    {
-        return;
-    }
-
     var tables = new[]
     {
         "PassOnLogs",
