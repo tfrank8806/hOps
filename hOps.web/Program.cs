@@ -1267,6 +1267,13 @@ static bool IsDuplicateTableCreateError(SqliteException ex, string tableName)
 
 static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbContext)
 {
+    var providerName = dbContext.Database.ProviderName;
+    if (string.IsNullOrWhiteSpace(providerName) ||
+        !providerName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+    {
+        return;
+    }
+
     var connection = dbContext.Database.GetDbConnection();
     var shouldCloseConnection = connection.State != ConnectionState.Open;
 
