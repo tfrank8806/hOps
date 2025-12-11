@@ -13,6 +13,7 @@ variables:
     solution: '**/*.sln'
     buildPlatform: 'Any CPU'
     buildConfiguration: 'Release'
+    HOPS_FORCE_SQLITE: 'true'
 
 steps:
   - task: AzureCLI@2
