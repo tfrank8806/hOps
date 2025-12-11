@@ -368,14 +368,13 @@ using (var scope = app.Services.CreateScope())
     if (isSqlite)
     {
         await dbContext.Database.EnsureCreatedAsync();
+        await EnsureProfilePhotoPathColumnAsync(dbContext);
+        await EnsureRoomLayoutShapeColumnsAsync(dbContext);
     }
     else
     {
         await ApplyMigrationsWithLegacySupportAsync(dbContext);
     }
-
-    await EnsureProfilePhotoPathColumnAsync(dbContext);
-    await EnsureRoomLayoutShapeColumnsAsync(dbContext);
 
     await SeedRolesAsync(roleManager);
     await SeedAdminUserAsync(userManager, roleManager);
@@ -1180,7 +1179,11 @@ static async Task EnsureLegacyWorkOrderTypeTableAsync(ApplicationDbContext dbCon
 
 static async Task ConsolidateLegacyWorkOrderTypeTableAsync(ApplicationDbContext dbContext)
 {
-    var connection = dbContext.Database.GetDbConnection();
+    if (dbContext.Database.GetDbConnection() is not SqliteConnection connection)
+    {
+        return;
+    }
+
     var shouldCloseConnection = connection.State != ConnectionState.Open;
 
     if (shouldCloseConnection)
@@ -1228,31 +1231,52 @@ static async Task ConsolidateLegacyWorkOrderTypeTableAsync(ApplicationDbContext 
 
 static async Task<bool> TableExistsAsync(DbConnection connection, string tableName)
 {
-    if (connection is not SqliteConnection)
+    var trimmedName = tableName.Trim('"');
+
+    if (connection is SqliteConnection sqliteConnection)
     {
-        throw new InvalidOperationException("TableExistsAsync should only be used with SQLite connections.");
+        try
+        {
+            await using var checkCommand = sqliteConnection.CreateCommand();
+            checkCommand.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name = @name LIMIT 1;";
+
+            var parameter = checkCommand.CreateParameter();
+            parameter.ParameterName = "@name";
+            parameter.Value = trimmedName;
+            checkCommand.Parameters.Add(parameter);
+
+            var result = await checkCommand.ExecuteScalarAsync();
+            return result != null;
+        }
+        catch (SqliteException ex) when (IsDuplicateTableSchemaError(ex, trimmedName))
+        {
+            // Legacy databases may contain duplicate schema entries which surface as
+            // "malformed database schema" errors even though the table already exists.
+            // Treat this as the table being present so the legacy migration logic can continue.
+            return true;
+        }
     }
 
-    try
+    if (connection is SqlConnection sqlConnection)
     {
-        await using var checkCommand = connection.CreateCommand();
-        checkCommand.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name = @name LIMIT 1;";
+        await using var checkCommand = sqlConnection.CreateCommand();
+        checkCommand.CommandText =
+            """
+            SELECT TOP 1 1
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = @name
+            """;
 
         var parameter = checkCommand.CreateParameter();
         parameter.ParameterName = "@name";
-        parameter.Value = tableName;
+        parameter.Value = trimmedName;
         checkCommand.Parameters.Add(parameter);
 
         var result = await checkCommand.ExecuteScalarAsync();
         return result != null;
     }
-    catch (SqliteException ex) when (IsDuplicateTableSchemaError(ex, tableName))
-    {
-        // Legacy databases may contain duplicate schema entries which surface as
-        // "malformed database schema" errors even though the table already exists.
-        // Treat this as the table being present so the legacy migration logic can continue.
-        return true;
-    }
+
+    throw new NotSupportedException($"Table existence checks are not implemented for provider '{connection.GetType().Name}'.");
 }
 
 static bool IsDuplicateTableSchemaError(SqliteException ex, string tableName)
