@@ -72,13 +72,18 @@ namespace hOps.web.Services
                 return false;
             }
 
+            if (ContainsAuthenticationKeyword(connectionString))
+            {
+                // An explicit Authentication clause means SqlClient will handle token acquisition.
+                return false;
+            }
+
             try
             {
                 var builder = new SqlConnectionStringBuilder(connectionString);
 
                 if (builder.Authentication is not SqlAuthenticationMethod.NotSpecified)
                 {
-                    // If Authentication is already configured, SqlClient manages tokens itself.
                     return false;
                 }
 
@@ -92,6 +97,34 @@ namespace hOps.web.Services
             catch
             {
                 // Ignore invalid connection strings; we only care about obvious Azure SQL cases.
+            }
+
+            return false;
+        }
+
+        private static bool ContainsAuthenticationKeyword(string connectionString)
+        {
+            var segments = connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var segment in segments)
+            {
+                var trimmed = segment.Trim();
+                if (trimmed.Length == 0)
+                {
+                    continue;
+                }
+
+                var equalsIndex = trimmed.IndexOf('=');
+                if (equalsIndex < 0)
+                {
+                    continue;
+                }
+
+                var key = trimmed[..equalsIndex].Trim();
+                if (key.Equals("Authentication", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
             }
 
             return false;
