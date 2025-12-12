@@ -29,7 +29,7 @@ namespace hOps.web.Services
             CancellationToken cancellationToken = default)
         {
             if (connection is SqlConnection sqlConnection &&
-                RequiresAccessToken(sqlConnection.ConnectionString))
+                ShouldAssignAccessToken(sqlConnection.ConnectionString))
             {
                 await EnsureAccessTokenAsync(sqlConnection, cancellationToken);
             }
@@ -43,7 +43,7 @@ namespace hOps.web.Services
             InterceptionResult result)
         {
             if (connection is SqlConnection sqlConnection &&
-                RequiresAccessToken(sqlConnection.ConnectionString))
+                ShouldAssignAccessToken(sqlConnection.ConnectionString))
             {
                 EnsureAccessTokenAsync(sqlConnection, CancellationToken.None)
                     .GetAwaiter()
@@ -69,41 +69,65 @@ namespace hOps.web.Services
             }
         }
 
-        private static bool RequiresAccessToken(string? connectionString)
+        private static bool ShouldAssignAccessToken(string? connectionString)
         {
             if (string.IsNullOrWhiteSpace(connectionString))
             {
                 return false;
             }
 
-            if (ContainsAuthenticationKeyword(connectionString))
+            if (!IsAzureSqlConnectionString(connectionString))
             {
-                // An explicit Authentication clause means SqlClient will handle token acquisition.
                 return false;
             }
 
+            if (HasExplicitAuthentication(connectionString))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsAzureSqlConnectionString(string connectionString)
+        {
             try
             {
                 var builder = new SqlConnectionStringBuilder(connectionString);
 
-                if (builder.Authentication is not SqlAuthenticationMethod.NotSpecified)
+                if (!string.IsNullOrEmpty(builder.Password))
                 {
                     return false;
                 }
 
-                if (!string.IsNullOrEmpty(builder.UserID)
-                    && string.IsNullOrEmpty(builder.Password)
-                    && builder.DataSource?.Contains("database.windows.net", StringComparison.OrdinalIgnoreCase) == true)
+                if (!string.IsNullOrEmpty(builder.UserID))
+                {
+                    return true;
+                }
+
+                return builder.DataSource?.Contains("database.windows.net", StringComparison.OrdinalIgnoreCase) == true;
+            }
+            catch
+            {
+                return connectionString.Contains("database.windows.net", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private static bool HasExplicitAuthentication(string connectionString)
+        {
+            try
+            {
+                var builder = new SqlConnectionStringBuilder(connectionString);
+                if (builder.Authentication is not SqlAuthenticationMethod.NotSpecified)
                 {
                     return true;
                 }
             }
             catch
             {
-                // Ignore invalid connection strings; we only care about obvious Azure SQL cases.
             }
 
-            return false;
+            return ContainsAuthenticationKeyword(connectionString);
         }
 
         private static bool ContainsAuthenticationKeyword(string connectionString)
