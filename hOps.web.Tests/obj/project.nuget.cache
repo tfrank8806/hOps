@@ -1,11 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "2orixYYEKXQ=",
+  "dgSpecHash": "msvfcjRM2Zw=",
   "success": true,
-  "projectFilePath": "C:\\hops\\hOps.web.Tests\\hOps.web.Tests.csproj",
+  "projectFilePath": "C:\\hOps\\hOps.web.Tests\\hOps.web.Tests.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\azure.core\\1.38.0\\azure.core.1.38.0.nupkg.sha512",
-    "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\azure.identity\\1.11.4\\azure.identity.1.11.4.nupkg.sha512",
+    "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\azure.core\\1.40.0\\azure.core.1.40.0.nupkg.sha512",
+    "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\azure.identity\\1.12.0\\azure.identity.1.12.0.nupkg.sha512",
     "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\bouncycastle.cryptography\\2.6.1\\bouncycastle.cryptography.2.6.1.nupkg.sha512",
     "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\castle.core\\5.1.1\\castle.core.5.1.1.nupkg.sha512",
     "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\closedxml\\0.104.0\\closedxml.0.104.0.nupkg.sha512",
