@@ -76,13 +76,10 @@ namespace hOps.web.Services
             {
                 var builder = new SqlConnectionStringBuilder(connectionString);
 
-                if (builder.Authentication is SqlAuthenticationMethod.ActiveDirectoryDefault
-                    or SqlAuthenticationMethod.ActiveDirectoryIntegrated
-                    or SqlAuthenticationMethod.ActiveDirectoryInteractive
-                    or SqlAuthenticationMethod.ActiveDirectoryManagedIdentity
-                    or SqlAuthenticationMethod.ActiveDirectoryServicePrincipal)
+                if (builder.Authentication is not SqlAuthenticationMethod.NotSpecified)
                 {
-                    return true;
+                    // If Authentication is already configured, SqlClient manages tokens itself.
+                    return false;
                 }
 
                 if (!string.IsNullOrEmpty(builder.UserID)
