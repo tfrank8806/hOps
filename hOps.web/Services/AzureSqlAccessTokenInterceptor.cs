@@ -62,7 +62,14 @@ namespace hOps.web.Services
                 new TokenRequestContext(SqlScopes),
                 cancellationToken);
 
-            sqlConnection.AccessToken = token.Token;
+            try
+            {
+                sqlConnection.AccessToken = token.Token;
+            }
+            catch (InvalidOperationException ex) when (IsAuthenticationConflict(ex))
+            {
+                // If the connection string already configures Authentication, SqlClient owns token acquisition.
+            }
         }
 
         private static bool RequiresAccessToken(string? connectionString)
@@ -128,6 +135,16 @@ namespace hOps.web.Services
             }
 
             return false;
+        }
+
+        private static bool IsAuthenticationConflict(InvalidOperationException exception)
+        {
+            return exception.Message.IndexOf(
+                "AccessToken property",
+                StringComparison.OrdinalIgnoreCase) >= 0
+                && exception.Message.IndexOf(
+                    "'Authentication' has been specified",
+                    StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
 }
