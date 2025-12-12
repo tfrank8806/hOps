@@ -28,7 +28,8 @@ namespace hOps.web.Services
             InterceptionResult result,
             CancellationToken cancellationToken = default)
         {
-            if (connection is SqlConnection sqlConnection)
+            if (connection is SqlConnection sqlConnection &&
+                RequiresAccessToken(sqlConnection.ConnectionString))
             {
                 await EnsureAccessTokenAsync(sqlConnection, cancellationToken);
             }
@@ -41,7 +42,8 @@ namespace hOps.web.Services
             ConnectionEventData eventData,
             InterceptionResult result)
         {
-            if (connection is SqlConnection sqlConnection)
+            if (connection is SqlConnection sqlConnection &&
+                RequiresAccessToken(sqlConnection.ConnectionString))
             {
                 EnsureAccessTokenAsync(sqlConnection, CancellationToken.None)
                     .GetAwaiter()
@@ -53,11 +55,6 @@ namespace hOps.web.Services
 
         private async Task EnsureAccessTokenAsync(SqlConnection sqlConnection, CancellationToken cancellationToken)
         {
-            if (!RequiresAccessToken(sqlConnection.ConnectionString))
-            {
-                return;
-            }
-
             var token = await _credential.GetTokenAsync(
                 new TokenRequestContext(SqlScopes),
                 cancellationToken);
