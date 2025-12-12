@@ -1,5 +1,3 @@
-using Azure.Identity;
-using hOps.web.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -24,15 +22,7 @@ namespace hOps.web.Data
                 ?? "Server=(localdb)\\mssqllocaldb;Database=hOps.web_designtime;Trusted_Connection=True;TrustServerCertificate=True;";
 
             var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-            var credentialOptions = new DefaultAzureCredentialOptions
-            {
-                ExcludeSharedTokenCacheCredential = false,
-                ExcludeInteractiveBrowserCredential = false
-            };
-
-            optionsBuilder
-                .UseSqlServer(connectionString)
-                .AddInterceptors(new AzureSqlAccessTokenInterceptor(new DefaultAzureCredential(credentialOptions)));
+            optionsBuilder.UseSqlServer(connectionString);
 
             return new ApplicationDbContext(optionsBuilder.Options);
         }

@@ -1,5 +1,3 @@
-using Azure.Core;
-using Azure.Identity;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Hubs;
@@ -28,16 +26,7 @@ var forceSqlite = ShouldForceSqlite(builder.Configuration);
 // 1. Services Registration
 // ----------------------
 
-var defaultCredentialOptions = new DefaultAzureCredentialOptions
-{
-    ExcludeSharedTokenCacheCredential = false,
-    ExcludeInteractiveBrowserCredential = builder.Environment.IsProduction()
-};
-
-builder.Services.AddSingleton<TokenCredential>(_ => new DefaultAzureCredential(defaultCredentialOptions));
-builder.Services.AddSingleton<AzureSqlAccessTokenInterceptor>();
-
-builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
 
@@ -64,7 +53,6 @@ builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =
     if (prefersSqlServer)
     {
         options.UseSqlServer(connectionString);
-        options.AddInterceptors(serviceProvider.GetRequiredService<AzureSqlAccessTokenInterceptor>());
         return;
     }
 
