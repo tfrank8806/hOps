@@ -13,7 +13,7 @@ using System.Data;
 using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using System.Linq;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.IO;
@@ -48,11 +48,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
     // Prefer SQL Server for cloud/remote connection strings; fall back to SQLite for local file-based strings.
     var lc = connectionString.ToLowerInvariant();
-    var prefersSqlServer = IsSqlServerConnectionString(connectionString, lc);
+    var prefersPostgres = IsPostgresConnectionString(connectionString, lc);
 
-    if (prefersSqlServer)
+    if (prefersPostgres)
     {
-        options.UseSqlServer(connectionString);
+        options.UseNpgsql(
+            connectionString,
+            npgsqlOptions => npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
         return;
     }
 
@@ -63,7 +65,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         sqliteOptions => sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
 });
 
-static bool IsSqlServerConnectionString(string connectionString, string lowerCasedConnectionString)
+static bool IsPostgresConnectionString(string connectionString, string lowerCasedConnectionString)
 {
     if (string.IsNullOrWhiteSpace(connectionString))
     {
@@ -78,43 +80,26 @@ static bool IsSqlServerConnectionString(string connectionString, string lowerCas
         return false;
     }
 
-    // Common SQL Server markers.
-    if (lowerCasedConnectionString.Contains("server=", StringComparison.Ordinal) ||
-        lowerCasedConnectionString.Contains("data source=tcp:", StringComparison.Ordinal) ||
-        lowerCasedConnectionString.Contains("database.windows.net", StringComparison.Ordinal) ||
-        lowerCasedConnectionString.Contains("initial catalog=", StringComparison.Ordinal) ||
-        lowerCasedConnectionString.Contains("authentication=active directory", StringComparison.Ordinal))
+    if (lowerCasedConnectionString.Contains("postgresql://", StringComparison.Ordinal) ||
+        lowerCasedConnectionString.Contains("host=", StringComparison.Ordinal) ||
+        lowerCasedConnectionString.Contains("username=", StringComparison.Ordinal) ||
+        lowerCasedConnectionString.Contains("user id=", StringComparison.Ordinal) ||
+        lowerCasedConnectionString.Contains("port=5432", StringComparison.Ordinal))
     {
         return true;
     }
 
     try
     {
-        var builder = new SqlConnectionStringBuilder(connectionString);
-        var dataSource = builder.DataSource?.Trim() ?? string.Empty;
-
-        // Treat file-like data sources as SQLite.
-        if (dataSource.EndsWith(".db", StringComparison.OrdinalIgnoreCase) ||
-            dataSource.EndsWith(".db3", StringComparison.OrdinalIgnoreCase) ||
-            dataSource.EndsWith(".sqlite", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        // If the data source looks like a host:port or host,prefer SQL Server; otherwise, default to SQLite.
-        if (dataSource.Contains(":", StringComparison.Ordinal) || dataSource.Contains(",", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        // No path separators is an indicator of a server/instance name.
-        if (!dataSource.Contains("/", StringComparison.Ordinal) && !dataSource.Contains("\\", StringComparison.Ordinal))
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        if (!string.IsNullOrWhiteSpace(builder.Host))
         {
             return true;
         }
     }
     catch
     {
+        // Ignore invalid connection strings – we'll fall back to SQLite.
     }
 
     return false;
@@ -240,7 +225,7 @@ static string ResolveSqliteConnectionString(string? configuredValue)
         var trimmed = configuredValue.Trim();
         var lower = trimmed.ToLowerInvariant();
 
-        if (IsSqlServerConnectionString(trimmed, lower))
+        if (IsPostgresConnectionString(trimmed, lower))
         {
             return BuildSqliteDataSourceFromPath("hOps.db");
         }
@@ -628,7 +613,7 @@ static async Task ApplyMigrationsWithLegacySupportAsync(ApplicationDbContext dbC
     }
     catch (SqliteException ex) when (IsDuplicateTableCreateError(ex, "AspNetRoles"))
     {
-        await EnsureInitialSqlServerMigrationRecordedAsync(dbContext);
+        await EnsureInitialPostgresMigrationRecordedAsync(dbContext);
         await dbContext.Database.MigrateAsync();
     }
     catch (SqliteException ex) when (IsDuplicateMustChangePasswordColumnError(ex))
@@ -1257,14 +1242,15 @@ static async Task<bool> TableExistsAsync(DbConnection connection, string tableNa
         }
     }
 
-    if (connection is SqlConnection sqlConnection)
+    if (connection is NpgsqlConnection npgsqlConnection)
     {
-        await using var checkCommand = sqlConnection.CreateCommand();
+        await using var checkCommand = npgsqlConnection.CreateCommand();
         checkCommand.CommandText =
             """
-            SELECT TOP 1 1
-            FROM INFORMATION_SCHEMA.TABLES
-            WHERE TABLE_NAME = @name
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = current_schema() AND table_name = @name
+            LIMIT 1;
             """;
 
         var parameter = checkCommand.CreateParameter();
@@ -1411,7 +1397,7 @@ static async Task EnsureLegacyPassOnLogMigrationAsync(ApplicationDbContext dbCon
     }
 }
 
-static async Task EnsureInitialSqlServerMigrationRecordedAsync(ApplicationDbContext dbContext)
+static async Task EnsureInitialPostgresMigrationRecordedAsync(ApplicationDbContext dbContext)
 {
     var connection = dbContext.Database.GetDbConnection();
     var shouldCloseConnection = connection.State != ConnectionState.Open;
@@ -1438,7 +1424,7 @@ static async Task EnsureInitialSqlServerMigrationRecordedAsync(ApplicationDbCont
             }
         }
 
-        await EnsureMigrationRecordedAsync(connection, "20251117203459_InitialSqlServer", "8.0.20");
+        await EnsureMigrationRecordedAsync(connection, "20251215210146_InitialPostgres", "8.0.20");
     }
     finally
     {

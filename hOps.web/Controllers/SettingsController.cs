@@ -14,8 +14,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
+using Npgsql;
 
 namespace hOps.web.Controllers
 {
@@ -1667,12 +1667,12 @@ namespace hOps.web.Controllers
                        sqliteEx.Message.Contains("SortOrder", StringComparison.OrdinalIgnoreCase);
             }
 
-            if (ex.InnerException is SqlException sqlEx)
-            {
-                return (sqlEx.Number == 2601 || sqlEx.Number == 2627) &&
-                       sqlEx.Message.Contains("ScheduleShiftTemplates", StringComparison.OrdinalIgnoreCase) &&
-                       sqlEx.Message.Contains("SortOrder", StringComparison.OrdinalIgnoreCase);
-            }
+        if (ex.InnerException is PostgresException postgresEx)
+        {
+            return string.Equals(postgresEx.SqlState, PostgresErrorCodes.UniqueViolation, StringComparison.Ordinal) &&
+                   postgresEx.TableName?.Equals("ScheduleShiftTemplates", StringComparison.OrdinalIgnoreCase) == true &&
+                   postgresEx.ConstraintName?.Contains("SortOrder", StringComparison.OrdinalIgnoreCase) == true;
+        }
 
             return false;
         }

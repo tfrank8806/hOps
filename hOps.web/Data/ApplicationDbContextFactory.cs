@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -5,7 +7,7 @@ using Microsoft.Extensions.Configuration;
 namespace hOps.web.Data
 {
     /// <summary>
-    /// Provides a design-time DbContext for EF Core tools so migrations target SQL Server even when
+    /// Provides a design-time DbContext for EF Core tools so migrations target PostgreSQL even when
     /// the runtime configuration might prefer SQLite for local development.
     /// </summary>
     public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<ApplicationDbContext>
@@ -13,16 +15,20 @@ namespace hOps.web.Data
         public ApplicationDbContext CreateDbContext(string[] args)
         {
             var config = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: true)
+                .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}.json", optional: true)
+                .AddUserSecrets<ApplicationDbContextFactory>(optional: true)
                 .AddEnvironmentVariables()
                 .Build();
 
             var connectionString =
                 config["ConnectionStrings:DefaultConnection"]
                 ?? config["ConnectionStrings__DefaultConnection"]
-                ?? "Server=(localdb)\\mssqllocaldb;Database=hOps.web_designtime;Trusted_Connection=True;TrustServerCertificate=True;";
+                ?? "Host=localhost;Port=5432;Database=hOps.web_designtime;Username=postgres;Password=postgres;SSL Mode=Disable";
 
             var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-            optionsBuilder.UseSqlServer(connectionString);
+            optionsBuilder.UseNpgsql(connectionString);
 
             return new ApplicationDbContext(optionsBuilder.Options);
         }
