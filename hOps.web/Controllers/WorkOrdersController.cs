@@ -320,7 +320,7 @@ namespace hOps.web.Controllers
                 WorkOrderTypeId = request.WorkOrderTypeId,
                 Issue = issue,
                 Details = string.IsNullOrWhiteSpace(request.Details) ? null : request.Details.Trim(),
-                DueDate = (request.DueDate ?? DateTime.UtcNow.Date).Date,
+                DueDate = NormalizeUtcDate((request.DueDate ?? DateTime.UtcNow.Date).Date),
                 DepartmentId = request.DepartmentId,
                 SelectedPropertyIds = new List<int> { request.PropertyId }
             };
@@ -387,7 +387,7 @@ namespace hOps.web.Controllers
             workOrder.WorkOrderTypeId = form.WorkOrderTypeId;
             workOrder.Issue = form.Issue;
             workOrder.Details = form.Details;
-            workOrder.DueDate = form.DueDate;
+            workOrder.DueDate = NormalizeUtcDate(form.DueDate);
             workOrder.DepartmentId = form.DepartmentId;
 
             var accessiblePropertySet = new HashSet<int>(accessiblePropertyIds);
@@ -713,7 +713,7 @@ namespace hOps.web.Controllers
                 WorkOrderTypeId = form.WorkOrderTypeId,
                 Issue = form.Issue,
                 Details = form.Details,
-                DueDate = form.DueDate,
+                DueDate = NormalizeUtcDate(form.DueDate),
                 DepartmentId = form.DepartmentId,
                 CreatedAt = DateTime.UtcNow,
                 CreatedById = user.Id
@@ -1207,7 +1207,7 @@ namespace hOps.web.Controllers
             var effectiveForm = form ?? new WorkOrderFormViewModel
             {
                 Status = defaultStatus,
-                DueDate = DateTime.Today
+                DueDate = DateTime.UtcNow.Date
             };
 
             if (string.IsNullOrWhiteSpace(effectiveForm.Status))
@@ -1353,6 +1353,21 @@ namespace hOps.web.Controllers
                     _logger.LogWarning(ex, "Failed to delete work order attachment at {Path}", relativePath);
                 }
             }
+        }
+
+        private static DateTime NormalizeUtcDate(DateTime value)
+        {
+            if (value == default)
+            {
+                return DateTime.SpecifyKind(default, DateTimeKind.Utc);
+            }
+
+            return value.Kind switch
+            {
+                DateTimeKind.Utc => value,
+                DateTimeKind.Local => value.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+            };
         }
 
         private static bool MatchesRoom(string roomNumber, string? location)
