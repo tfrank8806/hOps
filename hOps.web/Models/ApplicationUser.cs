@@ -15,12 +15,12 @@ namespace hOps.web.Models
 
         public bool MustChangePassword { get; set; } = false;
 
-        public bool EmailOnMessage { get; set; } = true;
-        public bool EmailOnMention { get; set; } = true;
-        public bool EmailOnWorkOrderDepartment { get; set; } = true;
-        public bool EmailOnLogEntry { get; set; } = true;
+        public bool EmailOnMessage { get; set; } = false;
+        public bool EmailOnMention { get; set; } = false;
+        public bool EmailOnWorkOrderDepartment { get; set; } = false;
+        public bool EmailOnLogEntry { get; set; } = false;
         public bool EmailDailySummary { get; set; } = false;
-        public bool EmailOnSchedulePosted { get; set; } = true;
+        public bool EmailOnSchedulePosted { get; set; } = false;
         public DateTime? DailySummaryLastSentUtc { get; set; }
         public DateTime? LastLoginAtUtc { get; set; }
 
