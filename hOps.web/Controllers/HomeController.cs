@@ -41,14 +41,14 @@ namespace hOps.web.Controllers
         {
             new HomeWidgetDefinition { Id = HomeWidgetIds.Announcements, DisplayName = "Announcements", Description = "Manager notes & attachments", DefaultSize = HomeWidgetSize.Third, DefaultHeight = DefaultWidgetHeight },
             new HomeWidgetDefinition { Id = HomeWidgetIds.Bulletins, DisplayName = "Bulletin Board", Description = "Team conversations & reminders", DefaultSize = HomeWidgetSize.Third, DefaultHeight = DefaultWidgetHeight },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.OpsFeed, DisplayName = "Ops Feed", Description = "Unified activity and replies", DefaultSize = HomeWidgetSize.Full, DefaultHeight = DefaultWidgetHeight },
             new HomeWidgetDefinition { Id = HomeWidgetIds.PassOnLogs, DisplayName = "Pass On Logs", Description = "Recent pass on entries", DefaultSize = HomeWidgetSize.Third, DefaultHeight = DefaultWidgetHeight },
             new HomeWidgetDefinition { Id = HomeWidgetIds.PackageLog, DisplayName = "Package Log", Description = "Undelivered packages", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
             new HomeWidgetDefinition { Id = HomeWidgetIds.UpcomingEvents, DisplayName = "Upcoming Events", Description = "Calendar highlights", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
             new HomeWidgetDefinition { Id = HomeWidgetIds.WorkOrders, DisplayName = "Work Orders", Description = "Active tickets and SLAs", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
             new HomeWidgetDefinition { Id = HomeWidgetIds.LostFound, DisplayName = "Lost & Found", Description = "Items awaiting resolution", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
             new HomeWidgetDefinition { Id = HomeWidgetIds.MySchedule, DisplayName = "My Schedule", Description = "Upcoming shifts for you", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.HotelLayout, DisplayName = "Hotel Layout", Description = "Interactive property map", DefaultSize = HomeWidgetSize.Full, DefaultHeight = DefaultWidgetHeight }
+            new HomeWidgetDefinition { Id = HomeWidgetIds.HotelLayout, DisplayName = "Hotel Layout", Description = "Interactive property map", DefaultSize = HomeWidgetSize.Full, DefaultHeight = DefaultWidgetHeight },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.OpsFeed, DisplayName = "Ops Feed", Description = "Unified activity and replies", DefaultSize = HomeWidgetSize.Full, DefaultHeight = DefaultWidgetHeight }
         };
 
         private static readonly LayoutPersonaOption[] PersonaOptions = new[]

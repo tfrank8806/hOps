@@ -52,11 +52,26 @@
         }
 
         .layout-editor-palette {
-            flex: 0 0 220px;
-            max-width: 220px;
+            flex: 0 0 260px;
+            max-width: 260px;
             border: 1px solid #ccc;
-            padding: 5px;
+            padding: 10px;
             overflow-y: auto;
+        }
+
+        .palette-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+        }
+
+        .palette-grid .pal-shape {
+            width: 100%;
+            margin: 0;
+        }
+
+        .pal-shape--full {
+            grid-column: span 2;
         }
 
         .layout-editor-wrapper {
@@ -236,34 +251,35 @@
 <div class="layout-editor-stage">
     <!-- Palette sidebar -->
     <div id="palette" class="layout-editor-palette">
-        <h4>Palette</h4>
-        <!-- Always include custom tile -->
-        <div class="pal-shape" data-room-id="0" data-room-label="Custom" draggable="true"
-             style="width:50px; height:50px; border:1px solid #333; margin-bottom:10px;
-                    display:flex; align-items:center; justify-content:center; cursor: grab;">
-            Custom
-        </div>
-        <div class="pal-shape pal-shape--connector pal-shape--connector-vertical" data-room-id="0" data-room-label="||" data-shape-type="connector" data-shape-data="vertical" data-multi-use="true" draggable="true" title="Connecting rooms (vertical)" aria-label="Connecting rooms (vertical)"
-             style="width:50px; height:50px; border:1px dashed #333; margin-bottom:10px;
-                    display:flex; align-items:center; justify-content:center; cursor: grab; font-weight:600;">
-            ||
-        </div>
-        <div class="pal-shape pal-shape--connector pal-shape--connector-horizontal" data-room-id="0" data-room-label="||" data-shape-type="connector" data-shape-data="horizontal" data-multi-use="true" draggable="true" title="Connecting rooms (horizontal)" aria-label="Connecting rooms (horizontal)"
-             style="width:50px; height:50px; border:1px dashed #333; margin-bottom:10px;
-                    display:flex; align-items:center; justify-content:center; cursor: grab; font-weight:600;">
-            ||
-        </div>
-        @foreach (var room in Model.Rooms.Where(r => r.Floor == selFloor))
-        {
-            <div class="pal-shape"
-                 data-room-id="@room.Id"
-                 data-room-label="@room.RoomNumber"
-                 draggable="true"
-                 style="width:50px; height:50px; border:1px solid #333; margin-bottom:10px;
-                            display:flex; align-items:center; justify-content:center; cursor: grab;">
-                @room.RoomNumber
+        <h4 class="mb-3">Palette</h4>
+        <div class="palette-grid">
+            <div class="pal-shape pal-shape--full" data-room-id="0" data-room-label="Custom" draggable="true"
+                 style="height:50px; border:1px solid #333;
+                        display:flex; align-items:center; justify-content:center; cursor: grab;">
+                Custom
             </div>
-        }
+            <div class="pal-shape pal-shape--connector pal-shape--connector-vertical pal-shape--full" data-room-id="0" data-room-label="||" data-shape-type="connector" data-shape-data="vertical" data-multi-use="true" draggable="true" title="Connecting rooms (vertical)" aria-label="Connecting rooms (vertical)"
+                 style="height:50px; border:1px dashed #333;
+                        display:flex; align-items:center; justify-content:center; cursor: grab; font-weight:600;">
+                ||
+            </div>
+            <div class="pal-shape pal-shape--connector pal-shape--connector-horizontal pal-shape--full" data-room-id="0" data-room-label="||" data-shape-type="connector" data-shape-data="horizontal" data-multi-use="true" draggable="true" title="Connecting rooms (horizontal)" aria-label="Connecting rooms (horizontal)"
+                 style="height:50px; border:1px dashed #333;
+                        display:flex; align-items:center; justify-content:center; cursor: grab; font-weight:600;">
+                ||
+            </div>
+            @foreach (var room in Model.Rooms.Where(r => r.Floor == selFloor))
+            {
+                <div class="pal-shape"
+                     data-room-id="@room.Id"
+                     data-room-label="@room.RoomNumber"
+                     draggable="true"
+                     style="height:50px; border:1px solid #333;
+                            display:flex; align-items:center; justify-content:center; cursor: grab;">
+                    @room.RoomNumber
+                </div>
+            }
+        </div>
     </div>
 
     <!-- Editor container wrapper for pan/zoom -->
