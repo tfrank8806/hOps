@@ -8,6 +8,8 @@ body {
     margin: 0;
     background: linear-gradient(180deg, #f8fbff 0%, #eef2f7 50%, #e9eef5 100%);
     color: #212529;
+    font-size: var(--base-font-size, 0.95rem);
+    line-height: var(--base-line-height, 1.45);
 }
 
 :root {
@@ -15,7 +17,33 @@ body {
     --todo-sidebar-width: 320px;
     --rail-toggle-width: 18px;
     --rail-toggle-height: 68px;
+    --base-font-size: 0.95rem;
+    --base-line-height: 1.45;
+    --heading-scale-1: 2.05rem;
+    --heading-scale-2: 1.65rem;
+    --heading-scale-3: 1.35rem;
+    --heading-scale-4: 1.15rem;
+    --heading-scale-5: 1rem;
+    --heading-scale-6: 0.9rem;
 }
+
+h1, .h1,
+h2, .h2,
+h3, .h3,
+h4, .h4,
+h5, .h5,
+h6, .h6 {
+    font-weight: 600;
+    line-height: 1.2;
+    margin-top: 0;
+}
+
+h1, .h1 { font-size: var(--heading-scale-1); }
+h2, .h2 { font-size: var(--heading-scale-2); }
+h3, .h3 { font-size: var(--heading-scale-3); }
+h4, .h4 { font-size: var(--heading-scale-4); }
+h5, .h5 { font-size: var(--heading-scale-5); }
+h6, .h6 { font-size: var(--heading-scale-6); }
 
 .layout-wrapper {
     display: flex;
