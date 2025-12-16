@@ -3,6 +3,7 @@ using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
+using hOps.web.Infrastructure;
 
 namespace hOps.web.Data
 {
@@ -22,10 +23,11 @@ namespace hOps.web.Data
                 .AddEnvironmentVariables()
                 .Build();
 
-            var connectionString =
-                config["ConnectionStrings:DefaultConnection"]
-                ?? config["ConnectionStrings__DefaultConnection"]
-                ?? "Host=localhost;Port=5432;Database=hOps.web_designtime;Username=postgres;Password=postgres;SSL Mode=Disable";
+            var connectionString = ConnectionStringHelper.GetDefaultConnectionString(config);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                connectionString = "Host=localhost;Port=5432;Database=hOps.web_designtime;Username=postgres;Password=postgres;SSL Mode=Disable";
+            }
 
             var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
             optionsBuilder.UseNpgsql(connectionString);

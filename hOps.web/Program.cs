@@ -3,6 +3,7 @@ using hOps.web.Models;
 using hOps.web.Hubs;
 using hOps.web.Services;
 using hOps.web.Options;
+using hOps.web.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using System;
@@ -28,7 +29,7 @@ var forceSqlite = ShouldForceSqlite(builder.Configuration);
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
+    var configuredConnectionString = ConnectionStringHelper.GetDefaultConnectionString(builder.Configuration);
 
     if (forceSqlite)
     {
