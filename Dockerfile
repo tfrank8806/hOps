@@ -4,7 +4,7 @@ EXPOSE 8080
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY hOps.web/hOps.web.csproj hOps.web/
+COPY ["hOps.web/hOps.web.csproj", "hOps.web/"]
 RUN dotnet restore hOps.web/hOps.web.csproj
 COPY . .
 WORKDIR /src/hOps.web
