@@ -14,5 +14,5 @@ COPY --from=build /src/hOps.web/scripts/start-with-migrations.sh ./start-with-mi
 ENV ASPNETCORE_URLS=http://+:8080
 ENV PATH="$PATH:/root/.dotnet/tools"
 RUN chmod +x ./start-with-migrations.sh \
-    && dotnet tool install --global dotnet-ef
+    && dotnet tool install --global dotnet-ef --version 8.0.11
 CMD ["./start-with-migrations.sh"]
