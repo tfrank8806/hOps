@@ -51,6 +51,13 @@ internal static class ConnectionStringHelper
         }
 
         var trimmed = TrimWrappingCharacters(value);
+        var schemeIndex = FindPostgresSchemeIndex(trimmed);
+
+        if (schemeIndex > 0)
+        {
+            trimmed = trimmed[schemeIndex..];
+        }
+
         if (!LooksLikePostgresUri(trimmed))
         {
             return trimmed;
@@ -150,6 +157,17 @@ internal static class ConnectionStringHelper
     private static bool LooksLikePostgresUri(string value) =>
         value.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
         value.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase);
+
+    private static int FindPostgresSchemeIndex(string value)
+    {
+        var index = value.IndexOf("postgres://", StringComparison.OrdinalIgnoreCase);
+        if (index >= 0)
+        {
+            return index;
+        }
+
+        return value.IndexOf("postgresql://", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool IsPlaceholder(string? value)
     {
