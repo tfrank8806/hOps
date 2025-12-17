@@ -257,8 +257,9 @@ internal static class ConnectionStringHelper
         var whitespacePrefix = value.Length - value.TrimStart().Length;
         var whitespaceSuffix = value.Length - value.TrimEnd().Length;
         var asciiPreview = string.Join(",", trimmed.Take(Math.Min(5, trimmed.Length)).Select(c => ((int)c).ToString()));
+        var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(trimmed));
 
-        return $"len={trimmed.Length}, firstCharCode={firstCharCode}, hasBrace={hasBraces}, hasEquals={hasEquals}, looksUri={looksUri}, leadingWhitespace={whitespacePrefix}, trailingWhitespace={whitespaceSuffix}, asciiPrefix=[{asciiPreview}]";
+        return $"len={trimmed.Length}, firstCharCode={firstCharCode}, hasBrace={hasBraces}, hasEquals={hasEquals}, looksUri={looksUri}, leadingWhitespace={whitespacePrefix}, trailingWhitespace={whitespaceSuffix}, asciiPrefix=[{asciiPreview}], base64={base64}";
     }
 
     private static bool TryParseBooleanFlag(string? raw)
