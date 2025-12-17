@@ -174,15 +174,62 @@ internal static class ConnectionStringHelper
     {
         connectionString = string.Empty;
 
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
         var trimmed = value.Trim();
-        if (trimmed.Length == 0 || (trimmed[0] != '{' && trimmed[0] != '['))
+
+        if (TryParseJsonPayload(trimmed, out connectionString))
+        {
+            return true;
+        }
+
+        var braceSlice = SliceBetween(trimmed, '{', '}');
+        if (braceSlice is { Length: > 0 } && TryParseJsonPayload(braceSlice, out connectionString))
+        {
+            return true;
+        }
+
+        var bracketSlice = SliceBetween(trimmed, '[', ']');
+        if (bracketSlice is { Length: > 0 } && TryParseJsonPayload(bracketSlice, out connectionString))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string? SliceBetween(string value, char startChar, char endChar)
+    {
+        var start = value.IndexOf(startChar);
+        if (start < 0)
+        {
+            return null;
+        }
+
+        var end = value.LastIndexOf(endChar);
+        if (end <= start)
+        {
+            return null;
+        }
+
+        return value[start..(end + 1)].Trim();
+    }
+
+    private static bool TryParseJsonPayload(string payload, out string connectionString)
+    {
+        connectionString = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(payload) || (payload[0] != '{' && payload[0] != '['))
         {
             return false;
         }
 
         try
         {
-            using var document = JsonDocument.Parse(trimmed);
+            using var document = JsonDocument.Parse(payload);
             var candidate = ExtractConnectionStringFromElement(document.RootElement);
             if (!string.IsNullOrWhiteSpace(candidate))
             {
@@ -192,7 +239,7 @@ internal static class ConnectionStringHelper
         }
         catch (JsonException)
         {
-            // Not JSON – treat the raw value as-is.
+            // Text wasn't valid JSON – ignore.
         }
 
         return false;
