@@ -20,13 +20,17 @@ internal static class ConnectionStringHelper
     internal static string GetDefaultConnectionString(IConfiguration configuration)
     {
         var configured = configuration.GetConnectionString("DefaultConnection");
+        if (IsPlaceholder(configured))
+        {
+            configured = null;
+        }
 
         if (string.IsNullOrWhiteSpace(configured))
         {
             foreach (var key in ConnectionStringFallbackKeys)
             {
                 var candidate = configuration[key];
-                if (string.IsNullOrWhiteSpace(candidate))
+                if (string.IsNullOrWhiteSpace(candidate) || IsPlaceholder(candidate))
                 {
                     continue;
                 }
@@ -137,6 +141,27 @@ internal static class ConnectionStringHelper
     private static bool LooksLikePostgresUri(string value) =>
         value.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
         value.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPlaceholder(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        var trimmed = value.Trim();
+        var hasLt = trimmed.IndexOf('<') >= 0;
+        var hasGt = trimmed.IndexOf('>') >= 0;
+        if (!hasLt && !hasGt)
+        {
+            return false;
+        }
+
+        // Treat strings that include template markers like <POSTGRES_HOST> as unset so env vars can override.
+        var tokenStart = trimmed.IndexOf('<');
+        var tokenEnd = trimmed.IndexOf('>', tokenStart + 1);
+        return tokenStart >= 0 && tokenEnd > tokenStart;
+    }
 
     private static IEnumerable<(string Key, string Value)> ParseSupportedQueryParameters(string rawQuery)
     {
