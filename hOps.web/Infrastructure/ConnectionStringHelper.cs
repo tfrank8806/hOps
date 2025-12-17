@@ -50,7 +50,7 @@ internal static class ConnectionStringHelper
             return string.Empty;
         }
 
-        var trimmed = TrimWrappingQuotes(value.Trim());
+        var trimmed = TrimWrappingCharacters(value);
         if (!LooksLikePostgresUri(trimmed))
         {
             return trimmed;
@@ -118,25 +118,34 @@ internal static class ConnectionStringHelper
         return builder.ToString().TrimEnd(';');
     }
 
-    private static string TrimWrappingQuotes(string value)
+    private static string TrimWrappingCharacters(string value)
     {
-        if (string.IsNullOrWhiteSpace(value) || value.Length < 2)
+        if (string.IsNullOrWhiteSpace(value))
         {
-            return value;
+            return string.Empty;
         }
 
-        var first = value[0];
-        var last = value[^1];
+        ReadOnlySpan<char> span = value.AsSpan().Trim();
 
-        if ((first == '"' && last == '"') ||
-            (first == '\'' && last == '\'') ||
-            (first == '`' && last == '`'))
+        int start = 0;
+        int end = span.Length - 1;
+
+        while (start <= end && IsWrapper(span[start]))
         {
-            return value.Substring(1, value.Length - 2);
+            start++;
         }
 
-        return value;
+        while (end >= start && IsWrapper(span[end]))
+        {
+            end--;
+        }
+
+        return start > 0 || end < span.Length - 1
+            ? span[start..(end + 1)].ToString()
+            : span.ToString();
     }
+
+    private static bool IsWrapper(char c) => c is '"' or '\'' or '`';
 
     private static bool LooksLikePostgresUri(string value) =>
         value.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
