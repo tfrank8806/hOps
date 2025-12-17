@@ -46,7 +46,7 @@ internal static class ConnectionStringHelper
             return string.Empty;
         }
 
-        var trimmed = value.Trim();
+        var trimmed = TrimWrappingQuotes(value.Trim());
         if (!LooksLikePostgresUri(trimmed))
         {
             return trimmed;
@@ -112,6 +112,26 @@ internal static class ConnectionStringHelper
         }
 
         return builder.ToString().TrimEnd(';');
+    }
+
+    private static string TrimWrappingQuotes(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 2)
+        {
+            return value;
+        }
+
+        var first = value[0];
+        var last = value[^1];
+
+        if ((first == '"' && last == '"') ||
+            (first == '\'' && last == '\'') ||
+            (first == '`' && last == '`'))
+        {
+            return value.Substring(1, value.Length - 2);
+        }
+
+        return value;
     }
 
     private static bool LooksLikePostgresUri(string value) =>
