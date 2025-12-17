@@ -51,12 +51,14 @@ internal static class ConnectionStringHelper
             return value;
         }
 
-        if (TryExtractConnectionStringFromJson(value, out var extracted))
+        var trimmed = TrimWrappingCharacters(value);
+
+        if (TryExtractConnectionStringFromJson(trimmed, out var extracted))
         {
             return extracted;
         }
 
-        return value;
+        return trimmed;
     }
 
     internal static string NormalizePostgresConnectionString(string? value)
