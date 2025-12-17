@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 
 namespace hOps.web.Infrastructure;
@@ -19,7 +20,7 @@ internal static class ConnectionStringHelper
 
     internal static string GetDefaultConnectionString(IConfiguration configuration)
     {
-        var configured = configuration.GetConnectionString("DefaultConnection");
+        var configured = NormalizeRawConnectionString(configuration.GetConnectionString("DefaultConnection"));
         if (IsPlaceholder(configured))
         {
             configured = null;
@@ -29,7 +30,7 @@ internal static class ConnectionStringHelper
         {
             foreach (var key in ConnectionStringFallbackKeys)
             {
-                var candidate = configuration[key];
+                var candidate = NormalizeRawConnectionString(configuration[key]);
                 if (string.IsNullOrWhiteSpace(candidate) || IsPlaceholder(candidate))
                 {
                     continue;
@@ -41,6 +42,21 @@ internal static class ConnectionStringHelper
         }
 
         return NormalizePostgresConnectionString(configured);
+    }
+
+    private static string? NormalizeRawConnectionString(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        if (TryExtractConnectionStringFromJson(value, out var extracted))
+        {
+            return extracted;
+        }
+
+        return value;
     }
 
     internal static string NormalizePostgresConnectionString(string? value)
@@ -150,6 +166,112 @@ internal static class ConnectionStringHelper
         return start > 0 || end < span.Length - 1
             ? span[start..(end + 1)].ToString()
             : span.ToString();
+    }
+
+    private static bool TryExtractConnectionStringFromJson(string value, out string connectionString)
+    {
+        connectionString = string.Empty;
+
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0 || (trimmed[0] != '{' && trimmed[0] != '['))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(trimmed);
+            var candidate = ExtractConnectionStringFromElement(document.RootElement);
+            if (!string.IsNullOrWhiteSpace(candidate))
+            {
+                connectionString = candidate.Trim();
+                return true;
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON – treat the raw value as-is.
+        }
+
+        return false;
+    }
+
+    private static string? ExtractConnectionStringFromElement(JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.String:
+                return element.GetString();
+
+            case JsonValueKind.Object:
+                if (TryGetPropertyCaseInsensitive(element, "ConnectionStrings", out var connectionStringsElement))
+                {
+                    var nested = ExtractConnectionStringFromElement(connectionStringsElement);
+                    if (!string.IsNullOrWhiteSpace(nested))
+                    {
+                        return nested;
+                    }
+                }
+
+                if (TryGetPropertyCaseInsensitive(element, "DefaultConnection", out var defaultElement))
+                {
+                    var nested = ExtractConnectionStringFromElement(defaultElement);
+                    if (!string.IsNullOrWhiteSpace(nested))
+                    {
+                        return nested;
+                    }
+                }
+
+                foreach (var property in element.EnumerateObject())
+                {
+                    if (property.Value.ValueKind == JsonValueKind.String)
+                    {
+                        var candidate = property.Value.GetString();
+                        if (!string.IsNullOrWhiteSpace(candidate))
+                        {
+                            return candidate;
+                        }
+                    }
+                }
+
+                break;
+
+            default:
+                if (element.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var arrayElement in element.EnumerateArray())
+                    {
+                        var candidate = ExtractConnectionStringFromElement(arrayElement);
+                        if (!string.IsNullOrWhiteSpace(candidate))
+                        {
+                            return candidate;
+                        }
+                    }
+                }
+
+                break;
+        }
+
+        return null;
+    }
+
+    private static bool TryGetPropertyCaseInsensitive(JsonElement element, string propertyName, out JsonElement value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.NameEquals(propertyName) ||
+                    property.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = property.Value;
+                    return true;
+                }
+            }
+        }
+
+        value = default;
+        return false;
     }
 
     private static bool IsWrapper(char c) => c is '"' or '\'' or '`';
