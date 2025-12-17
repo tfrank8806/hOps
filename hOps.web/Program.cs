@@ -53,6 +53,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
     if (prefersPostgres)
     {
+        connectionString = ConnectionStringHelper.NormalizePostgresConnectionString(connectionString);
+
         options.UseNpgsql(
             connectionString,
             npgsqlOptions => npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));

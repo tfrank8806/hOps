@@ -28,6 +28,10 @@ namespace hOps.web.Data
             {
                 connectionString = "Host=localhost;Port=5432;Database=hOps.web_designtime;Username=postgres;Password=postgres;SSL Mode=Disable";
             }
+            else
+            {
+                connectionString = ConnectionStringHelper.NormalizePostgresConnectionString(connectionString);
+            }
 
             var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
             optionsBuilder.UseNpgsql(connectionString);
