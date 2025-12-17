@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
@@ -8,6 +9,8 @@ namespace hOps.web.Infrastructure;
 
 internal static class ConnectionStringHelper
 {
+    private static bool? _diagnosticsEnabled;
+
     private static readonly string[] ConnectionStringFallbackKeys =
     [
         "ConnectionStrings:DefaultConnection",
@@ -21,8 +24,11 @@ internal static class ConnectionStringHelper
     internal static string GetDefaultConnectionString(IConfiguration configuration)
     {
         var configured = NormalizeRawConnectionString(configuration.GetConnectionString("DefaultConnection"));
+        LogConnectionStringDiagnostics(configuration, "ConnectionStrings:DefaultConnection", configured, "configured");
+
         if (IsPlaceholder(configured))
         {
+            LogConnectionStringDiagnostics(configuration, "ConnectionStrings:DefaultConnection", configured, "placeholder");
             configured = null;
         }
 
@@ -31,8 +37,15 @@ internal static class ConnectionStringHelper
             foreach (var key in ConnectionStringFallbackKeys)
             {
                 var candidate = NormalizeRawConnectionString(configuration[key]);
+                LogConnectionStringDiagnostics(configuration, key, candidate, "candidate");
+
                 if (string.IsNullOrWhiteSpace(candidate) || IsPlaceholder(candidate))
                 {
+                    if (IsPlaceholder(candidate))
+                    {
+                        LogConnectionStringDiagnostics(configuration, key, candidate, "placeholder");
+                    }
+
                     continue;
                 }
 
@@ -41,6 +54,7 @@ internal static class ConnectionStringHelper
             }
         }
 
+        LogConnectionStringDiagnostics(configuration, "effective", configured, "selected");
         return NormalizePostgresConnectionString(configured);
     }
 
@@ -196,6 +210,83 @@ internal static class ConnectionStringHelper
         if (bracketSlice is { Length: > 0 } && TryParseJsonPayload(bracketSlice, out connectionString))
         {
             return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsDiagnosticsEnabled(IConfiguration configuration)
+    {
+        if (_diagnosticsEnabled.HasValue)
+        {
+            return _diagnosticsEnabled.Value;
+        }
+
+        var raw =
+            configuration["ConnectionStrings:LogDiagnostics"] ??
+            configuration["ConnectionStrings__LogDiagnostics"] ??
+            configuration["LOG_CONNECTION_DIAGNOSTICS"] ??
+            Environment.GetEnvironmentVariable("LOG_CONNECTION_DIAGNOSTICS");
+
+        _diagnosticsEnabled = TryParseBooleanFlag(raw);
+        return _diagnosticsEnabled.Value;
+    }
+
+    private static void LogConnectionStringDiagnostics(IConfiguration configuration, string sourceKey, string? value, string stage)
+    {
+        if (!IsDiagnosticsEnabled(configuration))
+        {
+            return;
+        }
+
+        Console.WriteLine($"[ConnectionStringDiagnostics] stage={stage} source={sourceKey} info={DescribeValue(value)}");
+    }
+
+    private static string DescribeValue(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return "empty";
+        }
+
+        var trimmed = value.Trim();
+        var firstCharCode = trimmed.Length > 0 ? ((int)trimmed[0]).ToString() : "none";
+        var hasBraces = trimmed.Contains('{');
+        var hasEquals = trimmed.Contains('=');
+        var looksUri = LooksLikePostgresUri(trimmed);
+        var whitespacePrefix = value.Length - value.TrimStart().Length;
+        var whitespaceSuffix = value.Length - value.TrimEnd().Length;
+        var asciiPreview = string.Join(",", trimmed.Take(Math.Min(5, trimmed.Length)).Select(c => ((int)c).ToString()));
+
+        return $"len={trimmed.Length}, firstCharCode={firstCharCode}, hasBrace={hasBraces}, hasEquals={hasEquals}, looksUri={looksUri}, leadingWhitespace={whitespacePrefix}, trailingWhitespace={whitespaceSuffix}, asciiPrefix=[{asciiPreview}]";
+    }
+
+    private static bool TryParseBooleanFlag(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return false;
+        }
+
+        raw = raw.Trim();
+
+        if (bool.TryParse(raw, out var parsed))
+        {
+            return parsed;
+        }
+
+        if (string.Equals(raw, "1", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(raw, "yes", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(raw, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(raw, "0", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(raw, "no", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(raw, "false", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
         }
 
         return false;
