@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -66,6 +67,16 @@ internal static class ConnectionStringHelper
         }
 
         var trimmed = TrimWrappingCharacters(value);
+
+        if (TryExpandSecretFileReference(trimmed, out var expandedValue, out var secretSourceStage, out var secretSource))
+        {
+            trimmed = expandedValue;
+        }
+
+        if (!string.IsNullOrWhiteSpace(secretSourceStage))
+        {
+            RecordSecretSourceDiagnostic(secretSourceStage, secretSource);
+        }
 
         if (TryExtractConnectionStringFromJson(trimmed, out var extracted))
         {
@@ -215,6 +226,104 @@ internal static class ConnectionStringHelper
         return false;
     }
 
+    private static bool TryExpandSecretFileReference(string value, out string expandedValue, out string secretStage, out string? secretSource)
+    {
+        expandedValue = value;
+        secretStage = string.Empty;
+        secretSource = null;
+
+        if (string.IsNullOrWhiteSpace(value) || value[0] != '@')
+        {
+            return false;
+        }
+
+        var reference = value[1..].Trim();
+        if (reference.Length == 0)
+        {
+            expandedValue = string.Empty;
+            secretStage = "secret-file";
+            secretSource = "<empty>";
+            return true;
+        }
+
+        var candidates = new List<string>();
+
+        if (Path.IsPathRooted(reference))
+        {
+            candidates.Add(reference);
+        }
+        else
+        {
+            var envSecretDir = Environment.GetEnvironmentVariable("RENDER_SECRETS_DIR");
+            if (!string.IsNullOrWhiteSpace(envSecretDir))
+            {
+                candidates.Add(Path.Combine(envSecretDir, reference));
+            }
+
+            candidates.Add(Path.Combine("/etc/secrets", reference));
+            candidates.Add(Path.Combine("/var/run/secrets", reference));
+            candidates.Add(Path.Combine("/run/secrets", reference));
+            candidates.Add(Path.Combine(AppContext.BaseDirectory, reference));
+            candidates.Add(reference);
+        }
+
+        foreach (var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                if (File.Exists(candidate))
+                {
+                    expandedValue = File.ReadAllText(candidate).Trim();
+                    secretStage = "secret-file";
+                    secretSource = candidate;
+                    return true;
+                }
+            }
+            catch
+            {
+                // Ignore filesystem errors and keep trying other candidates.
+            }
+        }
+
+        // Fall back to environment variables that might carry the secret contents.
+        var envCandidates = BuildSecretEnvironmentVariableCandidates(reference);
+        foreach (var envKey in envCandidates)
+        {
+            var envValue = Environment.GetEnvironmentVariable(envKey);
+            if (!string.IsNullOrWhiteSpace(envValue))
+            {
+                expandedValue = envValue.Trim();
+                secretStage = "secret-env";
+                secretSource = envKey;
+                return true;
+            }
+        }
+
+        secretStage = "secret-missing";
+        secretSource = reference;
+        return false;
+    }
+
+    private static IEnumerable<string> BuildSecretEnvironmentVariableCandidates(string reference)
+    {
+        var sanitized = reference.Trim();
+
+        if (sanitized.StartsWith('/'))
+        {
+            yield break;
+        }
+
+        yield return sanitized;
+        yield return sanitized.ToUpperInvariant();
+
+        var underscores = sanitized.Replace('-', '_');
+        if (!string.Equals(underscores, sanitized, StringComparison.Ordinal))
+        {
+            yield return underscores;
+            yield return underscores.ToUpperInvariant();
+        }
+    }
+
     private static bool IsDiagnosticsEnabled(IConfiguration configuration)
     {
         if (_diagnosticsEnabled.HasValue)
@@ -260,6 +369,18 @@ internal static class ConnectionStringHelper
         var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(trimmed));
 
         return $"len={trimmed.Length}, firstCharCode={firstCharCode}, hasBrace={hasBraces}, hasEquals={hasEquals}, looksUri={looksUri}, leadingWhitespace={whitespacePrefix}, trailingWhitespace={whitespaceSuffix}, asciiPrefix=[{asciiPreview}], base64={base64}";
+    }
+
+    private static void RecordSecretSourceDiagnostic(string stage, string? source)
+    {
+        var diagnosticsEnabled = TryParseBooleanFlag(Environment.GetEnvironmentVariable("LOG_CONNECTION_DIAGNOSTICS"));
+        if (!diagnosticsEnabled)
+        {
+            return;
+        }
+
+        var resolved = string.IsNullOrWhiteSpace(source) ? "<unspecified>" : source;
+        Console.WriteLine($"[ConnectionStringDiagnostics] stage={stage} source={resolved} info=secret-lookup");
     }
 
     private static bool TryParseBooleanFlag(string? raw)
