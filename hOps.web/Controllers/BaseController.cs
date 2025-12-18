@@ -50,6 +50,12 @@ public class BaseController : Controller
 
                 ViewBag.UserProperties = userProperties;
                 ViewBag.CurrentUserId = user.Id;
+                var displayName = $"{user.FirstName} {user.LastName}".Trim();
+                if (string.IsNullOrWhiteSpace(displayName))
+                {
+                    displayName = user.Email ?? user.UserName ?? "My Profile";
+                }
+                ViewBag.CurrentUserAvatar = UserAvatarHelper.BuildFromUser(user, displayName);
 
                 int? currentPropertyId = httpContext.Session.GetInt32("CurrentPropertyId");
                 Property? currentProperty = currentPropertyId.HasValue

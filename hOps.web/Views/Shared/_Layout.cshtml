@@ -1,6 +1,7 @@
 @using Microsoft.AspNetCore.Identity
 @using hOps.web.Models
 @using hOps.web.Utilities
+@using hOps.web.ViewModels
 @using hOps.web.ViewModels.WorkOrders
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
@@ -45,6 +46,26 @@
     if (string.IsNullOrWhiteSpace(currentUrl))
     {
         currentUrl = Url.Action("Index", "Home") ?? "/";
+    }
+    var rawAvatarModel = ViewBag.CurrentUserAvatar as UserAvatarViewModel;
+    var fallbackProfileName = rawAvatarModel?.Name ?? (User?.Identity?.Name ?? "My Profile");
+    var profileAvatarModel = rawAvatarModel != null
+        ? new UserAvatarViewModel
+        {
+            ImageUrl = rawAvatarModel.ImageUrl,
+            Initials = rawAvatarModel.Initials,
+            Name = rawAvatarModel.Name,
+            Size = "sm",
+            AdditionalCssClasses = rawAvatarModel.AdditionalCssClasses
+        }
+        : UserAvatarHelper.Build(null, null, null, fallbackProfileName, "sm");
+    if (profileAvatarModel != null)
+    {
+        profileAvatarModel.Size = "sm";
+        var extraClasses = "me-2";
+        profileAvatarModel.AdditionalCssClasses = string.IsNullOrWhiteSpace(profileAvatarModel.AdditionalCssClasses)
+            ? extraClasses
+            : $"{profileAvatarModel.AdditionalCssClasses} {extraClasses}";
     }
 }
 <!DOCTYPE html>
@@ -320,7 +341,13 @@
                             </li>
 
                             <li class="nav-item me-2">
-                                <a class="nav-link @(currentController == "Profile" ? "active" : string.Empty)" asp-controller="Profile" asp-action="Index">My Profile</a>
+                                <a class="nav-link d-flex align-items-center gap-2 @(currentController == "Profile" ? "active" : string.Empty)" asp-controller="Profile" asp-action="Index">
+                                    @if (profileAvatarModel != null)
+                                    {
+                                        <partial name="_UserAvatar" model="profileAvatarModel" />
+                                    }
+                                    <span>My Profile</span>
+                                </a>
                             </li>
 
                             <li class="nav-item">
