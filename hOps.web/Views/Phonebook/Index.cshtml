@@ -19,6 +19,7 @@
             .Where(v => !string.IsNullOrWhiteSpace(v))
             .ToArray();
     }
+
     IEnumerable<(string number, string type)> BuildPhoneEntries(string? numbers, string? types)
     {
         var numberEntries = SplitValues(numbers);
@@ -35,6 +36,32 @@
             yield return (number, type);
         }
     }
+
+    string? NormalizeWebsiteUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absolute) &&
+            (absolute.Scheme == Uri.UriSchemeHttp ||
+             absolute.Scheme == Uri.UriSchemeHttps ||
+             absolute.Scheme == Uri.UriSchemeFtp))
+        {
+            return absolute.ToString();
+        }
+
+        if (!trimmed.Contains(' ') &&
+            Uri.TryCreate($"https://{trimmed}", UriKind.Absolute, out var httpsUri))
+        {
+            return httpsUri.ToString();
+        }
+
+        return trimmed;
+    }
+
     var contactsData = Model.Contacts.Select(contact => new
     {
         id = contact.Id,
@@ -50,6 +77,7 @@
         emails = SplitValues(contact.Email),
         fax = contact.Fax,
         website = contact.Website,
+        websiteUrl = NormalizeWebsiteUrl(contact.Website),
         address = contact.Address,
         notes = contact.Notes
     });
@@ -376,7 +404,25 @@ else
                 renderPhoneValues(detailElements.phoneList, contact.phoneEntries, contact.phone);
                 renderMultiValue(detailElements.emailList, contact.emails, contact.email, 'email');
                 detailElements.fax.textContent = formatValue(contact.fax);
-                detailElements.website.innerHTML = contact.website ? `<a href="${contact.website}" target="_blank" rel="noopener">${contact.website}</a>` : '-';
+                const websiteDisplay = (contact.website || '').trim();
+                const websiteContainer = detailElements.website;
+                websiteContainer.textContent = '';
+                if (websiteDisplay) {
+                    websiteContainer.classList.remove('text-muted');
+                    if (contact.websiteUrl) {
+                        const link = document.createElement('a');
+                        link.href = contact.websiteUrl;
+                        link.target = '_blank';
+                        link.rel = 'noopener';
+                        link.textContent = websiteDisplay;
+                        websiteContainer.appendChild(link);
+                    } else {
+                        websiteContainer.textContent = websiteDisplay;
+                    }
+                } else {
+                    websiteContainer.classList.add('text-muted');
+                    websiteContainer.textContent = '-';
+                }
                 detailElements.address.textContent = formatValue(contact.address);
                 detailElements.notes.textContent = formatValue(contact.notes, 'No notes');
                 const editUrl = `${basePath}/Edit/${contact.id}`;

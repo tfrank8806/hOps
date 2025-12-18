@@ -39,7 +39,6 @@ namespace hOps.web.Models
         [Phone]
         public string? Fax { get; set; }
 
-        [Url]
         public string? Website { get; set; }
 
         public string? Address { get; set; }
@@ -89,6 +88,15 @@ namespace hOps.web.Models
                     new[] { nameof(PhoneNumberTypes) });
             }
 
+            Website = Website?.Trim();
+
+            if (!string.IsNullOrWhiteSpace(Website) && !IsAllowedWebsite(Website))
+            {
+                yield return new ValidationResult(
+                    "Enter a valid website (example.com or https://example.com).",
+                    new[] { nameof(Website) });
+            }
+
             var emailValidator = new EmailAddressAttribute();
             foreach (var email in SplitMultiline(Email))
             {
@@ -110,6 +118,26 @@ namespace hOps.web.Models
                 .Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(v => v.Trim())
                 .Where(v => !string.IsNullOrWhiteSpace(v));
+        }
+
+        private static bool IsAllowedWebsite(string value)
+        {
+            if (Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+                (uri.Scheme == Uri.UriSchemeHttp ||
+                 uri.Scheme == Uri.UriSchemeHttps ||
+                 uri.Scheme == Uri.UriSchemeFtp))
+            {
+                return true;
+            }
+
+            if (!value.Contains(' ') &&
+                Uri.TryCreate($"https://{value}", UriKind.Absolute, out var httpsUri) &&
+                (httpsUri.Scheme == Uri.UriSchemeHttp || httpsUri.Scheme == Uri.UriSchemeHttps))
+            {
+                return true;
+            }
+
+            return false;
         }
     }
 }
