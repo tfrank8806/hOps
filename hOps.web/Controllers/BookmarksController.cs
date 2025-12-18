@@ -324,7 +324,7 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> QuickList()
+        public async Task<IActionResult> QuickList(bool includeAll = false)
         {
             var currentUser = await _userManager.GetUserAsync(User);
             if (currentUser == null)
@@ -339,20 +339,27 @@ namespace hOps.web.Controllers
 
             async Task<List<Bookmark>> LoadBookmarksAsync(IQueryable<Bookmark> query)
             {
-                var flagged = await query.Where(b => b.ShowInQuickMenu).OrderBy(b => b.Name).ToListAsync();
+                var orderedQuery = query.OrderBy(b => b.Name);
+
+                if (includeAll)
+                {
+                    return await orderedQuery.ToListAsync();
+                }
+
+                var flagged = await orderedQuery.Where(b => b.ShowInQuickMenu).ToListAsync();
                 if (flagged.Any())
                 {
                     return flagged;
                 }
 
-                return await query.OrderBy(b => b.Name).Take(5).ToListAsync();
+                return await orderedQuery.Take(5).ToListAsync();
             }
 
-            void AppendBookmarks(IEnumerable<Bookmark> bookmarks, string sectionLabel)
+            void AppendBookmarks(IEnumerable<Bookmark> bookmarks, string sectionLabel, BookmarkSection sectionType)
             {
                 foreach (var bookmark in bookmarks)
                 {
-                    if (quickList.Count >= 12)
+                    if (!includeAll && quickList.Count >= 12)
                     {
                         break;
                     }
@@ -366,7 +373,9 @@ namespace hOps.web.Controllers
                     {
                         name = bookmark.Name,
                         url = bookmark.Url,
-                        section = sectionLabel
+                        section = sectionLabel,
+                        description = bookmark.Description,
+                        sectionType = sectionType.ToString()
                     });
                 }
             }
@@ -374,7 +383,7 @@ namespace hOps.web.Controllers
             var userQuery = _context.Bookmarks
                 .Where(b => b.Section == BookmarkSection.User && b.CreatedById == currentUser.Id);
 
-            AppendBookmarks(await LoadBookmarksAsync(userQuery), "Personal");
+            AppendBookmarks(await LoadBookmarksAsync(userQuery), "Personal", BookmarkSection.User);
 
             if (currentPropertyId.HasValue)
             {
@@ -390,14 +399,14 @@ namespace hOps.web.Controllers
                 var teamQuery = _context.Bookmarks
                     .Where(b => b.Section == BookmarkSection.Team && b.PropertyId == currentPropertyId.Value);
 
-                AppendBookmarks(await LoadBookmarksAsync(teamQuery), $"Team - {propertyLabel}");
+                AppendBookmarks(await LoadBookmarksAsync(teamQuery), $"Team - {propertyLabel}", BookmarkSection.Team);
 
                 if (canManagePropertyBookmarks)
                 {
                     var propertyQuery = _context.Bookmarks
                         .Where(b => b.Section == BookmarkSection.Property && b.PropertyId == currentPropertyId.Value);
 
-                    AppendBookmarks(await LoadBookmarksAsync(propertyQuery), $"Property - {propertyLabel}");
+                    AppendBookmarks(await LoadBookmarksAsync(propertyQuery), $"Property - {propertyLabel}", BookmarkSection.Property);
                 }
             }
 
