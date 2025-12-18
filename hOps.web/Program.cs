@@ -350,19 +350,15 @@ using (var scope = app.Services.CreateScope())
     var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
 
-    var isSqlite = dbContext.Database.IsSqlite();
+var isSqlite = dbContext.Database.IsSqlite();
 
-    // Apply migrations with provider-specific handling; skip SQLite-only helpers for SQL Server.
-    if (isSqlite)
-    {
-        await dbContext.Database.EnsureCreatedAsync();
-        await EnsureProfilePhotoPathColumnAsync(dbContext);
-        await EnsureRoomLayoutShapeColumnsAsync(dbContext);
-    }
-    else
-    {
-        await ApplyMigrationsWithLegacySupportAsync(dbContext);
-    }
+await ApplyMigrationsWithLegacySupportAsync(dbContext);
+
+if (isSqlite)
+{
+    await EnsureProfilePhotoPathColumnAsync(dbContext);
+    await EnsureRoomLayoutShapeColumnsAsync(dbContext);
+}
 
     await SeedRolesAsync(roleManager);
     await SeedAdminUserAsync(userManager, roleManager);
@@ -602,12 +598,6 @@ static async Task EnsureRoomLayoutShapeColumnsAsync(ApplicationDbContext dbConte
 
 static async Task ApplyMigrationsWithLegacySupportAsync(ApplicationDbContext dbContext)
 {
-    if (dbContext.Database.ProviderName?.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) == true)
-    {
-        await dbContext.Database.EnsureCreatedAsync();
-        return;
-    }
-
     await EnsureLegacyPassOnLogMigrationAsync(dbContext);
 
     try
