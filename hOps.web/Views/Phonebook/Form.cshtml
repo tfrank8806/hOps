@@ -18,7 +18,23 @@
         return parts.Length > 0 ? parts : new[] { string.Empty };
     }
 
-    var phoneEntries = BuildEntries(Model.Contact.PhoneNumber);
+    var phoneEntries = BuildEntries(Model.Contact.PhoneNumber).ToList();
+    var phoneTypeEntries = BuildEntries(Model.Contact.PhoneNumberTypes).ToList();
+    var maxPhoneEntries = Math.Max(phoneEntries.Count, phoneTypeEntries.Count);
+    if (maxPhoneEntries > phoneEntries.Count)
+    {
+        while (phoneEntries.Count < maxPhoneEntries)
+        {
+            phoneEntries.Add(string.Empty);
+        }
+    }
+    else if (maxPhoneEntries > phoneTypeEntries.Count)
+    {
+        while (phoneTypeEntries.Count < maxPhoneEntries)
+        {
+            phoneTypeEntries.Add(string.Empty);
+        }
+    }
     var emailEntries = BuildEntries(Model.Contact.Email);
 }
 
@@ -83,12 +99,21 @@
         <div class="col-md-6" id="phoneFields">
             <label class="form-label" for="phoneFieldGroup">Phone Numbers</label>
             <input type="hidden" asp-for="Contact.PhoneNumber" data-field-hidden="phone" />
+            <input type="hidden" asp-for="Contact.PhoneNumberTypes" data-field-hidden="phone-types" />
             <div id="phoneFieldGroup" class="phonebook-field-group" data-field-group="phone">
-                @foreach (var phone in phoneEntries)
+                @for (var i = 0; i < phoneEntries.Count; i++)
                 {
-                    <div class="input-group mb-2" data-field-row="phone">
+                    var phone = phoneEntries[i];
+                    var phoneType = phoneTypeEntries[i];
+                    <div class="input-group mb-2 flex-nowrap" data-field-row="phone">
+                        <input type="text"
+                               class="form-control phone-type-input"
+                               data-field-meta="phone"
+                               value="@phoneType"
+                               placeholder="Type (e.g., Mobile)" />
                         <input type="tel"
                                class="form-control"
+                               data-field-value="phone"
                                value="@phone"
                                placeholder="(555) 123-4567" />
                         <button type="button"
@@ -102,6 +127,7 @@
                 + Add phone
             </button>
             <span asp-validation-for="Contact.PhoneNumber" class="text-danger"></span>
+            <span asp-validation-for="Contact.PhoneNumberTypes" class="text-danger"></span>
         </div>
         <div class="col-md-6" id="emailFields">
             <label class="form-label" for="emailFieldGroup">Email Addresses</label>
@@ -158,9 +184,14 @@
     <partial name="_ValidationScriptsPartial" />
     <script>
         (() => {
-            const setupGroup = (fieldName) => {
+            const setupGroup = (fieldName, options = {}) => {
+                const metaFieldName = options.metaField ?? null;
+                const metaPlaceholder = options.metaPlaceholder ?? 'Type (e.g., Mobile)';
                 const container = document.querySelector(`[data-field-group="${fieldName}"]`);
                 const hiddenInput = document.querySelector(`[data-field-hidden="${fieldName}"]`);
+                const hiddenMetaInput = metaFieldName
+                    ? document.querySelector(`[data-field-hidden="${metaFieldName}"]`)
+                    : null;
                 const addButton = document.querySelector(`[data-add-field="${fieldName}"]`);
                 if (!container || !hiddenInput || !addButton) {
                     return;
@@ -168,9 +199,9 @@
 
                 const form = hiddenInput.form;
 
-                const createRow = (value = '') => {
+                const createRow = (value = '', metaValue = '') => {
                     const wrapper = document.createElement('div');
-                    wrapper.className = 'input-group mb-2';
+                    wrapper.className = 'input-group mb-2 flex-nowrap';
                     wrapper.setAttribute('data-field-row', fieldName);
 
                     const input = document.createElement('input');
@@ -178,6 +209,17 @@
                     input.type = fieldName === 'email' ? 'email' : 'tel';
                     input.placeholder = fieldName === 'email' ? 'name@example.com' : '(555) 123-4567';
                     input.value = value;
+                    input.setAttribute('data-field-value', fieldName);
+
+                    if (hiddenMetaInput) {
+                        const metaInput = document.createElement('input');
+                        metaInput.type = 'text';
+                        metaInput.className = 'form-control phone-type-input';
+                        metaInput.placeholder = metaPlaceholder;
+                        metaInput.value = metaValue;
+                        metaInput.setAttribute('data-field-meta', fieldName);
+                        wrapper.append(metaInput);
+                    }
 
                     const removeBtn = document.createElement('button');
                     removeBtn.type = 'button';
@@ -191,10 +233,27 @@
                 };
 
                 const updateHidden = () => {
-                    const values = Array.from(container.querySelectorAll('input'))
-                        .map(input => input.value.trim())
-                        .filter(Boolean);
+                    const rows = Array.from(container.querySelectorAll('[data-field-row]'));
+                    const values = [];
+                    const metaValues = [];
+
+                    rows.forEach(row => {
+                        const valueInput = row.querySelector('[data-field-value]');
+                        const value = valueInput?.value.trim();
+                        if (!value) {
+                            return;
+                        }
+                        values.push(value);
+                        if (hiddenMetaInput) {
+                            const metaInput = row.querySelector('[data-field-meta]');
+                            metaValues.push(metaInput?.value.trim() ?? '');
+                        }
+                    });
+
                     hiddenInput.value = values.join('\n');
+                    if (hiddenMetaInput) {
+                        hiddenMetaInput.value = metaValues.join('\n');
+                    }
                     updateRemoveButtons();
                 };
 
@@ -208,7 +267,7 @@
                 addButton.addEventListener('click', () => {
                     const row = createRow();
                     container.appendChild(row);
-                    row.querySelector('input')?.focus();
+                    (row.querySelector('[data-field-meta]') ?? row.querySelector('[data-field-value]'))?.focus();
                     updateHidden();
                 });
 
@@ -230,7 +289,7 @@
                 updateHidden();
             };
 
-            setupGroup('phone');
+            setupGroup('phone', { metaField: 'phone-types' });
             setupGroup('email');
         })();
     </script>

@@ -195,6 +195,7 @@ namespace hOps.web.Controllers
             existing.Company = vm.Contact.Company;
             existing.Title = vm.Contact.Title;
             existing.PhoneNumber = vm.Contact.PhoneNumber;
+            existing.PhoneNumberTypes = vm.Contact.PhoneNumberTypes;
             existing.Email = vm.Contact.Email;
             existing.Fax = vm.Contact.Fax;
             existing.Website = vm.Contact.Website;

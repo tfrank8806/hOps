@@ -19,6 +19,22 @@
             .Where(v => !string.IsNullOrWhiteSpace(v))
             .ToArray();
     }
+    IEnumerable<(string number, string type)> BuildPhoneEntries(string? numbers, string? types)
+    {
+        var numberEntries = SplitValues(numbers);
+        var typeEntries = SplitValues(types);
+        var max = Math.Max(numberEntries.Length, typeEntries.Length);
+        for (var i = 0; i < max; i++)
+        {
+            var number = i < numberEntries.Length ? numberEntries[i] : string.Empty;
+            if (string.IsNullOrWhiteSpace(number))
+            {
+                continue;
+            }
+            var type = i < typeEntries.Length ? typeEntries[i] : string.Empty;
+            yield return (number, type);
+        }
+    }
     var contactsData = Model.Contacts.Select(contact => new
     {
         id = contact.Id,
@@ -28,7 +44,8 @@
         company = contact.Company,
         title = contact.Title,
         phone = contact.PhoneNumber,
-        phones = SplitValues(contact.PhoneNumber),
+        phoneEntries = BuildPhoneEntries(contact.PhoneNumber, contact.PhoneNumberTypes)
+            .Select(entry => new { number = entry.number, type = entry.type }),
         email = contact.Email,
         emails = SplitValues(contact.Email),
         fax = contact.Fax,
@@ -283,13 +300,51 @@ else
                 entries.forEach(entry => {
                     const li = document.createElement('li');
                     const safeValue = escapeHtml(entry);
-                    if (type === 'phone') {
-                        li.innerHTML = `<a href="tel:${encodeURIComponent(entry)}">${safeValue}</a>`;
-                    } else if (type === 'email') {
+                    if (type === 'email') {
                         li.innerHTML = `<a href="mailto:${encodeURIComponent(entry)}">${safeValue}</a>`;
                     } else {
                         li.textContent = entry;
                     }
+                    list.appendChild(li);
+                });
+                target.appendChild(list);
+            }
+
+            function renderPhoneValues(target, entries, fallback) {
+                if (!target) {
+                    return;
+                }
+                const normalized = Array.isArray(entries) && entries.length
+                    ? entries
+                        .map(entry => ({
+                            number: typeof entry.number === 'string' ? entry.number.trim() : '',
+                            type: typeof entry.type === 'string' ? entry.type.trim() : ''
+                        }))
+                        .filter(entry => entry.number)
+                    : (typeof fallback === 'string' && fallback.trim()
+                        ? fallback
+                            .split(/\r?\n/)
+                            .map(v => v.trim())
+                            .filter(Boolean)
+                            .map(number => ({ number, type: '' }))
+                        : []);
+
+                target.innerHTML = '';
+                if (!normalized.length) {
+                    target.classList.add('text-muted');
+                    target.textContent = '-';
+                    return;
+                }
+
+                target.classList.remove('text-muted');
+                const list = document.createElement('ul');
+                list.className = 'list-unstyled mb-0';
+                normalized.forEach(entry => {
+                    const li = document.createElement('li');
+                    const typeLabel = entry.type
+                        ? `<span class="text-muted me-2">${escapeHtml(entry.type)}</span>`
+                        : '';
+                    li.innerHTML = `${typeLabel}<a href="tel:${encodeURIComponent(entry.number)}">${escapeHtml(entry.number)}</a>`;
                     list.appendChild(li);
                 });
                 target.appendChild(list);
@@ -318,7 +373,7 @@ else
                 detailElements.type.textContent = contact.type || '-';
                 detailElements.type.style.backgroundColor = contact.typeColor || '#6c757d';
                 detailElements.title.textContent = formatValue(contact.title);
-                renderMultiValue(detailElements.phoneList, contact.phones, contact.phone, 'phone');
+                renderPhoneValues(detailElements.phoneList, contact.phoneEntries, contact.phone);
                 renderMultiValue(detailElements.emailList, contact.emails, contact.email, 'email');
                 detailElements.fax.textContent = formatValue(contact.fax);
                 detailElements.website.innerHTML = contact.website ? `<a href="${contact.website}" target="_blank" rel="noopener">${contact.website}</a>` : '-';
@@ -332,7 +387,7 @@ else
 
             function clearSelection() {
                 document.querySelectorAll('.phonebook-list-item.active').forEach(item => item.classList.remove('active'));
-                renderMultiValue(detailElements.phoneList, [], null, 'phone');
+                renderPhoneValues(detailElements.phoneList, [], null);
                 renderMultiValue(detailElements.emailList, [], null, 'email');
                 setActionButton(detailElements.editButton, null);
                 setActionButton(detailElements.addPhoneButton, null);

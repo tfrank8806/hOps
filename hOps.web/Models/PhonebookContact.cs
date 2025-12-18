@@ -31,6 +31,9 @@ namespace hOps.web.Models
         [Display(Name = "Phone Number")]
         public string? PhoneNumber { get; set; }
 
+        [Display(Name = "Phone Number Types")]
+        public string? PhoneNumberTypes { get; set; }
+
         public string? Email { get; set; }
 
         [Phone]
@@ -75,6 +78,15 @@ namespace hOps.web.Models
                 {
                     yield return new ValidationResult($"Invalid phone number: {phone}", new[] { nameof(PhoneNumber) });
                 }
+            }
+
+            var phoneEntries = SplitMultiline(PhoneNumber).ToList();
+            var typeEntries = SplitMultiline(PhoneNumberTypes).ToList();
+            if (typeEntries.Count > 0 && typeEntries.Count != phoneEntries.Count)
+            {
+                yield return new ValidationResult(
+                    "Each phone number must have a matching phone type.",
+                    new[] { nameof(PhoneNumberTypes) });
             }
 
             var emailValidator = new EmailAddressAttribute();
