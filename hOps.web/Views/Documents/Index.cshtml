@@ -41,7 +41,6 @@
         {
             "name" => "name",
             "size" => "size",
-            "shared" => "shared",
             "folder" => "folder",
             _ => "uploaded"
         };
@@ -51,9 +50,25 @@
         return string.Equals(input, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
     }
     var safeSortField = SanitizeSortField(Model.SortField);
-    var safeSortDirection = SanitizeSortDirection(Model.SortDirection);
-    string GetNextDirection(string field) => string.Equals(Model.SortField, field, StringComparison.OrdinalIgnoreCase) && Model.SortDirection == "asc" ? "desc" : "asc";
-    string GetSortIndicator(string field) => string.Equals(Model.SortField, field, StringComparison.OrdinalIgnoreCase) ? (Model.SortDirection == "asc" ? "\u25B2" : "\u25BC") : string.Empty;
+var safeSortDirection = SanitizeSortDirection(Model.SortDirection);
+string GetNextDirection(string field) => string.Equals(Model.SortField, field, StringComparison.OrdinalIgnoreCase) && Model.SortDirection == "asc" ? "desc" : "asc";
+string GetSortIndicator(string field) => string.Equals(Model.SortField, field, StringComparison.OrdinalIgnoreCase) ? (Model.SortDirection == "asc" ? "\u25B2" : "\u25BC") : string.Empty;
+}
+
+@section Styles {
+    <style>
+        .documents-table {
+            font-size: 0.95rem;
+        }
+
+        .documents-table .doc-title {
+            font-size: 1rem;
+        }
+
+        .documents-table .text-muted.small {
+            font-size: 0.8rem;
+        }
+    </style>
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -430,7 +445,7 @@
                 else
                 {
                     <div class="table-responsive">
-                        <table class="table align-middle">
+                        <table class="table table-sm align-middle documents-table">
                             <thead>
                                 <tr>
                                     <th scope="col">
@@ -442,17 +457,6 @@
                                            class="text-decoration-none text-reset">
                                             Document
                                             <span class="ms-1 text-muted small">@GetSortIndicator("name")</span>
-                                        </a>
-                                    </th>
-                                    <th scope="col">
-                                        <a asp-action="Index"
-                                           asp-route-folderId="@(showingUnassignedOnly ? -1 : selectedFolderId)"
-                                           asp-route-sort="shared"
-                                           asp-route-direction="@GetNextDirection("shared")"
-                                           asp-route-search="@searchQuery"
-                                           class="text-decoration-none text-reset">
-                                            Shared With
-                                            <span class="ms-1 text-muted small">@GetSortIndicator("shared")</span>
                                         </a>
                                     </th>
                                     <th scope="col" class="text-end">
@@ -475,7 +479,7 @@
                                     foreach (var child in Model.ChildFolders)
                                     {
                                         <tr class="table-light">
-                                            <td colspan="2">
+                                            <td>
                                                 <a asp-action="Index"
                                                    asp-route-folderId="@child.Id"
                                                    asp-route-sort="@safeSortField"
@@ -506,32 +510,11 @@
                                 {
                                     <tr>
                                         <td>
-                                            <div class="fw-semibold">@doc.DisplayName</div>
-                                            <div class="text-muted small">@doc.OriginalFileName</div>
+                                            <div class="fw-semibold doc-title">@doc.DisplayName</div>
                                             <div class="text-muted small">@doc.FileSizeDisplay</div>
-                                            @if (!string.IsNullOrWhiteSpace(doc.FolderPath))
-                                            {
-                                                <div class="text-muted small">Folder: @doc.FolderPath</div>
-                                            }
-                                            else
-                                            {
-                                                <div class="text-muted small">Folder: (no folder)</div>
-                                            }
                                             @if (!string.IsNullOrWhiteSpace(doc.Description))
                                             {
                                                 <div class="text-muted small">Notes: @doc.Description</div>
-                                            }
-                                        </td>
-                                        <td>
-                                            <div>@doc.AccessSummary</div>
-                                            @if (doc.TargetProperties.Count > 0)
-                                            {
-                                                <ul class="list-unstyled mb-0 small text-muted">
-                                                    @foreach (var propertyLabel in doc.TargetProperties)
-                                                    {
-                                                        <li>@propertyLabel</li>
-                                                    }
-                                                </ul>
                                             }
                                         </td>
                                         @{
@@ -573,6 +556,19 @@
                                                 <input type="hidden" name="currentSort" value="@safeSortField" />
                                                 <input type="hidden" name="currentDirection" value="@safeSortDirection" />
                                                 <input type="hidden" name="currentSearch" value="@searchQuery" />
+                                                <div class="alert alert-secondary small mb-3">
+                                                    <div class="fw-semibold mb-1">Current visibility</div>
+                                                    <div>@doc.AccessSummary</div>
+                                                    @if (doc.TargetProperties.Count > 0)
+                                                    {
+                                                        <ul class="list-unstyled mb-0 mt-1">
+                                                            @foreach (var propertyLabel in doc.TargetProperties)
+                                                            {
+                                                                <li>@propertyLabel</li>
+                                                            }
+                                                        </ul>
+                                                    }
+                                                </div>
                                                 <div class="mb-2">
                                                     <label class="form-label d-block mb-1">Visibility</label>
                                                     <div class="vstack gap-1">

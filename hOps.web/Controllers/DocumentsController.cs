@@ -1190,7 +1190,7 @@ namespace hOps.web.Controllers
         private static (string Field, string Direction) NormalizeSort(string? sortField, string? sortDirection)
         {
             var field = string.IsNullOrWhiteSpace(sortField) ? "uploaded" : sortField.Trim().ToLowerInvariant();
-            if (field != "name" && field != "uploaded" && field != "size" && field != "shared" && field != "folder")
+            if (field != "name" && field != "uploaded" && field != "size" && field != "folder")
             {
                 field = "uploaded";
             }
@@ -1211,9 +1211,6 @@ namespace hOps.web.Controllers
                 "size" => ascending
                     ? documents.OrderBy(d => d.FileSizeBytes)
                     : documents.OrderByDescending(d => d.FileSizeBytes),
-                "shared" => ascending
-                    ? documents.OrderBy(d => d.AccessScope).ThenBy(d => d.Property?.Name ?? string.Empty)
-                    : documents.OrderByDescending(d => d.AccessScope).ThenByDescending(d => d.Property?.Name ?? string.Empty),
                 "folder" => ascending
                     ? documents.OrderBy(d => d.Folder?.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                     : documents.OrderByDescending(d => d.Folder?.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase),
