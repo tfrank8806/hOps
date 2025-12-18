@@ -53,10 +53,15 @@
                         }
                     </select>
                 </div>
+                <div class="d-flex justify-content-end mb-4">
+                    <button class="btn btn-outline-primary btn-sm" type="button" data-action="add-shift">
+                        + Add Shift
+                    </button>
+                </div>
 
                 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                     <h5 class="mb-0">Default Shifts</h5>
-                    <button class="btn btn-outline-primary btn-sm" type="button" id="addShiftTemplate">
+                    <button class="btn btn-outline-primary btn-sm" type="button" data-action="add-shift">
                         + Add Shift
                     </button>
                 </div>
@@ -87,7 +92,7 @@
                                             <input type="number" asp-for="ShiftTemplates[i].SortOrder" class="form-control form-control-sm" data-role="sort-input" />
                                         </td>
                                         <td>
-                                            <input asp-for="ShiftTemplates[i].Name" class="form-control form-control-sm" />
+                                            <input asp-for="ShiftTemplates[i].Name" class="form-control form-control-sm" data-role="template-name" />
                                         </td>
                                         <td>
                                             <input asp-for="ShiftTemplates[i].ShiftName" class="form-control form-control-sm" />
@@ -103,7 +108,6 @@
                                         </td>
                                         <td>
                                             <div class="form-check">
-                                                <input type="hidden" name="@( $"ShiftTemplates[{i}].AlertIfMissing" )" value="false" />
                                                 <input class="form-check-input" asp-for="ShiftTemplates[i].AlertIfMissing" value="true" />
                                                 <label asp-for="ShiftTemplates[i].AlertIfMissing" class="form-check-label small text-muted">Alert if missing</label>
                                             </div>
@@ -129,7 +133,7 @@
                                         <input type="number" name="ShiftTemplates[0].SortOrder" value="0" class="form-control form-control-sm" data-role="sort-input" />
                                     </td>
                                     <td>
-                                        <input name="ShiftTemplates[0].Name" class="form-control form-control-sm" />
+                                        <input name="ShiftTemplates[0].Name" class="form-control form-control-sm" data-role="template-name" />
                                     </td>
                                     <td>
                                         <input name="ShiftTemplates[0].ShiftName" class="form-control form-control-sm" />
@@ -145,7 +149,8 @@
                                     </td>
                                     <td>
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="ShiftTemplates_0__AlertIfMissing" name="ShiftTemplates[0].AlertIfMissing" />
+                                            <input class="form-check-input" type="checkbox" id="ShiftTemplates_0__AlertIfMissing" name="ShiftTemplates[0].AlertIfMissing" value="true" />
+                                            <input type="hidden" name="ShiftTemplates[0].AlertIfMissing" value="false" data-role="alert-hidden" />
                                             <label class="form-check-label small text-muted" for="ShiftTemplates_0__AlertIfMissing">Alert if missing</label>
                                         </div>
                                     </td>
@@ -244,7 +249,7 @@
             <input type="number" name="ShiftTemplates[{{index}}].SortOrder" value="{{index}}" class="form-control form-control-sm" data-role="sort-input" />
         </td>
         <td>
-            <input name="ShiftTemplates[{{index}}].Name" class="form-control form-control-sm" />
+            <input name="ShiftTemplates[{{index}}].Name" class="form-control form-control-sm" data-role="template-name" />
         </td>
         <td>
             <input name="ShiftTemplates[{{index}}].ShiftName" class="form-control form-control-sm" />
@@ -260,8 +265,8 @@
         </td>
         <td>
             <div class="form-check">
-                <input type="hidden" name="ShiftTemplates[{{index}}].AlertIfMissing" value="false" />
                 <input class="form-check-input" type="checkbox" value="true" id="ShiftTemplates_{{index}}__AlertIfMissing" name="ShiftTemplates[{{index}}].AlertIfMissing" />
+                <input type="hidden" name="ShiftTemplates[{{index}}].AlertIfMissing" value="false" data-role="alert-hidden" />
                 <label class="form-check-label small text-muted" for="ShiftTemplates_{{index}}__AlertIfMissing">Alert if missing</label>
             </div>
         </td>
@@ -281,11 +286,11 @@
     <partial name="_ValidationScriptsPartial" />
     <script>
         (() => {
-            const addButton = document.getElementById('addShiftTemplate');
+            const addButtons = document.querySelectorAll('[data-action="add-shift"]');
             const tableBody = document.querySelector('#shiftTemplatesTable tbody');
             const template = document.getElementById('shift-row-template');
 
-            if (!addButton || !tableBody || !template) {
+            if (!addButtons.length || !tableBody || !template) {
                 return;
             }
 
@@ -371,7 +376,7 @@
                 return current;
             };
 
-            addButton.addEventListener('click', () => {
+            const addShiftRow = () => {
                 const nextIndex = getNextIndex();
                 const html = template.innerHTML.replace(/{{index}}/g, nextIndex);
                 const wrapper = document.createElement('tbody');
@@ -380,8 +385,14 @@
                 if (newRow) {
                     tableBody.appendChild(newRow);
                     updateSortInputs();
+                    const templateInput = newRow.querySelector('[data-role="template-name"]');
+                    if (templateInput) {
+                        templateInput.focus();
+                    }
                 }
-            });
+            };
+
+            addButtons.forEach(button => button.addEventListener('click', addShiftRow));
 
             updateSortInputs();
         })();
