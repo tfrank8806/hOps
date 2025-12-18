@@ -80,8 +80,10 @@ namespace hOps.web.Controllers
 
             var referenceDate = ParseWeekStart(weekStart) ?? _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
             var alignedWeekStart = AlignToWeekStart(referenceDate, startDay);
-            var normalizedWeekStart = DateTime.SpecifyKind(alignedWeekStart, DateTimeKind.Utc);
-            var alignedWeekEnd = alignedWeekStart.AddDays(6);
+            alignedWeekStart = DateTime.SpecifyKind(alignedWeekStart, DateTimeKind.Utc);
+            var alignedWeekEnd = DateTime.SpecifyKind(alignedWeekStart.AddDays(6), DateTimeKind.Utc);
+            var normalizedWeekStart = alignedWeekStart;
+            var normalizedWeekEnd = alignedWeekEnd;
 
             var schedule = await _context.Schedules
                 .Include(s => s.Assignments)
@@ -123,9 +125,10 @@ namespace hOps.web.Controllers
 
                     await _context.SaveChangesAsync();
                     schedule = draftToShift;
-                    alignedWeekStart = schedule.WeekStartDate.Date;
-                    alignedWeekEnd = alignedWeekStart.AddDays(6);
+                    alignedWeekStart = DateTime.SpecifyKind(schedule.WeekStartDate.Date, DateTimeKind.Utc);
+                    alignedWeekEnd = DateTime.SpecifyKind(alignedWeekStart.AddDays(6), DateTimeKind.Utc);
                     normalizedWeekStart = schedule.WeekStartDate;
+                    normalizedWeekEnd = DateTime.SpecifyKind(schedule.WeekEndDate, DateTimeKind.Utc);
                     autoShiftMessage = "Draft schedule updated to match the new week start day.";
                 }
             }
@@ -146,7 +149,10 @@ namespace hOps.web.Controllers
                 .ToListAsync();
 
             var pendingRequests = await _context.ScheduleTimeOffRequests
-                .Where(r => r.PropertyId == property.Id && r.Status == TimeOffRequestStatus.Pending)
+                .Where(r => r.PropertyId == property.Id &&
+                            r.Status == TimeOffRequestStatus.Pending &&
+                            r.StartDate <= alignedWeekEnd &&
+                            r.EndDate >= alignedWeekStart)
                 .Include(r => r.Employee)
                 .Include(r => r.SubmittedByUser)
                 .OrderBy(r => r.StartDate)
