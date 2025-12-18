@@ -92,7 +92,7 @@ namespace hOps.web.Controllers
                 ModelState.AddModelError(string.Empty, "You do not have access to any properties to associate with this event.");
             }
 
-            form.SelectedPropertyIds = form.SelectedPropertyIds
+            form.SelectedPropertyIds = (form.SelectedPropertyIds ?? new List<int>())
                 .Where(id => propertyIds.Contains(id))
                 .Distinct()
                 .ToList();
@@ -438,6 +438,7 @@ namespace hOps.web.Controllers
             var categoryOptions = await GetCalendarCategoryOptionsAsync();
 
             var form = formOverride ?? new CalendarEventFormViewModel();
+            form.SelectedPropertyIds ??= new List<int>();
 
             if (formOverride == null)
             {
