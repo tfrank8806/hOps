@@ -140,13 +140,16 @@ namespace hOps.web.Controllers
                 return View("Index", viewModel);
             }
 
+            var normalizedStartDate = NormalizeCalendarDate(form.StartDate);
+            var normalizedEndDate = NormalizeCalendarDate(form.EndDate);
+
             var calendarEvent = new CalendarEvent
             {
                 CalendarCategoryId = form.CategoryId,
                 Title = form.Title.Trim(),
-                StartDate = form.StartDate.Date,
+                StartDate = normalizedStartDate,
                 StartTime = form.StartTime,
-                EndDate = form.EndDate.Date,
+                EndDate = normalizedEndDate,
                 EndTime = form.EndTime,
                 Recurrence = form.Recurrence,
                 Details = string.IsNullOrWhiteSpace(form.Details) ? null : form.Details.Trim(),
@@ -363,11 +366,14 @@ namespace hOps.web.Controllers
                 return View(viewModel);
             }
 
+            var normalizedStartDate = NormalizeCalendarDate(form.StartDate);
+            var normalizedEndDate = NormalizeCalendarDate(form.EndDate);
+
             calendarEvent.CalendarCategoryId = form.CategoryId;
             calendarEvent.Title = form.Title.Trim();
-            calendarEvent.StartDate = form.StartDate.Date;
+            calendarEvent.StartDate = normalizedStartDate;
             calendarEvent.StartTime = form.StartTime;
-            calendarEvent.EndDate = form.EndDate.Date;
+            calendarEvent.EndDate = normalizedEndDate;
             calendarEvent.EndTime = form.EndTime;
             calendarEvent.Recurrence = form.Recurrence;
             calendarEvent.Details = string.IsNullOrWhiteSpace(form.Details) ? null : form.Details.Trim();
@@ -1024,6 +1030,12 @@ namespace hOps.web.Controllers
             }
 
             return new DateTime(fallback.Year, fallback.Month, 1);
+        }
+
+        private static DateTime NormalizeCalendarDate(DateTime value)
+        {
+            var dateOnly = value.Date;
+            return DateTime.SpecifyKind(dateOnly, DateTimeKind.Utc);
         }
     }
 }
