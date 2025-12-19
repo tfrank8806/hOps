@@ -829,7 +829,11 @@
 
     function serializeNode(node) {
         if (node.nodeType === Node.TEXT_NODE) {
-            return node.textContent || '';
+            const text = node.textContent || '';
+            if (!text.trim()) {
+                return '';
+            }
+            return text;
         }
 
         if (node.nodeType !== Node.ELEMENT_NODE) {
@@ -911,11 +915,21 @@
     }
 
     function wrapMarkup(marker, content) {
-        const trimmed = content;
-        if (!trimmed) {
+        if (!content) {
             return '';
         }
-        return `${marker}${trimmed}${marker}`;
+
+        const leadingMatch = content.match(/^\s+/);
+        const trailingMatch = content.match(/\s+$/);
+        const leading = leadingMatch ? leadingMatch[0] : '';
+        const trailing = trailingMatch ? trailingMatch[0] : '';
+        const core = content.trim();
+
+        if (!core) {
+            return content;
+        }
+
+        return `${leading}${marker}${core}${marker}${trailing}`;
     }
 
     function cleanupMarkup(markup) {
