@@ -23,6 +23,7 @@ using Microsoft.Extensions.Logging;
 
 namespace hOps.web.Controllers
 {
+    [Authorize]
     public class HomeController : BaseController
     {
         private readonly MentionService _mentionService;
