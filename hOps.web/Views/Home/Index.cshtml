@@ -366,28 +366,8 @@
             const rowGap = rowGapVar > 0 ? rowGapVar : (parseFloat(style.rowGap) || 0);
             return { rowHeight, rowGap };
         };
-        const updateWidgetRowSpan = (widget) => {
-            if (!widget) {
-                return;
-            }
-            const { rowHeight, rowGap } = getRowMetrics();
-            const effectiveHeight = widget.scrollHeight || widget.getBoundingClientRect().height;
-            const base = Math.max(rowHeight, 1);
-            const span = Math.max(1, Math.round((effectiveHeight + rowGap) / (base + rowGap)));
-            widget.style.setProperty('--widget-row-span', span);
-        };
-        const scheduleRowSpanRefresh = (() => {
-            let frameId = null;
-            return () => {
-                if (frameId) {
-                    cancelAnimationFrame(frameId);
-                }
-                frameId = requestAnimationFrame(() => {
-                    grid.querySelectorAll('.home-widget').forEach(updateWidgetRowSpan);
-                    frameId = null;
-                });
-            };
-        })();
+        const updateWidgetRowSpan = () => {};
+        const scheduleRowSpanRefresh = () => {};
         const syncHeightSlider = (widget, heightValue) => {
             if (!widget) {
                 return;
@@ -578,9 +558,7 @@
             requestAnimationFrame(() => updateWidgetRowSpan(widget));
         };
 
-        window.addEventListener('resize', () => {
-            scheduleRowSpanRefresh();
-        });
+        window.addEventListener('resize', () => {});
 
         let dragSource = null;
 

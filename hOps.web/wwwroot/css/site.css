@@ -1012,9 +1012,7 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     min-height: 0;
     --widget-height: 300px;
     --widget-span: 4;
-    --widget-row-span: 40;
     grid-column: span var(--widget-span, 4);
-    grid-row-end: span var(--widget-row-span, 40);
 }
 
 .home-widget-card {
