@@ -4,6 +4,11 @@
     var property = Model.CurrentProperty;
     var hasProperty = property != null;
     var tilesByFloor = hasProperty ? Model.RoomTiles.GroupBy(t => t.Floor).OrderBy(g => g.Key).ToList() : new List<IGrouping<int, hOps.web.ViewModels.Home.RoomLayoutTileViewModel>>();
+    var overlayGroups = hasProperty
+        ? Model.RoomTiles
+            .GroupBy(t => string.IsNullOrWhiteSpace(t.LocationKey) ? $"room:{t.RoomId}" : t.LocationKey)
+            .ToList()
+        : new List<IGrouping<string, hOps.web.ViewModels.Home.RoomLayoutTileViewModel>>();
 }
 
 <div class="card shadow-sm h-100">
@@ -79,29 +84,47 @@
 
             <div id="layoutOverlayView" class="layout-view">
                 <div class="layout-canvas multi-floor" style="--layout-width:@maxWidthAll; --layout-height:@maxHeightAll;">
-                    @foreach (var tile in Model.RoomTiles)
+                    @foreach (var overlayGroup in overlayGroups)
                     {
-                        var left = Math.Round((double)tile.X / maxWidthAll * 100, 2);
-                        var top = Math.Round((double)tile.Y / maxHeightAll * 100, 2);
-                        var width = Math.Round((double)tile.Width / maxWidthAll * 100, 2);
-                        var height = Math.Round((double)tile.Height / maxHeightAll * 100, 2);
-                        var label = string.IsNullOrWhiteSpace(tile.RoomNumber) ? tile.RoomType : tile.RoomNumber;
-                        <div class="room-tile-overlay @tile.CssClass"
-                             style="--tile-left:@left%; --tile-top:@top%; --tile-width:@width%; --tile-height:@height%; --tile-text-rotation:@(tile.TextRotation)deg;"
-                             data-room-id="@tile.RoomId"
-                             data-room-number="@tile.RoomNumber"
+                        var representative = overlayGroup.First();
+                        var minX = overlayGroup.Min(t => t.X);
+                        var minY = overlayGroup.Min(t => t.Y);
+                        var maxX = overlayGroup.Max(t => t.X + t.Width);
+                        var maxY = overlayGroup.Max(t => t.Y + t.Height);
+                        var rawWidth = Math.Max(1, maxX - minX);
+                        var rawHeight = Math.Max(1, maxY - minY);
+                        var left = Math.Round((double)minX / maxWidthAll * 100, 2);
+                        var top = Math.Round((double)minY / maxHeightAll * 100, 2);
+                        var width = Math.Round((double)rawWidth / maxWidthAll * 100, 2);
+                        var height = Math.Round((double)rawHeight / maxHeightAll * 100, 2);
+                        var label = string.IsNullOrWhiteSpace(representative.RoomNumber) ? representative.RoomType : representative.RoomNumber;
+                        var locationKey = string.IsNullOrWhiteSpace(representative.LocationKey) ? $"room:{representative.RoomId}" : representative.LocationKey;
+                        var floors = overlayGroup.Select(t => t.Floor).Distinct().OrderBy(f => f).ToList();
+                        var overlayFloor = floors.Count == 1 ? floors[0].ToString() : string.Empty;
+                        var overlayBadges = overlayGroup.SelectMany(t => t.Badges).ToList();
+                        var displayRoomType = overlayGroup.Select(t => t.RoomType).FirstOrDefault(type => !string.IsNullOrWhiteSpace(type)) ?? representative.RoomType;
+                        var overlayClass = representative.CssClass + (floors.Count > 1 ? " room-tile-overlay--multi" : string.Empty);
+                        <div class="room-tile-overlay @overlayClass"
+                             style="--tile-left:@left%; --tile-top:@top%; --tile-width:@width%; --tile-height:@height%; --tile-text-rotation:@(representative.TextRotation)deg;"
+                             data-room-id="@representative.RoomId"
+                             data-room-number="@representative.RoomNumber"
                              data-room-label="@label"
-                             data-room-floor="@tile.Floor"
-                             data-location-key="@tile.LocationKey">
+                             data-room-floor="@overlayFloor"
+                             data-floor-list="@string.Join(",", floors)"
+                             data-location-key="@locationKey">
                             <strong class="tile-label">@label</strong>
-                            @if (!string.IsNullOrWhiteSpace(tile.RoomType))
+                            @if (floors.Count > 1)
                             {
-                                <span class="tile-type">@tile.RoomType</span>
+                                <span class="tile-type text-muted">All Floors</span>
                             }
-                            @if (tile.Badges.Any())
+                            else if (!string.IsNullOrWhiteSpace(displayRoomType))
+                            {
+                                <span class="tile-type">@displayRoomType</span>
+                            }
+                            @if (overlayBadges.Any())
                             {
                                 <div class="tile-badges">
-                                    @foreach (var badge in tile.Badges)
+                                    @foreach (var badge in overlayBadges)
                                     {
                                         <span class="badge bg-@badge.Variant">@badge.Text</span>
                                     }
@@ -137,7 +160,7 @@
                                      data-room-label="@label"
                                      data-room-id="@tile.RoomId"
                                      data-room-floor="@tile.Floor"
-                                     data-location-key="@tile.LocationKey">
+                                     data-location-key="@(string.IsNullOrWhiteSpace(tile.LocationKey) ? $"room:{tile.RoomId}" : tile.LocationKey)">
                                     <span class="tile-room">@label</span>
                                     @if (!string.IsNullOrWhiteSpace(tile.RoomType))
                                     {
