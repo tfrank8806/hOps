@@ -156,12 +156,23 @@
                  @(storedSpan.HasValue ? $"data-custom-span=\"{appliedSpan}\"" : string.Empty)
                  @(storedHeight.HasValue ? $"data-custom-height=\"{appliedHeight}\"" : string.Empty)
                  @(forceFullWidth ? "data-lock-width=\"true\"" : string.Empty)
-                 style="@widgetStyle"
+                style="@widgetStyle"
                  draggable="false">
                 <div class="home-widget__editor d-flex align-items-center gap-2">
                     <span class="home-widget__drag-handle" role="button" tabindex="0" aria-label="Drag widget" title="Drag widget">⋮⋮</span>
                     <span class="home-widget__size-label" data-size-label>@sizeLabelText</span>
                     <span class="home-widget__height-label" data-height-label>@heightLabelText</span>
+                    <div class="home-widget__height-slider">
+                        <span class="text-muted small">Height</span>
+                        <input type="range"
+                               class="form-range form-range-sm"
+                               min="@Model.WidgetHeightMin"
+                               max="@Model.WidgetHeightMax"
+                               step="@Model.WidgetHeightStep"
+                               value="@appliedHeight"
+                               data-height-slider
+                               aria-label="Widget height" />
+                    </div>
                 </div>
                 <div class="home-widget__content">
                     @switch (widget.WidgetId)
@@ -345,6 +356,45 @@
             }
             return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, numeric));
         };
+        const syncHeightSlider = (widget, heightValue) => {
+            if (!widget) {
+                return;
+            }
+            const slider = widget.querySelector('[data-height-slider]');
+            if (!slider) {
+                return;
+            }
+            const nextValue = String(Math.round(heightValue));
+            if (slider.value !== nextValue) {
+                slider.value = nextValue;
+            }
+        };
+        const initializeHeightSlider = (widget) => {
+            if (!widget) {
+                return;
+            }
+            const slider = widget.querySelector('[data-height-slider]');
+            if (!slider) {
+                return;
+            }
+            if (slider.dataset.heightSlider === 'true') {
+                return;
+            }
+            const currentHeight = Number(widget.dataset.gridHeight || getDefaultHeight(widget));
+            slider.min = slider.min || String(MIN_HEIGHT);
+            slider.max = slider.max || String(MAX_HEIGHT);
+            slider.step = slider.step || String(HEIGHT_STEP);
+            slider.value = String(Math.round(clampHeight(currentHeight)));
+            const applySliderValue = () => {
+                const parsed = Number(slider.value);
+                if (Number.isFinite(parsed)) {
+                    updateWidgetHeight(widget, parsed);
+                }
+            };
+            slider.addEventListener('input', applySliderValue);
+            slider.addEventListener('change', applySliderValue);
+            slider.dataset.heightSlider = 'true';
+        };
         const getDefaultHeight = (widget) => {
             if (!widget) {
                 return DEFAULT_HEIGHT;
@@ -383,6 +433,7 @@
             widget.dataset.gridHeight = String(Math.round(heightToApply));
             widget.style.setProperty('--widget-height', `${heightToApply}px`);
             setHeightLabelText(widget, heightToApply);
+            syncHeightSlider(widget, heightToApply);
         };
 
         grid.querySelectorAll('.home-widget').forEach(widget => {
@@ -392,6 +443,7 @@
             } else {
                 updateWidgetHeight(widget);
             }
+            initializeHeightSlider(widget);
         });
 
         let isEditing = false;
@@ -457,6 +509,7 @@
                 }
                 updateWidgetSize(widget, entry.size ?? widget.dataset.widgetSize ?? 'third', typeof entry.customSpan === 'number' ? entry.customSpan : undefined);
                 updateWidgetHeight(widget, typeof entry.customHeight === 'number' ? entry.customHeight : undefined);
+                initializeHeightSlider(widget);
                 grid.appendChild(widget);
             });
         };

@@ -1083,6 +1083,23 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     display: inline;
 }
 
+.home-widget__height-slider {
+    display: none;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 140px;
+}
+
+.home-widget__height-slider .form-range {
+    flex: 1 1 auto;
+    min-width: 110px;
+    margin-bottom: 0;
+}
+
+.home-dashboard--editing .home-widget__height-slider {
+    display: inline-flex;
+}
+
 .home-widget--dragging {
     opacity: 0.65;
 }
