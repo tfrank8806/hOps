@@ -170,6 +170,7 @@
                                max="@Model.WidgetHeightMax"
                                step="@Model.WidgetHeightStep"
                                value="@appliedHeight"
+                               draggable="false"
                                data-height-slider
                                aria-label="Widget height" />
                     </div>
@@ -394,6 +395,14 @@
             slider.addEventListener('input', applySliderValue);
             slider.addEventListener('change', applySliderValue);
             slider.dataset.heightSlider = 'true';
+
+            const stopDrag = (event) => event.stopPropagation();
+            slider.addEventListener('pointerdown', stopDrag);
+            slider.addEventListener('pointermove', stopDrag);
+            slider.addEventListener('mousedown', stopDrag);
+            slider.addEventListener('touchstart', stopDrag);
+            slider.addEventListener('touchmove', stopDrag);
+            slider.addEventListener('click', (event) => event.stopPropagation());
         };
         const getDefaultHeight = (widget) => {
             if (!widget) {
