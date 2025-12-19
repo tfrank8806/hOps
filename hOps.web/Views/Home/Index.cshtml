@@ -362,7 +362,8 @@
             const rowHeightVar = parseFloat(style.getPropertyValue('--masonry-row-height')) || 0;
             const gridAutoRows = parseFloat(style.gridAutoRows) || 0;
             const rowHeight = rowHeightVar > 0 ? rowHeightVar : (gridAutoRows > 0 ? gridAutoRows : 8);
-            const rowGap = parseFloat(style.rowGap) || 0;
+            const rowGapVar = parseFloat(style.getPropertyValue('--masonry-row-gap')) || 0;
+            const rowGap = rowGapVar > 0 ? rowGapVar : (parseFloat(style.rowGap) || 0);
             return { rowHeight, rowGap };
         };
         const updateWidgetRowSpan = (widget) => {
@@ -370,8 +371,9 @@
                 return;
             }
             const { rowHeight, rowGap } = getRowMetrics();
-            const totalHeight = widget.getBoundingClientRect().height;
-            const span = Math.max(1, Math.round((totalHeight + rowGap) / (rowHeight + rowGap)));
+            const effectiveHeight = widget.scrollHeight || widget.getBoundingClientRect().height;
+            const base = Math.max(rowHeight, 1);
+            const span = Math.max(1, Math.round((effectiveHeight + rowGap) / (base + rowGap)));
             widget.style.setProperty('--widget-row-span', span);
         };
         const scheduleRowSpanRefresh = (() => {
@@ -483,8 +485,8 @@
                 updateWidgetHeight(widget);
             }
             initializeHeightSlider(widget);
+            requestAnimationFrame(() => updateWidgetRowSpan(widget));
         });
-        scheduleRowSpanRefresh();
 
         let isEditing = false;
         let originalLayout = (() => {
@@ -573,7 +575,7 @@
             widget.dataset.gridSpan = spanToApply;
             widget.style.setProperty('--widget-span', spanToApply);
             setSizeLabelText(widget, spanToApply);
-            updateWidgetRowSpan(widget);
+            requestAnimationFrame(() => updateWidgetRowSpan(widget));
         };
 
         window.addEventListener('resize', () => {
