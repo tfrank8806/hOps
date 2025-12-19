@@ -893,7 +893,10 @@
         const items = Array.from(listElement.children)
             .filter(child => child.tagName && child.tagName.toLowerCase() === 'li')
             .map(li => `${bullet} ${serializeChildren(li).trim()}`);
-        return items.length ? `${items.join('\n')}\n` : '';
+        if (!items.length) {
+            return '';
+        }
+        return `\n${items.join('\n')}\n`;
     }
 
     function serializeOrderedList(listElement) {
@@ -901,7 +904,10 @@
         const items = Array.from(listElement.children)
             .filter(child => child.tagName && child.tagName.toLowerCase() === 'li')
             .map(li => `${index++}. ${serializeChildren(li).trim()}`);
-        return items.length ? `${items.join('\n')}\n` : '';
+        if (!items.length) {
+            return '';
+        }
+        return `\n${items.join('\n')}\n`;
     }
 
     function wrapMarkup(marker, content) {
