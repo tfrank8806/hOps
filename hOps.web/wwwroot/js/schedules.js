@@ -206,4 +206,82 @@
     });
 
     updateClipboardStatus();
+
+    const editModalEl = document.getElementById('editShiftModal');
+    const editForm = document.getElementById('editShiftForm');
+    const editButtons = document.querySelectorAll('.edit-shift-btn');
+
+    if (editModalEl && editForm && editButtons.length) {
+        const editAssignmentIdInput = editForm.querySelector('input[name="AssignmentForm.AssignmentId"]');
+        const editEmployeeSelect = editForm.querySelector('select[name="AssignmentForm.ScheduleEmployeeId"]');
+        const editDateInput = editForm.querySelector('input[name="AssignmentForm.ShiftDate"]');
+        const editShiftNameInput = editForm.querySelector('input[name="AssignmentForm.ShiftName"]');
+        const editStartInput = editForm.querySelector('input[name="AssignmentForm.ShiftStartTime"]');
+        const editEndInput = editForm.querySelector('input[name="AssignmentForm.ShiftEndTime"]');
+        const editNotesInput = editForm.querySelector('textarea[name="AssignmentForm.Notes"]');
+        const editColorInput = editForm.querySelector('input[name="AssignmentForm.ShiftColorHex"]');
+        const editMeta = editModalEl.querySelector('[data-edit-shift-meta]');
+        const editModalTitle = document.getElementById('editShiftModalLabel');
+
+        const populateEditForm = (button) => {
+            if (!button || !(button instanceof HTMLElement)) {
+                return;
+            }
+            if (editAssignmentIdInput) {
+                editAssignmentIdInput.value = button.dataset.assignmentId || '';
+            }
+            if (editEmployeeSelect) {
+                editEmployeeSelect.value = button.dataset.employeeId || '';
+            }
+            if (editDateInput) {
+                editDateInput.value = button.dataset.shiftDate || '';
+            }
+            if (editShiftNameInput) {
+                editShiftNameInput.value = button.dataset.shiftName || '';
+            }
+            if (editStartInput) {
+                editStartInput.value = button.dataset.shiftStart || '';
+            }
+            if (editEndInput) {
+                editEndInput.value = button.dataset.shiftEnd || '';
+            }
+            if (editNotesInput) {
+                editNotesInput.value = button.dataset.notes || '';
+            }
+            if (editColorInput) {
+                editColorInput.value = button.dataset.color || '';
+            }
+
+            const shiftName = button.dataset.shiftName || 'Shift';
+            const employeeName = button.dataset.employeeName || '';
+            const dateLabel = button.dataset.dateLabel || '';
+            const metaParts = [];
+            if (employeeName) {
+                metaParts.push(employeeName);
+            }
+            if (dateLabel) {
+                metaParts.push(dateLabel);
+            }
+            if (editMeta) {
+                editMeta.textContent = metaParts.join(' • ');
+            }
+            if (editModalTitle) {
+                editModalTitle.textContent = shiftName.trim() ? `Edit ${shiftName}` : 'Edit Shift';
+            }
+        };
+
+        editButtons.forEach(button => {
+            button.addEventListener('click', () => populateEditForm(button));
+        });
+
+        editModalEl.addEventListener('hidden.bs.modal', () => {
+            editForm.reset();
+            if (editMeta) {
+                editMeta.textContent = '';
+            }
+            if (editModalTitle) {
+                editModalTitle.textContent = 'Edit Shift';
+            }
+        });
+    }
 })();

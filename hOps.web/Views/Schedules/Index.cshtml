@@ -224,7 +224,6 @@
 
                                                                 @if (Model.CanManage && Model.Status == hOps.web.Models.ScheduleStatus.Draft)
                                                                 {
-                                                                    var collapseId = $"editShift_{assignment.AssignmentId}";
                                                                     <div class="mt-2 d-flex flex-wrap gap-2">
                                                                         <button type="button"
                                                                                 class="btn btn-outline-primary btn-sm copy-shift-btn schedule-action-btn"
@@ -232,62 +231,27 @@
                                                                                 data-shift-label="@shiftLabel">
                                                                             Copy
                                                                         </button>
-                                                                        <button class="btn btn-outline-secondary btn-sm schedule-action-btn" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">Edit</button>
+                                                                        <button class="btn btn-outline-secondary btn-sm schedule-action-btn edit-shift-btn"
+                                                                                type="button"
+                                                                                data-bs-toggle="modal"
+                                                                                data-bs-target="#editShiftModal"
+                                                                                data-assignment-id="@assignment.AssignmentId"
+                                                                                data-employee-id="@row.ScheduleEmployeeId"
+                                                                                data-employee-name="@Html.AttributeEncode(row.EmployeeName)"
+                                                                                data-shift-date="@isoDate"
+                                                                                data-date-label="@dateKey.ToString("MMM d")"
+                                                                                data-shift-name="@Html.AttributeEncode(assignment.ShiftName)"
+                                                                                data-shift-start="@assignment.ShiftStartTime?.ToString("hh\\:mm")"
+                                                                                data-shift-end="@assignment.ShiftEndTime?.ToString("hh\\:mm")"
+                                                                                data-notes="@Html.AttributeEncode(assignment.Notes)"
+                                                                                data-color="@assignment.ColorHex">
+                                                                            Edit
+                                                                        </button>
                                                                         <form asp-action="DeleteAssignment" method="post" onsubmit="return confirm('Remove this shift?');">
                                                                             @Html.AntiForgeryToken()
                                                                             <input type="hidden" name="assignmentId" value="@assignment.AssignmentId" />
                                                                             <input type="hidden" name="weekStart" value="@weekStartParam" />
                                                                             <button type="submit" class="btn btn-outline-danger btn-sm schedule-action-btn">Remove</button>
-                                                                        </form>
-                                                                    </div>
-                                                                    <div class="collapse mt-2" id="@collapseId">
-                                                                            <form asp-action="UpdateAssignment" method="post">
-                                                                                @Html.AntiForgeryToken()
-                                                                                <input type="hidden" name="AssignmentForm.AssignmentId" value="@assignment.AssignmentId" />
-                                                                                <input type="hidden" name="AssignmentForm.ScheduleId" value="@Model.ScheduleId" />
-                                                                                <input type="hidden" name="weekStart" value="@weekStartParam" />
-                                                                                <input type="hidden" name="AssignmentForm.ShiftColorHex" value="@assignment.ColorHex" />
-                                                                                <div class="row g-2">
-                                                                                <div class="col-12">
-                                                                                    <label class="form-label small">Employee</label>
-                                                                                    <select name="AssignmentForm.ScheduleEmployeeId" class="form-select form-select-sm">
-                                                                                        @foreach (var option in Model.EmployeeOptions)
-                                                                                        {
-                                                                                            if (option.Id == row.ScheduleEmployeeId)
-                                                                                            {
-                                                                                                <option value="@option.Id" selected>@option.DisplayName</option>
-                                                                                            }
-                                                                                            else
-                                                                                            {
-                                                                                                <option value="@option.Id">@option.DisplayName</option>
-                                                                                            }
-                                                                                        }
-                                                                                    </select>
-                                                                                </div>
-                                                                                <div class="col-6">
-                                                                                    <label class="form-label small">Date</label>
-                                                                                    <input type="date" name="AssignmentForm.ShiftDate" value="@dateKey.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
-                                                                                </div>
-                                                                                <div class="col-6">
-                                                                                    <label class="form-label small">Shift Name</label>
-                                                                                    <input type="text" name="AssignmentForm.ShiftName" value="@assignment.ShiftName" class="form-control form-control-sm" />
-                                                                                </div>
-                                                                                <div class="col-6">
-                                                                                    <label class="form-label small">Start</label>
-                                                                                    <input type="time" name="AssignmentForm.ShiftStartTime" value="@assignment.ShiftStartTime?.ToString("hh\\:mm")" class="form-control form-control-sm" />
-                                                                                </div>
-                                                                                <div class="col-6">
-                                                                                    <label class="form-label small">End</label>
-                                                                                    <input type="time" name="AssignmentForm.ShiftEndTime" value="@assignment.ShiftEndTime?.ToString("hh\\:mm")" class="form-control form-control-sm" />
-                                                                                </div>
-                                                                                <div class="col-12">
-                                                                                    <label class="form-label small">Notes</label>
-                                                                                    <textarea name="AssignmentForm.Notes" class="form-control form-control-sm">@assignment.Notes</textarea>
-                                                                                </div>
-                                                                            </div>
-                                                                            <div class="d-flex justify-content-end mt-2">
-                                                                                <button type="submit" class="btn btn-primary btn-sm">Save</button>
-                                                                            </div>
                                                                         </form>
                                                                     </div>
                                                                 }
@@ -562,6 +526,68 @@
         </div>
     </div>
 </div>
+
+@if (Model.CanManage && Model.Status == hOps.web.Models.ScheduleStatus.Draft)
+{
+    <div class="modal fade" id="editShiftModal" tabindex="-1" aria-labelledby="editShiftModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <form id="editShiftForm" asp-action="UpdateAssignment" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="AssignmentForm.AssignmentId" />
+                    <input type="hidden" name="AssignmentForm.ScheduleId" value="@Model.ScheduleId" />
+                    <input type="hidden" name="AssignmentForm.ShiftColorHex" />
+                    <input type="hidden" name="weekStart" value="@weekStartParam" />
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title" id="editShiftModalLabel">Edit Shift</h5>
+                            <p class="text-muted small mb-0" data-edit-shift-meta></p>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Employee</label>
+                                <select name="AssignmentForm.ScheduleEmployeeId" class="form-select">
+                                    <option value="">-- Select --</option>
+                                    @foreach (var option in Model.EmployeeOptions)
+                                    {
+                                        <option value="@option.Id">@option.DisplayName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label">Shift Date</label>
+                                <input type="date" name="AssignmentForm.ShiftDate" class="form-control" />
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label">Shift Name</label>
+                                <input type="text" name="AssignmentForm.ShiftName" class="form-control" />
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label">Start Time</label>
+                                <input type="time" name="AssignmentForm.ShiftStartTime" class="form-control" />
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label">End Time</label>
+                                <input type="time" name="AssignmentForm.ShiftEndTime" class="form-control" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Notes</label>
+                                <textarea name="AssignmentForm.Notes" class="form-control" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
