@@ -11,6 +11,7 @@ using hOps.web.Models;
 using hOps.web.Utilities;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,7 @@ namespace hOps.web.Services
 
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DailySummaryEmailService> _logger;
+        private readonly string? _appBaseUrl;
         private static readonly IReadOnlyDictionary<string, string> SalesInquiryLabels =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -32,10 +34,14 @@ namespace hOps.web.Services
                 { "other", "Other" }
             };
 
-        public DailySummaryEmailService(IServiceProvider serviceProvider, ILogger<DailySummaryEmailService> logger)
+        public DailySummaryEmailService(
+            IServiceProvider serviceProvider,
+            ILogger<DailySummaryEmailService> logger,
+            IConfiguration configuration)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
+            _appBaseUrl = (configuration["App:BaseUrl"] ?? configuration["AppBaseUrl"])?.TrimEnd('/');
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -192,7 +198,7 @@ namespace hOps.web.Services
             if (logs.Any())
             {
                 builder.AppendLine(@"<h3 style=""margin-top:1.5rem;"">Pass On Logs</h3>");
-                builder.AppendLine("<ul>");
+                builder.AppendLine(@"<ul style=""padding-left:1.25rem;margin:0;list-style-type:disc;"">");
                 foreach (var log in logs.OrderBy(l => l.CreatedAt))
                 {
                     var logTitle = WebUtility.HtmlEncode(log.Title);
@@ -207,8 +213,8 @@ namespace hOps.web.Services
                         ? $"<span style=\"color:#555;\">{string.Join(", ", properties)}</span><br/>"
                         : string.Empty;
                     var previewHtml = BuildRichTextPreview(log.Body, PreviewCharacterLimit);
-                    var link = $"/PassOnLogs/Details/{log.Id}";
-                    builder.Append($@"<li><strong>{logTitle}</strong><br/>{propertiesText}<span style=""color:#555;"">{safeCreated}</span>");
+                    var link = BuildAbsoluteUrl($"/PassOnLogs/Details/{log.Id}");
+                    builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{logTitle}</strong><br/>{propertiesText}<span style=""color:#555;"">{safeCreated}</span>");
                     if (!string.IsNullOrEmpty(previewHtml))
                     {
                         builder.Append($@"<div style=""margin:0.5rem 0;"">{previewHtml}</div>");
@@ -225,7 +231,7 @@ namespace hOps.web.Services
             if (posts.Any())
             {
                 builder.AppendLine(@"<h3 style=""margin-top:1.5rem;"">Bulletin Board</h3>");
-                builder.AppendLine("<ul>");
+                builder.AppendLine(@"<ul style=""padding-left:1.25rem;margin:0;list-style-type:disc;"">");
                 foreach (var post in posts.OrderBy(p => p.CreatedAt))
                 {
                     var propertyName = post.Property?.Name ?? "Property";
@@ -233,7 +239,8 @@ namespace hOps.web.Services
                     var createdAtLocal = FormatUserLocal(post.CreatedAt, userTimeZone, "MMM d, yyyy h:mm tt");
                     var safeCreated = WebUtility.HtmlEncode(createdAtLocal);
                     var contentHtml = BuildRichTextPreview(post.Content, PreviewCharacterLimit);
-                    builder.Append($@"<li><strong>{safeProperty}</strong><br/><span style=""color:#555;"">{safeCreated}</span>");
+                    var link = BuildAbsoluteUrl("/Home");
+                    builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{safeProperty}</strong><br/><span style=""color:#555;"">{safeCreated}</span>");
                     if (!string.IsNullOrEmpty(contentHtml))
                     {
                         builder.Append($@"<div style=""margin:0.5rem 0;"">{contentHtml}</div>");
@@ -242,7 +249,7 @@ namespace hOps.web.Services
                     {
                         builder.Append("<br/>");
                     }
-                    builder.AppendLine(@"<a href=""/Home"">View post</a></li>");
+                    builder.AppendLine($@"<a href=""{link}"">View post</a></li>");
                 }
                 builder.AppendLine("</ul>");
             }
@@ -250,7 +257,8 @@ namespace hOps.web.Services
             if (salesLeads.Any())
             {
                 builder.AppendLine(@"<h3 style=""margin-top:1.5rem;"">Sales Leads</h3>");
-                builder.AppendLine("<ul>");
+                builder.AppendLine(@"<ul style=""padding-left:1.25rem;margin:0;list-style-type:disc;"">");
+                var salesLink = BuildAbsoluteUrl("/Sales");
                 foreach (var lead in salesLeads.OrderBy(l => l.CreatedAtUtc))
                 {
                     var propertyName = lead.Property?.Name ?? "Property";
@@ -267,7 +275,7 @@ namespace hOps.web.Services
                     var budgetText = BuildBudgetDescription(lead.BudgetMinimum, lead.BudgetMaximum);
                     var detailsHtml = BuildPlainTextHtml(lead.AdditionalDetails);
 
-                    builder.Append($@"<li><strong>{safeProperty}</strong><br/><span style=""color:#555;"">Submitted {safeSubmitted} by {submittedBy}</span>");
+                    builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{safeProperty}</strong><br/><span style=""color:#555;"">Submitted {safeSubmitted} by {submittedBy}</span>");
                     builder.Append($@"<div style=""margin:0.4rem 0;""><strong>Group:</strong> {groupName}<br/><strong>Contact:</strong> {contactName} &lt;<a href=""mailto:{contactEmail}"">{contactEmail}</a>&gt;<br/><strong>Phone:</strong> {contactPhone}</div>");
 
                     if (!string.IsNullOrEmpty(inquiryHtml))
@@ -282,7 +290,7 @@ namespace hOps.web.Services
                         builder.Append($@"<div style=""margin-bottom:0.3rem;""><strong>Additional details:</strong><br/>{detailsHtml}</div>");
                     }
 
-                    builder.AppendLine(@"<a href=""/Sales"">View sales tool</a></li>");
+                    builder.AppendLine($@"<a href=""{salesLink}"">View sales tool</a></li>");
                 }
                 builder.AppendLine("</ul>");
             }
@@ -485,6 +493,26 @@ namespace hOps.web.Services
 
             var localized = TimeZoneInfo.ConvertTimeFromUtc(utc, timeZone);
             return localized.ToString(format, CultureInfo.CurrentCulture);
+        }
+
+        private string BuildAbsoluteUrl(string relativeUrl)
+        {
+            if (string.IsNullOrWhiteSpace(relativeUrl))
+            {
+                return string.IsNullOrWhiteSpace(_appBaseUrl) ? "/" : _appBaseUrl!;
+            }
+
+            if (Uri.TryCreate(relativeUrl, UriKind.Absolute, out var absolute))
+            {
+                return absolute.ToString();
+            }
+
+            if (string.IsNullOrWhiteSpace(_appBaseUrl))
+            {
+                return relativeUrl;
+            }
+
+            return $"{_appBaseUrl!.TrimEnd('/')}/{relativeUrl.TrimStart('/')}";
         }
     }
 }
