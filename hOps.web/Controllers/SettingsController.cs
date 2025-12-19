@@ -1488,14 +1488,14 @@ namespace hOps.web.Controllers
                         !string.IsNullOrWhiteSpace(t.ShiftName) ||
                         !string.IsNullOrWhiteSpace(t.StartTime) ||
                         !string.IsNullOrWhiteSpace(t.EndTime)))
-                .Select((t, index) => new ScheduleShiftTemplateInputModel
+                .Select(t => new ScheduleShiftTemplateInputModel
                 {
                     Id = t.Id,
                     Name = t.Name?.Trim() ?? string.Empty,
                     ShiftName = t.ShiftName?.Trim() ?? string.Empty,
                     StartTime = t.StartTime ?? string.Empty,
                     EndTime = t.EndTime ?? string.Empty,
-                    SortOrder = t.SortOrder == 0 ? index : t.SortOrder,
+                    SortOrder = t.SortOrder,
                     ColorHex = (t.ColorHex ?? string.Empty).Trim(),
                     AlertIfMissing = t.AlertIfMissing,
                     IsDeleted = false
@@ -1543,6 +1543,17 @@ namespace hOps.web.Controllers
                 }
             }
 
+            var duplicateSortOrders = sanitizedShifts
+                .GroupBy(s => s.SortOrder)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+
+            if (duplicateSortOrders.Any())
+            {
+                ModelState.AddModelError(string.Empty, "Assign a unique number in the # column for each default shift.");
+            }
+
             if (!ModelState.IsValid)
             {
                 model.ShiftTemplates = sanitizedShifts;
@@ -1554,11 +1565,6 @@ namespace hOps.web.Controllers
             sanitizedShifts = sanitizedShifts
                 .OrderBy(s => s.SortOrder)
                 .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
-                .Select((shift, index) =>
-                {
-                    shift.SortOrder = index;
-                    return shift;
-                })
                 .ToList();
 
             var existingSettings = await _db.ScheduleSettings

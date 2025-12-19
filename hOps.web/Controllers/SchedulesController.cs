@@ -266,7 +266,13 @@ namespace hOps.web.Controllers
 
             if (schedule != null)
             {
-                vm.EmployeeRows = BuildEmployeeRows(schedule, vm.DayColumns, approvedRequestsForWeek, scheduleEmployees, selectedSort);
+                vm.EmployeeRows = BuildEmployeeRows(
+                    schedule,
+                    vm.DayColumns,
+                    approvedRequestsForWeek,
+                    scheduleEmployees,
+                    selectedSort,
+                    shiftTemplates);
             }
 
             vm.ShiftAlerts = BuildShiftAlerts(schedule, shiftTemplates, vm.DayColumns);
@@ -342,6 +348,12 @@ namespace hOps.web.Controllers
                 .OrderBy(e => e.DisplayName)
                 .ToListAsync();
 
+            var shiftTemplates = await _context.ScheduleShiftTemplates
+                .Where(t => t.PropertyId == property.Id)
+                .OrderBy(t => t.SortOrder)
+                .ThenBy(t => t.Name)
+                .ToListAsync();
+
             var dayColumnViewModels = dayColumns
                 .Select(d => new ScheduleDayColumnViewModel
                 {
@@ -352,7 +364,13 @@ namespace hOps.web.Controllers
                 .ToList();
 
             var sortOption = ResolveSortOption(null);
-            var employeeRows = BuildEmployeeRows(schedule, dayColumnViewModels, approvedRequests, scheduleEmployees, sortOption);
+            var employeeRows = BuildEmployeeRows(
+                schedule,
+                dayColumnViewModels,
+                approvedRequests,
+                scheduleEmployees,
+                sortOption,
+                shiftTemplates);
             if (employeeRows.Any())
             {
                 var lookup = gridRows.ToDictionary(r => r.ScheduleEmployeeId);
@@ -1204,9 +1222,28 @@ namespace hOps.web.Controllers
             IReadOnlyList<ScheduleDayColumnViewModel> dayColumns,
             IReadOnlyList<ScheduleTimeOffRequest> approvedRequests,
             IReadOnlyList<ScheduleEmployee>? rosterEmployees = null,
-            ScheduleSortOption sortOption = ScheduleSortOption.EmployeeName)
+            ScheduleSortOption sortOption = ScheduleSortOption.EmployeeName,
+            IReadOnlyList<ScheduleShiftTemplate>? shiftTemplates = null)
         {
             var rows = new List<ScheduleEmployeeRowViewModel>();
+            var templateOrderLookup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (shiftTemplates != null)
+            {
+                foreach (var template in shiftTemplates)
+                {
+                    var key = string.IsNullOrWhiteSpace(template.ShiftName) ? template.Name : template.ShiftName;
+                    if (string.IsNullOrWhiteSpace(key))
+                    {
+                        continue;
+                    }
+
+                    var trimmed = key.Trim();
+                    if (!templateOrderLookup.ContainsKey(trimmed))
+                    {
+                        templateOrderLookup[trimmed] = template.SortOrder;
+                    }
+                }
+            }
 
             var assignmentsByEmployee = schedule.Assignments
                 .GroupBy(a => a.ScheduleEmployeeId)
@@ -1320,6 +1357,16 @@ namespace hOps.web.Controllers
                     .SelectMany(a => a)
                     .Select(a => a.ShiftName)
                     .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? string.Empty;
+
+                if (!string.IsNullOrWhiteSpace(row.PrimaryShiftName) &&
+                    templateOrderLookup.TryGetValue(row.PrimaryShiftName.Trim(), out var order))
+                {
+                    row.PrimaryShiftOrder = order;
+                }
+                else
+                {
+                    row.PrimaryShiftOrder = null;
+                }
             }
 
             IOrderedEnumerable<ScheduleEmployeeRowViewModel> orderedRows;
@@ -1327,6 +1374,14 @@ namespace hOps.web.Controllers
             {
                 orderedRows = rows
                     .OrderBy(r => string.IsNullOrWhiteSpace(r.PrimaryShiftName))
+                    .ThenBy(r => r.PrimaryShiftName, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(r => r.EmployeeName, StringComparer.OrdinalIgnoreCase);
+            }
+            else if (sortOption == ScheduleSortOption.ShiftNumber)
+            {
+                orderedRows = rows
+                    .OrderBy(r => r.PrimaryShiftOrder.HasValue ? 0 : 1)
+                    .ThenBy(r => r.PrimaryShiftOrder ?? int.MaxValue)
                     .ThenBy(r => r.PrimaryShiftName, StringComparer.OrdinalIgnoreCase)
                     .ThenBy(r => r.EmployeeName, StringComparer.OrdinalIgnoreCase);
             }
@@ -1374,7 +1429,8 @@ namespace hOps.web.Controllers
             return new List<SelectListItem>
             {
                 new SelectListItem("Employee name", ScheduleSortOption.EmployeeName.ToString(), selected == ScheduleSortOption.EmployeeName),
-                new SelectListItem("Shift name", ScheduleSortOption.ShiftName.ToString(), selected == ScheduleSortOption.ShiftName)
+                new SelectListItem("Shift name", ScheduleSortOption.ShiftName.ToString(), selected == ScheduleSortOption.ShiftName),
+                new SelectListItem("Shift #", ScheduleSortOption.ShiftNumber.ToString(), selected == ScheduleSortOption.ShiftNumber)
             };
         }
 

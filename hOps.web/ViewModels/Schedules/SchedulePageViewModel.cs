@@ -64,6 +64,7 @@ namespace hOps.web.ViewModels.Schedules
         public string SourceLabel { get; set; } = string.Empty;
         public bool IsActive { get; set; }
         public string PrimaryShiftName { get; set; } = string.Empty;
+        public int? PrimaryShiftOrder { get; set; }
         public Dictionary<DateTime, List<ScheduleAssignmentItemViewModel>> AssignmentsByDate { get; set; } = new();
         public Dictionary<DateTime, List<TimeOffBadgeViewModel>> TimeOffByDate { get; set; } = new();
     }
@@ -201,6 +202,7 @@ namespace hOps.web.ViewModels.Schedules
     public enum ScheduleSortOption
     {
         EmployeeName,
-        ShiftName
+        ShiftName,
+        ShiftNumber
     }
 }

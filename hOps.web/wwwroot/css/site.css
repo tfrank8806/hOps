@@ -1395,6 +1395,22 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     word-break: break-word;
 }
 
+.schedule-page .schedule-grid th,
+.schedule-page .schedule-grid td {
+    font-size: 0.9rem;
+}
+
+.schedule-page .schedule-shift .text-muted,
+.schedule-page .schedule-shift .small {
+    font-size: 0.8rem;
+}
+
+.schedule-action-btn {
+    padding: 0.15rem 0.65rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+}
+
 @media (min-width: 992px) {
     .schedule-side-panel {
         position: sticky;

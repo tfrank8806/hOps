@@ -28,7 +28,7 @@
     <div class="alert alert-danger">@errorMessage</div>
 }
 
-<div class="row g-4">
+<div class="row g-4 schedule-page">
     <div class="col-12 col-xl-9 col-xxl-9">
         <div class="card mb-4">
             <div class="card-body">
@@ -190,11 +190,25 @@
                                                     {
                                                         foreach (var assignment in assignments)
                                                         {
-                                                            var shiftStart = assignment.ShiftStartTime?.ToString("hh\\:mm");
-                                                            var shiftEnd = assignment.ShiftEndTime?.ToString("hh\\:mm");
-                                                            var timeRange = string.IsNullOrWhiteSpace(shiftStart) && string.IsNullOrWhiteSpace(shiftEnd)
-                                                                ? null
-                                                                : $"{shiftStart} - {shiftEnd}";
+                                                            var shiftStart = assignment.ShiftStartTime.HasValue
+                                                                ? DateTime.Today.Add(assignment.ShiftStartTime.Value).ToString("h:mm tt")
+                                                                : null;
+                                                            var shiftEnd = assignment.ShiftEndTime.HasValue
+                                                                ? DateTime.Today.Add(assignment.ShiftEndTime.Value).ToString("h:mm tt")
+                                                                : null;
+                                                            string? timeRange = null;
+                                                            if (!string.IsNullOrWhiteSpace(shiftStart) && !string.IsNullOrWhiteSpace(shiftEnd))
+                                                            {
+                                                                timeRange = $"{shiftStart} - {shiftEnd}";
+                                                            }
+                                                            else if (!string.IsNullOrWhiteSpace(shiftStart))
+                                                            {
+                                                                timeRange = $"Starts {shiftStart}";
+                                                            }
+                                                            else if (!string.IsNullOrWhiteSpace(shiftEnd))
+                                                            {
+                                                                timeRange = $"Ends {shiftEnd}";
+                                                            }
                                                             var shiftColor = string.IsNullOrWhiteSpace(assignment.ColorHex) ? null : assignment.ColorHex;
                                                             var shiftLabel = $"{row.EmployeeName} · {assignment.ShiftName} ({dateKey:MMM d})";
                                                             <div class="schedule-shift border rounded p-2 mb-2">
@@ -213,17 +227,17 @@
                                                                     var collapseId = $"editShift_{assignment.AssignmentId}";
                                                                     <div class="mt-2 d-flex flex-wrap gap-2">
                                                                         <button type="button"
-                                                                                class="btn btn-outline-primary btn-sm copy-shift-btn"
+                                                                                class="btn btn-outline-primary btn-sm copy-shift-btn schedule-action-btn"
                                                                                 data-assignment-id="@assignment.AssignmentId"
                                                                                 data-shift-label="@shiftLabel">
                                                                             Copy
                                                                         </button>
-                                                                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">Edit</button>
+                                                                        <button class="btn btn-outline-secondary btn-sm schedule-action-btn" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">Edit</button>
                                                                         <form asp-action="DeleteAssignment" method="post" onsubmit="return confirm('Remove this shift?');">
                                                                             @Html.AntiForgeryToken()
                                                                             <input type="hidden" name="assignmentId" value="@assignment.AssignmentId" />
                                                                             <input type="hidden" name="weekStart" value="@weekStartParam" />
-                                                                            <button type="submit" class="btn btn-outline-danger btn-sm">Remove</button>
+                                                                            <button type="submit" class="btn btn-outline-danger btn-sm schedule-action-btn">Remove</button>
                                                                         </form>
                                                                     </div>
                                                                     <div class="collapse mt-2" id="@collapseId">

@@ -107,9 +107,23 @@
                                             <input asp-for="ShiftTemplates[i].ColorHex" class="form-control form-control-sm form-control-color" type="color" value="@(Model.ShiftTemplates[i].ColorHex ?? "#3b82f6")" />
                                         </td>
                                         <td>
+                                            @{
+                                                var alertInputId = $"ShiftTemplates_{i}__AlertIfMissing";
+                                                var isAlertChecked = Model.ShiftTemplates[i].AlertIfMissing;
+                                            }
                                             <div class="form-check">
-                                                <input class="form-check-input" asp-for="ShiftTemplates[i].AlertIfMissing" value="true" />
-                                                <label asp-for="ShiftTemplates[i].AlertIfMissing" class="form-check-label small text-muted">Alert if missing</label>
+                                                <input class="form-check-input"
+                                                       type="checkbox"
+                                                       id="@alertInputId"
+                                                       name="ShiftTemplates[@i].AlertIfMissing"
+                                                       value="true"
+                                                       @(isAlertChecked ? "checked" : null)
+                                                       data-role="alert-checkbox" />
+                                                <input type="hidden"
+                                                       name="ShiftTemplates[@i].AlertIfMissing"
+                                                       value="@(isAlertChecked ? "true" : "false")"
+                                                       data-role="alert-hidden" />
+                                                <label class="form-check-label small text-muted" for="@alertInputId">Alert if missing</label>
                                             </div>
                                         </td>
                                         <td class="text-nowrap">
@@ -149,7 +163,7 @@
                                     </td>
                                     <td>
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="ShiftTemplates_0__AlertIfMissing" name="ShiftTemplates[0].AlertIfMissing" value="true" />
+                                            <input class="form-check-input" type="checkbox" id="ShiftTemplates_0__AlertIfMissing" name="ShiftTemplates[0].AlertIfMissing" value="true" data-role="alert-checkbox" />
                                             <input type="hidden" name="ShiftTemplates[0].AlertIfMissing" value="false" data-role="alert-hidden" />
                                             <label class="form-check-label small text-muted" for="ShiftTemplates_0__AlertIfMissing">Alert if missing</label>
                                         </div>
@@ -167,6 +181,12 @@
                             }
                         </tbody>
                     </table>
+                </div>
+
+                <div class="d-flex justify-content-end mb-4">
+                    <button class="btn btn-outline-primary btn-sm" type="button" data-action="add-shift">
+                        + Add Shift
+                    </button>
                 </div>
 
                 <button type="submit" class="btn btn-primary">Save Settings</button>
@@ -265,7 +285,7 @@
         </td>
         <td>
             <div class="form-check">
-                <input class="form-check-input" type="checkbox" value="true" id="ShiftTemplates_{{index}}__AlertIfMissing" name="ShiftTemplates[{{index}}].AlertIfMissing" />
+                <input class="form-check-input" type="checkbox" value="true" id="ShiftTemplates_{{index}}__AlertIfMissing" name="ShiftTemplates[{{index}}].AlertIfMissing" data-role="alert-checkbox" />
                 <input type="hidden" name="ShiftTemplates[{{index}}].AlertIfMissing" value="false" data-role="alert-hidden" />
                 <label class="form-check-label small text-muted" for="ShiftTemplates_{{index}}__AlertIfMissing">Alert if missing</label>
             </div>
@@ -294,15 +314,37 @@
                 return;
             }
 
-            const getVisibleRows = () => Array.from(tableBody.querySelectorAll('tr')).filter(row => !row.classList.contains('d-none'));
+            const getVisibleRows = () =>
+                Array.from(tableBody.querySelectorAll('tr')).filter(row => !row.classList.contains('d-none'));
 
-            const updateSortInputs = () => {
-                getVisibleRows().forEach((row, index) => {
-                    const sortInput = row.querySelector('[data-role="sort-input"]');
-                    if (sortInput) {
-                        sortInput.value = index;
-                    }
-                });
+            const getSortInput = (row) => row.querySelector('[data-role="sort-input"]');
+
+            const parseSortValue = (input) => {
+                if (!input) {
+                    return null;
+                }
+                const value = Number(input.value);
+                return Number.isFinite(value) ? value : null;
+            };
+
+            const getNextSortValue = () => {
+                const values = getVisibleRows()
+                    .map(row => parseSortValue(getSortInput(row)))
+                    .filter(value => value !== null);
+                const max = values.length ? Math.max(...values) : -1;
+                return max + 1;
+            };
+
+            const swapSortValues = (rowA, rowB) => {
+                const inputA = getSortInput(rowA);
+                const inputB = getSortInput(rowB);
+                if (!inputA || !inputB) {
+                    return;
+                }
+
+                const temp = inputA.value;
+                inputA.value = inputB.value;
+                inputB.value = temp;
             };
 
             const findPreviousVisible = (row) => {
@@ -327,8 +369,38 @@
                     deleteFlag.value = 'true';
                 }
                 row.classList.add('d-none');
-                updateSortInputs();
             };
+
+            const getNextIndex = () => {
+                const current = Number(tableBody.getAttribute('data-next-index')) || tableBody.querySelectorAll('tr').length;
+                tableBody.setAttribute('data-next-index', (current + 1).toString());
+                return current;
+            };
+
+            const focusTemplateName = (row) => {
+                const templateInput = row.querySelector('[data-role="template-name"]');
+                if (templateInput) {
+                    templateInput.focus();
+                }
+            };
+
+            const syncAlertHidden = (checkbox) => {
+                const row = checkbox.closest('tr');
+                if (!row) {
+                    return;
+                }
+                const hidden = row.querySelector('[data-role="alert-hidden"]');
+                if (hidden) {
+                    hidden.value = checkbox.checked ? 'true' : 'false';
+                }
+            };
+
+            tableBody.addEventListener('change', (event) => {
+                const checkbox = event.target.closest('[data-role="alert-checkbox"]');
+                if (checkbox) {
+                    syncAlertHidden(checkbox);
+                }
+            });
 
             tableBody.addEventListener('click', (event) => {
                 const button = event.target.closest('[data-action]');
@@ -359,22 +431,16 @@
                     const prev = findPreviousVisible(row);
                     if (prev) {
                         tableBody.insertBefore(row, prev);
-                        updateSortInputs();
+                        swapSortValues(row, prev);
                     }
                 } else if (action === 'move-down') {
                     const next = findNextVisible(row);
                     if (next) {
                         tableBody.insertBefore(next, row);
-                        updateSortInputs();
+                        swapSortValues(row, next);
                     }
                 }
             });
-
-            const getNextIndex = () => {
-                const current = Number(tableBody.getAttribute('data-next-index')) || tableBody.querySelectorAll('tr').length;
-                tableBody.setAttribute('data-next-index', (current + 1).toString());
-                return current;
-            };
 
             const addShiftRow = () => {
                 const nextIndex = getNextIndex();
@@ -384,17 +450,22 @@
                 const newRow = wrapper.firstElementChild;
                 if (newRow) {
                     tableBody.appendChild(newRow);
-                    updateSortInputs();
-                    const templateInput = newRow.querySelector('[data-role="template-name"]');
-                    if (templateInput) {
-                        templateInput.focus();
+                    const sortInput = getSortInput(newRow);
+                    if (sortInput) {
+                        sortInput.value = getNextSortValue();
                     }
+                    const checkbox = newRow.querySelector('[data-role="alert-checkbox"]');
+                    if (checkbox) {
+                        checkbox.checked = false;
+                        syncAlertHidden(checkbox);
+                    }
+                    focusTemplateName(newRow);
                 }
             };
 
             addButtons.forEach(button => button.addEventListener('click', addShiftRow));
 
-            updateSortInputs();
+            tableBody.querySelectorAll('[data-role="alert-checkbox"]').forEach(syncAlertHidden);
         })();
     </script>
 }
