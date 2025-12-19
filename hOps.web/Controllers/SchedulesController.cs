@@ -88,6 +88,7 @@ namespace hOps.web.Controllers
             var schedule = await _context.Schedules
                 .Include(s => s.Assignments)
                     .ThenInclude(a => a.Employee)
+                .Include(s => s.PostedBy)
                 .Where(s => s.PropertyId == property.Id && s.WeekStartDate == normalizedWeekStart)
                 .FirstOrDefaultAsync();
 
@@ -195,6 +196,10 @@ namespace hOps.web.Controllers
                 HasSchedule = schedule != null,
                 ScheduleId = schedule?.Id,
                 Status = schedule?.Status,
+                PostedAtUtc = schedule?.PostedAtUtc,
+                PostedByName = schedule?.PostedBy != null
+                    ? $"{schedule.PostedBy.FirstName} {schedule.PostedBy.LastName}".Trim()
+                    : schedule?.PostedById,
                 CanManage = canManage,
                 SettingsSummary = new ScheduleSettingsSummaryViewModel
                 {
@@ -830,6 +835,41 @@ namespace hOps.web.Controllers
             }
 
             return RedirectToAction(nameof(Index), new { weekStart });
+        }
+
+        [Authorize(Roles = "Admin,Manager")]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UnlockSchedule(int scheduleId, string? weekStart = null)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var schedule = await _context.Schedules.FirstOrDefaultAsync(s => s.Id == scheduleId);
+            if (schedule == null)
+            {
+                TempData["ScheduleError"] = "Schedule not found.";
+                return RedirectToAction(nameof(Index), new { weekStart });
+            }
+
+            if (schedule.Status != ScheduleStatus.Posted)
+            {
+                TempData["ScheduleError"] = "Only posted schedules can be unlocked for editing.";
+                return RedirectToAction(nameof(Index), new { weekStart = weekStart ?? schedule.WeekStartDate.ToString("yyyy-MM-dd") });
+            }
+
+            schedule.Status = ScheduleStatus.Draft;
+            schedule.UpdatedAtUtc = DateTime.UtcNow;
+            schedule.UpdatedById = currentUser.Id;
+
+            await _context.SaveChangesAsync();
+
+            TempData["ScheduleMessage"] = "Schedule unlocked for editing. Re-post when you're ready.";
+            var redirectWeek = weekStart ?? schedule.WeekStartDate.ToString("yyyy-MM-dd");
+            return RedirectToAction(nameof(Index), new { weekStart = redirectWeek });
         }
 
         [Authorize(Roles = "Admin,Manager")]

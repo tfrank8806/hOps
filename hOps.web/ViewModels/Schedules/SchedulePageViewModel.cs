@@ -18,6 +18,8 @@ namespace hOps.web.ViewModels.Schedules
         public int? ScheduleId { get; set; }
         public ScheduleStatus? Status { get; set; }
         public bool CanManage { get; set; }
+        public DateTime? PostedAtUtc { get; set; }
+        public string? PostedByName { get; set; }
 
         public List<ScheduleDayColumnViewModel> DayColumns { get; set; } = new();
         public List<ScheduleEmployeeRowViewModel> EmployeeRows { get; set; } = new();
@@ -38,6 +40,8 @@ namespace hOps.web.ViewModels.Schedules
 
         public bool ShowCreateDraftAction { get; set; }
         public bool ShowPostAction => HasSchedule && Status == ScheduleStatus.Draft && CanManage;
+        public bool ShowUnlockAction => HasSchedule && Status == ScheduleStatus.Posted && CanManage;
+        public bool WasPreviouslyPosted => HasSchedule && Status == ScheduleStatus.Draft && PostedAtUtc.HasValue;
         public bool ShowUnpostedMessage => !HasSchedule || Status == ScheduleStatus.Draft;
         public string? AlertMessage { get; set; }
     }

@@ -57,11 +57,21 @@
                         }
                         @if (Model.ShowPostAction && Model.ScheduleId.HasValue)
                         {
-                            <form asp-action="PostSchedule" method="post" class="d-inline">
+                            var postLabel = Model.WasPreviouslyPosted ? "Re-post Schedule" : "Post Schedule";
+                            <form asp-action="PostSchedule" asp-controller="Schedules" method="post" class="d-inline">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="scheduleId" value="@Model.ScheduleId" />
                                 <input type="hidden" name="weekStart" value="@weekStartParam" />
-                                <button type="submit" class="btn btn-success">Post Schedule</button>
+                                <button type="submit" class="btn btn-success">@postLabel</button>
+                            </form>
+                        }
+                        @if (Model.ShowUnlockAction && Model.ScheduleId.HasValue)
+                        {
+                            <form asp-action="UnlockSchedule" asp-controller="Schedules" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="scheduleId" value="@Model.ScheduleId" />
+                                <input type="hidden" name="weekStart" value="@weekStartParam" />
+                                <button type="submit" class="btn btn-warning">Edit Schedule</button>
                             </form>
                         }
                         @if (Model.HasSchedule && Model.ScheduleId.HasValue)
@@ -237,13 +247,13 @@
                                                                                 data-bs-target="#editShiftModal"
                                                                                 data-assignment-id="@assignment.AssignmentId"
                                                                                 data-employee-id="@row.ScheduleEmployeeId"
-                                                                                data-employee-name="@Html.AttributeEncode(row.EmployeeName)"
+                                                                                data-employee-name="@row.EmployeeName"
                                                                                 data-shift-date="@isoDate"
                                                                                 data-date-label="@dateKey.ToString("MMM d")"
-                                                                                data-shift-name="@Html.AttributeEncode(assignment.ShiftName)"
+                                                                                data-shift-name="@assignment.ShiftName"
                                                                                 data-shift-start="@assignment.ShiftStartTime?.ToString("hh\\:mm")"
                                                                                 data-shift-end="@assignment.ShiftEndTime?.ToString("hh\\:mm")"
-                                                                                data-notes="@Html.AttributeEncode(assignment.Notes)"
+                                                                                data-notes="@assignment.Notes"
                                                                                 data-color="@assignment.ColorHex">
                                                                             Edit
                                                                         </button>
