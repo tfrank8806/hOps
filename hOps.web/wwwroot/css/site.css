@@ -989,15 +989,16 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 }
 
 .home-widget-grid {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: 1rem;
-    align-items: flex-start;
+    grid-auto-rows: var(--masonry-row-height, 8px);
+    grid-auto-flow: dense;
 }
 
 @media (max-width: 767.98px) {
     .home-widget-grid {
-        flex-direction: column;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
     }
 }
 
@@ -1008,16 +1009,10 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     flex-direction: column;
     min-height: 0;
     --widget-height: 300px;
-    --widget-width: 100%;
-    flex: 0 0 var(--widget-width, 100%);
-    max-width: var(--widget-width, 100%);
-}
-
-@media (max-width: 767.98px) {
-    .home-widget {
-        flex: 0 0 100%;
-        max-width: 100%;
-    }
+    --widget-span: 4;
+    --widget-row-span: 1;
+    grid-column: span var(--widget-span, 4);
+    grid-row-end: span var(--widget-row-span, 1);
 }
 
 .home-widget-card {

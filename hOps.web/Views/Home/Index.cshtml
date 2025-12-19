@@ -4,7 +4,6 @@
 @using System.Text.Json.Serialization
 @using hOps.web.Utilities
 @using hOps.web.ViewModels.Home
-@using System.Globalization
 @model hOps.web.ViewModels.Home.HomeIndexViewModel
 
 @{
@@ -147,8 +146,7 @@
             var appliedHeight = storedHeight ?? sanitizedDefaultHeight;
             var sizeLabelText = forceFullWidth ? $"{sizeLabel} (locked)" : sizeLabel;
             var heightLabelText = GetHeightLabel(appliedHeight, sanitizedDefaultHeight, storedHeight.HasValue);
-            var widthPercent = Math.Clamp((double)appliedSpan / 12d * 100d, 0d, 100d);
-            var widgetStyle = $"--widget-height: {appliedHeight}px; --widget-width: {widthPercent.ToString("0.###", CultureInfo.InvariantCulture)}%;";
+            var widgetStyle = $"--widget-height: {appliedHeight}px; --widget-span: {appliedSpan};";
             <div class="home-widget"
                  data-widget-id="@widget.WidgetId"
                  data-widget-size="@sizeValue"
@@ -322,7 +320,6 @@
         const MIN_COLUMNS = 1;
         const MAX_COLUMNS = 12;
         const DEFAULT_SPAN = 4;
-        const spanToPercent = (span) => `${Math.min(100, Math.max(0, (span / MAX_COLUMNS) * 100))}%`;
 
         const normalizeSizeKey = (key) => (key || 'third').toLowerCase();
         const clampSpan = (value) => {
@@ -360,6 +357,35 @@
             }
             return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, numeric));
         };
+        const getRowMetrics = () => {
+            const style = window.getComputedStyle(grid);
+            const rowHeightVar = parseFloat(style.getPropertyValue('--masonry-row-height')) || 0;
+            const gridAutoRows = parseFloat(style.gridAutoRows) || 0;
+            const rowHeight = rowHeightVar > 0 ? rowHeightVar : (gridAutoRows > 0 ? gridAutoRows : 8);
+            const rowGap = parseFloat(style.rowGap) || 0;
+            return { rowHeight, rowGap };
+        };
+        const updateWidgetRowSpan = (widget) => {
+            if (!widget) {
+                return;
+            }
+            const { rowHeight, rowGap } = getRowMetrics();
+            const totalHeight = widget.getBoundingClientRect().height;
+            const span = Math.max(1, Math.round((totalHeight + rowGap) / (rowHeight + rowGap)));
+            widget.style.setProperty('--widget-row-span', span);
+        };
+        const scheduleRowSpanRefresh = (() => {
+            let frameId = null;
+            return () => {
+                if (frameId) {
+                    cancelAnimationFrame(frameId);
+                }
+                frameId = requestAnimationFrame(() => {
+                    grid.querySelectorAll('.home-widget').forEach(updateWidgetRowSpan);
+                    frameId = null;
+                });
+            };
+        })();
         const syncHeightSlider = (widget, heightValue) => {
             if (!widget) {
                 return;
@@ -446,6 +472,7 @@
             widget.style.setProperty('--widget-height', `${heightToApply}px`);
             setHeightLabelText(widget, heightToApply);
             syncHeightSlider(widget, heightToApply);
+            requestAnimationFrame(() => updateWidgetRowSpan(widget));
         };
 
         grid.querySelectorAll('.home-widget').forEach(widget => {
@@ -457,6 +484,7 @@
             }
             initializeHeightSlider(widget);
         });
+        scheduleRowSpanRefresh();
 
         let isEditing = false;
         let originalLayout = (() => {
@@ -524,6 +552,7 @@
                 initializeHeightSlider(widget);
                 grid.appendChild(widget);
             });
+            scheduleRowSpanRefresh();
         };
 
         const updateWidgetSize = (widget, sizeKey, overrideSpan) => {
@@ -542,10 +571,14 @@
                 widget.dataset.customSpan = spanToApply;
             }
             widget.dataset.gridSpan = spanToApply;
-            const widthPercent = spanToPercent(spanToApply);
-            widget.style.setProperty('--widget-width', widthPercent);
+            widget.style.setProperty('--widget-span', spanToApply);
             setSizeLabelText(widget, spanToApply);
+            updateWidgetRowSpan(widget);
         };
+
+        window.addEventListener('resize', () => {
+            scheduleRowSpanRefresh();
+        });
 
         let dragSource = null;
 
