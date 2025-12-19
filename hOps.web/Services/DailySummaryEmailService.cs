@@ -163,7 +163,7 @@ namespace hOps.web.Services
                     continue;
                 }
 
-                var body = BuildSummaryBody(user, summaryDate, logs, posts, salesLeads);
+                var body = BuildSummaryBody(user, summaryDate, logs, posts, salesLeads, _appBaseUrl);
                 var subject = $"Daily summary for {summaryDate:MMM d, yyyy}";
 
                 try
@@ -185,7 +185,8 @@ namespace hOps.web.Services
             DateOnly summaryDate,
             List<PassOnLog> logs,
             List<BulletinPost> posts,
-            List<SalesLeadSubmission> salesLeads)
+            List<SalesLeadSubmission> salesLeads,
+            string? baseUrl)
         {
             var builder = new StringBuilder();
             var userName = BuildUserDisplayName(user);
@@ -213,7 +214,7 @@ namespace hOps.web.Services
                         ? $"<span style=\"color:#555;\">{string.Join(", ", properties)}</span><br/>"
                         : string.Empty;
                     var previewHtml = BuildRichTextPreview(log.Body, PreviewCharacterLimit);
-                    var link = BuildAbsoluteUrl($"/PassOnLogs/Details/{log.Id}");
+                    var link = BuildAbsoluteUrl($"/PassOnLogs/Details/{log.Id}", baseUrl);
                     builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{logTitle}</strong><br/>{propertiesText}<span style=""color:#555;"">{safeCreated}</span>");
                     if (!string.IsNullOrEmpty(previewHtml))
                     {
@@ -239,7 +240,7 @@ namespace hOps.web.Services
                     var createdAtLocal = FormatUserLocal(post.CreatedAt, userTimeZone, "MMM d, yyyy h:mm tt");
                     var safeCreated = WebUtility.HtmlEncode(createdAtLocal);
                     var contentHtml = BuildRichTextPreview(post.Content, PreviewCharacterLimit);
-                    var link = BuildAbsoluteUrl("/Home");
+                    var link = BuildAbsoluteUrl("/Home", baseUrl);
                     builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{safeProperty}</strong><br/><span style=""color:#555;"">{safeCreated}</span>");
                     if (!string.IsNullOrEmpty(contentHtml))
                     {
@@ -258,7 +259,7 @@ namespace hOps.web.Services
             {
                 builder.AppendLine(@"<h3 style=""margin-top:1.5rem;"">Sales Leads</h3>");
                 builder.AppendLine(@"<ul style=""padding-left:1.25rem;margin:0;list-style-type:disc;"">");
-                var salesLink = BuildAbsoluteUrl("/Sales");
+                var salesLink = BuildAbsoluteUrl("/Sales", baseUrl);
                 foreach (var lead in salesLeads.OrderBy(l => l.CreatedAtUtc))
                 {
                     var propertyName = lead.Property?.Name ?? "Property";
@@ -495,11 +496,11 @@ namespace hOps.web.Services
             return localized.ToString(format, CultureInfo.CurrentCulture);
         }
 
-        private string BuildAbsoluteUrl(string relativeUrl)
+        private static string BuildAbsoluteUrl(string relativeUrl, string? baseUrl)
         {
             if (string.IsNullOrWhiteSpace(relativeUrl))
             {
-                return string.IsNullOrWhiteSpace(_appBaseUrl) ? "/" : _appBaseUrl!;
+                return string.IsNullOrWhiteSpace(baseUrl) ? "/" : baseUrl!;
             }
 
             if (Uri.TryCreate(relativeUrl, UriKind.Absolute, out var absolute))
@@ -507,12 +508,12 @@ namespace hOps.web.Services
                 return absolute.ToString();
             }
 
-            if (string.IsNullOrWhiteSpace(_appBaseUrl))
+            if (string.IsNullOrWhiteSpace(baseUrl))
             {
                 return relativeUrl;
             }
 
-            return $"{_appBaseUrl!.TrimEnd('/')}/{relativeUrl.TrimStart('/')}";
+            return $"{baseUrl!.TrimEnd('/')}/{relativeUrl.TrimStart('/')}";
         }
     }
 }
