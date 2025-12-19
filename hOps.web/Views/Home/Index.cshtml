@@ -4,6 +4,7 @@
 @using System.Text.Json.Serialization
 @using hOps.web.Utilities
 @using hOps.web.ViewModels.Home
+@using System.Globalization
 @model hOps.web.ViewModels.Home.HomeIndexViewModel
 
 @{
@@ -146,7 +147,8 @@
             var appliedHeight = storedHeight ?? sanitizedDefaultHeight;
             var sizeLabelText = forceFullWidth ? $"{sizeLabel} (locked)" : sizeLabel;
             var heightLabelText = GetHeightLabel(appliedHeight, sanitizedDefaultHeight, storedHeight.HasValue);
-            var widgetStyle = $"grid-column: span {appliedSpan}; --widget-height: {appliedHeight}px;";
+            var widthPercent = Math.Clamp((double)appliedSpan / 12d * 100d, 0d, 100d);
+            var widgetStyle = $"--widget-height: {appliedHeight}px; --widget-width: {widthPercent.ToString("0.###", CultureInfo.InvariantCulture)}%;";
             <div class="home-widget"
                  data-widget-id="@widget.WidgetId"
                  data-widget-size="@sizeValue"
@@ -320,6 +322,7 @@
         const MIN_COLUMNS = 1;
         const MAX_COLUMNS = 12;
         const DEFAULT_SPAN = 4;
+        const spanToPercent = (span) => `${Math.min(100, Math.max(0, (span / MAX_COLUMNS) * 100))}%`;
 
         const normalizeSizeKey = (key) => (key || 'third').toLowerCase();
         const clampSpan = (value) => {
@@ -539,7 +542,8 @@
                 widget.dataset.customSpan = spanToApply;
             }
             widget.dataset.gridSpan = spanToApply;
-            widget.style.gridColumn = `span ${spanToApply}`;
+            const widthPercent = spanToPercent(spanToApply);
+            widget.style.setProperty('--widget-width', widthPercent);
             setSizeLabelText(widget, spanToApply);
         };
 
