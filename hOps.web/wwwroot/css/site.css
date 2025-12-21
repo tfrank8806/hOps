@@ -989,13 +989,14 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 }
 
 .home-widget-grid {
-    --masonry-row-height: 8px;
+    --masonry-row-height: 12px;
     --masonry-row-gap: 1rem;
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: var(--masonry-row-gap);
     grid-auto-rows: var(--masonry-row-height);
     grid-auto-flow: dense;
+    align-items: start;
 }
 
 @media (max-width: 767.98px) {
@@ -1012,7 +1013,9 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     min-height: 0;
     --widget-height: 300px;
     --widget-span: 4;
+    --widget-row-span: 1;
     grid-column: span var(--widget-span, 4);
+    grid-row-end: span var(--widget-row-span, 1);
 }
 
 .home-widget-card {

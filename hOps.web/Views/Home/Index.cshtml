@@ -366,8 +366,33 @@
             const rowGap = rowGapVar > 0 ? rowGapVar : (parseFloat(style.rowGap) || 0);
             return { rowHeight, rowGap };
         };
-        const updateWidgetRowSpan = () => {};
-        const scheduleRowSpanRefresh = () => {};
+        const getGridMetrics = () => {
+            const style = window.getComputedStyle(grid);
+            const rowHeight = parseFloat(style.getPropertyValue('--masonry-row-height')) || parseFloat(style.gridAutoRows) || 12;
+            const rowGap = parseFloat(style.getPropertyValue('--masonry-row-gap')) || parseFloat(style.rowGap) || 0;
+            return { rowHeight, rowGap };
+        };
+        const computeRowSpan = (el) => {
+            const { rowHeight, rowGap } = getGridMetrics();
+            const height = el.getBoundingClientRect().height;
+            const span = Math.max(1, Math.round((height + rowGap) / (rowHeight + rowGap)));
+            el.style.setProperty('--widget-row-span', span);
+        };
+        const widgetResizeObserver = new ResizeObserver(entries => {
+            entries.forEach(entry => {
+                const target = entry.target;
+                if (target && target.closest('#homeWidgetGrid')) {
+                    computeRowSpan(target);
+                }
+            });
+        });
+        const attachResizeObserver = (widget) => {
+            if (!widget) {
+                return;
+            }
+            widgetResizeObserver.observe(widget);
+            computeRowSpan(widget);
+        };
         const syncHeightSlider = (widget, heightValue) => {
             if (!widget) {
                 return;
@@ -465,7 +490,7 @@
                 updateWidgetHeight(widget);
             }
             initializeHeightSlider(widget);
-            requestAnimationFrame(() => updateWidgetRowSpan(widget));
+            attachResizeObserver(widget);
         });
 
         let isEditing = false;
@@ -484,10 +509,13 @@
 
         const setEditingState = (enabled) => {
             isEditing = enabled;
-            grid.querySelectorAll('.home-widget').forEach(widget => {
-                widget.setAttribute('draggable', enabled ? 'true' : 'false');
-                widget.classList.toggle('home-widget--editing', enabled);
-            });
+        grid.querySelectorAll('.home-widget').forEach(widget => {
+            widget.setAttribute('draggable', enabled ? 'true' : 'false');
+            widget.classList.toggle('home-widget--editing', enabled);
+            if (!enabled) {
+                computeRowSpan(widget);
+            }
+        });
             dashboard?.classList.toggle('home-dashboard--editing', enabled);
             if (marketplace) {
                 marketplace.classList.toggle('d-none', !enabled);
@@ -555,10 +583,12 @@
             widget.dataset.gridSpan = spanToApply;
             widget.style.setProperty('--widget-span', spanToApply);
             setSizeLabelText(widget, spanToApply);
-            requestAnimationFrame(() => updateWidgetRowSpan(widget));
+            computeRowSpan(widget);
         };
 
-        window.addEventListener('resize', () => {});
+        window.addEventListener('resize', () => {
+            grid.querySelectorAll('.home-widget').forEach(computeRowSpan);
+        });
 
         let dragSource = null;
 
