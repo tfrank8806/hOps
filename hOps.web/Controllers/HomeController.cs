@@ -260,12 +260,26 @@ namespace hOps.web.Controllers
                     continue;
                 }
 
+                int? normalizedColumn = null;
+                if (widget.GridColumn.HasValue)
+                {
+                    normalizedColumn = Math.Clamp(widget.GridColumn.Value, 1, 12);
+                }
+
+                int? normalizedRow = null;
+                if (widget.GridRow.HasValue && widget.GridRow.Value > 0)
+                {
+                    normalizedRow = widget.GridRow.Value;
+                }
+
                 normalized.Add(new HomeWidgetLayoutEntry
                 {
                     WidgetId = widget.WidgetId,
                     Size = parsedSize,
                     CustomSpan = normalizedSpan,
-                    CustomHeight = normalizedHeight
+                    CustomHeight = normalizedHeight,
+                    GridColumn = normalizedColumn,
+                    GridRow = normalizedRow
                 });
             }
 
@@ -1599,6 +1613,8 @@ namespace hOps.web.Controllers
                         var sanitizedSpan = entry.CustomSpan.HasValue ? ClampSpan(entry.CustomSpan.Value) : (int?)null;
                         var defaultHeight = definition.DefaultHeight > 0 ? definition.DefaultHeight : DefaultWidgetHeight;
                         var sanitizedHeight = entry.CustomHeight.HasValue ? ClampHeight(entry.CustomHeight.Value) : (int?)null;
+                        var sanitizedColumn = entry.GridColumn.HasValue ? Math.Clamp(entry.GridColumn.Value, 1, 12) : (int?)null;
+                        var sanitizedRow = entry.GridRow.HasValue && entry.GridRow.Value > 0 ? entry.GridRow.Value : (int?)null;
                         if (string.Equals(entry.WidgetId, HomeWidgetIds.HotelLayout, StringComparison.OrdinalIgnoreCase))
                         {
                             sanitizedSpan = GetSpanForSize(HomeWidgetSize.Full);
@@ -1617,7 +1633,9 @@ namespace hOps.web.Controllers
                             WidgetId = entry.WidgetId,
                             Size = entry.Size,
                             CustomSpan = sanitizedSpan,
-                            CustomHeight = sanitizedHeight
+                            CustomHeight = sanitizedHeight,
+                            GridColumn = sanitizedColumn,
+                            GridRow = sanitizedRow
                         });
                     }
                 }
@@ -1635,6 +1653,7 @@ namespace hOps.web.Controllers
                 }
             }
 
+            AssignGridPositions(finalLayout);
             return finalLayout;
         }
 
@@ -1649,6 +1668,49 @@ namespace hOps.web.Controllers
 
         private static int ClampSpan(int span) => Math.Clamp(span, 1, 12);
         private static int ClampHeight(int height) => Math.Clamp(height, MinWidgetHeight, MaxWidgetHeight);
+
+        private static void AssignGridPositions(List<HomeWidgetLayoutEntry> layout)
+        {
+            if (layout == null || layout.Count == 0)
+            {
+                return;
+            }
+
+            const int rowStep = 50;
+            var columnCursor = 1;
+            var rowCursor = 1;
+
+            foreach (var entry in layout)
+            {
+                var span = entry.CustomSpan ?? GetSpanForSize(entry.Size);
+                span = ClampSpan(span);
+
+                if (!entry.GridColumn.HasValue)
+                {
+                    if (columnCursor + span - 1 > 12)
+                    {
+                        columnCursor = 1;
+                        rowCursor += rowStep;
+                    }
+
+                    entry.GridColumn = columnCursor;
+                    columnCursor += span;
+                }
+                else
+                {
+                    columnCursor = entry.GridColumn.Value + span;
+                }
+
+                if (!entry.GridRow.HasValue)
+                {
+                    entry.GridRow = rowCursor;
+                }
+                else
+                {
+                    rowCursor = entry.GridRow.Value;
+                }
+            }
+        }
 
         private sealed record LayoutPersonaOption(string Key, string Name, string Description);
 
@@ -1755,6 +1817,8 @@ namespace hOps.web.Controllers
             public string Size { get; set; } = string.Empty;
             public int? CustomSpan { get; set; }
             public int? CustomHeight { get; set; }
+            public int? GridColumn { get; set; }
+            public int? GridRow { get; set; }
         }
 
         public class ManagerAnnouncementForm

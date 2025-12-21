@@ -146,7 +146,9 @@
             var appliedHeight = storedHeight ?? sanitizedDefaultHeight;
             var sizeLabelText = forceFullWidth ? $"{sizeLabel} (locked)" : sizeLabel;
             var heightLabelText = GetHeightLabel(appliedHeight, sanitizedDefaultHeight, storedHeight.HasValue);
-            var widgetStyle = $"--widget-height: {appliedHeight}px; --widget-span: {appliedSpan};";
+            var appliedColumn = widget.GridColumn ?? 1;
+            var appliedRow = widget.GridRow ?? 1;
+            var widgetStyle = $"--widget-height: {appliedHeight}px; --widget-span: {appliedSpan}; --widget-col: {appliedColumn}; --widget-row: {appliedRow}; --widget-row-span: 1;";
             <div class="home-widget"
                  data-widget-id="@widget.WidgetId"
                  data-widget-size="@sizeValue"
@@ -156,7 +158,9 @@
                  @(storedSpan.HasValue ? $"data-custom-span=\"{appliedSpan}\"" : string.Empty)
                  @(storedHeight.HasValue ? $"data-custom-height=\"{appliedHeight}\"" : string.Empty)
                  @(forceFullWidth ? "data-lock-width=\"true\"" : string.Empty)
-                style="@widgetStyle"
+                 data-grid-col="@appliedColumn"
+                 data-grid-row="@appliedRow"
+                 style="@widgetStyle"
                  draggable="false">
                 <div class="home-widget__editor d-flex align-items-center gap-2">
                     <span class="home-widget__drag-handle" role="button" tabindex="0" aria-label="Drag widget" title="Drag widget">⋮⋮</span>
@@ -246,7 +250,9 @@
                             break;
                     }
                 </div>
-                <button type="button" class="home-widget__resizer" data-resize-handle aria-label="Resize widget"></button>
+                <div class="home-widget__resize-edge home-widget__resize-edge--right" data-resize-handle data-resize-axis="horizontal" aria-hidden="true"></div>
+                <div class="home-widget__resize-edge home-widget__resize-edge--bottom" data-resize-handle data-resize-axis="vertical" aria-hidden="true"></div>
+                <button type="button" class="home-widget__resizer" data-resize-handle data-resize-axis="both" aria-label="Resize widget"></button>
             </div>
         }
     </div>
@@ -357,15 +363,6 @@
             }
             return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, numeric));
         };
-        const getRowMetrics = () => {
-            const style = window.getComputedStyle(grid);
-            const rowHeightVar = parseFloat(style.getPropertyValue('--masonry-row-height')) || 0;
-            const gridAutoRows = parseFloat(style.gridAutoRows) || 0;
-            const rowHeight = rowHeightVar > 0 ? rowHeightVar : (gridAutoRows > 0 ? gridAutoRows : 8);
-            const rowGapVar = parseFloat(style.getPropertyValue('--masonry-row-gap')) || 0;
-            const rowGap = rowGapVar > 0 ? rowGapVar : (parseFloat(style.rowGap) || 0);
-            return { rowHeight, rowGap };
-        };
         const getGridMetrics = () => {
             const style = window.getComputedStyle(grid);
             const rowHeight = parseFloat(style.getPropertyValue('--masonry-row-height')) || parseFloat(style.gridAutoRows) || 12;
@@ -390,6 +387,10 @@
             if (!widget) {
                 return;
             }
+            if (widget.dataset.resizeObserverAttached === 'true') {
+                return;
+            }
+            widget.dataset.resizeObserverAttached = 'true';
             widgetResizeObserver.observe(widget);
             computeRowSpan(widget);
         };
@@ -479,7 +480,7 @@
             widget.style.setProperty('--widget-height', `${heightToApply}px`);
             setHeightLabelText(widget, heightToApply);
             syncHeightSlider(widget, heightToApply);
-            requestAnimationFrame(() => updateWidgetRowSpan(widget));
+            requestAnimationFrame(() => computeRowSpan(widget));
         };
 
         grid.querySelectorAll('.home-widget').forEach(widget => {
@@ -536,11 +537,15 @@
             grid.querySelectorAll('.home-widget').forEach(widget => {
                 const spanValue = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
                 const heightValue = Number(widget.dataset.customHeight);
+                const columnValue = Number(widget.dataset.gridCol);
+                const rowValue = Number(widget.dataset.gridRow);
                 layout.push({
                     widgetId: widget.dataset.widgetId,
                     size: widget.dataset.widgetSize,
                     customSpan: clampSpan(spanValue),
-                    customHeight: Number.isFinite(heightValue) ? clampHeight(heightValue) : null
+                    customHeight: Number.isFinite(heightValue) ? clampHeight(heightValue) : null,
+                    gridColumn: Number.isFinite(columnValue) ? clampSpan(columnValue) : null,
+                    gridRow: Number.isFinite(rowValue) && rowValue > 0 ? Math.round(rowValue) : null
                 });
             });
             return layout;
@@ -560,9 +565,18 @@
                 updateWidgetSize(widget, entry.size ?? widget.dataset.widgetSize ?? 'third', typeof entry.customSpan === 'number' ? entry.customSpan : undefined);
                 updateWidgetHeight(widget, typeof entry.customHeight === 'number' ? entry.customHeight : undefined);
                 initializeHeightSlider(widget);
+                if (typeof entry.gridColumn === 'number') {
+                    widget.dataset.gridCol = entry.gridColumn;
+                    widget.style.setProperty('--widget-col', entry.gridColumn);
+                }
+                if (typeof entry.gridRow === 'number') {
+                    widget.dataset.gridRow = entry.gridRow;
+                    widget.style.setProperty('--widget-row', entry.gridRow);
+                }
+                attachResizeObserver(widget);
                 grid.appendChild(widget);
             });
-            scheduleRowSpanRefresh();
+            grid.querySelectorAll('.home-widget').forEach(computeRowSpan);
         };
 
         const updateWidgetSize = (widget, sizeKey, overrideSpan) => {
@@ -607,7 +621,7 @@
             return best.key;
         };
 
-        const beginResize = (widget, pointerDownEvent) => {
+        const beginResize = (widget, axis, pointerDownEvent) => {
             if (!widget) {
                 return;
             }
@@ -620,9 +634,11 @@
             const gridRect = grid.getBoundingClientRect();
             const columnWidth = gridRect.width / 12;
             const lockWidth = widget.dataset.lockWidth === 'true';
+            const allowHorizontal = axis === 'horizontal' || axis === 'both';
+            const allowVertical = axis === 'vertical' || axis === 'both';
 
             const handlePointerMove = (event) => {
-                if (!lockWidth) {
+                if (!lockWidth && allowHorizontal) {
                     const deltaX = event.clientX - startX;
                     const rawSpan = initialSpan + (deltaX / columnWidth);
                     const constrained = clampSpan(rawSpan);
@@ -631,11 +647,13 @@
                     updateWidgetSize(widget, sizeKey, snapped);
                 }
 
-                const deltaY = event.clientY - startY;
-                if (Math.abs(deltaY) > 0.5) {
-                    const rawHeight = initialHeight + deltaY;
-                    const snappedHeight = clampHeight(Math.round(rawHeight / HEIGHT_STEP) * HEIGHT_STEP);
-                    updateWidgetHeight(widget, snappedHeight);
+                if (allowVertical) {
+                    const deltaY = event.clientY - startY;
+                    if (Math.abs(deltaY) > 0.5) {
+                        const rawHeight = initialHeight + deltaY;
+                        const snappedHeight = clampHeight(Math.round(rawHeight / HEIGHT_STEP) * HEIGHT_STEP);
+                        updateWidgetHeight(widget, snappedHeight);
+                    }
                 }
             };
 
@@ -660,7 +678,8 @@
                     return;
                 }
 
-                beginResize(widget, event);
+                const axis = handle.dataset.resizeAxis || 'both';
+                beginResize(widget, axis, event);
             });
         });
 
@@ -677,11 +696,15 @@
             dragSource = widget;
             widget.classList.add('home-widget--dragging');
             event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', widget.dataset.widgetId || '');
         });
 
         grid.addEventListener('dragend', () => {
             const dragging = grid.querySelector('.home-widget--dragging');
-            dragging?.classList.remove('home-widget--dragging');
+            if (dragging) {
+                dragging.classList.remove('home-widget--dragging');
+                computeRowSpan(dragging);
+            }
             dragSource = null;
         });
 
@@ -690,15 +713,36 @@
                 return;
             }
             event.preventDefault();
-            const target = event.target.closest('.home-widget');
-            if (!dragSource || !target || dragSource === target) {
+            if (event.dataTransfer) {
+                event.dataTransfer.dropEffect = 'move';
+            }
+        });
+
+        grid.addEventListener('drop', (event) => {
+            if (!isEditing || !dragSource) {
                 return;
             }
+            event.preventDefault();
+            const rect = grid.getBoundingClientRect();
+            const relativeX = Math.max(0, event.clientX - rect.left);
+            const relativeY = Math.max(0, event.clientY - rect.top);
+            const columnWidth = rect.width / 12;
+            const span = Number(dragSource.dataset.gridSpan || getDefaultSpanForSize(dragSource.dataset.widgetSize));
+            const rawCol = Math.max(1, Math.floor(relativeX / columnWidth) + 1);
+            const maxCol = Math.max(1, 12 - span + 1);
+            const clampedCol = Math.min(rawCol, maxCol);
+            const { rowHeight, rowGap } = getGridMetrics();
+            const totalRow = rowHeight + rowGap;
+            const row = Math.max(1, Math.floor(relativeY / totalRow) + 1);
 
-            const bounding = target.getBoundingClientRect();
-            const offset = event.clientY - bounding.top;
-            const shouldInsertBefore = offset < bounding.height / 2;
-            grid.insertBefore(dragSource, shouldInsertBefore ? target : target.nextSibling);
+            dragSource.dataset.gridCol = clampedCol;
+            dragSource.dataset.gridRow = row;
+            dragSource.style.setProperty('--widget-col', clampedCol);
+            dragSource.style.setProperty('--widget-row', row);
+            computeRowSpan(dragSource);
+
+            dragSource.classList.remove('home-widget--dragging');
+            dragSource = null;
         });
 
         const personaSelect = document.getElementById('layoutPersonaSelect');

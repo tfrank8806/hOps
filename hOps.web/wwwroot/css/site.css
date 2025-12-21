@@ -1014,8 +1014,8 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     --widget-height: 300px;
     --widget-span: 4;
     --widget-row-span: 1;
-    grid-column: span var(--widget-span, 4);
-    grid-row-end: span var(--widget-row-span, 1);
+    grid-column: var(--widget-col, auto) / span var(--widget-span, 4);
+    grid-row: var(--widget-row, auto) / span var(--widget-row-span, 1);
 }
 
 .home-widget-card {
@@ -1138,6 +1138,33 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 .home-dashboard--editing .home-widget__resizer {
     display: block;
+}
+
+.home-widget__resize-edge {
+    position: absolute;
+    background-color: transparent;
+    pointer-events: none;
+    display: block;
+}
+
+.home-widget__resize-edge--right {
+    top: 0.35rem;
+    bottom: 0.35rem;
+    right: 0;
+    width: 0.5rem;
+    cursor: ew-resize;
+}
+
+.home-widget__resize-edge--bottom {
+    left: 0.35rem;
+    right: 0.35rem;
+    bottom: 0;
+    height: 0.5rem;
+    cursor: ns-resize;
+}
+
+.home-dashboard--editing .home-widget__resize-edge {
+    pointer-events: auto;
 }
 
 .home-widget-row--top .home-widget-card {
