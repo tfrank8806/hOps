@@ -260,17 +260,8 @@ namespace hOps.web.Controllers
                     continue;
                 }
 
-                int? normalizedColumn = null;
-                if (widget.GridColumn.HasValue)
-                {
-                    normalizedColumn = Math.Clamp(widget.GridColumn.Value, 1, 12);
-                }
-
-                int? normalizedRow = null;
-                if (widget.GridRow.HasValue && widget.GridRow.Value > 0)
-                {
-                    normalizedRow = widget.GridRow.Value;
-                }
+                var normalizedColumn = NormalizeColumnCoordinate(widget.GridColumn);
+                var normalizedRow = NormalizeRowCoordinate(widget.GridRow);
 
                 normalized.Add(new HomeWidgetLayoutEntry
                 {
@@ -1613,8 +1604,8 @@ namespace hOps.web.Controllers
                         var sanitizedSpan = entry.CustomSpan.HasValue ? ClampSpan(entry.CustomSpan.Value) : (int?)null;
                         var defaultHeight = definition.DefaultHeight > 0 ? definition.DefaultHeight : DefaultWidgetHeight;
                         var sanitizedHeight = entry.CustomHeight.HasValue ? ClampHeight(entry.CustomHeight.Value) : (int?)null;
-                        var sanitizedColumn = entry.GridColumn.HasValue ? Math.Clamp(entry.GridColumn.Value, 1, 12) : (int?)null;
-                        var sanitizedRow = entry.GridRow.HasValue && entry.GridRow.Value > 0 ? entry.GridRow.Value : (int?)null;
+                        var sanitizedColumn = NormalizeColumnCoordinate(entry.GridColumn);
+                        var sanitizedRow = NormalizeRowCoordinate(entry.GridRow);
                         if (string.Equals(entry.WidgetId, HomeWidgetIds.HotelLayout, StringComparison.OrdinalIgnoreCase))
                         {
                             sanitizedSpan = GetSpanForSize(HomeWidgetSize.Full);
@@ -1669,6 +1660,43 @@ namespace hOps.web.Controllers
         private static int ClampSpan(int span) => Math.Clamp(span, 1, 12);
         private static int ClampHeight(int height) => Math.Clamp(height, MinWidgetHeight, MaxWidgetHeight);
 
+        private static int? NormalizeColumnCoordinate(int? column)
+        {
+            if (!column.HasValue)
+            {
+                return null;
+            }
+
+            var value = column.Value;
+            if (value <= 0)
+            {
+                return null;
+            }
+
+            return Math.Clamp(value, 1, 12);
+        }
+
+        private static int? NormalizeRowCoordinate(int? row)
+        {
+            if (!row.HasValue)
+            {
+                return null;
+            }
+
+            var value = row.Value;
+            if (value <= 0)
+            {
+                return null;
+            }
+
+            if (value >= 40)
+            {
+                value = (int)Math.Ceiling(value / 50d);
+            }
+
+            return value;
+        }
+
         private static void AssignGridPositions(List<HomeWidgetLayoutEntry> layout)
         {
             if (layout == null || layout.Count == 0)
@@ -1676,7 +1704,7 @@ namespace hOps.web.Controllers
                 return;
             }
 
-            const int rowStep = 50;
+            const int rowStep = 1;
             var columnCursor = 1;
             var rowCursor = 1;
 
@@ -1694,20 +1722,22 @@ namespace hOps.web.Controllers
                     }
 
                     entry.GridColumn = columnCursor;
-                    columnCursor += span;
-                }
-                else
-                {
-                    columnCursor = entry.GridColumn.Value + span;
                 }
 
                 if (!entry.GridRow.HasValue)
                 {
                     entry.GridRow = rowCursor;
                 }
+
+                columnCursor = (entry.GridColumn ?? columnCursor) + span;
+                if (columnCursor > 12)
+                {
+                    columnCursor = 1;
+                    rowCursor = (entry.GridRow ?? rowCursor) + rowStep;
+                }
                 else
                 {
-                    rowCursor = entry.GridRow.Value;
+                    rowCursor = entry.GridRow ?? rowCursor;
                 }
             }
         }
