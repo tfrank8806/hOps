@@ -491,11 +491,65 @@
                 return [];
             }
         })();
+        const serverLayoutHasCustomHeight = Array.isArray(originalLayout)
+            && originalLayout.some(entry => typeof entry?.customHeight === 'number' && Number.isFinite(entry.customHeight));
+        const storageKey = `homeLayout:${selectedPersona}`;
+        const loadStoredLayout = () => {
+            try {
+                const raw = window.sessionStorage?.getItem(storageKey);
+                if (!raw) {
+                    return null;
+                }
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : null;
+            } catch {
+                return null;
+            }
+        };
+        const persistStoredLayout = (layout) => {
+            if (!Array.isArray(layout) || layout.length === 0) {
+                return;
+            }
+            try {
+                window.sessionStorage?.setItem(storageKey, JSON.stringify(layout));
+            } catch {
+                // Ignore storage failures
+            }
+        };
+        const layoutHasCustomHeight = (layout) => Array.isArray(layout)
+            && layout.some(entry => typeof entry?.customHeight === 'number' && Number.isFinite(entry.customHeight));
 
         const getAntiforgeryToken = () => {
             const form = document.getElementById('homeLayoutAntiforgery');
             return form?.querySelector('input[name="__RequestVerificationToken"]')?.value;
         };
+
+        async function syncLayoutFromCache(layout) {
+            if (!Array.isArray(layout) || layout.length === 0) {
+                return;
+            }
+            const saveUrl = grid.dataset.saveUrl;
+            if (!saveUrl) {
+                return;
+            }
+            const token = getAntiforgeryToken();
+            try {
+                await fetch(saveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token || ''
+                    },
+                    body: JSON.stringify({
+                        persona: selectedPersona,
+                        widgets: layout
+                    })
+                });
+                grid.dataset.initialLayout = JSON.stringify(layout);
+            } catch {
+                // Ignore background sync failures
+            }
+        }
 
         const setEditingState = (enabled) => {
             isEditing = enabled;
@@ -550,6 +604,17 @@
                 grid.appendChild(widget);
             });
         };
+
+        const cachedLayout = loadStoredLayout();
+        if (cachedLayout?.length) {
+            applyLayout(cachedLayout);
+            originalLayout = cachedLayout;
+            if (layoutHasCustomHeight(cachedLayout) && !serverLayoutHasCustomHeight) {
+                syncLayoutFromCache(cachedLayout);
+            }
+        } else if (serverLayoutHasCustomHeight) {
+            persistStoredLayout(originalLayout);
+        }
 
         const updateWidgetSize = (widget, sizeKey, overrideSpan) => {
             if (!widget) {
@@ -753,6 +818,7 @@
 
                 originalLayout = payload.widgets;
                 grid.dataset.initialLayout = JSON.stringify(originalLayout);
+                persistStoredLayout(originalLayout);
                 setEditingState(false);
             }
             catch {
