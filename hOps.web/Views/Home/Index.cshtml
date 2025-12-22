@@ -325,7 +325,6 @@
         const HEIGHT_TOLERANCE = Number(heightOptions.tolerance) || 6;
         const ROW_UNIT = Number(grid.dataset.rowUnit) || 30;
         const computedGridStyles = window.getComputedStyle(grid);
-        const ROW_GAP = computedGridStyles ? parseFloat(computedGridStyles.rowGap || '0') || 0 : 0;
         const COLUMN_GAP = computedGridStyles ? parseFloat(computedGridStyles.columnGap || '0') || 0 : 0;
 
         const MIN_COLUMNS = 1;
@@ -439,7 +438,7 @@
         };
         const computeRowSpan = (heightValue) => {
             const unit = ROW_UNIT > 0 ? ROW_UNIT : 30;
-            return Math.max(1, Math.ceil((heightValue + ROW_GAP) / (unit + ROW_GAP)));
+            return Math.max(1, Math.ceil(heightValue / unit));
         };
         const applyRowSpan = (widget, rows) => {
             if (!widget) {
