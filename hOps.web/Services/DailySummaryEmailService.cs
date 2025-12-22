@@ -445,24 +445,30 @@ namespace hOps.web.Services
                 return string.Empty;
             }
 
-            var displayText = RichTextRenderer.ToPlainText(content);
-            if (string.IsNullOrWhiteSpace(displayText))
+            var plainText = RichTextRenderer.ToPlainText(content);
+            if (string.IsNullOrWhiteSpace(plainText))
             {
                 return string.Empty;
             }
 
-            if (maxCharacters <= 0 || displayText.Length <= maxCharacters)
+            if (maxCharacters <= 0 || plainText.Length <= maxCharacters)
             {
                 return RichTextRenderer.ToHtml(content);
             }
 
-            var truncated = displayText[..Math.Min(maxCharacters, displayText.Length)].TrimEnd();
-            if (truncated.Length < displayText.Length)
+            var displayWithBreaks = RichTextRenderer.ToPlainTextWithLineBreaks(content);
+            if (string.IsNullOrWhiteSpace(displayWithBreaks))
+            {
+                displayWithBreaks = plainText;
+            }
+
+            var truncated = displayWithBreaks[..Math.Min(maxCharacters, displayWithBreaks.Length)].TrimEnd();
+            if (truncated.Length < displayWithBreaks.Length)
             {
                 truncated = $"{truncated}...";
             }
 
-            return RichTextRenderer.ToHtml(truncated);
+            return BuildPlainTextHtml(truncated);
         }
 
         private static TimeZoneInfo ResolveUserTimeZone(ApplicationUser user)

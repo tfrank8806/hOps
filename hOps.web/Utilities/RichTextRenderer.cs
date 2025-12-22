@@ -189,6 +189,32 @@ namespace hOps.web.Utilities
             return collapsed;
         }
 
+        public static string ToPlainTextWithLineBreaks(string? content)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return string.Empty;
+            }
+
+            var html = ToHtml(content);
+            if (string.IsNullOrWhiteSpace(html))
+            {
+                return string.Empty;
+            }
+
+            var withBreaks = HtmlBreakTagRegex.Replace(html, "\n");
+            var stripped = HtmlTagRegex.Replace(withBreaks, " ");
+            var decoded = WebUtility.HtmlDecode(stripped);
+            var normalized = decoded.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+            var lines = normalized
+                .Split('\n')
+                .Select(line => line.Trim())
+                .Where(line => !string.IsNullOrWhiteSpace(line));
+
+            return string.Join("\n", lines);
+        }
+
         private sealed class ColorToken
         {
             public ColorToken(int index, string colorName, string cssClass)
