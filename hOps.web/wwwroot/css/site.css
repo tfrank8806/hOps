@@ -991,7 +991,8 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 .home-widget-grid {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: 1rem;
+    column-gap: 1rem;
+    row-gap: var(--home-widget-row-gap, 12px);
     grid-auto-flow: row dense;
     grid-auto-rows: var(--home-widget-row-size, 30px);
     align-items: start;

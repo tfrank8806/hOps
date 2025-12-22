@@ -13,6 +13,7 @@
     ViewData["MainContainerClass"] = "main-inner--wide home-main-container";
     ViewData["ContentSurfaceClass"] = "content-surface--flush";
     const int widgetRowUnit = 30;
+    const int widgetRowGap = 12;
     var layoutOptions = new JsonSerializerOptions
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -122,7 +123,8 @@
          data-height-options='@Html.Raw(heightOptionsJson)'
          data-persona="@Model.SelectedPersona"
          data-row-unit="@widgetRowUnit"
-         style="--home-widget-row-size: @(widgetRowUnit)px;">
+         data-row-gap="@widgetRowGap"
+         style="--home-widget-row-size: @(widgetRowUnit)px; --home-widget-row-gap: @(widgetRowGap)px;">
         @foreach (var widget in Model.WidgetLayout)
         {
             var widgetId = widget.WidgetId ?? string.Empty;
@@ -149,7 +151,7 @@
             var appliedHeight = storedHeight ?? sanitizedDefaultHeight;
             var sizeLabelText = forceFullWidth ? $"{sizeLabel} (locked)" : sizeLabel;
             var heightLabelText = GetHeightLabel(appliedHeight, sanitizedDefaultHeight, storedHeight.HasValue);
-            var rowSpan = Math.Max(1, (int)Math.Ceiling((double)appliedHeight / widgetRowUnit));
+            var rowSpan = Math.Max(1, (int)Math.Ceiling((double)(appliedHeight + widgetRowGap) / (widgetRowUnit + widgetRowGap)));
             var widgetStyle = $"--widget-span: {appliedSpan}; --widget-height: {appliedHeight}px; --widget-row-span: {rowSpan};";
             <div class="home-widget"
                  data-widget-id="@widget.WidgetId"
@@ -324,6 +326,7 @@
         const HEIGHT_STEP = Number(heightOptions.step) || 10;
         const HEIGHT_TOLERANCE = Number(heightOptions.tolerance) || 6;
         const ROW_UNIT = Number(grid.dataset.rowUnit) || 30;
+        const ROW_GAP = Number(grid.dataset.rowGap) || 0;
         const computedGridStyles = window.getComputedStyle(grid);
         const COLUMN_GAP = computedGridStyles ? parseFloat(computedGridStyles.columnGap || '0') || 0 : 0;
 
@@ -438,7 +441,8 @@
         };
         const computeRowSpan = (heightValue) => {
             const unit = ROW_UNIT > 0 ? ROW_UNIT : 30;
-            return Math.max(1, Math.ceil(heightValue / unit));
+            const gap = ROW_GAP >= 0 ? ROW_GAP : 0;
+            return Math.max(1, Math.ceil((heightValue + gap) / (unit + gap)));
         };
         const applyRowSpan = (widget, rows) => {
             if (!widget) {
