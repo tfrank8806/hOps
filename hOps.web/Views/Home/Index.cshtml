@@ -375,14 +375,18 @@
             const span = Math.max(1, Math.round((height + rowGap) / (rowHeight + rowGap)));
             el.style.setProperty('--widget-row-span', span);
         };
-        const widgetResizeObserver = new ResizeObserver(entries => {
-            entries.forEach(entry => {
-                const target = entry.target;
-                if (target && target.closest('#homeWidgetGrid')) {
-                    computeRowSpan(target);
-                }
-            });
-        });
+        const widgetResizeObserver = typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(entries => {
+                entries.forEach(entry => {
+                    const target = entry.target;
+                    if (target && target.closest('#homeWidgetGrid')) {
+                        computeRowSpan(target);
+                    }
+                });
+            })
+            : {
+                observe: () => { /* no-op */ }
+            };
         const attachResizeObserver = (widget) => {
             if (!widget) {
                 return;
