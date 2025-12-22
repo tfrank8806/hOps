@@ -989,13 +989,11 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 }
 
 .home-widget-grid {
-    --masonry-row-height: 12px;
-    --masonry-row-gap: 1rem;
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: var(--masonry-row-gap);
-    grid-auto-rows: var(--masonry-row-height);
-    grid-auto-flow: dense;
+    gap: 1rem;
+    grid-auto-flow: row dense;
+    grid-auto-rows: var(--home-widget-row-size, 30px);
     align-items: start;
 }
 
@@ -1010,16 +1008,15 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     transition: transform 0.15s ease, box-shadow 0.15s ease;
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    min-height: var(--widget-height, 300px);
+    height: var(--widget-height, 300px);
+    grid-column: span var(--widget-span, 4);
+    grid-row: span var(--widget-row-span, 10);
     --widget-height: 300px;
-    --widget-span: 4;
-    --widget-row-span: 1;
-    grid-column: var(--widget-col, auto) / span var(--widget-span, 4);
-    grid-row: var(--widget-row, auto) / span var(--widget-row-span, 1);
 }
 
 .home-widget-card {
-    max-height: var(--widget-height, 300px);
+    height: 100%;
     display: flex;
     flex-direction: column;
     font-size: 0.92rem;

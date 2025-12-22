@@ -185,8 +185,6 @@ namespace hOps.web.ViewModels.Home
         public HomeWidgetSize Size { get; set; } = HomeWidgetSize.Third;
         public int? CustomSpan { get; set; }
         public int? CustomHeight { get; set; }
-        public int? GridColumn { get; set; }
-        public int? GridRow { get; set; }
     }
 
     public enum HomeWidgetSize
