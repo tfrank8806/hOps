@@ -600,14 +600,14 @@
     @if (SignInManager.IsSignedIn(User))
     {
         <div class="modal fade" id="allBookmarksModal" tabindex="-1" aria-labelledby="allBookmarksModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h1 class="modal-title fs-5" id="allBookmarksModalLabel">All Bookmarks</h1>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body">
-                        <div id="allBookmarksContent" class="text-center text-muted py-4">
+                    <div class="modal-body all-bookmarks-modal-body">
+                        <div id="allBookmarksContent" class="all-bookmarks-content text-center text-muted py-5">
                             Loading bookmarks...
                         </div>
                     </div>
@@ -695,6 +695,96 @@
                     bookmarkMenuContent.appendChild(list);
                 };
 
+                const getFaviconUrl = (rawUrl) => {
+                    if (typeof rawUrl !== 'string' || !rawUrl.trim()) {
+                        return null;
+                    }
+
+                    try {
+                        const parsed = new URL(rawUrl, window.location.origin);
+                        if (!parsed.hostname) {
+                            return null;
+                        }
+                        return `https://www.google.com/s2/favicons?sz=128&domain_url=${encodeURIComponent(parsed.origin)}`;
+                    } catch {
+                        return null;
+                    }
+                };
+
+                const getBookmarkInitial = (value) => {
+                    if (typeof value !== 'string') {
+                        return '#';
+                    }
+                    const trimmed = value.trim();
+                    if (!trimmed) {
+                        return '#';
+                    }
+                    const code = trimmed.codePointAt(0);
+                    return code ? String.fromCodePoint(code).toUpperCase() : '#';
+                };
+
+                const createTileText = (text, className) => {
+                    if (!text) {
+                        return null;
+                    }
+                    const element = document.createElement('div');
+                    element.className = className;
+                    element.textContent = text;
+                    return element;
+                };
+
+                const createBookmarkTile = (item) => {
+                    const name = item.name || 'Untitled bookmark';
+                    const section = item.section || '';
+                    const description = item.description || '';
+                    const url = typeof item.url === 'string' && item.url.trim() ? item.url.trim() : '#';
+                    const tile = document.createElement('a');
+                    tile.className = 'bookmark-tile text-decoration-none';
+                    tile.href = url;
+                    tile.target = '_blank';
+                    tile.rel = 'noopener';
+                    tile.title = `${name}${section ? ` · ${section}` : ''}`;
+
+                    const icon = document.createElement('div');
+                    icon.className = 'bookmark-tile-icon';
+                    const faviconUrl = getFaviconUrl(url);
+                    const fallbackInitial = getBookmarkInitial(name);
+
+                    if (faviconUrl) {
+                        const img = document.createElement('img');
+                        img.src = faviconUrl;
+                        img.alt = '';
+                        img.loading = 'lazy';
+                        img.referrerPolicy = 'no-referrer';
+                        img.addEventListener('error', () => {
+                            icon.classList.add('bookmark-tile-icon--fallback');
+                            icon.textContent = fallbackInitial;
+                            img.remove();
+                        });
+                        icon.appendChild(img);
+                    } else {
+                        icon.classList.add('bookmark-tile-icon--fallback');
+                        icon.textContent = fallbackInitial;
+                    }
+
+                    const nameElement = createTileText(name, 'bookmark-tile-name');
+                    const sectionElement = createTileText(section, 'bookmark-tile-section text-muted');
+                    const descriptionElement = createTileText(description, 'bookmark-tile-description text-muted');
+
+                    tile.appendChild(icon);
+                    if (nameElement) {
+                        tile.appendChild(nameElement);
+                    }
+                    if (sectionElement) {
+                        tile.appendChild(sectionElement);
+                    }
+                    if (descriptionElement) {
+                        tile.appendChild(descriptionElement);
+                    }
+
+                    return tile;
+                };
+
                 const renderAllBookmarks = (items) => {
                     if (!allBookmarksContent) {
                         return;
@@ -706,24 +796,10 @@
                     }
 
                     const grid = document.createElement('div');
-                    grid.className = 'row g-3';
+                    grid.className = 'bookmark-tiles-grid';
 
                     items.forEach(item => {
-                        const col = document.createElement('div');
-                        col.className = 'col-sm-6 col-lg-4';
-                        const name = escapeHtml(item.name || 'Untitled bookmark');
-                        const section = item.section ? escapeHtml(item.section) : '';
-                        const description = item.description ? escapeHtml(item.description) : '';
-                        const url = item.url || '#';
-                        col.innerHTML = `
-                            <a class="text-decoration-none d-block h-100" href="${url}" target="_blank" rel="noopener">
-                                <div class="border rounded p-3 h-100">
-                                    <div class="fw-semibold">${name}</div>
-                                    ${section ? `<div class="text-muted small">${section}</div>` : ''}
-                                    ${description ? `<div class="text-muted small mt-2">${description}</div>` : ''}
-                                </div>
-                            </a>`;
-                        grid.appendChild(col);
+                        grid.appendChild(createBookmarkTile(item));
                     });
 
                     allBookmarksContent.innerHTML = '';
