@@ -406,7 +406,10 @@
                 }
             };
             slider.addEventListener('input', applySliderValue);
-            slider.addEventListener('change', applySliderValue);
+            slider.addEventListener('change', () => {
+                applySliderValue();
+                persistLayoutSnapshot();
+            });
             slider.dataset.heightSlider = 'true';
 
             const stopDrag = (event) => event.stopPropagation();
@@ -473,6 +476,21 @@
             syncHeightSlider(widget, heightToApply);
         };
 
+        const getCurrentLayout = () => {
+            const layout = [];
+            grid.querySelectorAll('.home-widget').forEach(widget => {
+                const spanValue = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
+                const heightValue = Number(widget.dataset.customHeight);
+                layout.push({
+                    widgetId: widget.dataset.widgetId,
+                    size: widget.dataset.widgetSize,
+                    customSpan: clampSpan(spanValue),
+                    customHeight: Number.isFinite(heightValue) ? clampHeight(heightValue) : null
+                });
+            });
+            return layout;
+        };
+
         grid.querySelectorAll('.home-widget').forEach(widget => {
             const initialHeight = Number(widget.dataset.customHeight || widget.dataset.gridHeight);
             if (Number.isFinite(initialHeight)) {
@@ -493,10 +511,20 @@
         })();
         const serverLayoutHasCustomHeight = Array.isArray(originalLayout)
             && originalLayout.some(entry => typeof entry?.customHeight === 'number' && Number.isFinite(entry.customHeight));
+        const storage = (() => {
+            try {
+                return window.localStorage ?? window.sessionStorage ?? null;
+            } catch {
+                return null;
+            }
+        })();
         const storageKey = `homeLayout:${selectedPersona}`;
         const loadStoredLayout = () => {
+            if (!storage) {
+                return null;
+            }
             try {
-                const raw = window.sessionStorage?.getItem(storageKey);
+                const raw = storage.getItem(storageKey);
                 if (!raw) {
                     return null;
                 }
@@ -507,17 +535,23 @@
             }
         };
         const persistStoredLayout = (layout) => {
-            if (!Array.isArray(layout) || layout.length === 0) {
+            if (!storage || !Array.isArray(layout) || layout.length === 0) {
                 return;
             }
             try {
-                window.sessionStorage?.setItem(storageKey, JSON.stringify(layout));
+                storage.setItem(storageKey, JSON.stringify(layout));
             } catch {
                 // Ignore storage failures
             }
         };
         const layoutHasCustomHeight = (layout) => Array.isArray(layout)
             && layout.some(entry => typeof entry?.customHeight === 'number' && Number.isFinite(entry.customHeight));
+        const persistLayoutSnapshot = () => {
+            const snapshot = getCurrentLayout();
+            if (layoutHasCustomHeight(snapshot)) {
+                persistStoredLayout(snapshot);
+            }
+        };
 
         const getAntiforgeryToken = () => {
             const form = document.getElementById('homeLayoutAntiforgery');
@@ -615,6 +649,7 @@
         } else if (serverLayoutHasCustomHeight) {
             persistStoredLayout(originalLayout);
         }
+        window.addEventListener('beforeunload', persistLayoutSnapshot);
 
         const updateWidgetSize = (widget, sizeKey, overrideSpan) => {
             if (!widget) {
