@@ -529,6 +529,20 @@
                 // Ignore storage failures
             }
         };
+        const getCurrentLayout = () => {
+            const layout = [];
+            grid.querySelectorAll('.home-widget').forEach(widget => {
+                const spanValue = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
+                const heightValue = Number(widget.dataset.customHeight);
+                layout.push({
+                    widgetId: widget.dataset.widgetId,
+                    size: widget.dataset.widgetSize,
+                    customSpan: clampSpan(spanValue),
+                    customHeight: Number.isFinite(heightValue) ? clampHeight(heightValue) : null
+                });
+            });
+            return layout;
+        };
         const layoutHasCustomHeight = (layout) => Array.isArray(layout)
             && layout.some(entry => typeof entry?.customHeight === 'number' && Number.isFinite(entry.customHeight));
         const persistLayoutSnapshot = () => {
