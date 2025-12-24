@@ -476,21 +476,6 @@
             syncHeightSlider(widget, heightToApply);
         };
 
-        const getCurrentLayout = () => {
-            const layout = [];
-            grid.querySelectorAll('.home-widget').forEach(widget => {
-                const spanValue = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
-                const heightValue = Number(widget.dataset.customHeight);
-                layout.push({
-                    widgetId: widget.dataset.widgetId,
-                    size: widget.dataset.widgetSize,
-                    customSpan: clampSpan(spanValue),
-                    customHeight: Number.isFinite(heightValue) ? clampHeight(heightValue) : null
-                });
-            });
-            return layout;
-        };
-
         grid.querySelectorAll('.home-widget').forEach(widget => {
             const initialHeight = Number(widget.dataset.customHeight || widget.dataset.gridHeight);
             if (Number.isFinite(initialHeight)) {
@@ -604,21 +589,6 @@
                 editorGroup?.classList.add('d-none');
                 hint?.classList.add('d-none');
             }
-        };
-
-        const getCurrentLayout = () => {
-            const layout = [];
-            grid.querySelectorAll('.home-widget').forEach(widget => {
-                const spanValue = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
-                const heightValue = Number(widget.dataset.customHeight);
-                layout.push({
-                    widgetId: widget.dataset.widgetId,
-                    size: widget.dataset.widgetSize,
-                    customSpan: clampSpan(spanValue),
-                    customHeight: Number.isFinite(heightValue) ? clampHeight(heightValue) : null
-                });
-            });
-            return layout;
         };
 
         const applyLayout = (layout) => {
