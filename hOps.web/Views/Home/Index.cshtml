@@ -496,61 +496,82 @@
         })();
         const serverLayoutHasCustomHeight = Array.isArray(originalLayout)
             && originalLayout.some(entry => typeof entry?.customHeight === 'number' && Number.isFinite(entry.customHeight));
-        const storage = (() => {
-            try {
-                return window.localStorage ?? window.sessionStorage ?? null;
-            } catch {
-                return null;
-            }
-        })();
-        const storageKey = `homeLayout:${selectedPersona}`;
-        const loadStoredLayout = () => {
-            if (!storage) {
-                return null;
-            }
-            try {
-                const raw = storage.getItem(storageKey);
-                if (!raw) {
+        let loadStoredLayout = () => null;
+        let persistStoredLayout = () => { };
+        let getCurrentLayout = () => [];
+        let layoutHasCustomHeight = () => false;
+        let persistLayoutSnapshot = () => { };
+        try {
+            const storage = (() => {
+                try {
+                    return window.localStorage ?? window.sessionStorage ?? null;
+                } catch {
                     return null;
                 }
-                const parsed = JSON.parse(raw);
-                return Array.isArray(parsed) ? parsed : null;
-            } catch {
-                return null;
-            }
-        };
-        const persistStoredLayout = (layout) => {
-            if (!storage || !Array.isArray(layout) || layout.length === 0) {
-                return;
-            }
-            try {
-                storage.setItem(storageKey, JSON.stringify(layout));
-            } catch {
-                // Ignore storage failures
-            }
-        };
-        const getCurrentLayout = () => {
-            const layout = [];
-            grid.querySelectorAll('.home-widget').forEach(widget => {
-                const spanValue = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
-                const heightValue = Number(widget.dataset.customHeight);
-                layout.push({
-                    widgetId: widget.dataset.widgetId,
-                    size: widget.dataset.widgetSize,
-                    customSpan: clampSpan(spanValue),
-                    customHeight: Number.isFinite(heightValue) ? clampHeight(heightValue) : null
+            })();
+            const storageKey = `homeLayout:${selectedPersona}`;
+            loadStoredLayout = () => {
+                if (!storage) {
+                    return null;
+                }
+                try {
+                    const raw = storage.getItem(storageKey);
+                    if (!raw) {
+                        return null;
+                    }
+                    const parsed = JSON.parse(raw);
+                    return Array.isArray(parsed) ? parsed : null;
+                } catch {
+                    return null;
+                }
+            };
+            persistStoredLayout = (layout) => {
+                if (!storage || !Array.isArray(layout) || layout.length === 0) {
+                    return;
+                }
+                try {
+                    storage.setItem(storageKey, JSON.stringify(layout));
+                } catch {
+                    // Ignore storage failures
+                }
+            };
+            getCurrentLayout = () => {
+                const layout = [];
+                grid.querySelectorAll('.home-widget').forEach(widget => {
+                    const spanValue = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
+                    const heightValue = Number(widget.dataset.customHeight);
+                    layout.push({
+                        widgetId: widget.dataset.widgetId,
+                        size: widget.dataset.widgetSize,
+                        customSpan: clampSpan(spanValue),
+                        customHeight: Number.isFinite(heightValue) ? clampHeight(heightValue) : null
+                    });
                 });
-            });
-            return layout;
-        };
-        const layoutHasCustomHeight = (layout) => Array.isArray(layout)
-            && layout.some(entry => typeof entry?.customHeight === 'number' && Number.isFinite(entry.customHeight));
-        const persistLayoutSnapshot = () => {
-            const snapshot = getCurrentLayout();
-            if (layoutHasCustomHeight(snapshot)) {
-                persistStoredLayout(snapshot);
+                return layout;
+            };
+            layoutHasCustomHeight = (layout) => Array.isArray(layout)
+                && layout.some(entry => typeof entry?.customHeight === 'number' && Number.isFinite(entry.customHeight));
+            persistLayoutSnapshot = () => {
+                const snapshot = getCurrentLayout();
+                if (layoutHasCustomHeight(snapshot)) {
+                    persistStoredLayout(snapshot);
+                }
+            };
+
+            const cachedLayout = loadStoredLayout();
+            if (cachedLayout?.length) {
+                applyLayout(cachedLayout);
+                originalLayout = cachedLayout;
+                if (layoutHasCustomHeight(cachedLayout) && !serverLayoutHasCustomHeight) {
+                    syncLayoutFromCache(cachedLayout);
+                }
+            } else if (serverLayoutHasCustomHeight) {
+                persistStoredLayout(originalLayout);
             }
-        };
+            window.addEventListener('beforeunload', persistLayoutSnapshot);
+        } catch (error) {
+            console.warn('Home layout persistence disabled:', error);
+        }
 
         const getAntiforgeryToken = () => {
             const form = document.getElementById('homeLayoutAntiforgery');
@@ -622,18 +643,6 @@
                 grid.appendChild(widget);
             });
         };
-
-        const cachedLayout = loadStoredLayout();
-        if (cachedLayout?.length) {
-            applyLayout(cachedLayout);
-            originalLayout = cachedLayout;
-            if (layoutHasCustomHeight(cachedLayout) && !serverLayoutHasCustomHeight) {
-                syncLayoutFromCache(cachedLayout);
-            }
-        } else if (serverLayoutHasCustomHeight) {
-            persistStoredLayout(originalLayout);
-        }
-        window.addEventListener('beforeunload', persistLayoutSnapshot);
 
         const updateWidgetSize = (widget, sizeKey, overrideSpan) => {
             if (!widget) {
