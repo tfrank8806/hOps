@@ -40,16 +40,32 @@ namespace hOps.web.Controllers
 
         private static readonly IReadOnlyList<HomeWidgetDefinition> WidgetDefinitions = new[]
         {
-            new HomeWidgetDefinition { Id = HomeWidgetIds.Announcements, DisplayName = "Announcements", Description = "Manager notes & attachments", DefaultSize = HomeWidgetSize.Third, DefaultHeight = DefaultWidgetHeight },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.Bulletins, DisplayName = "Bulletin Board", Description = "Team conversations & reminders", DefaultSize = HomeWidgetSize.Third, DefaultHeight = DefaultWidgetHeight },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.PassOnLogs, DisplayName = "Pass On Logs", Description = "Recent pass on entries", DefaultSize = HomeWidgetSize.Third, DefaultHeight = DefaultWidgetHeight },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.PackageLog, DisplayName = "Package Log", Description = "Undelivered packages", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.UpcomingEvents, DisplayName = "Upcoming Events", Description = "Calendar highlights", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.WorkOrders, DisplayName = "Work Orders", Description = "Active tickets and SLAs", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.LostFound, DisplayName = "Lost & Found", Description = "Items awaiting resolution", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.MySchedule, DisplayName = "My Schedule", Description = "Upcoming shifts for you", DefaultSize = HomeWidgetSize.Quarter, DefaultHeight = DefaultWidgetHeight },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.HotelLayout, DisplayName = "Hotel Layout", Description = "Interactive property map", DefaultSize = HomeWidgetSize.Full, DefaultHeight = DefaultWidgetHeight },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.OpsFeed, DisplayName = "Ops Feed", Description = "Unified activity and replies", DefaultSize = HomeWidgetSize.Full, DefaultHeight = DefaultWidgetHeight }
+            new HomeWidgetDefinition { Id = HomeWidgetIds.Announcements, DisplayName = "Announcements", Description = "Manager notes & attachments", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 660 },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.Bulletins, DisplayName = "Bulletin Board", Description = "Team conversations & reminders", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 690 },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.WorkOrders, DisplayName = "Work Orders", Description = "Active tickets and SLAs", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 690 },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.UpcomingEvents, DisplayName = "Upcoming Events", Description = "Calendar highlights", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 490 },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.PassOnLogs, DisplayName = "Pass On Logs", Description = "Recent pass on entries", DefaultSize = HomeWidgetSize.Full, DefaultHeight = 490 },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.MySchedule, DisplayName = "My Schedule", Description = "Upcoming shifts for you", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 300 },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.LostFound, DisplayName = "Lost & Found", Description = "Items awaiting resolution", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 300 },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.PackageLog, DisplayName = "Package Log", Description = "Undelivered packages", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 300 },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.HotelLayout, DisplayName = "Hotel Layout", Description = "Interactive property map", DefaultSize = HomeWidgetSize.Full, DefaultHeight = 870 },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.OpsFeed, DisplayName = "Ops Feed", Description = "Unified activity and replies", DefaultSize = HomeWidgetSize.Full, DefaultHeight = 750 }
+        };
+
+        private sealed record DefaultWidgetLayoutSpec(string WidgetId, HomeWidgetSize Size, int? CustomSpan = null, int? CustomHeight = null);
+
+        private static readonly IReadOnlyList<DefaultWidgetLayoutSpec> DefaultWidgetLayout = new[]
+        {
+            new DefaultWidgetLayoutSpec(HomeWidgetIds.Announcements, HomeWidgetSize.Third),
+            new DefaultWidgetLayoutSpec(HomeWidgetIds.Bulletins, HomeWidgetSize.Third),
+            new DefaultWidgetLayoutSpec(HomeWidgetIds.WorkOrders, HomeWidgetSize.Third),
+            new DefaultWidgetLayoutSpec(HomeWidgetIds.UpcomingEvents, HomeWidgetSize.Third),
+            new DefaultWidgetLayoutSpec(HomeWidgetIds.PassOnLogs, HomeWidgetSize.Full, CustomSpan: 8),
+            new DefaultWidgetLayoutSpec(HomeWidgetIds.MySchedule, HomeWidgetSize.Third),
+            new DefaultWidgetLayoutSpec(HomeWidgetIds.LostFound, HomeWidgetSize.Third),
+            new DefaultWidgetLayoutSpec(HomeWidgetIds.PackageLog, HomeWidgetSize.Third),
+            new DefaultWidgetLayoutSpec(HomeWidgetIds.HotelLayout, HomeWidgetSize.Full),
+            new DefaultWidgetLayoutSpec(HomeWidgetIds.OpsFeed, HomeWidgetSize.Full)
         };
 
         private static readonly LayoutPersonaOption[] PersonaOptions = new[]
@@ -1570,6 +1586,10 @@ namespace hOps.web.Controllers
                     storedLayout = null;
                 }
             }
+            if (storedLayout == null || storedLayout.Count == 0)
+            {
+                storedLayout = BuildDefaultWidgetLayout(activeDefinitions);
+            }
 
             var definitions = activeDefinitions.ToDictionary(d => d.Id, d => d, StringComparer.OrdinalIgnoreCase);
             var finalLayout = new List<HomeWidgetLayoutEntry>();
@@ -1636,6 +1656,43 @@ namespace hOps.web.Controllers
             }
 
             return finalLayout;
+        }
+
+        private static List<HomeWidgetLayoutEntry> BuildDefaultWidgetLayout(IReadOnlyList<HomeWidgetDefinition> activeDefinitions)
+        {
+            var definitions = activeDefinitions.ToDictionary(d => d.Id, d => d, StringComparer.OrdinalIgnoreCase);
+            var layout = new List<HomeWidgetLayoutEntry>();
+            foreach (var spec in DefaultWidgetLayout)
+            {
+                if (!definitions.ContainsKey(spec.WidgetId))
+                {
+                    continue;
+                }
+
+                layout.Add(new HomeWidgetLayoutEntry
+                {
+                    WidgetId = spec.WidgetId,
+                    Size = spec.Size,
+                    CustomSpan = spec.CustomSpan,
+                    CustomHeight = spec.CustomHeight
+                });
+            }
+
+            foreach (var definition in activeDefinitions)
+            {
+                if (layout.Any(entry => entry.WidgetId.Equals(definition.Id, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                layout.Add(new HomeWidgetLayoutEntry
+                {
+                    WidgetId = definition.Id,
+                    Size = definition.DefaultSize
+                });
+            }
+
+            return layout;
         }
 
         private static int GetSpanForSize(HomeWidgetSize size) => size switch
