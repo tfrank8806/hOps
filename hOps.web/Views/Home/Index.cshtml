@@ -465,6 +465,16 @@
             syncHeightSlider(widget, heightToApply);
         };
 
+        const entryHasCustomizations = (entry) => {
+            if (!entry) {
+                return false;
+            }
+            const spanValue = Number(entry.customSpan);
+            const heightValue = Number(entry.customHeight);
+            return Number.isFinite(spanValue) || Number.isFinite(heightValue);
+        };
+        const layoutHasCustomizations = (layout) => Array.isArray(layout) && layout.some(entryHasCustomizations);
+
         grid.querySelectorAll('.home-widget').forEach(widget => {
             const initialHeight = Number(widget.dataset.customHeight || widget.dataset.gridHeight);
             if (Number.isFinite(initialHeight)) {
@@ -483,12 +493,10 @@
                 return [];
             }
         })();
-        const serverLayoutHasCustomHeight = Array.isArray(originalLayout)
-            && originalLayout.some(entry => typeof entry?.customHeight === 'number' && Number.isFinite(entry.customHeight));
+        const serverLayoutHasCustomizations = layoutHasCustomizations(originalLayout);
         let loadStoredLayout = () => null;
         let persistStoredLayout = () => { };
         let getCurrentLayout = () => [];
-        let layoutHasCustomHeight = () => false;
         let persistLayoutSnapshot = () => { };
         try {
             const storage = (() => {
@@ -527,35 +535,35 @@
             getCurrentLayout = () => {
                 const layout = [];
                 grid.querySelectorAll('.home-widget').forEach(widget => {
-                    const spanValue = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
+                    const customSpanValue = Number(widget.dataset.customSpan);
                     const heightValue = Number(widget.dataset.customHeight);
                     layout.push({
                         widgetId: widget.dataset.widgetId,
                         size: widget.dataset.widgetSize,
-                        customSpan: clampSpan(spanValue),
+                        customSpan: Number.isFinite(customSpanValue) ? clampSpan(customSpanValue) : null,
                         customHeight: Number.isFinite(heightValue) ? clampHeight(heightValue) : null
                     });
                 });
                 return layout;
             };
-            layoutHasCustomHeight = (layout) => Array.isArray(layout)
-                && layout.some(entry => typeof entry?.customHeight === 'number' && Number.isFinite(entry.customHeight));
             persistLayoutSnapshot = () => {
                 const snapshot = getCurrentLayout();
-                if (layoutHasCustomHeight(snapshot)) {
-                    persistStoredLayout(snapshot);
-                    syncLayoutFromCache(snapshot);
+                if (!layoutHasCustomizations(snapshot)) {
+                    return;
                 }
+                persistStoredLayout(snapshot);
+                syncLayoutFromCache(snapshot);
+                originalLayout = snapshot;
             };
 
             const cachedLayout = loadStoredLayout();
             if (cachedLayout?.length) {
                 applyLayout(cachedLayout);
                 originalLayout = cachedLayout;
-                if (layoutHasCustomHeight(cachedLayout) && !serverLayoutHasCustomHeight) {
+                if (layoutHasCustomizations(cachedLayout) && !serverLayoutHasCustomizations) {
                     syncLayoutFromCache(cachedLayout);
                 }
-            } else if (serverLayoutHasCustomHeight) {
+            } else if (serverLayoutHasCustomizations) {
                 persistStoredLayout(originalLayout);
             }
             window.addEventListener('beforeunload', persistLayoutSnapshot);
@@ -713,6 +721,7 @@
                 document.removeEventListener('pointermove', handlePointerMove);
                 document.removeEventListener('pointerup', stopResize);
                 document.removeEventListener('pointercancel', stopResize);
+                persistLayoutSnapshot();
             };
 
             document.addEventListener('pointermove', handlePointerMove);
@@ -783,6 +792,7 @@
                 return;
             }
             event.preventDefault();
+            persistLayoutSnapshot();
         });
 
         startButton?.addEventListener('click', () => {
