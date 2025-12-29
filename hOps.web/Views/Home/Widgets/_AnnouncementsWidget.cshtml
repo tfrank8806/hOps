@@ -8,6 +8,7 @@
         ? string.Empty
         : value.Replace("</textarea>", "&lt;/textarea&gt;");
     var announcementMarkup = Model.Announcement?.Content ?? string.Empty;
+    var announcementInitialHtml = RichTextRenderer.ToHtml(announcementMarkup);
 }
 
 <div class="card shadow-sm h-100">
@@ -74,7 +75,8 @@
                                   rows="6"
                                   maxlength="4000"
                                   data-enable-mentions="true"
-                                  data-rich-text="true">@Html.Raw(EscapeTextareaValue(announcementMarkup))</textarea>
+                                  data-rich-text="true"
+                                  data-initial-html="@announcementInitialHtml">@Html.Raw(EscapeTextareaValue(announcementMarkup))</textarea>
                         <div class="form-text">Use the toolbar for bold, italic, underline, lists, and quotes. Markdown shortcuts also work.</div>
                     </div>
                     @if (Model.Announcement.Attachments.Any())
