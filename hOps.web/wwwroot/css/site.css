@@ -716,7 +716,7 @@ body.sidebar-collapsed .sidebar-inner {
 }
 
 .table thead th {
-    background: var(--theme-gradient);
+    background: #f5f7ff;
     color: #0f172a;
     border-bottom: 1px solid rgba(15, 23, 42, 0.05);
 }
