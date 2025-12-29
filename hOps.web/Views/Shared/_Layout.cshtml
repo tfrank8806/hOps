@@ -293,7 +293,7 @@
                             }
 
                             <li class="nav-item dropdown me-2" id="bookmarkMenu">
-                                <a class="nav-link position-relative bookmark-toggle" href="#" role="button" id="bookmarkMenuToggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Quick bookmarks">
+                                <a class="nav-link position-relative bookmark-toggle" href="@Url.Action("Index", "Bookmarks")" id="bookmarkMenuToggle" aria-expanded="false" aria-label="Quick bookmarks">
                                     <svg class="bookmark-toggle-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                         <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                                     </svg>
@@ -648,19 +648,20 @@
             const bookmarkMenu = document.getElementById('bookmarkMenu');
             const bookmarkMenuContent = document.getElementById('bookmarkMenuContent');
 
-            if (bookmarkMenu && bookmarkMenuContent && window.bootstrap) {
-                const toggle = bookmarkMenu.querySelector('[data-bs-toggle="dropdown"]');
-                const dropdown = toggle ? bootstrap.Dropdown.getOrCreateInstance(toggle, { autoClose: true }) : null;
+            if (bookmarkMenu && bookmarkMenuContent) {
+                const toggle = document.getElementById('bookmarkMenuToggle');
+                const dropdownMenu = bookmarkMenu.querySelector('.dropdown-menu');
                 let bookmarksLoaded = false;
                 let bookmarksLoading = false;
                 const allBookmarksButton = bookmarkMenu.querySelector('[data-all-bookmarks-toggle]');
                 const allBookmarksModalElement = document.getElementById('allBookmarksModal');
                 const allBookmarksContent = document.getElementById('allBookmarksContent');
-                const allBookmarksModal = allBookmarksModalElement
+                const allBookmarksModal = allBookmarksModalElement && window.bootstrap
                     ? bootstrap.Modal.getOrCreateInstance(allBookmarksModalElement)
                     : null;
                 let allBookmarksLoaded = false;
                 let allBookmarksLoading = false;
+                let hoverHideTimer;
 
                 const escapeHtml = (value) => {
                     const div = document.createElement('div');
@@ -852,33 +853,38 @@
                     }
                 };
 
-                const showBookmarkDropdown = () => {
-                    if (dropdown) {
-                        dropdown.show();
-                        loadBookmarks();
+                const setDropdownVisibility = (visible) => {
+                    if (!dropdownMenu) {
+                        return;
                     }
+                    dropdownMenu.classList.toggle('show', visible);
+                    bookmarkMenu.classList.toggle('show', visible);
+                    toggle?.setAttribute('aria-expanded', visible ? 'true' : 'false');
                 };
 
-                const hideBookmarkDropdown = () => {
-                    if (dropdown) {
-                        dropdown.hide();
-                    }
+                const showBookmarkDropdown = () => {
+                    clearTimeout(hoverHideTimer);
+                    setDropdownVisibility(true);
+                    loadBookmarks();
+                };
+
+                const scheduleHideDropdown = () => {
+                    clearTimeout(hoverHideTimer);
+                    hoverHideTimer = setTimeout(() => {
+                        if (!bookmarkMenu.matches(':hover') && document.activeElement !== toggle) {
+                            setDropdownVisibility(false);
+                        }
+                    }, 180);
                 };
 
                 bookmarkMenu.addEventListener('mouseenter', showBookmarkDropdown);
-                bookmarkMenu.addEventListener('mouseleave', () => {
-                    setTimeout(() => {
-                        if (!bookmarkMenu.matches(':hover')) {
-                            hideBookmarkDropdown();
-                        }
-                    }, 200);
-                });
-
-                toggle?.addEventListener('click', () => loadBookmarks());
+                bookmarkMenu.addEventListener('mouseleave', scheduleHideDropdown);
+                toggle?.addEventListener('focus', showBookmarkDropdown);
+                toggle?.addEventListener('blur', scheduleHideDropdown);
 
                 allBookmarksButton?.addEventListener('click', async (event) => {
                     event.preventDefault();
-                    dropdown?.hide();
+                    setDropdownVisibility(false);
                     if (allBookmarksModal) {
                         allBookmarksModal.show();
                     }
