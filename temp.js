@@ -1,0 +1,1 @@
+const fs=require("fs"); const text=fs.readFileSync("hOps.web/Views/WorkOrders/Index.cshtml","utf8"); const idx=text.indexOf("Work Orders (@"); console.log(idx); console.log(text.slice(idx-60, idx+20));
