@@ -544,6 +544,7 @@
                 const snapshot = getCurrentLayout();
                 if (layoutHasCustomHeight(snapshot)) {
                     persistStoredLayout(snapshot);
+                    syncLayoutFromCache(snapshot);
                 }
             };
 
