@@ -592,6 +592,16 @@ body.sidebar-collapsed .sidebar-inner {
     margin-inline: auto;
 }
 
+.main-header {
+    position: sticky;
+    top: 0;
+    z-index: 1200;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
 .content-surface {
     background: var(--theme-surface-bg);
     border-radius: 1.35rem;
