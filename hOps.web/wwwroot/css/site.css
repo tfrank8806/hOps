@@ -602,6 +602,19 @@ body.sidebar-collapsed .sidebar-inner {
     border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 }
 
+.logo-mark {
+    gap: 0.25rem;
+    text-align: center;
+}
+
+.logo-mark__image {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.25);
+    object-fit: cover;
+}
+
 .content-surface {
     background: var(--theme-surface-bg);
     border-radius: 1.35rem;
