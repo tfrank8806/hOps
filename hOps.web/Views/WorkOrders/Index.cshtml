@@ -10,7 +10,7 @@
 
 @{
     ViewData["Title"] = "Work Orders";
-    ViewData["MainContainerClass"] = "main-inner--wide";
+    ViewData["MainContainerClass"] = "main-inner--wide main-inner--wide-stretched";
 
     bool showPropertySelector = Model.PropertyOptions.Count > 1;
     var formAction = Model.IsEditing ? "Edit" : "Create";
@@ -514,7 +514,7 @@
                         </a>
                     </div>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive workorders-table-wrapper">
                     <table class="table table-hover align-middle mb-0 workorders-table">
                         <colgroup>
                             <col class="col-actions" />

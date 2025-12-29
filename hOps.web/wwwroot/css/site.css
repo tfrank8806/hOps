@@ -592,6 +592,11 @@ body.sidebar-collapsed .sidebar-inner {
     margin-inline: auto;
 }
 
+.main-inner--wide-stretched {
+    max-width: none;
+    width: min(1720px, 100%);
+}
+
 .main-header {
     position: sticky;
     top: 0;
@@ -723,6 +728,48 @@ body.sidebar-collapsed .sidebar-inner {
 .modal-footer {
     border-top: 1px solid rgba(15, 23, 42, 0.05);
     background: radial-gradient(circle at top, rgba(255, 255, 255, 0.96), rgba(241, 245, 255, 0.9));
+}
+
+.workorders-table-wrapper {
+    overflow-x: visible;
+}
+
+.workorders-table {
+    table-layout: fixed;
+    min-width: 100%;
+}
+
+.workorders-table .col-actions {
+    width: 140px;
+}
+
+.workorders-table .col-status {
+    width: 150px;
+}
+
+.workorders-table .col-location {
+    width: 200px;
+}
+
+.workorders-table .col-department,
+.workorders-table .col-type {
+    width: 160px;
+}
+
+.workorders-table .col-issue {
+    width: 300px;
+}
+
+.workorders-table .col-due,
+.workorders-table .col-created,
+.workorders-table .col-attachments {
+    width: 150px;
+}
+
+.workorders-table .workorder-issue {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .badge {
