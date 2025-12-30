@@ -61,14 +61,43 @@
         </div>
     }
 
-    <div class="home-layout-controls d-flex flex-wrap gap-3 mb-3">
+    <div class="home-layout-controls d-flex flex-wrap gap-3 mb-3 align-items-center">
         <div class="d-flex gap-2 align-items-center flex-wrap">
             <button type="button" class="btn btn-outline-secondary" data-layout-action="start">Customize Layout</button>
             <div class="btn-group d-none" data-layout-editor>
                 <button type="button" class="btn btn-primary" data-layout-action="save">Save Layout</button>
                 <button type="button" class="btn btn-outline-secondary" data-layout-action="cancel">Cancel</button>
             </div>
-            <div class="text-muted small d-none" data-layout-hint>Drag cards to reorder. Drag the corner handle to adjust width and height.</div>
+            <button type="button" class="btn btn-link p-0 text-decoration-none" data-layout-help>
+                <span class="me-1" aria-hidden="true">💡</span>Layout tips
+            </button>
+        </div>
+        <div class="text-muted" data-layout-hint>
+            Drag cards to reorder. Use the resize handle or height slider to change dimensions.
+        </div>
+    </div>
+
+    <div class="modal fade" id="layoutHelpModal" tabindex="-1" aria-labelledby="layoutHelpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5" id="layoutHelpModalLabel">Customize your dashboard</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ol class="mb-3">
+                        <li>Click <strong>Customize Layout</strong> to unlock drag &amp; resize controls.</li>
+                        <li>Use the <em>six-dot</em> handle to drag widgets into a new order.</li>
+                        <li>Grab the corner handle or adjust the Height slider for precise sizing.</li>
+                        <li>Widgets snap to a 12-column grid—Full = 12, Half = 6, etc.</li>
+                        <li>Press <strong>Save Layout</strong> to keep changes or <strong>Cancel</strong> to revert.</li>
+                    </ol>
+                    <p class="mb-0 text-muted">Tip: your layout is remembered per persona. Switching personas gives each team its own arrangement.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Got it</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -275,6 +304,12 @@
         const saveButton = document.querySelector('[data-layout-action="save"]');
         const cancelButton = document.querySelector('[data-layout-action="cancel"]');
         const hint = document.querySelector('[data-layout-hint]');
+        const helpButton = document.querySelector('[data-layout-help]');
+        const layoutHelpModalElement = document.getElementById('layoutHelpModal');
+        const layoutHelpModal = layoutHelpModalElement && window.bootstrap
+            ? bootstrap.Modal.getOrCreateInstance(layoutHelpModalElement)
+            : null;
+        const layoutTipsStorageKey = 'homeLayoutTipsShown';
         const marketplace = document.querySelector('[data-widget-marketplace]');
         const sizeOptions = (() => {
             try {
@@ -576,6 +611,48 @@
             return form?.querySelector('input[name="__RequestVerificationToken"]')?.value;
         };
 
+        const getClientStorage = () => {
+            try {
+                return window.localStorage ?? window.sessionStorage ?? null;
+            } catch {
+                return null;
+            }
+        };
+
+        const hasSeenLayoutTips = () => {
+            const storage = getClientStorage();
+            if (!storage) {
+                return false;
+            }
+            try {
+                return storage.getItem(layoutTipsStorageKey) === '1';
+            } catch {
+                return false;
+            }
+        };
+
+        const markLayoutTipsSeen = () => {
+            const storage = getClientStorage();
+            if (!storage) {
+                return;
+            }
+            try {
+                storage.setItem(layoutTipsStorageKey, '1');
+            } catch {
+                // ignore
+            }
+        };
+
+        const showLayoutTips = (skipRecord = false) => {
+            if (!layoutHelpModal) {
+                return;
+            }
+            if (!skipRecord && !hasSeenLayoutTips()) {
+                markLayoutTipsSeen();
+            }
+            layoutHelpModal.show();
+        };
+
         async function syncLayoutFromCache(layout) {
             if (!Array.isArray(layout) || layout.length === 0) {
                 return;
@@ -798,6 +875,9 @@
         startButton?.addEventListener('click', () => {
             originalLayout = getCurrentLayout();
             setEditingState(true);
+            if (!hasSeenLayoutTips()) {
+                showLayoutTips();
+            }
         });
 
         cancelButton?.addEventListener('click', () => {
@@ -838,6 +918,12 @@
             }
             catch {
                 alert('Unable to save your layout changes. Please try again.');
+            }
+        });
+        helpButton?.addEventListener('click', (event) => {
+            event.preventDefault();
+            if (layoutHelpModal) {
+                layoutHelpModal.show();
             }
         });
     })();
