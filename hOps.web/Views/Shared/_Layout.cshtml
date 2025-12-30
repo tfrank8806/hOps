@@ -84,7 +84,13 @@
         <aside id="sidebar" class="sidebar bg-white border-end">
             <div class="sidebar-inner">
                 <div class="sidebar-brand d-flex align-items-center justify-content-between mb-4">
-                    <a class="sidebar-title text-decoration-none fw-semibold" asp-controller="Home" asp-action="Index">GuestQuest - hOps</a>
+                    <a class="brand-lockup text-decoration-none" asp-controller="Home" asp-action="Index">
+                        <img src="~/favicon.png" alt="GuestQuest logo mark" class="brand-lockup__mark" asp-append-version="true" />
+                        <span class="brand-lockup__text">
+                            <span class="brand-lockup__title">GuestQuest</span>
+                            <span class="brand-lockup__subtitle">hOps</span>
+                        </span>
+                    </a>
                     <button class="sidebar-toggle d-lg-none" type="button" aria-label="Toggle navigation" aria-expanded="true">
                         <span class="sidebar-toggle-icon" aria-hidden="true">
                             <svg class="icon-collapse" viewBox="0 0 24 24" fill="currentColor">
@@ -241,8 +247,12 @@
             <header class="main-header">
                 <div class="container-fluid py-2 d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center gap-3">
-                        <a class="logo-mark d-flex flex-column align-items-center" href="@Url.Action("Index", "Home")">
-                            <img src="~/favicon.png" alt="hOps logo" class="logo-mark__image" asp-append-version="true" />
+                        <a class="brand-lockup text-decoration-none" href="@Url.Action("Index", "Home")">
+                            <img src="~/favicon.png" alt="GuestQuest logo" class="brand-lockup__mark" asp-append-version="true" />
+                            <span class="brand-lockup__text">
+                                <span class="brand-lockup__title">GuestQuest</span>
+                                <span class="brand-lockup__subtitle">hOps</span>
+                            </span>
                         </a>
                         <button class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="true">
                             <span class="sidebar-toggle-icon" aria-hidden="true">
