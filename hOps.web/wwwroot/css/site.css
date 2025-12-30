@@ -744,7 +744,7 @@ body.sidebar-collapsed .sidebar-inner {
 }
 
 .workorders-table .col-status {
-    width: 150px;
+    width: 120px;
 }
 
 .workorders-table .col-location {
@@ -753,17 +753,17 @@ body.sidebar-collapsed .sidebar-inner {
 
 .workorders-table .col-department,
 .workorders-table .col-type {
-    width: 160px;
+    width: 140px;
 }
 
 .workorders-table .col-issue {
-    width: 300px;
+    width: 240px;
 }
 
 .workorders-table .col-due,
 .workorders-table .col-created,
 .workorders-table .col-attachments {
-    width: 150px;
+    width: 180px;
 }
 
 .workorders-table .workorder-issue {

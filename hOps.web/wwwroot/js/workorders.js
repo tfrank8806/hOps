@@ -5,6 +5,11 @@
     }
 
     const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    const attachmentsModalEl = document.getElementById('workOrderAttachmentsModal');
+    const attachmentsModal = attachmentsModalEl ? bootstrap.Modal.getOrCreateInstance(attachmentsModalEl) : null;
+    const attachmentsModalBody = attachmentsModalEl?.querySelector('[data-attachments-modal-body]');
+    const attachmentsModalEmpty = attachmentsModalEl?.querySelector('[data-attachments-modal-empty]');
+    const attachmentsModalTitle = attachmentsModalEl?.querySelector('[data-attachments-modal-title]');
     const fields = {
         title: modalEl.querySelector('[data-workorder-field="title"]'),
         meta: modalEl.querySelector('[data-workorder-field="meta"]'),
@@ -49,7 +54,13 @@
             evt.preventDefault();
             evt.stopPropagation();
             const row = trigger.closest('.workorder-row');
-            if (row) {
+            if (!row) {
+                return;
+            }
+            const action = trigger.dataset.workorderTrigger;
+            if (action === 'attachments') {
+                showAttachmentPreview(row);
+            } else {
                 showRowDetails(row);
             }
         });
@@ -184,8 +195,81 @@
                 col.appendChild(actions);
             }
 
-            attachmentsContainer.appendChild(col);
+        attachmentsContainer.appendChild(col);
+    });
+}
+
+    function showAttachmentPreview(row) {
+        if (!attachmentsModal || !attachmentsModalBody || !attachmentsModalEmpty) {
+            showRowDetails(row);
+            return;
+        }
+
+        const payloadRaw = row.dataset.workorder;
+        if (!payloadRaw) {
+            return;
+        }
+
+        let data;
+        try {
+            data = JSON.parse(payloadRaw);
+        } catch {
+            return;
+        }
+
+        const attachments = Array.isArray(data.attachments) ? data.attachments.filter(att => att && att.url) : [];
+        if (attachments.length === 0) {
+            showRowDetails(row);
+            return;
+        }
+
+        attachmentsModalBody.innerHTML = '';
+        attachmentsModalTitle.textContent = data.issue || 'Work Order Attachments';
+
+        attachments.forEach(att => {
+            const col = document.createElement('div');
+            col.className = 'col-12 col-sm-6';
+
+            if (att.isImage) {
+                const link = document.createElement('a');
+                link.href = att.url;
+                link.target = '_blank';
+                link.rel = 'noopener';
+                link.className = 'd-block';
+
+                const img = document.createElement('img');
+                img.src = att.url;
+                img.alt = att.name || 'Attachment preview';
+                img.className = 'img-fluid rounded shadow-sm';
+                img.loading = 'lazy';
+
+                link.appendChild(img);
+                col.appendChild(link);
+            } else {
+                const card = document.createElement('div');
+                card.className = 'border rounded p-3 h-100 d-flex flex-column gap-2';
+
+                const title = document.createElement('div');
+                title.className = 'fw-semibold';
+                title.textContent = att.name || 'Attachment';
+                card.appendChild(title);
+
+                const link = document.createElement('a');
+                link.href = att.url;
+                link.target = '_blank';
+                link.rel = 'noopener';
+                link.className = 'btn btn-sm btn-outline-primary align-self-start';
+                link.textContent = 'Open File';
+                card.appendChild(link);
+
+                col.appendChild(card);
+            }
+
+            attachmentsModalBody.appendChild(col);
         });
+
+        attachmentsModalEmpty.classList.toggle('d-none', attachmentsModalBody.children.length > 0);
+        attachmentsModal.show();
     }
 
     function isInteractiveTarget(target) {
