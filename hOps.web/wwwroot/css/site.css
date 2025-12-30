@@ -8,7 +8,10 @@ body {
     margin: 0;
     background: var(--brand-page-bg, linear-gradient(180deg, #f3f8ff 0%, #eaf1fb 60%, #dde6f5 100%));
     color: var(--brand-text, #1f2739);
+    font-size: var(--font-body-size);
+    line-height: var(--font-body-line);
 }
+
 
 :root {
     --sidebar-width: 260px;
@@ -33,6 +36,16 @@ body {
     --brand-sidebar-border: rgba(9, 118, 179, 0.18);
     --brand-primary-soft: rgba(10, 158, 229, 0.13);
     --brand-page-bg: linear-gradient(180deg, #f3f8ff 0%, #eaf1fb 60%, #dde6f5 100%);
+    --font-body-size: 0.96rem;
+    --font-body-line: 1.5;
+    --font-heading-1: 2.15rem;
+    --font-heading-2: 1.8rem;
+    --font-heading-3: 1.45rem;
+    --font-heading-4: 1.25rem;
+    --font-heading-5: 1.05rem;
+    --font-heading-6: 0.92rem;
+    --space-card: 1.5rem;
+    --space-card-inner: 1.25rem;
 }
 
 .layout-wrapper {
@@ -42,6 +55,30 @@ body {
     min-height: 100vh;
     width: 100%;
     background-color: inherit;
+}
+
+h1, .h1,
+h2, .h2,
+h3, .h3,
+h4, .h4,
+h5, .h5,
+h6, .h6 {
+    font-weight: 700;
+    color: var(--brand-heading);
+    margin-bottom: 0.65rem;
+    line-height: 1.2;
+}
+
+h1, .h1 { font-size: var(--font-heading-1); }
+h2, .h2 { font-size: var(--font-heading-2); }
+h3, .h3 { font-size: var(--font-heading-3); }
+h4, .h4 { font-size: var(--font-heading-4); }
+h5, .h5 { font-size: var(--font-heading-5); }
+h6, .h6 { font-size: var(--font-heading-6); }
+
+p, li, td, th, .card, .table, .home-widget-card {
+    font-size: var(--font-body-size);
+    line-height: var(--font-body-line);
 }
 
 .sidebar {
@@ -636,7 +673,7 @@ body.sidebar-collapsed .sidebar-inner {
 .content-surface {
     background: var(--brand-surface);
     border-radius: 1.25rem;
-    padding: 2rem;
+    padding: var(--space-card);
     box-shadow: var(--brand-shadow);
     border: 1px solid var(--brand-border);
 }
@@ -653,10 +690,17 @@ body.sidebar-collapsed .sidebar-inner {
     background: transparent;
     border-bottom: 1px solid var(--brand-border);
     color: var(--brand-heading);
+    padding: 0.85rem var(--space-card-inner) 0.65rem var(--space-card-inner);
 }
 
 .card-body {
     color: var(--brand-text);
+    padding: var(--space-card-inner);
+}
+
+.table {
+    font-size: var(--font-body-size);
+    line-height: var(--font-body-line);
 }
 
 .btn-primary {
@@ -1149,8 +1193,8 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     max-height: var(--widget-height, 300px);
     display: flex;
     flex-direction: column;
-    font-size: 0.92rem;
-    line-height: 1.35;
+    font-size: var(--font-body-size);
+    line-height: var(--font-body-line);
 }
 
 .home-widget-card--fill {
@@ -1160,14 +1204,16 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 .home-widget-card__header {
     flex: 0 0 auto;
-    padding-bottom: 0.4rem;
-    font-size: 0.95rem;
+    padding-bottom: 0.5rem;
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
+    font-size: var(--font-heading-6);
 }
 
 .home-widget-card__body {
     flex: 1 1 auto;
     overflow-y: auto;
-    padding-top: 0.35rem;
+    padding-top: 0.75rem;
 }
 
 .home-widget__editor {
