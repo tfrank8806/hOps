@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -156,8 +155,6 @@ namespace hOps.web.Controllers
             }
 
             var propertyId = currentProperty.Id;
-            await EnsureWorkOrderEscalationsAsync(currentProperty, user);
-
             await PopulateAnnouncementAsync(viewModel, propertyId);
             await PopulateBulletinAsync(viewModel, propertyId, user, roleSet);
             await PopulateRoomTilesAsync(viewModel, propertyId);
@@ -966,87 +963,6 @@ namespace hOps.web.Controllers
                     DetailUrl = entry.DetailUrl
                 };
             }).ToList();
-        }
-
-        private async Task EnsureWorkOrderEscalationsAsync(Property property, ApplicationUser actor)
-        {
-            var propertyId = property.Id;
-            var now = DateTime.UtcNow;
-
-            var overdueOrders = await _context.WorkOrders
-                .Include(wo => wo.Properties)
-                .Where(wo =>
-                    (wo.Status == "New" || wo.Status == "In Progress" || wo.Status == "Escalated") &&
-                    wo.DueDate < now &&
-                    wo.Properties.Any(p => p.PropertyId == propertyId))
-                .Select(wo => new
-                {
-                    wo.Id,
-                    wo.Issue,
-                    wo.Location,
-                    wo.DueDate
-                })
-                .AsNoTracking()
-                .ToListAsync();
-
-            if (!overdueOrders.Any())
-            {
-                return;
-            }
-
-            var summaryDate = now.Date;
-            var summaryTitle = $"[Auto] Work Order Escalations - {summaryDate:yyyy-MM-dd}";
-            var propertyName = string.IsNullOrWhiteSpace(property.Name)
-                ? $"Property #{property.Id}"
-                : property.Name;
-
-            var builder = new StringBuilder();
-            builder.AppendLine($"Daily recap for {propertyName} - {summaryDate:MMMM d, yyyy}");
-            builder.AppendLine();
-
-            foreach (var order in overdueOrders.OrderBy(o => o.DueDate))
-            {
-                builder.Append($"- Work order #{order.Id} \"{order.Issue}\"");
-                if (!string.IsNullOrWhiteSpace(order.Location))
-                {
-                    builder.Append($" at {order.Location}");
-                }
-
-                builder.AppendLine($" (Due {order.DueDate:g})");
-            }
-
-            var summaryBody = builder.ToString();
-
-            var existingSummary = await _context.PassOnLogs
-                .Include(log => log.Properties)
-                .FirstOrDefaultAsync(log =>
-                    log.Title == summaryTitle &&
-                    log.Properties.Any(lp => lp.PropertyId == propertyId));
-
-            if (existingSummary == null)
-            {
-                var log = new PassOnLog
-                {
-                    Title = summaryTitle,
-                    Body = summaryBody,
-                    CreatedAt = now,
-                    CreatedById = actor.Id
-                };
-                log.Properties.Add(new PassOnLogProperty { PropertyId = propertyId });
-                _context.PassOnLogs.Add(log);
-            }
-            else
-            {
-                existingSummary.Body = summaryBody;
-                existingSummary.UpdatedAt = now;
-
-                if (!existingSummary.Properties.Any(lp => lp.PropertyId == propertyId))
-                {
-                    existingSummary.Properties.Add(new PassOnLogProperty { PropertyId = propertyId });
-                }
-            }
-
-            await _context.SaveChangesAsync();
         }
 
         private async Task PopulateLostFoundAsync(HomeIndexViewModel viewModel, int propertyId)
