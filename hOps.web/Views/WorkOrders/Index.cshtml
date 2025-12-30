@@ -117,8 +117,11 @@
         var url = Url.Action("Index") + builder.ToQueryString();
         var indicator = isAsc ? "↑" : isDesc ? "↓" : string.Empty;
         var classes = $"sortable-header {(isAsc || isDesc ? "active" : string.Empty)}";
+        var indicatorMarkup = string.IsNullOrEmpty(indicator)
+            ? string.Empty
+            : $"<span class=\"sort-indicator\">{indicator}</span>";
 
-        return new HtmlString($"<a class=\"{classes}\" href=\"{url}\">{label}<span class=\"sort-indicator\">{indicator}</span></a>");
+        return new HtmlString($"<a class=\"{classes}\" href=\"{url}\">{label}{indicatorMarkup}</a>");
     }
 
     private static bool IsImageAttachment(string? fileName)
