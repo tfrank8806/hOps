@@ -1,0 +1,300 @@
+
+        .room-tile-overlay.room-tile--connector[data-shape-data="horizontal"] .tile-label {
+            transform: rotate(calc(var(--tile-text-rotation, 0deg) + 90deg));
+        }
+
+        .room-tile-overlay.room-tile--custom {
+            border: 2px dashed rgba(13, 110, 253, 0.4);
+            background-color: transparent;
+            color: #0f2e61;
+        }
+
+        .room-tile-overlay.room-tile--workorder {
+            border-color: rgba(220, 53, 69, 0.85);
+            background-color: rgba(220, 53, 69, 0.12);
+        }
+
+        .room-tile-overlay.room-tile--lostfound {
+            border-color: rgba(255, 193, 7, 0.75);
+            background-color: rgba(255, 193, 7, 0.12);
+        }
+
+        .room-tile-overlay:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 14px rgba(15, 46, 97, 0.18);
+        }
+
+        .room-tile-overlay[data-navigate-url]:not([data-navigate-url=""]) {
+            cursor: pointer;
+        }
+
+        .tile-badges--overlay {
+            justify-content: center;
+            gap: 0.25rem;
+        }
+
+        .tile-badges--overlay .badge {
+            font-size: 0.7rem;
+            padding: 0.3rem 0.55rem;
+        }
+
+        .tile-header {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 0.35rem;
+            text-align: center;
+        }
+
+        .tile-room {
+            font-weight: 600;
+            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            text-align: center;
+            line-height: 1.2;
+            word-break: break-word;
+            transform: rotate(var(--tile-text-rotation, 0deg));
+            transform-origin: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tile-type {
+            font-size: 0.85rem;
+            color: #64748b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tile-badges {
+            display: flex;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+        }
+
+        .room-tile-overlay--actionable,
+        .room-tile--actionable {
+            cursor: pointer;
+        }
+
+        .room-tile-overlay--active,
+        .room-tile--active {
+            outline: 3px solid rgba(13, 110, 253, 0.35);
+            box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.15);
+        }
+
+        .layout-room-menu {
+            position: absolute;
+            min-width: 300px;
+            max-width: 360px;
+            background: #fff;
+            border-radius: 0.85rem;
+            border: 1px solid rgba(15, 46, 97, 0.12);
+            box-shadow: 0 24px 50px rgba(15, 46, 97, 0.2);
+            padding: 1rem;
+            display: none;
+            z-index: 1300;
+            max-height: min(70vh, 480px);
+            overflow-y: auto;
+        }
+
+        .layout-room-menu.show {
+            display: block;
+        }
+
+        .layout-room-menu__title {
+            font-weight: 600;
+            font-size: 1.05rem;
+        }
+
+        .layout-room-menu__section {
+            margin-bottom: 0.85rem;
+        }
+
+        .layout-room-menu__section-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #0f2e61;
+            margin-bottom: 0.35rem;
+        }
+
+        .layout-room-menu__workorder-list li + li {
+            margin-top: 0.6rem;
+            padding-top: 0.55rem;
+            border-top: 1px dashed rgba(148, 163, 184, 0.35);
+        }
+
+        .layout-room-menu__workorder-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .layout-room-menu__workorder-icon {
+            width: 0.8rem;
+            height: 0.8rem;
+            border-radius: 999px;
+            background: var(--dept-color, #dc3545);
+            display: inline-flex;
+            align-self: center;
+            flex-shrink: 0;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+        }
+
+        .layout-room-menu__workorder-link:hover,
+        .layout-room-menu__workorder-link:focus {
+            color: #0d6efd;
+            text-decoration: none;
+        }
+
+        .layout-room-menu__workorder-link small {
+            font-size: 0.75rem;
+        }
+
+        .layout-room-menu__actions .btn {
+            flex: 1 1 auto;
+        }
+
+        .widget-dept-dot {
+            width: 0.55rem;
+            height: 0.55rem;
+            border-radius: 999px;
+            background-color: var(--dept-color, #0d6efd);
+            display: inline-flex;
+            flex-shrink: 0;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6);
+        }
+
+        @@media (max-width: 575.98px) {
+            .layout-room-menu {
+                width: calc(100% - 2rem);
+                left: 1rem !important;
+                right: 1rem;
+            }
+        }
+
+        .legend-swatch {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            margin-right: 4px;
+        }
+
+        .legend-swatch.workorder {
+            background-color: rgba(220, 53, 69, 0.75);
+        }
+
+        .legend-swatch.lostfound {
+            background-color: rgba(255, 193, 7, 0.75);
+        }
+
+        .widget-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .widget-item {
+            padding-bottom: 0.75rem;
+            border-bottom: 1px dashed rgba(148, 163, 184, 0.35);
+        }
+
+        .widget-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+    </style>
+}
+
+@section Scripts {
+    <script>
+        (() => {
+            const overlayView = document.getElementById('layoutOverlayView');
+            const perFloorView = document.getElementById('layoutFloorView');
+            const viewRadios = document.querySelectorAll('input[name="layoutViewMode"]');
+
+            if (!overlayView && !perFloorView) {
+                return;
+            }
+
+            const floorSections = document.querySelectorAll('.layout-floor-section');
+
+            const setActiveFloor = (floorValue) => {
+                floorSections.forEach(section => {
+                    if (!(section instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const shouldHide = section.dataset.floor !== floorValue;
+                    section.classList.toggle('d-none', shouldHide);
+                });
+            };
+
+            const applySelectedView = () => {
+                const selected = document.querySelector('input[name="layoutViewMode"]:checked');
+                if (!selected) {
+                    return;
+                }
+
+                if (selected.value === 'all') {
+                    overlayView?.classList.remove('d-none');
+                    perFloorView?.classList.add('d-none');
+                } else {
+                    overlayView?.classList.add('d-none');
+                    perFloorView?.classList.remove('d-none');
+                    setActiveFloor(selected.value);
+                }
+            };
+
+            viewRadios.forEach(radio => {
+                radio.addEventListener('change', () => {
+                    if (radio.checked) {
+                        applySelectedView();
+                    }
+                });
+            });
+
+            applySelectedView();
+
+            const clickableTiles = document.querySelectorAll('.room-tile-overlay, .layout-floor-section .room-tile');
+            const layoutWidget = document.getElementById('layoutWidget');
+            const propertyId = Number(layoutWidget?.dataset.propertyId || '0');
+            const summaryUrl = layoutWidget?.dataset.roomSummaryUrl || '';
+            const createUrl = layoutWidget?.dataset.roomCreateUrl || '';
+            const workOrdersUrl = layoutWidget?.dataset.workordersUrl || '';
+            const roomMenu = document.getElementById('layoutRoomMenu');
+            if (roomMenu && roomMenu.parentElement !== document.body) {
+                document.body.appendChild(roomMenu);
+            }
+
+            const roomMenuTitle = roomMenu?.querySelector('[data-room-name]');
+            const roomMenuFloor = roomMenu?.querySelector('[data-room-floor]');
+            const roomMenuList = roomMenu?.querySelector('[data-room-workorders]');
+            const viewOrdersLink = roomMenu?.querySelector('[data-view-workorders]');
+            const createWorkOrderButton = roomMenu?.querySelector('[data-create-workorder]');
+            const closeMenuButton = roomMenu?.querySelector('[data-close-room-menu]');
+
+            const workOrderForm = document.getElementById('layoutWorkOrderForm');
+            const formStatus = workOrderForm?.querySelector('[data-form-status]');
+            const roomDisplay = workOrderForm?.querySelector('[data-room-display]');
+            const dueDateInput = workOrderForm?.querySelector('input[name="DueDate"]');
+            const issueInput = workOrderForm?.querySelector('textarea[name="Issue"]');
+            const detailsInput = workOrderForm?.querySelector('textarea[name="Details"]');
+            const propertyInput = workOrderForm?.querySelector('input[name="PropertyId"]');
+            const roomNumberInput = workOrderForm?.querySelector('input[name="RoomNumber"]');
+            const roomLabelInput = workOrderForm?.querySelector('input[name="RoomLabel"]');
+            const tokenInput = workOrderForm?.querySelector('input[name="__RequestVerificationToken"]');
+            const modalEl = document.getElementById('layoutWorkOrderModal');
+
+            const resolveBootstrap = () => {
+                if (typeof window !== 'undefined' && window.bootstrap) {
+                    return window.bootstrap;
+                }

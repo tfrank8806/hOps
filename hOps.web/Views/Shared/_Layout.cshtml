@@ -867,6 +867,14 @@
                     toggle?.setAttribute('aria-expanded', visible ? 'true' : 'false');
                 };
 
+                const openAllBookmarksModal = async () => {
+                    setDropdownVisibility(false);
+                    if (allBookmarksModal) {
+                        allBookmarksModal.show();
+                    }
+                    await loadAllBookmarks(true);
+                };
+
                 const showBookmarkDropdown = () => {
                     clearTimeout(hoverHideTimer);
                     setDropdownVisibility(true);
@@ -886,14 +894,15 @@
                 bookmarkMenu.addEventListener('mouseleave', scheduleHideDropdown);
                 toggle?.addEventListener('focus', showBookmarkDropdown);
                 toggle?.addEventListener('blur', scheduleHideDropdown);
+                toggle?.addEventListener('click', async (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    await openAllBookmarksModal();
+                });
 
                 allBookmarksButton?.addEventListener('click', async (event) => {
                     event.preventDefault();
-                    setDropdownVisibility(false);
-                    if (allBookmarksModal) {
-                        allBookmarksModal.show();
-                    }
-                    await loadAllBookmarks(true);
+                    await openAllBookmarksModal();
                 });
             }
 

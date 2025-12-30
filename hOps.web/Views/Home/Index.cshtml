@@ -1522,29 +1522,41 @@
                     return [];
                 }
 
-                const baseNumber = tile.dataset.roomNumber?.trim();
+                const resolveIdentifier = (node) => {
+                    if (!(node instanceof HTMLElement)) {
+                        return null;
+                    }
+                    const nodeKey = node.dataset.locationKey?.trim();
+                    if (nodeKey && !nodeKey.startsWith('room:')) {
+                        return nodeKey;
+                    }
+                    const number = node.dataset.roomNumber?.trim();
+                    return number || null;
+                };
+
+                const baseIdentifier = resolveIdentifier(tile);
                 const locationKey = tile.dataset.locationKey?.trim();
                 const isOverlaySelection = tile.classList.contains('room-tile-overlay') && !overlayView?.classList.contains('d-none');
 
                 if (!isOverlaySelection || !locationKey) {
-                    return baseNumber ? [baseNumber] : [];
+                    return baseIdentifier ? [baseIdentifier] : [];
                 }
 
                 const selector = `[data-location-key="${escapeCssIdentifier(locationKey)}"]`;
                 const matches = document.querySelectorAll(selector);
-                const numbers = new Set();
+                const identifiers = new Set();
                 matches.forEach(node => {
-                    const number = node.dataset.roomNumber?.trim();
-                    if (number) {
-                        numbers.add(number);
+                    const identifier = resolveIdentifier(node);
+                    if (identifier) {
+                        identifiers.add(identifier);
                     }
                 });
 
-                if (numbers.size > 0) {
-                    return Array.from(numbers);
+                if (identifiers.size === 0 && baseIdentifier) {
+                    identifiers.add(baseIdentifier);
                 }
 
-                return baseNumber ? [baseNumber] : [];
+                return Array.from(identifiers);
             };
 
             const fetchRoomWorkOrders = async (roomIdentifiers) => {
