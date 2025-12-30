@@ -772,6 +772,11 @@ body.sidebar-collapsed .sidebar-inner {
     white-space: nowrap;
 }
 
+.workorders-form-card .card-header {
+    background: #f5f7ff;
+    color: #0f172a;
+}
+
 .badge {
     border-radius: 999px;
     padding: 0.35rem 0.75rem;
