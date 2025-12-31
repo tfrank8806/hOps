@@ -98,7 +98,7 @@
                             <span class="brand-lockup__subtitle">hOps</span>
                         </span>
                     </a>
-                    <button class="sidebar-toggle d-lg-none" type="button" aria-label="Toggle navigation" aria-expanded="true">
+                    <button class="sidebar-toggle d-lg-none" type="button" aria-label="Toggle navigation" aria-expanded="true" data-sidebar-toggle="true">
                         <span class="sidebar-toggle-icon" aria-hidden="true">
                             <svg class="icon-collapse" viewBox="0 0 24 24" fill="currentColor">
                                 <polygon points="14 5 8 12 14 19" />
@@ -245,6 +245,7 @@
         <button type="button"
                 id="sidebarFabToggle"
                 class="sidebar-fab-toggle"
+                data-sidebar-toggle="true"
                 aria-controls="sidebar"
                 aria-expanded="true"
                 aria-label="Collapse navigation sidebar">
@@ -261,7 +262,7 @@
                                 <span class="brand-lockup__subtitle">hOps</span>
                             </span>
                         </a>
-                        <button class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="true">
+                        <button class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="true" data-sidebar-toggle="true">
                             <span class="sidebar-toggle-icon" aria-hidden="true">
                                 <svg class="icon-collapse" viewBox="0 0 24 24" fill="currentColor">
                                     <polygon points="14 5 8 12 14 19" />
@@ -404,6 +405,7 @@
             <button type="button"
                     id="todoSidebarRailToggle"
                     class="todo-sidebar-rail-toggle"
+                    data-todo-toggle="toggle"
                     aria-controls="todoSidebar"
                     aria-expanded="true"
                     aria-label="Collapse to-do sidebar">
@@ -616,7 +618,7 @@
     <div id="sidebarQuickMenu" class="sidebar-quick-menu" aria-hidden="true"></div>
     @if (showTodoSidebar)
     {
-        <div class="todo-sidebar-backdrop d-lg-none" id="todoSidebarBackdrop"></div>
+        <div class="todo-sidebar-backdrop d-lg-none" id="todoSidebarBackdrop" data-todo-toggle="collapse"></div>
     }
 
     @if (SignInManager.IsSignedIn(User))
@@ -1316,7 +1318,6 @@
             }
 
             sidebarToggles.forEach(btn => {
-                btn.addEventListener('click', toggleSidebar);
                 if (quickMenu && btn !== sidebarFabToggle) {
                     btn.addEventListener('mouseenter', () => {
                         cancelHideQuickMenu();
@@ -1328,6 +1329,25 @@
                         showQuickMenu(btn);
                     });
                     btn.addEventListener('blur', scheduleHideQuickMenu);
+                }
+            });
+
+            document.addEventListener('click', (event) => {
+                const sidebarTrigger = event.target.closest('[data-sidebar-toggle]');
+                if (sidebarTrigger) {
+                    event.preventDefault();
+                    toggleSidebar();
+                    return;
+                }
+                const todoTrigger = event.target.closest('[data-todo-toggle]');
+                if (todoTrigger) {
+                    event.preventDefault();
+                    const action = todoTrigger.dataset.todoToggle;
+                    if (action === 'collapse') {
+                        toggleTodoSidebar(true);
+                    } else {
+                        toggleTodoSidebar();
+                    }
                 }
             });
 
@@ -1572,14 +1592,6 @@
             }
 
             if (todoSidebar) {
-                todoToggleButtons.forEach(btn => {
-                    btn.addEventListener('click', () => toggleTodoSidebar());
-                });
-
-                if (todoBackdrop) {
-                    todoBackdrop.addEventListener('click', () => toggleTodoSidebar(true));
-                }
-
                 initialiseTodoSidebar();
 
                 if (todoMediaQuery.addEventListener) {
