@@ -196,10 +196,41 @@ body.sidebar-collapsed button.sidebar-toggle {
     text-transform: uppercase;
 }
 
+.main-header .nav-link {
+    border-radius: 0.75rem;
+}
+
+.main-header .nav-link:focus-visible,
+.main-header .nav-link.dropdown-toggle:focus-visible {
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(9, 118, 179, 0.2);
+    background-color: rgba(255, 255, 255, 0.85);
+}
+
 .bookmark-toggle-icon {
     width: 1.1rem;
     height: 1.1rem;
     display: block;
+}
+
+.bookmark-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bookmark-toggle:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.bookmark-toggle:focus-visible {
+    outline: 0;
+    background-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 0 0.2rem rgba(9, 118, 179, 0.3);
 }
 
 .bookmark-dropdown-menu {
@@ -672,11 +703,19 @@ body.sidebar-collapsed .sidebar-inner {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    padding-inline: 1.5rem;
 }
 
 .main-inner--wide {
     max-width: 1440px;
     margin-inline: auto;
+}
+
+@media (max-width: 991.98px) {
+    .main-inner,
+    .main-inner--wide {
+        padding-inline: 1rem;
+    }
 }
 
 .main-header {
