@@ -34,6 +34,8 @@ namespace hOps.web.Models
 
         public ICollection<Bookmark> CreatedBookmarks { get; set; } = new List<Bookmark>();
         public ICollection<BookmarkOrderPreference> BookmarkOrderPreferences { get; set; } = new List<BookmarkOrderPreference>();
+        public ICollection<BookmarkSectionGroup> BookmarkSectionGroups { get; set; } = new List<BookmarkSectionGroup>();
+        public ICollection<BookmarkSectionAssignment> BookmarkSectionAssignments { get; set; } = new List<BookmarkSectionAssignment>();
 
         public ICollection<DirectMessage> SentDirectMessages { get; set; } = new List<DirectMessage>();
         public ICollection<DirectMessage> ReceivedDirectMessages { get; set; } = new List<DirectMessage>();

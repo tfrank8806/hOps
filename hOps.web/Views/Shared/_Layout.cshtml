@@ -625,7 +625,10 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h1 class="modal-title fs-5" id="allBookmarksModalLabel">All Bookmarks</h1>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-add-bookmark-section>Add Section</button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
                     </div>
                     <div class="modal-body all-bookmarks-modal-body">
                         <div id="bookmarkOrderStatus" class="alert alert-success d-none small py-2" role="alert"></div>
@@ -690,6 +693,7 @@
                 let bookmarkOrderStatusTimer;
                 let dragSourceTile = null;
                 let orderSaveAbortController = null;
+                const addSectionButton = document.querySelector('[data-add-bookmark-section]');
 
                 const escapeHtml = (value) => {
                     const div = document.createElement('div');
@@ -758,6 +762,45 @@
                     }
                 };
 
+                const persistBookmarkSection = async (bookmarkId, sectionId) => {
+                    try {
+                        await fetch('/Bookmarks/AssignSection', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'RequestVerificationToken': antiForgeryToken || ''
+                            },
+                            body: JSON.stringify({
+                                bookmarkId,
+                                sectionId
+                            })
+                        });
+                    } catch (error) {
+                        console.error('Unable to update bookmark section', error);
+                        showBookmarkOrderStatus('danger', 'Unable to update bookmark section.');
+                    }
+                };
+
+                const getSectionIdFromGrid = (grid) => {
+                    const value = grid?.dataset.sectionId;
+                    if (!value) {
+                        return null;
+                    }
+                    const parsed = Number(value);
+                    return Number.isInteger(parsed) ? parsed : null;
+                };
+
+                const updateTileSectionData = (tile, sectionId) => {
+                    if (!(tile instanceof HTMLElement)) {
+                        return;
+                    }
+                    if (sectionId == null) {
+                        tile.dataset.sectionId = '';
+                        return;
+                    }
+                    tile.dataset.sectionId = sectionId.toString();
+                };
+
                 const handleDragStart = (event) => {
                     const tile = event.currentTarget;
                     dragSourceTile = tile;
@@ -804,6 +847,12 @@
                     } else {
                         grid.insertBefore(dragSourceTile, target.nextSibling);
                     }
+                    const targetSectionId = getSectionIdFromGrid(grid);
+                    const sourceSectionId = dragSourceTile.dataset.sectionId ? Number(dragSourceTile.dataset.sectionId) : null;
+                    updateTileSectionData(dragSourceTile, targetSectionId);
+                    if ((sourceSectionId ?? null) !== (targetSectionId ?? null)) {
+                        persistBookmarkSection(Number(dragSourceTile.dataset.bookmarkId), targetSectionId);
+                    }
                     persistBookmarkOrder();
                 };
 
@@ -813,7 +862,14 @@
                         return;
                     }
                     const grid = event.currentTarget;
+                    const grid = event.currentTarget;
                     grid.appendChild(dragSourceTile);
+                    const targetSectionId = getSectionIdFromGrid(grid);
+                    const sourceSectionId = dragSourceTile.dataset.sectionId ? Number(dragSourceTile.dataset.sectionId) : null;
+                    updateTileSectionData(dragSourceTile, targetSectionId);
+                    if ((sourceSectionId ?? null) !== (targetSectionId ?? null)) {
+                        persistBookmarkSection(Number(dragSourceTile.dataset.bookmarkId), targetSectionId);
+                    }
                     persistBookmarkOrder();
                 };
 
@@ -958,32 +1014,94 @@
                     return tile;
                 };
 
-                const renderAllBookmarks = (items) => {
+                const createBookmarkGrid = (bookmarks, sectionId) => {
+                    const grid = document.createElement('div');
+                    grid.className = 'bookmark-tiles-grid';
+                    grid.dataset.sectionId = sectionId != null ? sectionId.toString() : '';
+                    bookmarks.forEach(item => {
+                        const tile = createBookmarkTile(item);
+                        updateTileSectionData(tile, sectionId ?? null);
+                        grid.appendChild(tile);
+                    });
+                    initializeDragAndDrop(grid);
+                    return grid;
+                };
+
+                const createSectionBlock = (section) => {
+                    const wrapper = document.createElement('section');
+                    wrapper.className = 'bookmark-section-block';
+                    wrapper.dataset.sectionId = section.id?.toString() || '';
+
+                    const header = document.createElement('div');
+                    header.className = 'bookmark-section-header';
+
+                    const title = document.createElement('h3');
+                    title.className = 'bookmark-section-title';
+                    title.textContent = section.name || 'Section';
+                    header.appendChild(title);
+
+                    wrapper.appendChild(header);
+
+                    if (!Array.isArray(section.bookmarks) || section.bookmarks.length === 0) {
+                        const empty = document.createElement('p');
+                        empty.className = 'bookmark-section-empty mb-2';
+                        empty.textContent = 'No bookmarks yet. Drag one here.';
+                        wrapper.appendChild(empty);
+                    }
+
+                    wrapper.appendChild(createBookmarkGrid(Array.isArray(section.bookmarks) ? section.bookmarks : [], section.id));
+                    return wrapper;
+                };
+
+                const createUngroupedBlock = (bookmarks) => {
+                    const wrapper = document.createElement('section');
+                    wrapper.className = 'bookmark-section-block';
+
+                    const header = document.createElement('div');
+                    header.className = 'bookmark-section-header';
+
+                    const title = document.createElement('h3');
+                    title.className = 'bookmark-section-title';
+                    title.textContent = 'Ungrouped Bookmarks';
+                    header.appendChild(title);
+
+                    wrapper.appendChild(header);
+
+                    if (!Array.isArray(bookmarks) || bookmarks.length === 0) {
+                        const empty = document.createElement('p');
+                        empty.className = 'bookmark-section-empty mb-2';
+                        empty.textContent = 'Drag bookmarks here to keep them ungrouped.';
+                        wrapper.appendChild(empty);
+                    }
+
+                    wrapper.appendChild(createBookmarkGrid(Array.isArray(bookmarks) ? bookmarks : [], null));
+                    return wrapper;
+                };
+
+                const renderAllBookmarks = (payload) => {
                     if (!allBookmarksContent) {
                         return;
                     }
 
-                    if (!items.length) {
-                        if (bookmarkOrderStatus) {
-                            bookmarkOrderStatus.classList.add('d-none');
-                        }
+                    const sections = Array.isArray(payload?.sections) ? payload.sections : [];
+                    const ungrouped = Array.isArray(payload?.ungrouped) ? payload.ungrouped : [];
+
+                    if (!sections.length && !ungrouped.length) {
+                        bookmarkOrderStatus?.classList.add('d-none');
                         allBookmarksContent.innerHTML = '<div class="text-muted text-center py-4">No bookmarks yet.</div>';
                         return;
                     }
 
-                    const grid = document.createElement('div');
-                    grid.className = 'bookmark-tiles-grid';
-
-                    items.forEach(item => {
-                        grid.appendChild(createBookmarkTile(item));
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'bookmark-sections-wrapper';
+                    wrapper.appendChild(createUngroupedBlock(ungrouped));
+                    sections.forEach(section => {
+                        wrapper.appendChild(createSectionBlock(section));
                     });
 
                     allBookmarksContent.innerHTML = '';
-                    allBookmarksContent.appendChild(grid);
-                    initializeDragAndDrop(grid);
-                    if (bookmarkOrderStatus) {
-                        bookmarkOrderStatus.classList.add('d-none');
-                    }
+                    allBookmarksContent.appendChild(wrapper);
+                    bookmarkOrderStatus?.classList.add('d-none');
                 };
 
                 const loadBookmarks = async () => {
@@ -1021,8 +1139,7 @@
                             throw new Error('Request failed');
                         }
                         const data = await response.json();
-                        const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-                        renderAllBookmarks(items);
+                        renderAllBookmarks(data);
                         allBookmarksLoaded = true;
                     } catch (err) {
                         console.error('Unable to load all bookmarks', err);
@@ -1077,6 +1194,33 @@
                 allBookmarksButton?.addEventListener('click', async (event) => {
                     event.preventDefault();
                     await openAllBookmarksModal();
+                });
+
+                addSectionButton?.addEventListener('click', async (event) => {
+                    event.preventDefault();
+                    const name = window.prompt('Section name');
+                    if (!name || !name.trim()) {
+                        return;
+                    }
+                    showBookmarkOrderStatus('warning', 'Creating section...');
+                    try {
+                        const response = await fetch('/Bookmarks/CreateSection', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'RequestVerificationToken': antiForgeryToken || ''
+                            },
+                            body: JSON.stringify({ name: name.trim() })
+                        });
+                        if (!response.ok) {
+                            throw new Error('Request failed');
+                        }
+                        showBookmarkOrderStatus('success', 'Section added.');
+                        await loadAllBookmarks(true);
+                    } catch (error) {
+                        console.error('Unable to create section', error);
+                        showBookmarkOrderStatus('danger', 'Unable to create section.');
+                    }
                 });
             }
 

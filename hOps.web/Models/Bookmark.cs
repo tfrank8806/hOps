@@ -40,5 +40,6 @@ namespace hOps.web.Models
         public Property? Property { get; set; }
 
         public ICollection<BookmarkOrderPreference> OrderPreferences { get; set; } = new List<BookmarkOrderPreference>();
+        public ICollection<BookmarkSectionAssignment> SectionAssignments { get; set; } = new List<BookmarkSectionAssignment>();
     }
 }

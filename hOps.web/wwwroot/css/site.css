@@ -1914,6 +1914,44 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     outline-offset: 4px;
 }
 
+.bookmark-sections-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.bookmark-section-block {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    border: 1px solid rgba(13, 110, 253, 0.1);
+    box-shadow: 0 18px 35px rgba(15, 23, 42, 0.08);
+}
+
+.bookmark-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.bookmark-section-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0b1c35;
+}
+
+.bookmark-section-empty {
+    color: #6c7a97;
+    font-size: 0.9rem;
+}
+
+.bookmark-section-actions .btn {
+    font-size: 0.85rem;
+    padding: 0.2rem 0.75rem;
+}
+
 
 
 

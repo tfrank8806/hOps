@@ -41,6 +41,8 @@ namespace hOps.web.Data
 
         public DbSet<Bookmark> Bookmarks { get; set; }
         public DbSet<BookmarkOrderPreference> BookmarkOrderPreferences { get; set; }
+        public DbSet<BookmarkSectionGroup> BookmarkSectionGroups { get; set; }
+        public DbSet<BookmarkSectionAssignment> BookmarkSectionAssignments { get; set; }
 
         public DbSet<PassOnLog> PassOnLogs { get; set; }
         public DbSet<PassOnLogProperty> PassOnLogProperties { get; set; }
@@ -336,6 +338,37 @@ namespace hOps.web.Data
                 .HasOne(p => p.Bookmark)
                 .WithMany(b => b.OrderPreferences)
                 .HasForeignKey(p => p.BookmarkId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<BookmarkSectionGroup>()
+                .HasOne(g => g.User)
+                .WithMany(u => u.BookmarkSectionGroups)
+                .HasForeignKey(g => g.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<BookmarkSectionGroup>()
+                .Property(g => g.Name)
+                .HasMaxLength(100);
+
+            builder.Entity<BookmarkSectionAssignment>()
+                .HasKey(a => new { a.UserId, a.BookmarkId });
+
+            builder.Entity<BookmarkSectionAssignment>()
+                .HasOne(a => a.User)
+                .WithMany(u => u.BookmarkSectionAssignments)
+                .HasForeignKey(a => a.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<BookmarkSectionAssignment>()
+                .HasOne(a => a.Bookmark)
+                .WithMany(b => b.SectionAssignments)
+                .HasForeignKey(a => a.BookmarkId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<BookmarkSectionAssignment>()
+                .HasOne(a => a.SectionGroup)
+                .WithMany(g => g.Assignments)
+                .HasForeignKey(a => a.SectionGroupId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<DirectMessageConversation>()

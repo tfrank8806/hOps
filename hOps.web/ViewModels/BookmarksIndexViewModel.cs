@@ -68,4 +68,30 @@ namespace hOps.web.ViewModels
     {
         public List<int> BookmarkIds { get; set; } = new();
     }
+
+    public class BookmarkSectionCreateRequest
+    {
+        [Required]
+        [StringLength(100)]
+        public string Name { get; set; } = string.Empty;
+    }
+
+    public class BookmarkSectionLayoutRequest
+    {
+        public List<int> SectionIds { get; set; } = new();
+        public List<BookmarkSectionAssignmentRequest> Sections { get; set; } = new();
+        public List<int> UngroupedBookmarkIds { get; set; } = new();
+    }
+
+    public class BookmarkSectionAssignmentRequest
+    {
+        public int SectionId { get; set; }
+        public List<int> BookmarkIds { get; set; } = new();
+    }
+
+    public class BookmarkAssignSectionRequest
+    {
+        public int BookmarkId { get; set; }
+        public int? SectionId { get; set; }
+    }
 }
