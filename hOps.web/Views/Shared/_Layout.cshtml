@@ -1192,7 +1192,6 @@
                 toggle?.addEventListener('blur', scheduleHideDropdown);
                 toggle?.addEventListener('click', async (event) => {
                     event.preventDefault();
-                    event.stopPropagation();
                     await openAllBookmarksModal();
                 });
 
