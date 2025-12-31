@@ -717,6 +717,35 @@ body.sidebar-collapsed .sidebar-inner {
     padding: var(--space-card-inner);
 }
 
+.form-label {
+    font-weight: 600;
+    color: var(--brand-heading);
+    margin-bottom: 0.35rem;
+}
+
+.form-control,
+.form-select,
+.form-check-input {
+    background-color: var(--brand-surface);
+    border: 1px solid var(--brand-border);
+    border-radius: 0.65rem;
+    color: var(--brand-text);
+    box-shadow: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+    border-color: rgba(9, 118, 179, 0.6);
+    box-shadow: 0 0 0 0.2rem rgba(9, 118, 179, 0.2);
+    background-color: #fff;
+}
+
+.form-control::placeholder {
+    color: rgba(95, 108, 130, 0.75);
+}
+
 .table {
     font-size: var(--font-body-size);
     line-height: var(--font-body-line);
@@ -741,6 +770,18 @@ body.sidebar-collapsed .sidebar-inner {
 .table td,
 .table th {
     vertical-align: middle;
+}
+
+.btn {
+    border-radius: 0.75rem;
+    font-weight: 600;
+    padding: 0.45rem 1.2rem;
+    letter-spacing: 0.01em;
+}
+
+.btn-sm {
+    padding: 0.3rem 0.85rem;
+    border-radius: 0.65rem;
 }
 
 .btn-primary {
@@ -1402,13 +1443,17 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-word;
-    background-color: #fff;
+    background-color: var(--brand-surface);
+    border: 1px solid var(--brand-border);
+    border-radius: 0.9rem;
+    color: var(--brand-text);
 }
 
 .rich-text-editor:focus {
     outline: 0;
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-    border-color: rgba(13, 110, 253, 0.6);
+    box-shadow: 0 0 0 0.25rem rgba(9, 118, 179, 0.2);
+    border-color: rgba(9, 118, 179, 0.6);
+    background-color: #fff;
 }
 
 .rich-text-editor:empty::before {
