@@ -342,6 +342,7 @@ namespace hOps.web.Controllers
             }
 
             await _context.SaveChangesAsync();
+            TempData["HomeMessage"] = "Widget marketplace updated.";
             return RedirectToAction(nameof(Index));
         }
 

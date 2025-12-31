@@ -12,6 +12,25 @@ body {
     line-height: var(--font-body-line);
 }
 
+.skip-link {
+    position: absolute;
+    left: 1rem;
+    top: -3rem;
+    padding: 0.4rem 0.75rem;
+    background: #0b2344;
+    color: #fff;
+    border-radius: 0.5rem;
+    z-index: 2000;
+    text-decoration: none;
+    transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+    top: 0.75rem;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.6);
+}
+
 
 :root {
     --sidebar-width: 260px;
@@ -693,9 +712,9 @@ body.sidebar-collapsed .sidebar-inner {
 .sidebar-menu .nav-link.active,
 .sidebar-menu .nav-link:hover,
 .sidebar-menu .nav-link:focus {
-    background: linear-gradient(120deg, rgba(10, 158, 229, 0.16), rgba(123, 97, 255, 0.12));
-    color: var(--brand-primary-strong);
-    box-shadow: inset 0 0 0 1px rgba(9, 118, 179, 0.18);
+    background: linear-gradient(120deg, rgba(9, 118, 179, 0.22), rgba(12, 35, 73, 0.25));
+    color: #051f3b;
+    box-shadow: inset 0 0 0 1px rgba(9, 118, 179, 0.35);
     text-decoration: none;
 }
 

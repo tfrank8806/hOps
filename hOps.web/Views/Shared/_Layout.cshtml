@@ -80,6 +80,7 @@
     @RenderSection("Styles", required: false)
 </head>
 <body>
+    <a class="skip-link" href="#mainContent">Skip to main content</a>
     @if (SignInManager.IsSignedIn(User))
     {
         <form id="globalAntiforgeryForm" method="post" class="d-none">
@@ -109,7 +110,7 @@
                         <span class="sidebar-toggle-text">Menu</span>
                     </button>
                 </div>
-                <nav class="sidebar-menu">
+                <nav class="sidebar-menu" role="navigation" aria-label="Primary navigation">
                     <ul class="nav flex-column gap-1">
                         <li class="nav-item">
                             <a class="nav-link @(currentController == "Home" ? "active" : string.Empty)" asp-controller="Home" asp-action="Index">
@@ -390,7 +391,7 @@
                 </div>
             </header>
 
-            <main class="flex-grow-1">
+            <main class="flex-grow-1" id="mainContent" role="main">
                 <div class="main-inner container-fluid py-4 @mainContainerClass">
                     <div class="content-surface shadow-sm rounded-4 p-4 @contentSurfaceClass">
                         @RenderBody()
@@ -652,6 +653,8 @@
     <script src="~/js/notifications.js" asp-append-version="true"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @RenderSection("Scripts", required: false)
+
+    <div id="pageLiveRegion" class="visually-hidden" role="status" aria-live="polite"></div>
 
     <script>
         (function () {

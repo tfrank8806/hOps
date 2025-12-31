@@ -48,14 +48,14 @@
 <div class="home-dashboard">
     @if (TempData["HomeMessage"] is string successMessage)
     {
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <div class="alert alert-success alert-dismissible fade show" role="status" aria-live="polite">
             <span>@successMessage</span>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
     @if (TempData["HomeError"] is string errorMessage)
     {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <div class="alert alert-danger alert-dismissible fade show" role="alert" aria-live="assertive">
             <span>@errorMessage</span>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
@@ -298,6 +298,14 @@
             return;
         }
 
+        const liveRegion = document.getElementById('pageLiveRegion');
+        const announceStatus = (message) => {
+            if (!liveRegion || typeof message !== 'string' || !message.trim()) {
+                return;
+            }
+            liveRegion.textContent = '';
+            liveRegion.textContent = message.trim();
+        };
         const dashboard = grid.closest('.home-dashboard');
         const startButton = document.querySelector('[data-layout-action="start"]');
         const editorGroup = document.querySelector('[data-layout-editor]');
@@ -311,6 +319,12 @@
             : null;
         const layoutTipsStorageKey = 'homeLayoutTipsShown';
         const marketplace = document.querySelector('[data-widget-marketplace]');
+        if (marketplace) {
+            const marketplaceForm = marketplace.querySelector('form');
+            marketplaceForm?.addEventListener('submit', () => {
+                announceStatus('Updating widget marketplace modules...');
+            });
+        }
         const sizeOptions = (() => {
             try {
                 return JSON.parse(grid.dataset.sizeOptions || '{}');
@@ -878,11 +892,13 @@
             if (!hasSeenLayoutTips()) {
                 showLayoutTips();
             }
+            announceStatus('Dashboard layout editing enabled.');
         });
 
         cancelButton?.addEventListener('click', () => {
             applyLayout(originalLayout);
             setEditingState(false);
+            announceStatus('Layout changes canceled.');
         });
 
         saveButton?.addEventListener('click', async () => {
@@ -915,9 +931,11 @@
                 grid.dataset.initialLayout = JSON.stringify(originalLayout);
                 persistStoredLayout(originalLayout);
                 setEditingState(false);
+                announceStatus('Dashboard layout saved successfully.');
             }
             catch {
                 alert('Unable to save your layout changes. Please try again.');
+                announceStatus('Unable to save layout changes.');
             }
         });
         helpButton?.addEventListener('click', (event) => {
