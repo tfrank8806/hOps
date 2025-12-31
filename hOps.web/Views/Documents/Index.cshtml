@@ -459,6 +459,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                             <span class="ms-1 text-muted small">@GetSortIndicator("name")</span>
                                         </a>
                                     </th>
+                                    <th scope="col" class="text-center">Type</th>
                                     <th scope="col" class="text-end">
                                         <a asp-action="Index"
                                            asp-route-folderId="@(showingUnassignedOnly ? -1 : selectedFolderId)"
@@ -490,6 +491,9 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                                 </a>
                                                 <div class="text-muted small">@child.DisplayPath</div>
                                             </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-light text-dark">Folder</span>
+                                            </td>
                                             <td class="text-end">
                                                 <span class="badge bg-secondary">@child.DocumentCount</span>
                                             </td>
@@ -516,6 +520,9 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                             {
                                                 <div class="text-muted small">Notes: @doc.Description</div>
                                             }
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-light text-dark">@doc.FileTypeDisplay</span>
                                         </td>
                                         @{
                                             var uploadedLocal = TimeZoneService.ConvertToUserTime(doc.UploadedAtUtc);

@@ -11,6 +11,7 @@ namespace hOps.web.ViewModels.Documents
         public string OriginalFileName { get; set; } = string.Empty;
         public long FileSizeBytes { get; set; }
         public string FileSizeDisplay { get; set; } = string.Empty;
+        public string FileTypeDisplay { get; set; } = string.Empty;
         public DateTime UploadedAtUtc { get; set; }
         public string UploadedByDisplayName { get; set; } = string.Empty;
         public DocumentAccessScope AccessScope { get; set; }

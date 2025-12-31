@@ -948,6 +948,7 @@ namespace hOps.web.Controllers
                 OriginalFileName = document.OriginalFileName,
                 FileSizeBytes = document.FileSizeBytes,
                 FileSizeDisplay = FormatFileSize(document.FileSizeBytes),
+                FileTypeDisplay = FormatDocumentType(document),
                 UploadedAtUtc = document.UploadedAtUtc,
                 UploadedByDisplayName = uploaderName,
                 AccessScope = document.AccessScope,
@@ -1185,6 +1186,28 @@ namespace hOps.web.Controllers
             }
 
             return $"{size:0.##} {units[unitIndex]}";
+        }
+
+        private static string FormatDocumentType(Document document)
+        {
+            var source = document.OriginalFileName;
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                source = document.FilePath;
+            }
+            var extension = Path.GetExtension(source);
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                return "FILE";
+            }
+            extension = extension.TrimStart('.').ToUpperInvariant();
+            return extension switch
+            {
+                "XLSX" or "XLS" => "XLS",
+                "DOCX" or "DOC" => "DOC",
+                "PPTX" or "PPT" => "PPT",
+                _ => extension
+            };
         }
 
         private static (string Field, string Direction) NormalizeSort(string? sortField, string? sortDirection)
