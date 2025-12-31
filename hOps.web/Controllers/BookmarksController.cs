@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -336,23 +337,44 @@ namespace hOps.web.Controllers
             var roles = await _userManager.GetRolesAsync(currentUser);
             var canManagePropertyBookmarks = roles.Contains("Manager") || roles.Contains("Admin");
             var quickList = new List<object>();
+            var orderLookup = await _context.BookmarkOrderPreferences
+                .Where(p => p.UserId == currentUser.Id)
+                .ToDictionaryAsync(p => p.BookmarkId, p => p.SortOrder);
+
+            List<Bookmark> ApplyOrdering(List<Bookmark> source)
+            {
+                if (!source.Any())
+                {
+                    return source;
+                }
+
+                return source
+                    .OrderBy(b => orderLookup.TryGetValue(b.Id, out var sortOrder) ? sortOrder : int.MaxValue)
+                    .ThenBy(b => b.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
 
             async Task<List<Bookmark>> LoadBookmarksAsync(IQueryable<Bookmark> query)
             {
-                var orderedQuery = query.OrderBy(b => b.Name);
+                var bookmarks = await query.AsNoTracking().ToListAsync();
+
+                if (!bookmarks.Any())
+                {
+                    return bookmarks;
+                }
 
                 if (includeAll)
                 {
-                    return await orderedQuery.ToListAsync();
+                    return ApplyOrdering(bookmarks);
                 }
 
-                var flagged = await orderedQuery.Where(b => b.ShowInQuickMenu).ToListAsync();
+                var flagged = bookmarks.Where(b => b.ShowInQuickMenu).ToList();
                 if (flagged.Any())
                 {
-                    return flagged;
+                    return ApplyOrdering(flagged);
                 }
 
-                return await orderedQuery.Take(5).ToListAsync();
+                return ApplyOrdering(bookmarks).Take(5).ToList();
             }
 
             void AppendBookmarks(IEnumerable<Bookmark> bookmarks, string sectionLabel, BookmarkSection sectionType)
@@ -371,6 +393,7 @@ namespace hOps.web.Controllers
 
                     quickList.Add(new
                     {
+                        id = bookmark.Id,
                         name = bookmark.Name,
                         url = bookmark.Url,
                         section = sectionLabel,
@@ -411,6 +434,104 @@ namespace hOps.web.Controllers
             }
 
             return Json(quickList);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateOrder([FromBody] BookmarkOrderUpdateRequest request)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            var requestedIds = request?.BookmarkIds?
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList() ?? new List<int>();
+
+            if (!requestedIds.Any())
+            {
+                var existingPreferences = await _context.BookmarkOrderPreferences
+                    .Where(p => p.UserId == currentUser.Id)
+                    .ToListAsync();
+
+                if (existingPreferences.Any())
+                {
+                    _context.BookmarkOrderPreferences.RemoveRange(existingPreferences);
+                    await _context.SaveChangesAsync();
+                }
+
+                return Ok(new { success = true, count = 0 });
+            }
+
+            var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            var isAdmin = roles.Contains("Admin");
+            var isManager = isAdmin || roles.Contains("Manager");
+            var hasPropertyAccess = currentPropertyId.HasValue && (isAdmin || await _context.UserPropertyAccesses
+                .AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == currentPropertyId.Value));
+
+            bool CanUseBookmark(Bookmark bookmark)
+            {
+                return bookmark.Section switch
+                {
+                    BookmarkSection.User => bookmark.CreatedById == currentUser.Id,
+                    BookmarkSection.Team => bookmark.PropertyId.HasValue &&
+                        currentPropertyId.HasValue &&
+                        bookmark.PropertyId.Value == currentPropertyId.Value &&
+                        hasPropertyAccess,
+                    BookmarkSection.Property => bookmark.PropertyId.HasValue &&
+                        currentPropertyId.HasValue &&
+                        bookmark.PropertyId.Value == currentPropertyId.Value &&
+                        isManager,
+                    _ => false
+                };
+            }
+
+            var bookmarks = await _context.Bookmarks
+                .Where(b => requestedIds.Contains(b.Id))
+                .ToListAsync();
+
+            var orderLookup = requestedIds
+                .Select((id, index) => new { id, index })
+                .ToDictionary(x => x.id, x => x.index);
+
+            var orderedBookmarks = bookmarks
+                .Where(CanUseBookmark)
+                .OrderBy(b => orderLookup[b.Id])
+                .ToList();
+
+            if (!orderedBookmarks.Any())
+            {
+                return Ok(new { success = true, count = 0 });
+            }
+
+            var preferenceLookup = await _context.BookmarkOrderPreferences
+                .Where(p => p.UserId == currentUser.Id && requestedIds.Contains(p.BookmarkId))
+                .ToDictionaryAsync(p => p.BookmarkId);
+
+            for (var i = 0; i < orderedBookmarks.Count; i++)
+            {
+                var bookmark = orderedBookmarks[i];
+                if (preferenceLookup.TryGetValue(bookmark.Id, out var preference))
+                {
+                    preference.SortOrder = i;
+                }
+                else
+                {
+                    _context.BookmarkOrderPreferences.Add(new BookmarkOrderPreference
+                    {
+                        UserId = currentUser.Id,
+                        BookmarkId = bookmark.Id,
+                        SortOrder = i
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, count = orderedBookmarks.Count });
         }
     }
 }

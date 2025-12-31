@@ -80,6 +80,12 @@
     @RenderSection("Styles", required: false)
 </head>
 <body>
+    @if (SignInManager.IsSignedIn(User))
+    {
+        <form id="globalAntiforgeryForm" method="post" class="d-none">
+            @Html.AntiForgeryToken()
+        </form>
+    }
     <div class="layout-wrapper">
         <aside id="sidebar" class="sidebar bg-white border-end">
             <div class="sidebar-inner">
@@ -622,6 +628,7 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body all-bookmarks-modal-body">
+                        <div id="bookmarkOrderStatus" class="alert alert-success d-none small py-2" role="alert"></div>
                         <div id="allBookmarksContent" class="all-bookmarks-content text-center text-muted py-5">
                             Loading bookmarks...
                         </div>
@@ -646,6 +653,8 @@
     <script>
         (function () {
             const body = document.body;
+            const antiForgeryInput = document.querySelector('#globalAntiforgeryForm input[name="__RequestVerificationToken"]');
+            const antiForgeryToken = antiForgeryInput?.value || '';
 
             const sidebar = document.getElementById('sidebar');
             const sidebarFabToggle = document.getElementById('sidebarFabToggle');
@@ -677,11 +686,155 @@
                 let allBookmarksLoaded = false;
                 let allBookmarksLoading = false;
                 let hoverHideTimer;
+                const bookmarkOrderStatus = document.getElementById('bookmarkOrderStatus');
+                let bookmarkOrderStatusTimer;
+                let dragSourceTile = null;
+                let orderSaveAbortController = null;
 
                 const escapeHtml = (value) => {
                     const div = document.createElement('div');
                     div.textContent = value ?? '';
                     return div.innerHTML;
+                };
+
+                const showBookmarkOrderStatus = (variant, message) => {
+                    if (!bookmarkOrderStatus) {
+                        return;
+                    }
+                    window.clearTimeout(bookmarkOrderStatusTimer);
+                    bookmarkOrderStatus.textContent = message;
+                    bookmarkOrderStatus.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
+                    bookmarkOrderStatus.classList.add(`alert-${variant}`);
+                    bookmarkOrderStatusTimer = window.setTimeout(() => {
+                        bookmarkOrderStatus?.classList.add('d-none');
+                    }, variant === 'danger' ? 4000 : 2000);
+                };
+
+                const getBookmarkIdsFromGrid = () => {
+                    if (!allBookmarksContent) {
+                        return [];
+                    }
+                    return Array.from(allBookmarksContent.querySelectorAll('.bookmark-tile'))
+                        .map(tile => Number(tile.dataset.bookmarkId))
+                        .filter(id => Number.isInteger(id) && id > 0);
+                };
+
+                const persistBookmarkOrder = async () => {
+                    if (!allBookmarksContent) {
+                        return;
+                    }
+                    const ids = getBookmarkIdsFromGrid();
+                    if (!ids.length) {
+                        return;
+                    }
+                    if (orderSaveAbortController) {
+                        orderSaveAbortController.abort();
+                        orderSaveAbortController = null;
+                    }
+                    const controller = new AbortController();
+                    orderSaveAbortController = controller;
+                    try {
+                        const response = await fetch('/Bookmarks/UpdateOrder', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'RequestVerificationToken': antiForgeryToken || ''
+                            },
+                            body: JSON.stringify({ bookmarkIds: ids }),
+                            signal: controller.signal
+                        });
+                        if (!response.ok) {
+                            throw new Error('Request failed');
+                        }
+                        showBookmarkOrderStatus('success', 'Bookmark order saved.');
+                    } catch (err) {
+                        if (err.name === 'AbortError') {
+                            return;
+                        }
+                        console.error('Unable to save bookmark order', err);
+                        showBookmarkOrderStatus('danger', 'Unable to save bookmark order.');
+                    } finally {
+                        orderSaveAbortController = null;
+                    }
+                };
+
+                const handleDragStart = (event) => {
+                    const tile = event.currentTarget;
+                    dragSourceTile = tile;
+                    tile.classList.add('bookmark-tile--dragging');
+                    if (event.dataTransfer) {
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', tile.dataset.bookmarkId || '');
+                    }
+                };
+
+                const handleDragEnd = () => {
+                    dragSourceTile?.classList.remove('bookmark-tile--dragging');
+                    dragSourceTile = null;
+                    allBookmarksContent?.querySelectorAll('.bookmark-tile--drop-target').forEach(tile => tile.classList.remove('bookmark-tile--drop-target'));
+                };
+
+                const handleDragEnter = (event) => {
+                    if (event.currentTarget === dragSourceTile) {
+                        return;
+                    }
+                    event.currentTarget.classList.add('bookmark-tile--drop-target');
+                };
+
+                const handleDragLeave = (event) => {
+                    event.currentTarget.classList.remove('bookmark-tile--drop-target');
+                };
+
+                const handleDropOnTile = (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const target = event.currentTarget;
+                    target.classList.remove('bookmark-tile--drop-target');
+                    if (!dragSourceTile || dragSourceTile === target) {
+                        return;
+                    }
+                    const grid = target.parentElement;
+                    if (!grid) {
+                        return;
+                    }
+                    const rect = target.getBoundingClientRect();
+                    const shouldInsertBefore = (event.clientY - rect.top) < rect.height / 2;
+                    if (shouldInsertBefore) {
+                        grid.insertBefore(dragSourceTile, target);
+                    } else {
+                        grid.insertBefore(dragSourceTile, target.nextSibling);
+                    }
+                    persistBookmarkOrder();
+                };
+
+                const handleGridDrop = (event) => {
+                    event.preventDefault();
+                    if (!dragSourceTile) {
+                        return;
+                    }
+                    const grid = event.currentTarget;
+                    grid.appendChild(dragSourceTile);
+                    persistBookmarkOrder();
+                };
+
+                const initializeDragAndDrop = (grid) => {
+                    if (!grid) {
+                        return;
+                    }
+                    grid.addEventListener('dragover', (event) => event.preventDefault());
+                    grid.addEventListener('drop', handleGridDrop);
+                    grid.querySelectorAll('.bookmark-tile').forEach(tile => {
+                        const bookmarkId = Number(tile.dataset.bookmarkId);
+                        if (!Number.isInteger(bookmarkId) || bookmarkId <= 0) {
+                            return;
+                        }
+                        tile.setAttribute('draggable', 'true');
+                        tile.addEventListener('dragstart', handleDragStart);
+                        tile.addEventListener('dragend', handleDragEnd);
+                        tile.addEventListener('dragenter', handleDragEnter);
+                        tile.addEventListener('dragleave', handleDragLeave);
+                        tile.addEventListener('drop', handleDropOnTile);
+                    });
                 };
 
                 const renderBookmarks = (items) => {
@@ -760,6 +913,10 @@
                     tile.target = '_blank';
                     tile.rel = 'noopener';
                     tile.title = `${name}${section ? ` · ${section}` : ''}`;
+                    const bookmarkId = Number(item.id);
+                    if (Number.isInteger(bookmarkId) && bookmarkId > 0) {
+                        tile.dataset.bookmarkId = bookmarkId.toString();
+                    }
 
                     const icon = document.createElement('div');
                     icon.className = 'bookmark-tile-icon';
@@ -784,8 +941,8 @@
                     }
 
                     const nameElement = createTileText(name, 'bookmark-tile-name');
-                    const sectionElement = createTileText(section, 'bookmark-tile-section text-muted');
-                    const descriptionElement = createTileText(description, 'bookmark-tile-description text-muted');
+                    const sectionElement = createTileText(section, 'bookmark-tile-section');
+                    const descriptionElement = createTileText(description, 'bookmark-tile-description');
 
                     tile.appendChild(icon);
                     if (nameElement) {
@@ -807,6 +964,9 @@
                     }
 
                     if (!items.length) {
+                        if (bookmarkOrderStatus) {
+                            bookmarkOrderStatus.classList.add('d-none');
+                        }
                         allBookmarksContent.innerHTML = '<div class="text-muted text-center py-4">No bookmarks yet.</div>';
                         return;
                     }
@@ -820,6 +980,10 @@
 
                     allBookmarksContent.innerHTML = '';
                     allBookmarksContent.appendChild(grid);
+                    initializeDragAndDrop(grid);
+                    if (bookmarkOrderStatus) {
+                        bookmarkOrderStatus.classList.add('d-none');
+                    }
                 };
 
                 const loadBookmarks = async () => {

@@ -38,5 +38,7 @@ namespace hOps.web.Models
         public int? PropertyId { get; set; }
 
         public Property? Property { get; set; }
+
+        public ICollection<BookmarkOrderPreference> OrderPreferences { get; set; } = new List<BookmarkOrderPreference>();
     }
 }

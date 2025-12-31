@@ -40,6 +40,7 @@ namespace hOps.web.Data
         public DbSet<PackageLogEntry> PackageLogEntries { get; set; }
 
         public DbSet<Bookmark> Bookmarks { get; set; }
+        public DbSet<BookmarkOrderPreference> BookmarkOrderPreferences { get; set; }
 
         public DbSet<PassOnLog> PassOnLogs { get; set; }
         public DbSet<PassOnLogProperty> PassOnLogProperties { get; set; }
@@ -321,6 +322,21 @@ namespace hOps.web.Data
             builder.Entity<Bookmark>()
                 .Property(b => b.Description)
                 .HasMaxLength(500);
+
+            builder.Entity<BookmarkOrderPreference>()
+                .HasKey(p => new { p.UserId, p.BookmarkId });
+
+            builder.Entity<BookmarkOrderPreference>()
+                .HasOne(p => p.User)
+                .WithMany(u => u.BookmarkOrderPreferences)
+                .HasForeignKey(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<BookmarkOrderPreference>()
+                .HasOne(p => p.Bookmark)
+                .WithMany(b => b.OrderPreferences)
+                .HasForeignKey(p => p.BookmarkId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<DirectMessageConversation>()
                 .HasIndex(c => new { c.ParticipantAId, c.ParticipantBId })

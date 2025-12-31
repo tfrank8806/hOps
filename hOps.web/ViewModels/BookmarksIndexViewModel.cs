@@ -63,4 +63,9 @@ namespace hOps.web.ViewModels
 
         public string CurrentUserId { get; set; } = string.Empty;
     }
+
+    public class BookmarkOrderUpdateRequest
+    {
+        public List<int> BookmarkIds { get; set; } = new();
+    }
 }
