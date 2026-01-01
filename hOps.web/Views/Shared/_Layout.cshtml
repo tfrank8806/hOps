@@ -698,6 +698,9 @@
                 let bookmarkOrderStatusTimer;
                 let dragSourceTile = null;
                 let orderSaveAbortController = null;
+                let draggedSectionBlock = null;
+                let sectionOrderSaveTimer;
+                let sectionOrderAbortController = null;
                 const addSectionButton = document.querySelector('[data-add-bookmark-section]');
 
                 const escapeHtml = (value) => {
@@ -765,6 +768,159 @@
                     } finally {
                         orderSaveAbortController = null;
                     }
+                };
+
+                const getSectionOrderFromDom = () => {
+                    if (!allBookmarksContent) {
+                        return [];
+                    }
+                    return Array.from(allBookmarksContent.querySelectorAll('.bookmark-section-block[data-section-id]'))
+                        .map(block => Number(block.dataset.sectionId))
+                        .filter(id => Number.isInteger(id) && id > 0);
+                };
+
+                const schedulePersistSectionOrder = () => {
+                    window.clearTimeout(sectionOrderSaveTimer);
+                    sectionOrderSaveTimer = window.setTimeout(() => {
+                        sectionOrderSaveTimer = undefined;
+                        persistSectionOrder();
+                    }, 240);
+                };
+
+                const persistSectionOrder = async () => {
+                    const sectionIds = getSectionOrderFromDom();
+                    if (!sectionIds.length) {
+                        return;
+                    }
+                    if (sectionOrderAbortController) {
+                        sectionOrderAbortController.abort();
+                        sectionOrderAbortController = null;
+                    }
+                    const controller = new AbortController();
+                    sectionOrderAbortController = controller;
+                    try {
+                        const response = await fetch('/Bookmarks/UpdateSectionOrder', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'RequestVerificationToken': antiForgeryToken || ''
+                            },
+                            body: JSON.stringify({ sectionIds }),
+                            signal: controller.signal
+                        });
+                        if (!response.ok) {
+                            throw new Error('Request failed');
+                        }
+                        showBookmarkOrderStatus('success', 'Section order saved.');
+                    } catch (error) {
+                        if (error.name === 'AbortError') {
+                            return;
+                        }
+                        console.error('Unable to save section order', error);
+                        showBookmarkOrderStatus('danger', 'Unable to save section order.');
+                    } finally {
+                        sectionOrderAbortController = null;
+                    }
+                };
+
+                const clearSectionDropTargets = () => {
+                    allBookmarksContent?.querySelectorAll('.bookmark-section-block--drop-target')
+                        .forEach(block => block.classList.remove('bookmark-section-block--drop-target'));
+                };
+
+                const handleSectionDragStart = (event) => {
+                    const block = event.currentTarget;
+                    if (!block?.dataset?.sectionId) {
+                        event.preventDefault();
+                        return;
+                    }
+                    draggedSectionBlock = block;
+                    block.classList.add('bookmark-section-block--dragging');
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', block.dataset.sectionId);
+                };
+
+                const handleSectionDragEnd = () => {
+                    if (draggedSectionBlock) {
+                        draggedSectionBlock.classList.remove('bookmark-section-block--dragging');
+                    }
+                    draggedSectionBlock = null;
+                    clearSectionDropTargets();
+                };
+
+                const handleSectionDragEnter = (event) => {
+                    const target = event.currentTarget;
+                    if (!draggedSectionBlock || target === draggedSectionBlock) {
+                        return;
+                    }
+                    target.classList.add('bookmark-section-block--drop-target');
+                };
+
+                const handleSectionDragLeave = (event) => {
+                    event.currentTarget.classList.remove('bookmark-section-block--drop-target');
+                };
+
+                const handleSectionDropOnBlock = (event) => {
+                    event.preventDefault();
+                    const target = event.currentTarget;
+                    if (!draggedSectionBlock || draggedSectionBlock === target) {
+                        clearSectionDropTargets();
+                        return;
+                    }
+                    const parent = target.parentElement;
+                    if (!parent) {
+                        clearSectionDropTargets();
+                        return;
+                    }
+                    const rect = target.getBoundingClientRect();
+                    const shouldInsertBefore = (event.clientY - rect.top) < rect.height / 2;
+                    if (shouldInsertBefore) {
+                        parent.insertBefore(draggedSectionBlock, target);
+                    } else {
+                        parent.insertBefore(draggedSectionBlock, target.nextSibling);
+                    }
+                    clearSectionDropTargets();
+                    schedulePersistSectionOrder();
+                };
+
+                const handleSectionWrapperDragOver = (event) => {
+                    if (!draggedSectionBlock) {
+                        return;
+                    }
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                };
+
+                const handleSectionWrapperDrop = (event) => {
+                    if (!draggedSectionBlock) {
+                        return;
+                    }
+                    if (event.target instanceof Element && event.target.closest('.bookmark-section-block[data-section-id]')) {
+                        return;
+                    }
+                    event.preventDefault();
+                    event.currentTarget.appendChild(draggedSectionBlock);
+                    schedulePersistSectionOrder();
+                };
+
+                const initializeSectionDragAndDrop = (container) => {
+                    if (!container) {
+                        return;
+                    }
+                    const wrapper = container.querySelector('.bookmark-sections-wrapper');
+                    if (!wrapper) {
+                        return;
+                    }
+                    wrapper.addEventListener('dragover', handleSectionWrapperDragOver);
+                    wrapper.addEventListener('drop', handleSectionWrapperDrop);
+                    wrapper.querySelectorAll('.bookmark-section-block[data-section-id]').forEach(sectionBlock => {
+                        sectionBlock.setAttribute('draggable', 'true');
+                        sectionBlock.addEventListener('dragstart', handleSectionDragStart);
+                        sectionBlock.addEventListener('dragend', handleSectionDragEnd);
+                        sectionBlock.addEventListener('dragenter', handleSectionDragEnter);
+                        sectionBlock.addEventListener('dragleave', handleSectionDragLeave);
+                        sectionBlock.addEventListener('drop', handleSectionDropOnBlock);
+                    });
                 };
 
                 const persistBookmarkSection = async (bookmarkId, sectionId) => {
@@ -1044,6 +1200,20 @@
                     title.textContent = section.name || 'Section';
                     header.appendChild(title);
 
+                    const actions = document.createElement('div');
+                    actions.className = 'bookmark-section-actions';
+                    const dragHandle = document.createElement('button');
+                    dragHandle.type = 'button';
+                    dragHandle.className = 'bookmark-section-drag-handle';
+                    dragHandle.setAttribute('aria-label', 'Drag to reorder section');
+                    dragHandle.title = 'Drag to reorder section';
+                    const dragIcon = document.createElement('span');
+                    dragIcon.className = 'bookmark-section-drag-icon';
+                    dragIcon.setAttribute('aria-hidden', 'true');
+                    dragHandle.appendChild(dragIcon);
+                    actions.appendChild(dragHandle);
+                    header.appendChild(actions);
+
                     wrapper.appendChild(header);
 
                     if (!Array.isArray(section.bookmarks) || section.bookmarks.length === 0) {
@@ -1105,6 +1275,7 @@
 
                     allBookmarksContent.innerHTML = '';
                     allBookmarksContent.appendChild(wrapper);
+                    initializeSectionDragAndDrop(allBookmarksContent);
                     bookmarkOrderStatus?.classList.add('d-none');
                 };
 

@@ -650,6 +650,72 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateSectionOrder([FromBody] BookmarkSectionOrderRequest request)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            var requestedIds = request?.SectionIds?
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList() ?? new List<int>();
+
+            var sections = await _context.BookmarkSectionGroups
+                .Where(g => g.UserId == currentUser.Id)
+                .OrderBy(g => g.SortOrder)
+                .ThenBy(g => g.Id)
+                .ToListAsync();
+
+            if (!sections.Any())
+            {
+                return Ok(new { success = true, count = 0 });
+            }
+
+            var orderedSections = new List<BookmarkSectionGroup>();
+            var included = new HashSet<int>();
+
+            foreach (var sectionId in requestedIds)
+            {
+                var match = sections.FirstOrDefault(g => g.Id == sectionId);
+                if (match != null && included.Add(match.Id))
+                {
+                    orderedSections.Add(match);
+                }
+            }
+
+            foreach (var remaining in sections)
+            {
+                if (included.Contains(remaining.Id))
+                {
+                    continue;
+                }
+                orderedSections.Add(remaining);
+                included.Add(remaining.Id);
+            }
+
+            var updatedCount = 0;
+            for (var i = 0; i < orderedSections.Count; i++)
+            {
+                if (orderedSections[i].SortOrder != i)
+                {
+                    orderedSections[i].SortOrder = i;
+                    updatedCount++;
+                }
+            }
+
+            if (updatedCount > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok(new { success = true, count = orderedSections.Count, updated = updatedCount });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateSection([FromBody] BookmarkSectionCreateRequest request)
         {
             var currentUser = await _userManager.GetUserAsync(User);

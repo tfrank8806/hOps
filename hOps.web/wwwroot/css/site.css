@@ -2031,11 +2031,65 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     box-shadow: 0 18px 35px rgba(15, 23, 42, 0.08);
 }
 
+.bookmark-section-block--dragging {
+    opacity: 0.85;
+    border-color: rgba(13, 110, 253, 0.4);
+    box-shadow: 0 24px 45px rgba(15, 23, 42, 0.2);
+}
+
+.bookmark-section-block--drop-target {
+    outline: 2px dashed rgba(13, 110, 253, 0.55);
+    outline-offset: 6px;
+}
+
 .bookmark-section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 0.75rem;
+}
+
+.bookmark-section-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.bookmark-section-drag-handle {
+    border: 1px dashed rgba(13, 110, 253, 0.4);
+    background: rgba(13, 110, 253, 0.12);
+    color: #0d6efd;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.bookmark-section-drag-handle:hover {
+    background: rgba(13, 110, 253, 0.18);
+    border-color: rgba(13, 110, 253, 0.6);
+}
+
+.bookmark-section-drag-handle:focus-visible {
+    outline: 2px solid rgba(13, 110, 253, 0.45);
+    outline-offset: 2px;
+}
+
+.bookmark-section-drag-handle:active {
+    cursor: grabbing;
+}
+
+.bookmark-section-drag-icon {
+    position: relative;
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: 0 6px 0 currentColor, 0 -6px 0 currentColor, 6px 0 0 currentColor, 6px 6px 0 currentColor, 6px -6px 0 currentColor;
 }
 
 .bookmark-section-title {

@@ -76,6 +76,11 @@ namespace hOps.web.ViewModels
         public string Name { get; set; } = string.Empty;
     }
 
+    public class BookmarkSectionOrderRequest
+    {
+        public List<int> SectionIds { get; set; } = new();
+    }
+
     public class BookmarkSectionLayoutRequest
     {
         public List<int> SectionIds { get; set; } = new();
