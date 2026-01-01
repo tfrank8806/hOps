@@ -156,7 +156,7 @@
                                                                     <span class="calendar-day-continuation__title">@continuation.Title</span>
                                                                     @if (continuation.EndDate.Date > day.Date.Date)
                                                                     {
-                                                                        <span class="calendar-day-continuation__range text-white-50">through @continuation.EndDate:MMM d</span>
+                                                                        <span class="calendar-day-continuation__range text-white-50">through @continuation.EndDate.ToString("MMM d")</span>
                                                                     }
                                                                 </div>
                                                             }
