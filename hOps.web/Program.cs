@@ -354,11 +354,12 @@ var isSqlite = dbContext.Database.IsSqlite();
 
 await ApplyMigrationsWithLegacySupportAsync(dbContext);
 
-if (isSqlite)
-{
-    await EnsureProfilePhotoPathColumnAsync(dbContext);
-    await EnsureRoomLayoutShapeColumnsAsync(dbContext);
-}
+ if (isSqlite)
+ {
+     await EnsureProfilePhotoPathColumnAsync(dbContext);
+     await EnsureRoomLayoutShapeColumnsAsync(dbContext);
+     await EnsureUserHomeLayoutsTableAsync(dbContext);
+ }
 
     await SeedRolesAsync(roleManager);
     await SeedAdminUserAsync(userManager, roleManager);
