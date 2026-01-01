@@ -72,7 +72,7 @@ body {
     display: flex;
     flex-direction: row;
     align-items: stretch;
-    min-height: 100vh;
+    min-height: calc(100vh - var(--main-header-height));
     width: 100%;
     background-color: inherit;
 }
@@ -117,9 +117,9 @@ p, li, td, th, .card, .table, .home-widget-card {
 @media (min-width: 992px) {
     body:not(.sidebar-collapsed) .sidebar {
         position: sticky;
-        top: 0;
-        height: 100vh;
-        max-height: 100vh;
+        top: var(--main-header-height);
+        height: calc(100vh - var(--main-header-height));
+        max-height: calc(100vh - var(--main-header-height));
         align-self: flex-start;
     }
 }
@@ -324,7 +324,10 @@ body.sidebar-collapsed button.sidebar-toggle {
 
 .sidebar-backdrop {
     position: fixed;
-    inset: 0;
+    top: var(--main-header-height);
+    right: 0;
+    bottom: 0;
+    left: 0;
     background: rgba(15, 27, 63, 0.35);
     z-index: 1040;
     opacity: 0;
@@ -346,9 +349,9 @@ body.sidebar-collapsed button.sidebar-toggle {
 @media (min-width: 992px) {
     body:not(.todo-sidebar-collapsed) .todo-sidebar {
         position: sticky;
-        top: 0;
-        height: 100vh;
-        max-height: 100vh;
+        top: var(--main-header-height);
+        height: calc(100vh - var(--main-header-height));
+        max-height: calc(100vh - var(--main-header-height));
         align-self: flex-start;
     }
 }
@@ -464,7 +467,10 @@ body.todo-sidebar-collapsed .todo-sidebar {
 
 .todo-sidebar-backdrop {
     position: fixed;
-    inset: 0;
+    top: var(--main-header-height);
+    right: 0;
+    bottom: 0;
+    left: 0;
     background: rgba(15, 27, 63, 0.4);
     z-index: 1045;
     opacity: 0;
@@ -480,9 +486,9 @@ body.todo-sidebar-collapsed .todo-sidebar {
 @media (max-width: 991.98px) {
     .todo-sidebar {
         position: fixed;
-        top: 0;
+        top: var(--main-header-height);
         right: 0;
-        height: 100vh;
+        height: calc(100vh - var(--main-header-height));
         width: min(80vw, 360px);
         padding: 1.25rem;
         transform: translateX(0);
@@ -1076,7 +1082,7 @@ body.sidebar-collapsed .sidebar-inner {
 @media (max-width: 991.98px) {
     .sidebar {
         position: fixed;
-        top: 0;
+        top: var(--main-header-height);
         bottom: 0;
         left: 0;
         width: 260px;

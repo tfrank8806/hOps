@@ -87,17 +87,149 @@
             @Html.AntiForgeryToken()
         </form>
     }
+    <header class="main-header">
+        <div class="container-fluid py-2 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-3">
+                <a class="brand-lockup text-decoration-none" href="@Url.Action("Index", "Home")">
+                    <img src="~/favicon.png" alt="GuestQuest logo" class="brand-lockup__mark" asp-append-version="true" />
+                    <span class="brand-lockup__text">
+                        <span class="brand-lockup__title">GuestQuest</span>
+                        <span class="brand-lockup__subtitle">hOps</span>
+                    </span>
+                </a>
+                <button class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="true" data-sidebar-toggle="true">
+                    <span class="sidebar-toggle-icon" aria-hidden="true">
+                        <svg class="icon-collapse" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="14 5 8 12 14 19" />
+                        </svg>
+                        <svg class="icon-expand" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="10 5 16 12 10 19" />
+                        </svg>
+                    </span>
+                    <span class="sidebar-toggle-text d-none d-md-inline">Menu</span>
+                </button>
+                <div class="page-title">
+                    <span class="text-uppercase text-muted small">Hotel Operations</span>
+                    <h1 class="h5 mb-0 fw-semibold">@(ViewData["Title"] as string ?? "HotelOps")</h1>
+                </div>
+            </div>
+            <ul class="nav align-items-center">
+                @if (SignInManager.IsSignedIn(User))
+                {
+                    var userProps = ViewBag.UserProperties as List<Property>;
+                    var currentProp = ViewBag.CurrentProperty as Property;
+
+                    <li class="nav-item me-2 d-none d-md-block">
+                        <a class="btn btn-outline-primary" asp-controller="Sales" asp-action="Index">Sales Lead</a>
+                    </li>
+                    <li class="nav-item me-2 d-md-none">
+                        <a class="nav-link @(currentController == "Sales" ? "active" : string.Empty)" asp-controller="Sales" asp-action="Index">Sales Lead</a>
+                    </li>
+
+                    if (userProps != null && userProps.Count > 1)
+                    {
+                        <li class="nav-item dropdown me-2">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                @(currentProp?.Name ?? "Select Property")
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                @foreach (var prop in userProps)
+                                {
+                                    var propertyLabel = string.IsNullOrWhiteSpace(prop.Code) ? prop.Name : $"{prop.Name} ({prop.Code})";
+
+                                    <li>
+                                        <a class="dropdown-item"
+                                           asp-controller="Home"
+                                           asp-action="SwitchProperty"
+                                           asp-route-propertyId="@prop.Id">
+                                            @propertyLabel
+                                        </a>
+                                    </li>
+                                }
+                            </ul>
+                        </li>
+                    }
+
+                    <li class="nav-item dropdown me-2" id="bookmarkMenu">
+                        <a class="nav-link position-relative bookmark-toggle" href="#" id="bookmarkMenuToggle" data-bookmark-toggle aria-expanded="false" aria-label="Quick bookmarks">
+                            <svg class="bookmark-toggle-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                            </svg>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end bookmark-dropdown-menu" aria-labelledby="bookmarkMenuToggle">
+                            <div class="px-3 pt-2 pb-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary w-100" data-all-bookmarks-toggle>
+                                    All Bookmarks
+                                </button>
+                            </div>
+                            <div class="px-3 py-2 text-muted small">Quick Bookmarks</div>
+                            <div id="bookmarkMenuContent">
+                                <div class="px-3 py-2 text-muted small">Loading bookmarks...</div>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" asp-controller="Bookmarks" asp-action="Index">Manage bookmarks</a>
+                        </div>
+                    </li>
+
+                    <li class="nav-item dropdown me-2" id="messagesMenu">
+                        <a class="nav-link dropdown-toggle position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="me-1">Messages</span>
+                            <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle @(totalUnreadMessageCenterCount > 0 ? string.Empty : "d-none")" id="messagesMenuTriggerBadge">@totalUnreadMessageCenterBadgeText</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end messages-dropdown-menu">
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center gap-2" asp-controller="DirectMessages" asp-action="Index" asp-route-startNew="true" id="messagesMenuCreate">
+                                    <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis">+</span>
+                                    <span>Create New Message</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center justify-content-between" asp-controller="DirectMessages" asp-action="Index" id="messagesMenuConversations">
+                                    <span>Conversations</span>
+                                    <span class="badge rounded-pill bg-primary @(unreadDirectMessageCount > 0 ? string.Empty : "d-none")" id="messagesMenuConversationsBadge">@unreadDirectMessageBadgeText</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center justify-content-between" asp-controller="DirectMessages" asp-action="Alerts" id="messagesMenuAlerts">
+                                    <span>Alerts</span>
+                                    <span class="badge rounded-pill bg-info @(unreadAlertCount > 0 ? string.Empty : "d-none")" id="messagesMenuAlertsBadge">@unreadAlertBadgeText</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <li class="nav-item me-2">
+                        <a class="nav-link d-flex align-items-center gap-2 @(currentController == "Profile" ? "active" : string.Empty)" asp-controller="Profile" asp-action="Index">
+                            @if (profileAvatarModel != null)
+                            {
+                                <partial name="_UserAvatar" model="profileAvatarModel" />
+                            }
+                            <span>My Profile</span>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <form method="post" asp-area="Identity" asp-page="/Account/Logout">
+                            <button type="submit" class="btn btn-link nav-link">Log Out</button>
+                        </form>
+                    </li>
+                }
+                else
+                {
+                    <li class="nav-item">
+                        <a class="nav-link" asp-area="Identity" asp-page="/Account/Login">Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" asp-area="Identity" asp-page="/Account/Register">Register</a>
+                    </li>
+                }
+            </ul>
+        </div>
+    </header>
     <div class="layout-wrapper">
         <aside id="sidebar" class="sidebar bg-white border-end">
             <div class="sidebar-inner">
-                <div class="sidebar-brand d-flex align-items-center justify-content-between mb-4">
-                    <a class="brand-lockup text-decoration-none" asp-controller="Home" asp-action="Index">
-                        <img src="~/favicon.png" alt="GuestQuest logo mark" class="brand-lockup__mark" asp-append-version="true" />
-                        <span class="brand-lockup__text">
-                            <span class="brand-lockup__title">GuestQuest</span>
-                            <span class="brand-lockup__subtitle">hOps</span>
-                        </span>
-                    </a>
+                <div class="sidebar-brand d-flex align-items-center justify-content-end mb-4">
                     <button class="sidebar-toggle d-lg-none" type="button" aria-label="Toggle navigation" aria-expanded="true" data-sidebar-toggle="true">
                         <span class="sidebar-toggle-icon" aria-hidden="true">
                             <svg class="icon-collapse" viewBox="0 0 24 24" fill="currentColor">
@@ -252,146 +384,6 @@
             <span class="sidebar-fab-toggle__icon" aria-hidden="true"></span>
         </button>
         <div class="main-content flex-grow-1 d-flex flex-column">
-            <header class="main-header">
-                <div class="container-fluid py-2 d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center gap-3">
-                        <a class="brand-lockup text-decoration-none" href="@Url.Action("Index", "Home")">
-                            <img src="~/favicon.png" alt="GuestQuest logo" class="brand-lockup__mark" asp-append-version="true" />
-                            <span class="brand-lockup__text">
-                                <span class="brand-lockup__title">GuestQuest</span>
-                                <span class="brand-lockup__subtitle">hOps</span>
-                            </span>
-                        </a>
-                        <button class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="true" data-sidebar-toggle="true">
-                            <span class="sidebar-toggle-icon" aria-hidden="true">
-                                <svg class="icon-collapse" viewBox="0 0 24 24" fill="currentColor">
-                                    <polygon points="14 5 8 12 14 19" />
-                                </svg>
-                                <svg class="icon-expand" viewBox="0 0 24 24" fill="currentColor">
-                                    <polygon points="10 5 16 12 10 19" />
-                                </svg>
-                            </span>
-                            <span class="sidebar-toggle-text d-none d-md-inline">Menu</span>
-                        </button>
-                        <div class="page-title">
-                            <span class="text-uppercase text-muted small">Hotel Operations</span>
-                            <h1 class="h5 mb-0 fw-semibold">@(ViewData["Title"] as string ?? "HotelOps")</h1>
-                        </div>
-                    </div>
-                    <ul class="nav align-items-center">
-                        @if (SignInManager.IsSignedIn(User))
-                        {
-                            var userProps = ViewBag.UserProperties as List<Property>;
-                            var currentProp = ViewBag.CurrentProperty as Property;
-
-                            <li class="nav-item me-2 d-none d-md-block">
-                                <a class="btn btn-outline-primary" asp-controller="Sales" asp-action="Index">Sales Lead</a>
-                            </li>
-                            <li class="nav-item me-2 d-md-none">
-                                <a class="nav-link @(currentController == "Sales" ? "active" : string.Empty)" asp-controller="Sales" asp-action="Index">Sales Lead</a>
-                            </li>
-
-                            if (userProps != null && userProps.Count > 1)
-                            {
-                                <li class="nav-item dropdown me-2">
-                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                        @(currentProp?.Name ?? "Select Property")
-                                    </a>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        @foreach (var prop in userProps)
-                                        {
-                                            var propertyLabel = string.IsNullOrWhiteSpace(prop.Code) ? prop.Name : $"{prop.Name} ({prop.Code})";
-
-                                            <li>
-                                                <a class="dropdown-item"
-                                                   asp-controller="Home"
-                                                   asp-action="SwitchProperty"
-                                                   asp-route-propertyId="@prop.Id">
-                                                    @propertyLabel
-                                                </a>
-                                            </li>
-                                        }
-                                    </ul>
-                                </li>
-                            }
-
-                            <li class="nav-item dropdown me-2" id="bookmarkMenu">
-                                <a class="nav-link position-relative bookmark-toggle" href="#" id="bookmarkMenuToggle" data-bookmark-toggle aria-expanded="false" aria-label="Quick bookmarks">
-                                    <svg class="bookmark-toggle-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                                    </svg>
-                                </a>
-                                <div class="dropdown-menu dropdown-menu-end bookmark-dropdown-menu" aria-labelledby="bookmarkMenuToggle">
-                                    <div class="px-3 pt-2 pb-2">
-                                        <button type="button" class="btn btn-sm btn-outline-primary w-100" data-all-bookmarks-toggle>
-                                            All Bookmarks
-                                        </button>
-                                    </div>
-                                    <div class="px-3 py-2 text-muted small">Quick Bookmarks</div>
-                                    <div id="bookmarkMenuContent">
-                                        <div class="px-3 py-2 text-muted small">Loading bookmarks...</div>
-                                    </div>
-                                    <div class="dropdown-divider"></div>
-                                    <a class="dropdown-item" asp-controller="Bookmarks" asp-action="Index">Manage bookmarks</a>
-                                </div>
-                            </li>
-
-                            <li class="nav-item dropdown me-2" id="messagesMenu">
-                                <a class="nav-link dropdown-toggle position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <span class="me-1">Messages</span>
-                                    <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle @(totalUnreadMessageCenterCount > 0 ? string.Empty : "d-none")" id="messagesMenuTriggerBadge">@totalUnreadMessageCenterBadgeText</span>
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-end messages-dropdown-menu">
-                                    <li>
-                                        <a class="dropdown-item d-flex align-items-center gap-2" asp-controller="DirectMessages" asp-action="Index" asp-route-startNew="true" id="messagesMenuCreate">
-                                            <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis">+</span>
-                                            <span>Create New Message</span>
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item d-flex align-items-center justify-content-between" asp-controller="DirectMessages" asp-action="Index" id="messagesMenuConversations">
-                                            <span>Conversations</span>
-                                            <span class="badge rounded-pill bg-primary @(unreadDirectMessageCount > 0 ? string.Empty : "d-none")" id="messagesMenuConversationsBadge">@unreadDirectMessageBadgeText</span>
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item d-flex align-items-center justify-content-between" asp-controller="DirectMessages" asp-action="Alerts" id="messagesMenuAlerts">
-                                            <span>Alerts</span>
-                                            <span class="badge rounded-pill bg-info @(unreadAlertCount > 0 ? string.Empty : "d-none")" id="messagesMenuAlertsBadge">@unreadAlertBadgeText</span>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </li>
-
-                            <li class="nav-item me-2">
-                                <a class="nav-link d-flex align-items-center gap-2 @(currentController == "Profile" ? "active" : string.Empty)" asp-controller="Profile" asp-action="Index">
-                                    @if (profileAvatarModel != null)
-                                    {
-                                        <partial name="_UserAvatar" model="profileAvatarModel" />
-                                    }
-                                    <span>My Profile</span>
-                                </a>
-                            </li>
-
-                            <li class="nav-item">
-                                <form method="post" asp-area="Identity" asp-page="/Account/Logout">
-                                    <button type="submit" class="btn btn-link nav-link">Log Out</button>
-                                </form>
-                            </li>
-                        }
-                        else
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link" asp-area="Identity" asp-page="/Account/Login">Login</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" asp-area="Identity" asp-page="/Account/Register">Register</a>
-                            </li>
-                        }
-                    </ul>
-                </div>
-            </header>
-
             <main class="flex-grow-1" id="mainContent" role="main">
                 <div class="main-inner container-fluid py-4 @mainContainerClass">
                     <div class="content-surface shadow-sm rounded-4 p-4 @contentSurfaceClass">
