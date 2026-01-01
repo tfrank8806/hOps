@@ -250,20 +250,54 @@
             }
         }
 
+        .workorders-table {
+            font-size: 0.92rem;
+        }
+
+        .workorders-table th,
+        .workorders-table td {
+            white-space: normal;
+        }
+
+        .workorders-table .col-actions {
+            width: 8%;
+            min-width: 90px;
+        }
+
+        .workorders-table .col-status {
+            width: 10%;
+            min-width: 110px;
+        }
+
         .workorders-table .col-location {
-            width: 26%;
-            min-width: 210px;
+            width: 22%;
+            min-width: 160px;
+        }
+
+        .workorders-table .col-department {
+            width: 11%;
+            min-width: 110px;
+        }
+
+        .workorders-table .col-type {
+            width: 10%;
+            min-width: 110px;
         }
 
         .workorders-table .col-issue {
-            width: 32%;
-            min-width: 250px;
+            width: 27%;
+            min-width: 180px;
         }
 
         .workorders-table .col-due,
         .workorders-table .col-created {
-            width: 8%;
-            min-width: 95px;
+            width: 6%;
+            min-width: 80px;
+        }
+
+        .workorders-table .col-attachments {
+            width: 6%;
+            min-width: 70px;
         }
 
         .workorder-action-group {
@@ -518,7 +552,7 @@
                     </div>
                 </div>
                 <div class="table-responsive workorders-table-wrapper">
-                    <table class="table table-hover align-middle mb-0 workorders-table">
+                    <table class="table table-hover table-sm align-middle mb-0 workorders-table">
                         <colgroup>
                             <col class="col-actions" />
                             <col class="col-status" />
