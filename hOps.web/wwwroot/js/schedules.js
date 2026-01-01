@@ -284,4 +284,143 @@
             }
         });
     }
+
+    const scheduleGrid = document.querySelector('[data-schedule-grid="true"]');
+    if (scheduleGrid && scheduleGrid.dataset.canReorder === 'true') {
+        initEmployeeReorder(scheduleGrid);
+    }
+
+    function initEmployeeReorder(grid) {
+        const tbody = grid.querySelector('tbody');
+        if (!tbody) {
+            return;
+        }
+
+        const reorderUrl = grid.dataset.reorderUrl || '';
+        const scheduleId = Number(grid.dataset.scheduleId || '0');
+        const weekStart = grid.dataset.weekStart || '';
+        const statusElement = document.getElementById('scheduleReorderStatus');
+
+        const rowSelector = '[data-schedule-row]';
+        const rows = () => Array.from(tbody.querySelectorAll(rowSelector));
+
+        let dragRow = null;
+
+        rows().forEach(row => {
+            row.addEventListener('dragstart', event => {
+                if (!event.target.closest('[data-row-handle]')) {
+                    event.preventDefault();
+                    return;
+                }
+                dragRow = row;
+                row.classList.add('schedule-row--dragging');
+                if (event.dataTransfer) {
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', row.dataset.scheduleEmployeeId ?? '');
+                }
+            });
+
+            row.addEventListener('dragend', () => {
+                row.classList.remove('schedule-row--dragging');
+                dragRow = null;
+            });
+        });
+
+        tbody.addEventListener('dragover', event => {
+            if (!dragRow) {
+                return;
+            }
+            event.preventDefault();
+            const targetRow = event.target.closest(rowSelector);
+            if (!targetRow || targetRow === dragRow) {
+                return;
+            }
+            const rect = targetRow.getBoundingClientRect();
+            const shouldInsertBefore = (event.clientY - rect.top) < rect.height / 2;
+            if (shouldInsertBefore) {
+                tbody.insertBefore(dragRow, targetRow);
+            } else {
+                tbody.insertBefore(dragRow, targetRow.nextSibling);
+            }
+        });
+
+        tbody.addEventListener('drop', event => {
+            if (!dragRow) {
+                return;
+            }
+            event.preventDefault();
+            dragRow.classList.remove('schedule-row--dragging');
+            dragRow = null;
+            persistEmployeeOrder();
+        });
+
+        const persistEmployeeOrder = debounce(() => {
+            saveEmployeeOrder();
+        }, 200);
+
+        async function saveEmployeeOrder() {
+            if (!reorderUrl || !scheduleId) {
+                return;
+            }
+
+            const employeeIds = rows()
+                .map(row => Number(row.dataset.scheduleEmployeeId))
+                .filter(id => Number.isInteger(id) && id > 0);
+
+            if (!employeeIds.length) {
+                return;
+            }
+
+            setReorderStatus('Saving order…', 'text-muted');
+
+            try {
+                const token = getScheduleAntiforgeryToken();
+                const response = await fetch(reorderUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token || ''
+                    },
+                    body: JSON.stringify({
+                        scheduleId,
+                        weekStart,
+                        employeeIds
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Request failed');
+                }
+
+                setReorderStatus('Order saved.', 'text-success');
+            } catch (error) {
+                console.error('Unable to save employee order', error);
+                setReorderStatus('Unable to save order. Please refresh and try again.', 'text-danger');
+            }
+        }
+
+        function setReorderStatus(message, className) {
+            if (!statusElement) {
+                return;
+            }
+            statusElement.textContent = message;
+            statusElement.classList.remove('d-none', 'text-muted', 'text-success', 'text-danger');
+            if (className) {
+                statusElement.classList.add(className);
+            }
+        }
+    }
+
+    function getScheduleAntiforgeryToken() {
+        const form = document.getElementById('scheduleAntiforgeryForm');
+        return form?.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+    }
+
+    function debounce(callback, wait) {
+        let timerId;
+        return function debounced(...args) {
+            window.clearTimeout(timerId);
+            timerId = window.setTimeout(() => callback.apply(this, args), wait);
+        };
+    }
 })();

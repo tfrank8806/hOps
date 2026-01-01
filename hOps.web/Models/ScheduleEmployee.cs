@@ -20,6 +20,7 @@ namespace hOps.web.Models
 
         public bool IsActive { get; set; } = true;
         public bool EmailAlertsEnabled { get; set; } = true;
+        public int SortOrder { get; set; }
 
         public string? CreatedByUserId { get; set; }
         public ApplicationUser? CreatedByUser { get; set; }

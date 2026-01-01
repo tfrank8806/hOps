@@ -146,7 +146,8 @@ namespace hOps.web.Controllers
 
             var scheduleEmployees = await _context.ScheduleEmployees
                 .Where(e => e.PropertyId == property.Id)
-                .OrderBy(e => e.DisplayName)
+                .OrderBy(e => e.SortOrder)
+                .ThenBy(e => e.DisplayName)
                 .ToListAsync();
 
             var pendingRequests = await _context.ScheduleTimeOffRequests
@@ -723,6 +724,76 @@ namespace hOps.web.Controllers
         [Authorize(Roles = "Admin,Manager")]
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateEmployeeOrder([FromBody] ScheduleEmployeeOrderRequest request)
+        {
+            if (request == null || request.ScheduleId <= 0 || request.EmployeeIds == null || request.EmployeeIds.Count == 0)
+            {
+                return BadRequest(new { message = "Invalid request." });
+            }
+
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                return Forbid();
+            }
+
+            var schedule = await _context.Schedules
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == request.ScheduleId);
+
+            if (schedule == null || schedule.PropertyId != property.Id)
+            {
+                return NotFound(new { message = "Schedule not found." });
+            }
+
+            if (schedule.Status != ScheduleStatus.Draft)
+            {
+                return BadRequest(new { message = "Only draft schedules can be reordered." });
+            }
+
+            var propertyEmployees = await _context.ScheduleEmployees
+                .Where(e => e.PropertyId == property.Id)
+                .OrderBy(e => e.SortOrder)
+                .ThenBy(e => e.DisplayName)
+                .ToListAsync();
+
+            var seen = new HashSet<int>();
+            var ordered = new List<ScheduleEmployee>();
+
+            foreach (var employeeId in request.EmployeeIds)
+            {
+                var employee = propertyEmployees.FirstOrDefault(e => e.Id == employeeId);
+                if (employee != null && seen.Add(employeeId))
+                {
+                    ordered.Add(employee);
+                }
+            }
+
+            ordered.AddRange(propertyEmployees.Where(e => !seen.Contains(e.Id)));
+
+            var updated = false;
+            for (var index = 0; index < ordered.Count; index++)
+            {
+                if (ordered[index].SortOrder != index)
+                {
+                    ordered[index].SortOrder = index;
+                    ordered[index].UpdatedAtUtc = DateTime.UtcNow;
+                    updated = true;
+                }
+            }
+
+            if (updated)
+            {
+                await _context.SaveChangesAsync();
+                HttpContext.Session.SetString(ScheduleSortSessionKey, ScheduleSortOption.CustomOrder.ToString());
+            }
+
+            return Json(new { success = true, updated });
+        }
+
+        [Authorize(Roles = "Admin,Manager")]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> PasteAssignment(int scheduleId, int sourceAssignmentId, int targetEmployeeId, DateTime targetDate, string? weekStart = null)
         {
             var property = ViewBag.CurrentProperty as Property;
@@ -896,6 +967,10 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
+            var maxSort = await _context.ScheduleEmployees
+                .Where(e => e.PropertyId == property.Id)
+                .MaxAsync(e => (int?)e.SortOrder) ?? -1;
+
             var employee = new ScheduleEmployee
             {
                 PropertyId = property.Id,
@@ -903,7 +978,8 @@ namespace hOps.web.Controllers
                 Email = string.IsNullOrWhiteSpace(form.Email) ? null : form.Email.Trim(),
                 EmailAlertsEnabled = form.EmailAlertsEnabled,
                 CreatedAtUtc = DateTime.UtcNow,
-                CreatedByUserId = currentUser.Id
+                CreatedByUserId = currentUser.Id,
+                SortOrder = maxSort + 1
             };
 
             _context.ScheduleEmployees.Add(employee);
@@ -1061,6 +1137,8 @@ namespace hOps.web.Controllers
 
             var existingUserEmployees = await _context.ScheduleEmployees
                 .Where(e => e.PropertyId == propertyId && e.ApplicationUserId != null)
+                .OrderBy(e => e.SortOrder)
+                .ThenBy(e => e.DisplayName)
                 .ToListAsync();
 
             var existingUserIds = existingUserEmployees
@@ -1069,31 +1147,9 @@ namespace hOps.web.Controllers
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var now = DateTime.UtcNow;
-            var newEntries = new List<ScheduleEmployee>();
-
-            foreach (var user in propertyUsers)
-            {
-                if (existingUserIds.Contains(user.Id))
-                {
-                    continue;
-                }
-
-                newEntries.Add(new ScheduleEmployee
-                {
-                    PropertyId = propertyId,
-                    ApplicationUserId = user.Id,
-                    DisplayName = BuildDisplayName(user),
-                    Email = user.Email,
-                    EmailAlertsEnabled = true,
-                    CreatedAtUtc = now,
-                    CreatedByUserId = currentUserId
-                });
-            }
-
-            if (newEntries.Any())
-            {
-                _context.ScheduleEmployees.AddRange(newEntries);
-            }
+            var enforceSortOrder = existingUserEmployees.Count > 1 &&
+                existingUserEmployees.Select(e => e.SortOrder).Distinct().Count() <= 1;
+            var normalizedIndex = 0;
 
             foreach (var employee in existingUserEmployees)
             {
@@ -1105,6 +1161,16 @@ namespace hOps.web.Controllers
 
                 var displayName = BuildDisplayName(user);
                 var updated = false;
+
+                if (enforceSortOrder)
+                {
+                    if (employee.SortOrder != normalizedIndex)
+                    {
+                        employee.SortOrder = normalizedIndex;
+                        updated = true;
+                    }
+                    normalizedIndex++;
+                }
 
                 if (!string.Equals(displayName, employee.DisplayName, StringComparison.Ordinal))
                 {
@@ -1122,6 +1188,37 @@ namespace hOps.web.Controllers
                 {
                     employee.UpdatedAtUtc = now;
                 }
+            }
+
+            var nextSortOrder = existingUserEmployees.Any()
+                ? existingUserEmployees.Max(e => e.SortOrder) + 1
+                : 0;
+
+            var newEntries = new List<ScheduleEmployee>();
+
+            foreach (var user in propertyUsers)
+            {
+                if (existingUserIds.Contains(user.Id))
+                {
+                    continue;
+                }
+
+                newEntries.Add(new ScheduleEmployee
+                {
+                    PropertyId = propertyId,
+                    ApplicationUserId = user.Id,
+                    DisplayName = BuildDisplayName(user),
+                    Email = user.Email,
+                    EmailAlertsEnabled = true,
+                    CreatedAtUtc = now,
+                    CreatedByUserId = currentUserId,
+                    SortOrder = nextSortOrder++
+                });
+            }
+
+            if (newEntries.Any())
+            {
+                _context.ScheduleEmployees.AddRange(newEntries);
             }
 
             if (newEntries.Any() || existingUserEmployees.Any(e => e.UpdatedAtUtc == now))
@@ -1307,17 +1404,26 @@ namespace hOps.web.Controllers
                 .ToList();
 
             var rosterOrder = rosterEmployees?
-                .Select((e, index) => new { e.Id, index })
-                .ToDictionary(x => x.Id, x => x.index) ?? new Dictionary<int, int>();
+                .Select(e => new { e.Id, e.SortOrder })
+                .ToDictionary(x => x.Id, x => x.SortOrder) ?? new Dictionary<int, int>();
+            var rosterNames = rosterEmployees?
+                .ToDictionary(e => e.Id, e => e.DisplayName, EqualityComparer<int>.Default) ?? new Dictionary<int, string>();
 
             activeEmployeeIds.Sort((a, b) =>
             {
-                var hasA = rosterOrder.TryGetValue(a, out var indexA);
-                var hasB = rosterOrder.TryGetValue(b, out var indexB);
+                var hasA = rosterOrder.TryGetValue(a, out var orderA);
+                var hasB = rosterOrder.TryGetValue(b, out var orderB);
 
                 if (hasA && hasB)
                 {
-                    return indexA.CompareTo(indexB);
+                    var compare = orderA.CompareTo(orderB);
+                    if (compare != 0)
+                    {
+                        return compare;
+                    }
+                    rosterNames.TryGetValue(a, out var nameA);
+                    rosterNames.TryGetValue(b, out var nameB);
+                    return string.Compare(nameA, nameB, StringComparison.OrdinalIgnoreCase);
                 }
                 if (hasA)
                 {
@@ -1407,6 +1513,10 @@ namespace hOps.web.Controllers
                 {
                     row.PrimaryShiftOrder = null;
                 }
+
+                row.SortOrder = rosterOrder.TryGetValue(row.ScheduleEmployeeId, out var sortValue)
+                    ? sortValue
+                    : int.MaxValue;
             }
 
             IOrderedEnumerable<ScheduleEmployeeRowViewModel> orderedRows;
@@ -1423,6 +1533,12 @@ namespace hOps.web.Controllers
                     .OrderBy(r => r.PrimaryShiftOrder.HasValue ? 0 : 1)
                     .ThenBy(r => r.PrimaryShiftOrder ?? int.MaxValue)
                     .ThenBy(r => r.PrimaryShiftName, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(r => r.EmployeeName, StringComparer.OrdinalIgnoreCase);
+            }
+            else if (sortOption == ScheduleSortOption.CustomOrder)
+            {
+                orderedRows = rows
+                    .OrderBy(r => r.SortOrder)
                     .ThenBy(r => r.EmployeeName, StringComparer.OrdinalIgnoreCase);
             }
             else
@@ -1468,6 +1584,7 @@ namespace hOps.web.Controllers
         {
             return new List<SelectListItem>
             {
+                new SelectListItem("Custom order", ScheduleSortOption.CustomOrder.ToString(), selected == ScheduleSortOption.CustomOrder),
                 new SelectListItem("Employee name", ScheduleSortOption.EmployeeName.ToString(), selected == ScheduleSortOption.EmployeeName),
                 new SelectListItem("Shift name", ScheduleSortOption.ShiftName.ToString(), selected == ScheduleSortOption.ShiftName),
                 new SelectListItem("Shift #", ScheduleSortOption.ShiftNumber.ToString(), selected == ScheduleSortOption.ShiftNumber)

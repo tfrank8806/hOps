@@ -6,6 +6,50 @@
     var nextWeek = Model.WeekStartDate.AddDays(7).ToString("yyyy-MM-dd");
     string? successMessage = Model.AlertMessage;
     string? errorMessage = ViewBag.ScheduleError as string;
+    var canReorderEmployees = Model.CanManage
+        && Model.Status == hOps.web.Models.ScheduleStatus.Draft
+        && Model.SortOption == hOps.web.ViewModels.Schedules.ScheduleSortOption.CustomOrder
+        && Model.HasSchedule
+        && Model.ScheduleId.HasValue;
+}
+
+<form id="scheduleAntiforgeryForm" method="post" class="d-none">
+    @Html.AntiForgeryToken()
+</form>
+
+@section Styles {
+    <style>
+        .schedule-reorder-hint {
+            padding-left: 0.15rem;
+        }
+
+        .schedule-row-handle {
+            border: none;
+            background: transparent;
+            padding: 0 0.35rem 0 0;
+            cursor: grab;
+            color: #94a3b8;
+        }
+
+        .schedule-row-handle:focus-visible {
+            outline: 2px solid rgba(59, 130, 246, 0.45);
+            outline-offset: 2px;
+        }
+
+        .schedule-row-handle__icon {
+            font-size: 0.95rem;
+            letter-spacing: 0.1rem;
+        }
+
+        .schedule-row--dragging {
+            opacity: 0.6;
+            background-color: rgba(59, 130, 246, 0.08);
+        }
+
+        .schedule-reorder-status {
+            min-height: 1.5rem;
+        }
+    </style>
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -143,8 +187,20 @@
                 }
                 else
                 {
+                    @if (canReorderEmployees)
+                    {
+                        <div class="schedule-reorder-hint text-muted small mb-1">
+                            Drag employee rows to change their order. Changes save automatically.
+                        </div>
+                        <div class="schedule-reorder-status text-muted small d-none mb-2" id="scheduleReorderStatus" role="status"></div>
+                    }
                     <div class="table-responsive schedule-grid-wrapper">
-                        <table class="table table-bordered align-middle schedule-grid">
+                        <table class="table table-bordered align-middle schedule-grid"
+                               data-schedule-grid="true"
+                               data-can-reorder="@canReorderEmployees.ToString().ToLowerInvariant()"
+                               data-reorder-url="@(Url.Action("UpdateEmployeeOrder", "Schedules") ?? string.Empty)"
+                               data-schedule-id="@(Model.ScheduleId?.ToString() ?? string.Empty)"
+                               data-week-start="@weekStartParam">
                             <thead class="table-light">
                                 <tr>
                                     <th scope="col" style="width: 180px;">Employee</th>
@@ -159,12 +215,26 @@
                                 {
                                     foreach (var row in Model.EmployeeRows)
                                     {
-                                        <tr>
+                                        <tr data-schedule-row="true"
+                                            data-schedule-employee-id="@row.ScheduleEmployeeId"
+                                            draggable="@(canReorderEmployees ? "true" : "false")">
                                             <td>
                                                 <div class="d-flex justify-content-between align-items-start">
-                                                    <div>
-                                                        <div class="fw-semibold">@row.EmployeeName</div>
-                                                        <div class="text-muted small">@row.SourceLabel @(row.IsActive ? "" : "(Inactive)")</div>
+                                                    <div class="d-flex align-items-start flex-grow-1">
+                                                        @if (canReorderEmployees)
+                                                        {
+                                                            <button type="button"
+                                                                    class="schedule-row-handle"
+                                                                    data-row-handle
+                                                                    title="Drag to reorder"
+                                                                    aria-label="Drag to reorder @row.EmployeeName">
+                                                                <span class="schedule-row-handle__icon" aria-hidden="true">⋮⋮</span>
+                                                            </button>
+                                                        }
+                                                        <div>
+                                                            <div class="fw-semibold">@row.EmployeeName</div>
+                                                            <div class="text-muted small">@row.SourceLabel @(row.IsActive ? "" : "(Inactive)")</div>
+                                                        </div>
                                                     </div>
                                                     @if (Model.CanManage && Model.Status == hOps.web.Models.ScheduleStatus.Draft && Model.ScheduleId.HasValue)
                                                     {

@@ -69,6 +69,7 @@ namespace hOps.web.ViewModels.Schedules
         public bool IsActive { get; set; }
         public string PrimaryShiftName { get; set; } = string.Empty;
         public int? PrimaryShiftOrder { get; set; }
+        public int SortOrder { get; set; }
         public Dictionary<DateTime, List<ScheduleAssignmentItemViewModel>> AssignmentsByDate { get; set; } = new();
         public Dictionary<DateTime, List<TimeOffBadgeViewModel>> TimeOffByDate { get; set; } = new();
     }
@@ -207,6 +208,14 @@ namespace hOps.web.ViewModels.Schedules
     {
         EmployeeName,
         ShiftName,
-        ShiftNumber
+        ShiftNumber,
+        CustomOrder
+    }
+
+    public class ScheduleEmployeeOrderRequest
+    {
+        public int ScheduleId { get; set; }
+        public string? WeekStart { get; set; }
+        public List<int> EmployeeIds { get; set; } = new();
     }
 }
