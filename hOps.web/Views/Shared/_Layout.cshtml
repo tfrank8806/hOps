@@ -150,6 +150,18 @@
                         </li>
                     }
 
+                    <li class="nav-item me-2 d-none d-lg-block">
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                data-hotel-layout-trigger
+                                aria-haspopup="dialog"
+                                aria-expanded="false"
+                                title="Hotel layout quick view">
+                            <span aria-hidden="true">🏨</span>
+                            <span class="d-none d-xl-inline ms-1">Layout</span>
+                        </button>
+                    </li>
+
                     <li class="nav-item dropdown me-2" id="bookmarkMenu">
                         <a class="nav-link position-relative bookmark-toggle" href="#" id="bookmarkMenuToggle" data-bookmark-toggle aria-expanded="false" aria-label="Quick bookmarks">
                             <svg class="bookmark-toggle-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -226,6 +238,11 @@
             </ul>
         </div>
     </header>
+    <div class="hotel-layout-panel shadow-lg d-none" id="hotelLayoutPanel" role="dialog" aria-modal="false">
+        <div class="hotel-layout-panel__content" id="hotelLayoutPanelContent">
+            <div class="p-3 text-muted small">Loading layout…</div>
+        </div>
+    </div>
     <div class="layout-wrapper">
         <aside id="sidebar" class="sidebar bg-white border-end">
             <div class="sidebar-inner">
@@ -671,6 +688,13 @@
             const SIDEBAR_STORAGE_KEY = 'sidebarCollapsed';
             const bookmarkMenu = document.getElementById('bookmarkMenu');
             const bookmarkMenuContent = document.getElementById('bookmarkMenuContent');
+            const hotelLayoutTrigger = document.querySelector('[data-hotel-layout-trigger]');
+            const hotelLayoutPanel = document.getElementById('hotelLayoutPanel');
+            const hotelLayoutPanelContent = document.getElementById('hotelLayoutPanelContent');
+            let hotelLayoutLoaded = false;
+            let hotelLayoutLoading = false;
+            let hotelLayoutHideTimer;
+            let hideHotelLayoutPanel = () => {};
 
             if (bookmarkMenu && bookmarkMenuContent) {
                 const toggle = document.getElementById('bookmarkMenuToggle');
@@ -1348,11 +1372,11 @@
                     }, 180);
                 };
 
-                bookmarkMenu.addEventListener('mouseenter', showBookmarkDropdown);
-                bookmarkMenu.addEventListener('mouseleave', scheduleHideDropdown);
-                toggle?.addEventListener('focus', showBookmarkDropdown);
-                toggle?.addEventListener('blur', scheduleHideDropdown);
-                toggle?.addEventListener('click', async (event) => {
+            bookmarkMenu.addEventListener('mouseenter', showBookmarkDropdown);
+            bookmarkMenu.addEventListener('mouseleave', scheduleHideDropdown);
+            toggle?.addEventListener('focus', showBookmarkDropdown);
+            toggle?.addEventListener('blur', scheduleHideDropdown);
+            toggle?.addEventListener('click', async (event) => {
                     event.preventDefault();
                     await openAllBookmarksModal();
                 });
@@ -1569,8 +1593,105 @@
                     if (todoSidebar && !body.classList.contains('todo-sidebar-collapsed')) {
                         setTodoSidebarCollapsed(true);
                     }
+                    hideHotelLayoutPanel();
                 }
             });
+
+            if (hotelLayoutTrigger && hotelLayoutPanel && hotelLayoutPanelContent) {
+                const showHotelLayoutPanel = () => {
+                    hotelLayoutTrigger.setAttribute('aria-expanded', 'true');
+                    hotelLayoutPanel.classList.add('show');
+                    positionHotelLayoutPanel();
+                    cancelHotelLayoutHide();
+                    ensureHotelLayoutLoaded();
+                };
+
+                hideHotelLayoutPanel = () => {
+                    hotelLayoutTrigger.setAttribute('aria-expanded', 'false');
+                    hotelLayoutPanel.classList.remove('show');
+                };
+
+                const scheduleHotelLayoutHide = () => {
+                    cancelHotelLayoutHide();
+                    hotelLayoutHideTimer = window.setTimeout(() => hideHotelLayoutPanel(), 200);
+                };
+
+                const cancelHotelLayoutHide = () => {
+                    if (hotelLayoutHideTimer) {
+                        window.clearTimeout(hotelLayoutHideTimer);
+                        hotelLayoutHideTimer = undefined;
+                    }
+                };
+
+                const positionHotelLayoutPanel = () => {
+                    const rect = hotelLayoutTrigger.getBoundingClientRect();
+                    const maxWidth = Math.min(520, document.documentElement.clientWidth - 24);
+                    hotelLayoutPanel.style.width = `${maxWidth}px`;
+                    let left = rect.left + window.scrollX + rect.width / 2 - maxWidth / 2;
+                    left = Math.max(12, Math.min(left, document.documentElement.clientWidth - maxWidth - 12));
+                    hotelLayoutPanel.style.left = `${left}px`;
+                    hotelLayoutPanel.style.top = `${rect.bottom + window.scrollY + 8}px`;
+                };
+
+                const ensureHotelLayoutLoaded = async () => {
+                    if (hotelLayoutLoaded || hotelLayoutLoading) {
+                        return;
+                    }
+                    hotelLayoutLoading = true;
+                    hotelLayoutPanelContent.innerHTML = '<div class="p-3 text-muted small">Loading layout…</div>';
+                    try {
+                        const response = await fetch('/Home/HotelLayoutWidget');
+                        if (!response.ok) {
+                            throw new Error('Request failed');
+                        }
+                        const html = await response.text();
+                        hotelLayoutPanelContent.innerHTML = html;
+                        hotelLayoutLoaded = true;
+                    } catch (error) {
+                        console.error('Unable to load hotel layout preview', error);
+                        hotelLayoutPanelContent.innerHTML = '<div class="p-3 text-danger small">Unable to load layout.</div>';
+                    } finally {
+                        hotelLayoutLoading = false;
+                    }
+                };
+
+                const handleHotelLayoutClick = event => {
+                    event.preventDefault();
+                    window.open('/Home/HotelLayoutWidget?mode=popup', 'HotelLayoutPopup', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+                    hideHotelLayoutPanel();
+                };
+
+                hotelLayoutTrigger.addEventListener('mouseenter', showHotelLayoutPanel);
+                hotelLayoutTrigger.addEventListener('focus', showHotelLayoutPanel);
+                hotelLayoutTrigger.addEventListener('mouseleave', scheduleHotelLayoutHide);
+                hotelLayoutTrigger.addEventListener('blur', scheduleHotelLayoutHide);
+                hotelLayoutTrigger.addEventListener('click', handleHotelLayoutClick);
+
+                hotelLayoutPanel.addEventListener('mouseenter', cancelHotelLayoutHide);
+                hotelLayoutPanel.addEventListener('mouseleave', scheduleHotelLayoutHide);
+
+                window.addEventListener('scroll', () => {
+                    if (hotelLayoutPanel.classList.contains('show')) {
+                        hideHotelLayoutPanel();
+                    }
+                });
+
+                window.addEventListener('resize', () => {
+                    if (hotelLayoutPanel.classList.contains('show')) {
+                        positionHotelLayoutPanel();
+                    }
+                });
+
+                document.addEventListener('click', event => {
+                    if (!hotelLayoutPanel.classList.contains('show')) {
+                        return;
+                    }
+                    if (event.target.closest('[data-hotel-layout-trigger]') || event.target.closest('#hotelLayoutPanel')) {
+                        return;
+                    }
+                    hideHotelLayoutPanel();
+                });
+            }
 
             const todoSidebar = document.getElementById('todoSidebar');
             const todoRailToggle = document.getElementById('todoSidebarRailToggle');

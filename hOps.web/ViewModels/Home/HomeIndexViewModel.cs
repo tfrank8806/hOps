@@ -41,7 +41,7 @@ namespace hOps.web.ViewModels.Home
         public Dictionary<HomeWidgetSize, string> WidgetSizeClasses { get; set; } = new();
         public List<HomeWidgetDefinition> ActiveWidgetDefinitions { get; set; } = new();
         public int WidgetHeightMin { get; set; } = 220;
-        public int WidgetHeightMax { get; set; } = 900;
+        public int WidgetHeightMax { get; set; } = 1500;
         public int WidgetHeightStep { get; set; } = 10;
         public int WidgetHeightDefault { get; set; } = 300;
         public int WidgetHeightResetThreshold { get; set; } = 5;

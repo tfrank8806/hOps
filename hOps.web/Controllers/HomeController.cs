@@ -33,7 +33,7 @@ namespace hOps.web.Controllers
         private const string PersonaSessionKey = "HomeLayoutPersona";
         private const int DefaultWidgetHeight = 300;
         private const int MinWidgetHeight = 220;
-        private const int MaxWidgetHeight = 900;
+        private const int MaxWidgetHeight = 1500;
         private const int WidgetHeightStep = 10;
         private const int WidgetHeightResetThreshold = 6;
 
@@ -168,6 +168,26 @@ namespace hOps.web.Controllers
             await PopulateMyScheduleAsync(viewModel, propertyId, user.Id);
 
             return View(viewModel);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> HotelLayoutWidget(string? mode = null)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var property = ViewBag.CurrentProperty as Property;
+            var viewModel = await BuildHotelLayoutViewModelAsync(property);
+
+            if (string.Equals(mode, "popup", StringComparison.OrdinalIgnoreCase))
+            {
+                return View("HotelLayoutPopup", viewModel);
+            }
+
+            return PartialView("~/Views/Home/Widgets/_HotelLayoutWidget.cshtml", viewModel);
         }
 
         [HttpGet]
@@ -747,6 +767,27 @@ namespace hOps.web.Controllers
                         .ToList(),
                 })
                 .ToList();
+        }
+
+        private async Task<HomeIndexViewModel> BuildHotelLayoutViewModelAsync(Property? property)
+        {
+            var viewModel = new HomeIndexViewModel
+            {
+                CurrentProperty = property,
+                WidgetHeightDefault = DefaultWidgetHeight,
+                WidgetHeightMin = MinWidgetHeight,
+                WidgetHeightMax = MaxWidgetHeight,
+                WidgetHeightStep = WidgetHeightStep,
+                WidgetHeightResetThreshold = WidgetHeightResetThreshold
+            };
+
+            if (property != null)
+            {
+                await PopulateRoomTilesAsync(viewModel, property.Id);
+                await PopulateQuickWorkOrderOptionsAsync(viewModel, property.Id);
+            }
+
+            return viewModel;
         }
 
         private async Task PopulateRoomTilesAsync(HomeIndexViewModel viewModel, int propertyId)
