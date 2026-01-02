@@ -384,14 +384,14 @@
 
     <div class="col-12 col-xl-3 col-xxl-3">
         <div class="schedule-side-panel">
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h5>Add Shift</h5>
-                    @if (!Model.HasSchedule)
-                    {
-                        <p class="text-muted mb-0">Create a schedule draft before adding shifts.</p>
-                        @if (Model.CanManage)
+            @if (Model.CanManage)
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5>Add Shift</h5>
+                        @if (!Model.HasSchedule)
                         {
+                            <p class="text-muted mb-0">Create a schedule draft before adding shifts.</p>
                             <button type="button"
                                     class="btn btn-outline-secondary btn-sm mt-3"
                                     data-bs-toggle="modal"
@@ -399,18 +399,13 @@
                                 Add Employee
                             </button>
                         }
-                    }
-                    else if (!Model.CanManage)
-                    {
-                        <p class="text-muted mb-0">Only managers can edit the schedule.</p>
-                    }
-                    else
-                    {
-                        <div id="scheduleClipboardStatus" class="alert alert-info small d-none"></div>
-                        <form id="addShiftForm" asp-action="AddAssignment" method="post" class="row g-3">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" asp-for="AssignmentForm.ScheduleId" />
-                            <input type="hidden" asp-for="AssignmentForm.ShiftColorHex" id="shiftColorInput" />
+                        else
+                        {
+                            <div id="scheduleClipboardStatus" class="alert alert-info small d-none"></div>
+                            <form id="addShiftForm" asp-action="AddAssignment" method="post" class="row g-3">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" asp-for="AssignmentForm.ScheduleId" />
+                                <input type="hidden" asp-for="AssignmentForm.ShiftColorHex" id="shiftColorInput" />
                             <input type="hidden" name="weekStart" value="@weekStartParam" />
                             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                             <div class="col-12">
@@ -493,9 +488,10 @@
                                 <button type="submit" class="btn btn-primary w-100">Add Shift</button>
                             </div>
                         </form>
-                    }
+                        }
+                    </div>
                 </div>
-            </div>
+            }
         <div class="card mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -569,17 +565,20 @@
             </div>
         }
 
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5>Schedule Settings</h5>
-                <p class="mb-1"><strong>Week starts on:</strong> @Model.SettingsSummary.StartDayOfWeek</p>
-                <p class="mb-2"><strong>Default shifts:</strong> @Model.SettingsSummary.ShiftTemplateCount</p>
-                @if (!string.IsNullOrWhiteSpace(Model.SettingsSummary.SettingsUrl))
-                {
-                    <a class="btn btn-link p-0" href="@Model.SettingsSummary.SettingsUrl">Edit schedule setup</a>
-                }
+        @if (Model.CanManage)
+        {
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5>Schedule Settings</h5>
+                    <p class="mb-1"><strong>Week starts on:</strong> @Model.SettingsSummary.StartDayOfWeek</p>
+                    <p class="mb-2"><strong>Default shifts:</strong> @Model.SettingsSummary.ShiftTemplateCount</p>
+                    @if (!string.IsNullOrWhiteSpace(Model.SettingsSummary.SettingsUrl))
+                    {
+                        <a class="btn btn-link p-0" href="@Model.SettingsSummary.SettingsUrl">Edit schedule setup</a>
+                    }
+                </div>
             </div>
-        </div>
+        }
 
         </div>
     </div>

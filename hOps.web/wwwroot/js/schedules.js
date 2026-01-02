@@ -431,49 +431,42 @@
                 option.selected = option.value === value;
             });
         }
+    }
 
-        const returnDateFormatter = typeof Intl !== 'undefined' && Intl.DateTimeFormat
-            ? new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-            : null;
+    const returnDateFormatter = typeof Intl !== 'undefined' && Intl.DateTimeFormat
+        ? new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        : null;
 
-        const updateReturnToWorkDate = () => {
-            if (!timeOffEndInput || !returnToWorkDateElement) {
-                return;
-            }
-            const iso = (timeOffEndInput.value || '').trim();
-            if (!iso) {
-                returnToWorkDateElement.textContent = 'N/A';
-                return;
-            }
-            const [year, month, day] = iso.split('-').map(part => parseInt(part, 10));
-            if ([year, month, day].some(value => Number.isNaN(value))) {
-                returnToWorkDateElement.textContent = 'N/A';
-                return;
-            }
-            const date = new Date(Date.UTC(year, month - 1, day));
-            date.setUTCDate(date.getUTCDate() + 1);
-            if (returnDateFormatter) {
-                returnToWorkDateElement.textContent = returnDateFormatter.format(date);
-            } else {
-                const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-                const dd = String(date.getUTCDate()).padStart(2, '0');
-                returnToWorkDateElement.textContent = `${date.getUTCFullYear()}-${mm}-${dd}`;
-            }
-        };
-
-        if (timeOffEndInput && returnToWorkDateElement) {
-            const debouncedUpdate = debounce(updateReturnToWorkDate, 75);
-            timeOffEndInput.addEventListener('input', debouncedUpdate);
-            timeOffEndInput.addEventListener('change', updateReturnToWorkDate);
-            updateReturnToWorkDate();
+    const updateReturnToWorkDate = () => {
+        if (!timeOffEndInput || !returnToWorkDateElement) {
+            return;
         }
-
-            statusElement.textContent = message;
-            statusElement.classList.remove('d-none', 'text-muted', 'text-success', 'text-danger');
-            if (className) {
-                statusElement.classList.add(className);
-            }
+        const iso = (timeOffEndInput.value || '').trim();
+        if (!iso) {
+            returnToWorkDateElement.textContent = 'N/A';
+            return;
         }
+        const [year, month, day] = iso.split('-').map(part => parseInt(part, 10));
+        if ([year, month, day].some(value => Number.isNaN(value))) {
+            returnToWorkDateElement.textContent = 'N/A';
+            return;
+        }
+        const date = new Date(Date.UTC(year, month - 1, day));
+        date.setUTCDate(date.getUTCDate() + 1);
+        if (returnDateFormatter) {
+            returnToWorkDateElement.textContent = returnDateFormatter.format(date);
+        } else {
+            const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const dd = String(date.getUTCDate()).padStart(2, '0');
+            returnToWorkDateElement.textContent = `${date.getUTCFullYear()}-${mm}-${dd}`;
+        }
+    };
+
+    if (timeOffEndInput && returnToWorkDateElement) {
+        const debouncedUpdate = debounce(updateReturnToWorkDate, 75);
+        timeOffEndInput.addEventListener('input', debouncedUpdate);
+        timeOffEndInput.addEventListener('change', updateReturnToWorkDate);
+        updateReturnToWorkDate();
     }
 
     function getScheduleAntiforgeryToken() {
