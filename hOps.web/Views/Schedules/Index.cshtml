@@ -56,9 +56,15 @@
         <h2 class="mb-0">@Model.PropertyName</h2>
         <p class="text-muted mb-0">@Model.WeekStartDate.ToString("MMM d") - @Model.WeekEndDate.ToString("MMM d, yyyy")</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap align-items-center">
         <a class="btn btn-outline-secondary" asp-action="Index" asp-route-weekStart="@previousWeek" asp-route-sortOption="@Model.SortOption">&larr; Previous</a>
         <a class="btn btn-outline-secondary" asp-action="Index" asp-route-weekStart="@nextWeek" asp-route-sortOption="@Model.SortOption">Next &rarr;</a>
+        <button type="button"
+                class="btn btn-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#requestOffModal">
+            Request Off
+        </button>
     </div>
 </div>
 
@@ -384,6 +390,15 @@
                     @if (!Model.HasSchedule)
                     {
                         <p class="text-muted mb-0">Create a schedule draft before adding shifts.</p>
+                        @if (Model.CanManage)
+                        {
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm mt-3"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#addEmployeeModal">
+                                Add Employee
+                            </button>
+                        }
                     }
                     else if (!Model.CanManage)
                     {
@@ -407,6 +422,12 @@
                                         <option value="@option.Id">@option.DisplayName</option>
                                     }
                                 </select>
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm mt-2"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#addEmployeeModal">
+                                    Add Employee
+                                </button>
                             </div>
                             <div class="col-12">
                                 <label asp-for="AssignmentForm.ShiftTemplateId" class="form-label"></label>
@@ -477,30 +498,15 @@
             </div>
         <div class="card mb-4">
             <div class="card-body">
-                <h5>Request Time Off</h5>
-                <form asp-action="SubmitTimeOff" method="post">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="weekStart" value="@weekStartParam" />
-                    <div class="mb-3">
-                        <label asp-for="TimeOffForm.StartDate" class="form-label"></label>
-                        <input asp-for="TimeOffForm.StartDate" class="form-control" type="date" value="@Model.TimeOffForm.StartDate.ToString("yyyy-MM-dd")" />
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="TimeOffForm.EndDate" class="form-label"></label>
-                        <input asp-for="TimeOffForm.EndDate" class="form-control" type="date" value="@Model.TimeOffForm.EndDate.ToString("yyyy-MM-dd")" />
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="TimeOffForm.Reason" class="form-label"></label>
-                        <textarea asp-for="TimeOffForm.Reason" class="form-control"></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-outline-secondary w-100">Submit Request</button>
-                </form>
-            </div>
-        </div>
-
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5>My Requests</h5>
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h5 class="mb-0">My Requests</h5>
+                    <button type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#requestOffModal">
+                        Request Off
+                    </button>
+                </div>
                 @if (Model.MyRequests.Any())
                 {
                     <ul class="list-group list-group-flush">
@@ -575,14 +581,56 @@
             </div>
         </div>
 
-        @if (Model.CanManage)
-        {
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h5>Add Employee</h5>
-                    <form asp-action="AddEmployee" method="post">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="weekStart" value="@weekStartParam" />
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="requestOffModal" tabindex="-1" aria-labelledby="requestOffModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="SubmitTimeOff" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="weekStart" value="@weekStartParam" />
+                <div class="modal-header">
+                    <h5 class="modal-title" id="requestOffModalLabel">Request Time Off</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label asp-for="TimeOffForm.StartDate" class="form-label"></label>
+                        <input asp-for="TimeOffForm.StartDate" class="form-control" type="date" value="@Model.TimeOffForm.StartDate.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="TimeOffForm.EndDate" class="form-label"></label>
+                        <input asp-for="TimeOffForm.EndDate" class="form-control" type="date" value="@Model.TimeOffForm.EndDate.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="TimeOffForm.Reason" class="form-label"></label>
+                        <textarea asp-for="TimeOffForm.Reason" class="form-control"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Submit Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@if (Model.CanManage)
+{
+    <div class="modal fade" id="addEmployeeModal" tabindex="-1" aria-labelledby="addEmployeeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form asp-action="AddEmployee" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="weekStart" value="@weekStartParam" />
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addEmployeeModalLabel">Add Employee</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
                         <div class="mb-3">
                             <label asp-for="EmployeeForm.DisplayName" class="form-label"></label>
                             <input asp-for="EmployeeForm.DisplayName" class="form-control" />
@@ -597,14 +645,16 @@
                             <input asp-for="EmployeeForm.EmailAlertsEnabled" class="form-check-input" />
                             <label asp-for="EmployeeForm.EmailAlertsEnabled" class="form-check-label"></label>
                         </div>
-                        <button type="submit" class="btn btn-outline-primary w-100">Add Employee</button>
-                    </form>
-                </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add Employee</button>
+                    </div>
+                </form>
             </div>
-        }
         </div>
     </div>
-</div>
+}
 
 @if (Model.CanManage && Model.Status == hOps.web.Models.ScheduleStatus.Draft)
 {
