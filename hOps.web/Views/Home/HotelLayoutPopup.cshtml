@@ -5,6 +5,10 @@
     ViewData["ContentSurfaceClass"] = "content-surface--flush";
 }
 
+@section Styles {
+    @await Html.PartialAsync("~/Views/Home/Widgets/_HotelLayoutWidgetStyles.cshtml")
+}
+
 <div class="container-fluid py-4">
     <div class="content-surface shadow-sm rounded-4 p-3">
         @await Html.PartialAsync("~/Views/Home/Widgets/_HotelLayoutWidget.cshtml", Model)
