@@ -757,13 +757,13 @@ body.sidebar-collapsed .sidebar-inner {
     position: fixed;
     top: calc(var(--main-header-height) + 0.5rem);
     right: 2rem;
-    width: min(520px, 95vw);
-    max-height: 82vh;
-    overflow: auto;
+    width: min(680px, 92vw);
+    max-height: 90vh;
+    overflow: hidden;
     background: #fff;
     border: 1px solid rgba(15, 23, 42, 0.08);
-    border-radius: 1rem;
-    padding: 0.75rem;
+    border-radius: 1.25rem;
+    padding: 0;
     z-index: 1500;
     display: none;
 }
@@ -773,7 +773,21 @@ body.sidebar-collapsed .sidebar-inner {
 }
 
 .hotel-layout-panel__content {
-    min-width: 300px;
+    min-width: 340px;
+    height: 100%;
+}
+
+.hotel-layout-panel__frame {
+    display: block;
+    width: 100%;
+    height: min(88vh, 760px);
+    border: 0;
+    background: transparent;
+    border-radius: 1.25rem;
+}
+
+.hotel-layout-panel__placeholder {
+    padding: 1.25rem;
 }
 
 .content-surface {

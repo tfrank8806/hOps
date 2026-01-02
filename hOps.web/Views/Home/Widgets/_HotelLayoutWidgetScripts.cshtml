@@ -41,6 +41,7 @@
                 radio.addEventListener('change', () => {
                     if (radio.checked) {
                         applySelectedView();
+                        queueRoomLabelMeasurement();
                     }
                 });
             });
@@ -49,6 +50,80 @@
 
             const clickableTiles = document.querySelectorAll('.room-tile-overlay, .layout-floor-section .room-tile');
             const layoutWidget = document.getElementById('layoutWidget');
+            let labelMeasurementFrame;
+
+            const buildRoomLabelAbbreviation = (value) => {
+                const text = typeof value === 'string' ? value.trim() : '';
+                if (!text) {
+                    return '';
+                }
+                if (text.length <= 5) {
+                    return text;
+                }
+                const tokens = text.split(/[\s\-\/]+/g).filter(Boolean);
+                if (tokens.length > 1) {
+                    const acronym = tokens.map(token => token[0]).join('').toUpperCase();
+                    if (acronym.length >= 2) {
+                        return acronym.slice(0, 4);
+                    }
+                }
+                const sanitized = text.replace(/[^A-Za-z0-9]/g, '');
+                if (sanitized.length >= 3) {
+                    return sanitized.slice(0, 4).toUpperCase();
+                }
+                return text.slice(0, 4).toUpperCase();
+            };
+
+            const applyRoomLabelAbbreviations = () => {
+                if (!layoutWidget) {
+                    return;
+                }
+                const labels = layoutWidget.querySelectorAll('.tile-label, .tile-room');
+                labels.forEach(label => {
+                    if (!(label instanceof HTMLElement)) {
+                        return;
+                    }
+                    const fullLabel = (label.dataset.roomFullLabel || label.textContent || '').trim();
+                    if (!fullLabel) {
+                        label.removeAttribute('title');
+                        label.classList.remove('tile-text--abbreviated');
+                        return;
+                    }
+                    label.dataset.roomFullLabel = fullLabel;
+                    label.textContent = fullLabel;
+                    label.classList.remove('tile-text--abbreviated');
+                    label.removeAttribute('title');
+
+                    if (label.offsetParent === null) {
+                        return;
+                    }
+
+                    const overflows = (label.scrollWidth - label.clientWidth) > 1 || (label.scrollHeight - label.clientHeight) > 1;
+                    if (!overflows) {
+                        return;
+                    }
+
+                    const abbreviation = buildRoomLabelAbbreviation(fullLabel);
+                    if (!abbreviation || abbreviation === fullLabel) {
+                        label.setAttribute('title', fullLabel);
+                        return;
+                    }
+                    label.textContent = abbreviation;
+                    label.classList.add('tile-text--abbreviated');
+                    label.setAttribute('title', fullLabel);
+                });
+            };
+
+            const queueRoomLabelMeasurement = () => {
+                if (labelMeasurementFrame) {
+                    cancelAnimationFrame(labelMeasurementFrame);
+                }
+                labelMeasurementFrame = window.requestAnimationFrame(() => {
+                    labelMeasurementFrame = null;
+                    applyRoomLabelAbbreviations();
+                });
+            };
+
             const propertyId = Number(layoutWidget?.dataset.propertyId || '0');
             const summaryUrl = layoutWidget?.dataset.roomSummaryUrl || '';
             const createUrl = layoutWidget?.dataset.roomCreateUrl || '';
@@ -57,6 +132,8 @@
             if (roomMenu && roomMenu.parentElement !== document.body) {
                 document.body.appendChild(roomMenu);
             }
+
+            queueRoomLabelMeasurement();
 
             const roomMenuTitle = roomMenu?.querySelector('[data-room-name]');
             const roomMenuFloor = roomMenu?.querySelector('[data-room-floor]');
@@ -443,7 +520,10 @@
                 closeRoomMenu();
             });
             window.addEventListener('scroll', () => closeRoomMenu(), true);
-            window.addEventListener('resize', () => closeRoomMenu());
+            window.addEventListener('resize', () => {
+                closeRoomMenu();
+                queueRoomLabelMeasurement();
+            });
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape') {
                     closeRoomMenu();
