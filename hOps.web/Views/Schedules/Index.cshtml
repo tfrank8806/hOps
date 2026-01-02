@@ -602,11 +602,39 @@
                     </div>
                     <div class="mb-3">
                         <label asp-for="TimeOffForm.EndDate" class="form-label"></label>
-                        <input asp-for="TimeOffForm.EndDate" class="form-control" type="date" value="@Model.TimeOffForm.EndDate.ToString("yyyy-MM-dd")" />
+                        <input asp-for="TimeOffForm.EndDate" id="timeOffEndDateInput" class="form-control" type="date" value="@Model.TimeOffForm.EndDate.ToString("yyyy-MM-dd")" />
+                        <div class="form-text">
+                            Return to Work Date:
+                            <span id="returnToWorkDate">@Model.TimeOffForm.EndDate.AddDays(1).ToString("MMM d, yyyy")</span>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label asp-for="TimeOffForm.Reason" class="form-label"></label>
                         <textarea asp-for="TimeOffForm.Reason" class="form-control"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="TimeOffForm.VacationHours" class="form-label"></label>
+                        <input asp-for="TimeOffForm.VacationHours"
+                               class="form-control"
+                               type="number"
+                               min="0"
+                               step="0.25"
+                               inputmode="decimal"
+                               placeholder="Enter vacation hours to use" />
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="TimeOffForm.SickTimeHours" class="form-label"></label>
+                        <input asp-for="TimeOffForm.SickTimeHours"
+                               class="form-control"
+                               type="number"
+                               min="0"
+                               step="0.25"
+                               inputmode="decimal"
+                               placeholder="Enter sick time hours to use" />
+                    </div>
+                    <div class="form-check mb-3">
+                        <input asp-for="TimeOffForm.IsUnpaid" class="form-check-input" />
+                        <label asp-for="TimeOffForm.IsUnpaid" class="form-check-label"></label>
                     </div>
                 </div>
                 <div class="modal-footer">

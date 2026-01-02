@@ -22,6 +22,10 @@ namespace hOps.web.Models
 
         public string Reason { get; set; } = string.Empty;
 
+        public decimal? VacationHours { get; set; }
+        public decimal? SickTimeHours { get; set; }
+        public bool IsUnpaid { get; set; }
+
         public TimeOffRequestStatus Status { get; set; } = TimeOffRequestStatus.Pending;
 
         public string? DecisionByUserId { get; set; }

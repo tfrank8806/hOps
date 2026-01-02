@@ -179,6 +179,17 @@ namespace hOps.web.ViewModels.Schedules
         [MaxLength(500)]
         [Display(Name = "Reason")]
         public string Reason { get; set; } = string.Empty;
+
+        [Display(Name = "Vacation hours (optional)")]
+        [Range(0, 1000, ErrorMessage = "Vacation hours must be zero or greater.")]
+        public decimal? VacationHours { get; set; }
+
+        [Display(Name = "Sick time hours (optional)")]
+        [Range(0, 1000, ErrorMessage = "Sick time hours must be zero or greater.")]
+        public decimal? SickTimeHours { get; set; }
+
+        [Display(Name = "unpaid")]
+        public bool IsUnpaid { get; set; }
     }
 
     public class TimeOffRequestListItemViewModel
@@ -194,6 +205,9 @@ namespace hOps.web.ViewModels.Schedules
         public string? DecisionByName { get; set; }
         public DateTime? DecisionAtUtc { get; set; }
         public string? DecisionNotes { get; set; }
+        public decimal? VacationHours { get; set; }
+        public decimal? SickTimeHours { get; set; }
+        public bool IsUnpaid { get; set; }
     }
 
     public class ScheduleShiftAlertViewModel

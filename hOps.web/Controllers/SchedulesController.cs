@@ -1034,17 +1034,20 @@ namespace hOps.web.Controllers
                 return RedirectToAction(nameof(Index), new { weekStart });
             }
 
-            var request = new ScheduleTimeOffRequest
-            {
-                PropertyId = property.Id,
-                ScheduleEmployeeId = employee.Id,
-                SubmittedByUserId = currentUser.Id,
-                StartDate = DateTime.SpecifyKind(form.StartDate.Date, DateTimeKind.Utc),
-                EndDate = DateTime.SpecifyKind(form.EndDate.Date, DateTimeKind.Utc),
-                Reason = form.Reason.Trim(),
-                Status = TimeOffRequestStatus.Pending,
-                SubmittedAtUtc = DateTime.UtcNow
-            };
+              var request = new ScheduleTimeOffRequest
+              {
+                  PropertyId = property.Id,
+                  ScheduleEmployeeId = employee.Id,
+                  SubmittedByUserId = currentUser.Id,
+                  StartDate = DateTime.SpecifyKind(form.StartDate.Date, DateTimeKind.Utc),
+                  EndDate = DateTime.SpecifyKind(form.EndDate.Date, DateTimeKind.Utc),
+                  Reason = form.Reason.Trim(),
+                  VacationHours = form.VacationHours,
+                  SickTimeHours = form.SickTimeHours,
+                  IsUnpaid = form.IsUnpaid,
+                  Status = TimeOffRequestStatus.Pending,
+                  SubmittedAtUtc = DateTime.UtcNow
+              };
 
             _context.ScheduleTimeOffRequests.Add(request);
             await _context.SaveChangesAsync();
@@ -1724,7 +1727,10 @@ namespace hOps.web.Controllers
                     ? $"{request.DecisionByUser.FirstName} {request.DecisionByUser.LastName}".Trim()
                     : null,
                 DecisionAtUtc = request.DecisionAtUtc,
-                DecisionNotes = request.DecisionNotes
+                DecisionNotes = request.DecisionNotes,
+                VacationHours = request.VacationHours,
+                SickTimeHours = request.SickTimeHours,
+                IsUnpaid = request.IsUnpaid
             };
         }
     }
