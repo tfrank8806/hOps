@@ -10,3 +10,7 @@
         @await Html.PartialAsync("~/Views/Home/Widgets/_HotelLayoutWidget.cshtml", Model)
     </div>
 </div>
+
+@section Scripts {
+    @await Html.PartialAsync("~/Views/Home/Widgets/_HotelLayoutWidgetScripts.cshtml")
+}

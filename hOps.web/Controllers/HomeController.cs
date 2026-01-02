@@ -187,6 +187,11 @@ namespace hOps.web.Controllers
                 return View("HotelLayoutPopup", viewModel);
             }
 
+            if (string.Equals(mode, "panel", StringComparison.OrdinalIgnoreCase))
+            {
+                return View("HotelLayoutPanel", viewModel);
+            }
+
             return PartialView("~/Views/Home/Widgets/_HotelLayoutWidget.cshtml", viewModel);
         }
 

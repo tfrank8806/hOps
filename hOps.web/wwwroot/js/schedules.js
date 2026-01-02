@@ -378,7 +378,7 @@
                 return;
             }
             ensureCustomSortSelected();
-            setReorderStatus('Saving order…', 'text-muted');
+            setReorderStatus('Saving order...', 'text-muted');
             try {
                 const token = getScheduleAntiforgeryToken();
                 const response = await fetch(reorderUrl, {

@@ -1598,12 +1598,27 @@
             });
 
             if (hotelLayoutTrigger && hotelLayoutPanel && hotelLayoutPanelContent) {
+                const ensureHotelLayoutIframe = () => {
+                    let iframe = hotelLayoutPanelContent.querySelector('iframe');
+                    if (!iframe) {
+                        iframe = document.createElement('iframe');
+                        iframe.src = '/Home/HotelLayoutWidget?mode=panel';
+                        iframe.className = 'hotel-layout-panel__frame';
+                        iframe.title = 'Hotel layout preview';
+                        iframe.loading = 'lazy';
+                        iframe.setAttribute('aria-label', 'Hotel layout preview');
+                        hotelLayoutPanelContent.innerHTML = '';
+                        hotelLayoutPanelContent.appendChild(iframe);
+                    }
+                    return iframe;
+                };
+
                 const showHotelLayoutPanel = () => {
                     hotelLayoutTrigger.setAttribute('aria-expanded', 'true');
                     hotelLayoutPanel.classList.add('show');
                     positionHotelLayoutPanel();
                     cancelHotelLayoutHide();
-                    ensureHotelLayoutLoaded();
+                    ensureHotelLayoutIframe();
                 };
 
                 hideHotelLayoutPanel = () => {
@@ -1631,28 +1646,6 @@
                     left = Math.max(12, Math.min(left, document.documentElement.clientWidth - maxWidth - 12));
                     hotelLayoutPanel.style.left = `${left}px`;
                     hotelLayoutPanel.style.top = `${rect.bottom + window.scrollY + 8}px`;
-                };
-
-                const ensureHotelLayoutLoaded = async () => {
-                    if (hotelLayoutLoaded || hotelLayoutLoading) {
-                        return;
-                    }
-                    hotelLayoutLoading = true;
-                    hotelLayoutPanelContent.innerHTML = '<div class="p-3 text-muted small">Loading layout…</div>';
-                    try {
-                        const response = await fetch('/Home/HotelLayoutWidget');
-                        if (!response.ok) {
-                            throw new Error('Request failed');
-                        }
-                        const html = await response.text();
-                        hotelLayoutPanelContent.innerHTML = html;
-                        hotelLayoutLoaded = true;
-                    } catch (error) {
-                        console.error('Unable to load hotel layout preview', error);
-                        hotelLayoutPanelContent.innerHTML = '<div class="p-3 text-danger small">Unable to load layout.</div>';
-                    } finally {
-                        hotelLayoutLoading = false;
-                    }
                 };
 
                 const handleHotelLayoutClick = event => {

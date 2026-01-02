@@ -1,0 +1,582 @@
+<script>
+        (() => {
+            const overlayView = document.getElementById('layoutOverlayView');
+            const perFloorView = document.getElementById('layoutFloorView');
+            const viewRadios = document.querySelectorAll('input[name="layoutViewMode"]');
+
+            if (!overlayView && !perFloorView) {
+                return;
+            }
+
+            const floorSections = document.querySelectorAll('.layout-floor-section');
+
+            const setActiveFloor = (floorValue) => {
+                floorSections.forEach(section => {
+                    if (!(section instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const shouldHide = section.dataset.floor !== floorValue;
+                    section.classList.toggle('d-none', shouldHide);
+                });
+            };
+
+            const applySelectedView = () => {
+                const selected = document.querySelector('input[name="layoutViewMode"]:checked');
+                if (!selected) {
+                    return;
+                }
+
+                if (selected.value === 'all') {
+                    overlayView?.classList.remove('d-none');
+                    perFloorView?.classList.add('d-none');
+                } else {
+                    overlayView?.classList.add('d-none');
+                    perFloorView?.classList.remove('d-none');
+                    setActiveFloor(selected.value);
+                }
+            };
+
+            viewRadios.forEach(radio => {
+                radio.addEventListener('change', () => {
+                    if (radio.checked) {
+                        applySelectedView();
+                    }
+                });
+            });
+
+            applySelectedView();
+
+            const clickableTiles = document.querySelectorAll('.room-tile-overlay, .layout-floor-section .room-tile');
+            const layoutWidget = document.getElementById('layoutWidget');
+            const propertyId = Number(layoutWidget?.dataset.propertyId || '0');
+            const summaryUrl = layoutWidget?.dataset.roomSummaryUrl || '';
+            const createUrl = layoutWidget?.dataset.roomCreateUrl || '';
+            const workOrdersUrl = layoutWidget?.dataset.workordersUrl || '';
+            const roomMenu = document.getElementById('layoutRoomMenu');
+            if (roomMenu && roomMenu.parentElement !== document.body) {
+                document.body.appendChild(roomMenu);
+            }
+
+            const roomMenuTitle = roomMenu?.querySelector('[data-room-name]');
+            const roomMenuFloor = roomMenu?.querySelector('[data-room-floor]');
+            const roomMenuList = roomMenu?.querySelector('[data-room-workorders]');
+            const viewOrdersLink = roomMenu?.querySelector('[data-view-workorders]');
+            const createWorkOrderButton = roomMenu?.querySelector('[data-create-workorder]');
+            const closeMenuButton = roomMenu?.querySelector('[data-close-room-menu]');
+
+            const workOrderForm = document.getElementById('layoutWorkOrderForm');
+            const formStatus = workOrderForm?.querySelector('[data-form-status]');
+            const roomDisplay = workOrderForm?.querySelector('[data-room-display]');
+            const dueDateInput = workOrderForm?.querySelector('input[name="DueDate"]');
+            const issueInput = workOrderForm?.querySelector('textarea[name="Issue"]');
+            const detailsInput = workOrderForm?.querySelector('textarea[name="Details"]');
+            const propertyInput = workOrderForm?.querySelector('input[name="PropertyId"]');
+            const roomNumberInput = workOrderForm?.querySelector('input[name="RoomNumber"]');
+            const roomLabelInput = workOrderForm?.querySelector('input[name="RoomLabel"]');
+            const tokenInput = workOrderForm?.querySelector('input[name="__RequestVerificationToken"]');
+            const modalEl = document.getElementById('layoutWorkOrderModal');
+
+            const resolveBootstrap = () => {
+                if (typeof window !== 'undefined' && window.bootstrap) {
+                    return window.bootstrap;
+                }
+                if (typeof bootstrap !== 'undefined') {
+                    return bootstrap;
+                }
+                return null;
+            };
+
+            let layoutModalInstance = null;
+            const getLayoutModal = () => {
+                if (!modalEl) {
+                    return null;
+                }
+                if (layoutModalInstance) {
+                    return layoutModalInstance;
+                }
+                const bootstrapLib = resolveBootstrap();
+                if (!bootstrapLib?.Modal) {
+                    return null;
+                }
+                layoutModalInstance = bootstrapLib.Modal.getOrCreateInstance(modalEl);
+                return layoutModalInstance;
+            };
+
+            let activeTile;
+            let currentRoom;
+
+            const setActiveTile = (tile) => {
+                if (activeTile) {
+                    activeTile.classList.remove('room-tile-overlay--active', 'room-tile--active');
+                }
+                activeTile = tile;
+                if (!activeTile) {
+                    return;
+                }
+                if (activeTile.classList.contains('room-tile-overlay')) {
+                    activeTile.classList.add('room-tile-overlay--active');
+                } else {
+                    activeTile.classList.add('room-tile--active');
+                }
+            };
+
+            const closeRoomMenu = () => {
+                if (roomMenu) {
+                    roomMenu.classList.remove('show');
+                    roomMenu.style.top = '';
+                    roomMenu.style.left = '';
+                }
+                setActiveTile(null);
+                currentRoom = undefined;
+            };
+
+            const buildWorkOrdersLink = (roomNumber) => {
+                if (!roomNumber) {
+                    return '';
+                }
+                const base = new URL(workOrdersUrl || '/WorkOrders', window.location.origin);
+                base.searchParams.set('RoomNumber', roomNumber);
+                if (propertyId > 0) {
+                    base.searchParams.append('PropertyIds', propertyId.toString());
+                }
+                ['New', 'In Progress'].forEach(status => base.searchParams.append('Statuses', status));
+                return base.toString();
+            };
+
+            const positionMenu = (tile) => {
+                if (!roomMenu || !(tile instanceof HTMLElement)) {
+                    return;
+                }
+                const rect = tile.getBoundingClientRect();
+                const menuWidth = roomMenu.offsetWidth || 320;
+                const viewportWidth = document.documentElement.clientWidth;
+                const viewportHeight = document.documentElement.clientHeight;
+                const scrollX = window.scrollX || window.pageXOffset || 0;
+                const scrollY = window.scrollY || window.pageYOffset || 0;
+                const gutter = 16;
+                const menuHeight = roomMenu.offsetHeight || 0;
+                const spaceBelow = viewportHeight - rect.bottom;
+                const spaceAbove = rect.top;
+                let top = scrollY + rect.bottom + 8;
+                if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+                    top = scrollY + rect.top - menuHeight - 8;
+                }
+                const maxTop = scrollY + viewportHeight - menuHeight - gutter;
+                const minTop = scrollY + gutter;
+                top = Math.min(Math.max(top, minTop), Math.max(minTop, maxTop));
+                let left = scrollX + rect.left;
+                if (left + menuWidth > scrollX + viewportWidth - gutter) {
+                    left = Math.max(gutter, scrollX + viewportWidth - menuWidth - gutter);
+                }
+                roomMenu.style.top = `${top}px`;
+                roomMenu.style.left = `${left}px`;
+                roomMenu.style.maxHeight = `${Math.max(260, viewportHeight - gutter * 2)}px`;
+            };
+
+            const renderWorkOrders = (items) => {
+                if (!roomMenuList) {
+                    return;
+                }
+                if (!items.length) {
+                    roomMenuList.innerHTML = '<p class="text-muted small mb-0">No open work orders for this room.</p>';
+                    return;
+                }
+
+                const list = document.createElement('ul');
+                list.className = 'list-unstyled mb-0 layout-room-menu__workorder-list';
+
+                items.forEach(order => {
+                    const li = document.createElement('li');
+                    const link = document.createElement('a');
+                    link.className = 'layout-room-menu__workorder-link d-flex align-items-start gap-2';
+                    link.href = order.detailUrl || workOrdersUrl || '#';
+                    link.target = '_blank';
+                    link.rel = 'noopener';
+
+                    const icon = document.createElement('span');
+                    icon.className = 'layout-room-menu__workorder-icon';
+                    if (order.departmentColor) {
+                        icon.style.setProperty('--dept-color', order.departmentColor);
+                    }
+                    if (order.departmentName) {
+                        icon.title = order.departmentName;
+                    }
+                    icon.setAttribute('aria-hidden', 'true');
+
+                    const textWrap = document.createElement('div');
+                    textWrap.className = 'flex-grow-1';
+
+                    const statusSpan = document.createElement('span');
+                    statusSpan.className = 'fw-semibold me-2';
+                    statusSpan.textContent = order.status ?? 'Work Order';
+
+                    const issueSpan = document.createElement('span');
+                    issueSpan.className = 'layout-room-menu__workorder-issue';
+                    issueSpan.textContent = order.issue ?? 'Details unavailable';
+
+                    const meta = document.createElement('small');
+                    meta.className = 'text-muted d-block';
+                    const metaParts = [];
+                    if (order.departmentName) {
+                        metaParts.push(order.departmentName);
+                    }
+                    if (order.createdAt) {
+                        metaParts.push(order.createdAt);
+                    }
+                    meta.textContent = metaParts.join(' â€¢ ');
+
+                    textWrap.appendChild(statusSpan);
+                    textWrap.appendChild(issueSpan);
+                    textWrap.appendChild(meta);
+
+                    link.appendChild(icon);
+                    link.appendChild(textWrap);
+                    li.appendChild(link);
+                    list.appendChild(li);
+                });
+
+                roomMenuList.innerHTML = '';
+                roomMenuList.appendChild(list);
+            };
+
+            const escapeCssIdentifier = (value) => {
+                if (typeof value !== 'string' || !value) {
+                    return '';
+                }
+                if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+                    return CSS.escape(value);
+                }
+                return value.replace(/([!"#$%&'()*+,.\/:;<=>?@@\[\\\]^`{|}~])/g, '\\$1');
+            };
+
+            const getRoomNumbersForTile = (tile) => {
+                if (!(tile instanceof HTMLElement)) {
+                    return [];
+                }
+
+                const resolveIdentifier = (node) => {
+                    if (!(node instanceof HTMLElement)) {
+                        return null;
+                    }
+                    const nodeKey = node.dataset.locationKey?.trim();
+                    if (nodeKey && !nodeKey.startsWith('room:')) {
+                        return nodeKey;
+                    }
+                    const number = node.dataset.roomNumber?.trim();
+                    return number || null;
+                };
+
+                const baseIdentifier = resolveIdentifier(tile);
+                const locationKey = tile.dataset.locationKey?.trim();
+                const isOverlaySelection = tile.classList.contains('room-tile-overlay') && !overlayView?.classList.contains('d-none');
+
+                if (!isOverlaySelection || !locationKey) {
+                    return baseIdentifier ? [baseIdentifier] : [];
+                }
+
+                const selector = `[data-location-key="${escapeCssIdentifier(locationKey)}"]`;
+                const matches = document.querySelectorAll(selector);
+                const identifiers = new Set();
+                matches.forEach(node => {
+                    const identifier = resolveIdentifier(node);
+                    if (identifier) {
+                        identifiers.add(identifier);
+                    }
+                });
+
+                if (identifiers.size === 0 && baseIdentifier) {
+                    identifiers.add(baseIdentifier);
+                }
+
+                return Array.from(identifiers);
+            };
+
+            const fetchRoomWorkOrders = async (roomIdentifiers) => {
+                if (!roomMenuList || !summaryUrl) {
+                    return;
+                }
+                const identifiers = Array.isArray(roomIdentifiers)
+                    ? roomIdentifiers.filter(value => typeof value === 'string' && value.trim().length > 0)
+                    : (roomIdentifiers ? [roomIdentifiers] : []).filter(value => typeof value === 'string' && value.trim().length > 0);
+                if (!identifiers.length) {
+                    return;
+                }
+                roomMenuList.innerHTML = '<div class="text-muted small py-2">Loading open work orders...</div>';
+                try {
+                    const requests = identifiers.map(identifier => {
+                        const params = new URLSearchParams({
+                            propertyId: propertyId.toString(),
+                            roomNumber: identifier.trim()
+                        });
+                        return fetch(`${summaryUrl}?${params.toString()}`).then(response => {
+                            if (!response.ok) {
+                                throw new Error('Request failed');
+                            }
+                            return response.json();
+                        }).then(data => Array.isArray(data?.workOrders) ? data.workOrders : []);
+                    });
+
+                    const results = await Promise.allSettled(requests);
+                    const aggregated = [];
+                    results.forEach(result => {
+                        if (result.status === 'fulfilled') {
+                            aggregated.push(...result.value);
+                        }
+                    });
+
+                    const uniqueOrders = [];
+                    const seen = new Set();
+                    aggregated.forEach(order => {
+                        if (!order) {
+                            return;
+                        }
+                        const orderId = order.id ?? order.Id;
+                        if (orderId == null || seen.has(orderId)) {
+                            return;
+                        }
+                        seen.add(orderId);
+                        uniqueOrders.push(order);
+                    });
+
+                    renderWorkOrders(uniqueOrders);
+                } catch (error) {
+                    roomMenuList.innerHTML = '<p class="text-danger small mb-0">Unable to load work orders.</p>';
+                }
+            };
+
+            const openRoomMenu = (tile) => {
+                if (!roomMenu || !(tile instanceof HTMLElement)) {
+                    return;
+                }
+
+                const roomLabel = tile.dataset.roomLabel?.trim() || tile.dataset.roomNumber?.trim() || 'Room';
+                const aggregatedRooms = getRoomNumbersForTile(tile);
+                const primaryRoom = aggregatedRooms[0] || tile.dataset.roomNumber?.trim() || '';
+                const isAllFloorsSelection = tile.classList.contains('room-tile-overlay') &&
+                    !overlayView?.classList.contains('d-none') &&
+                    aggregatedRooms.length > 1;
+                const floorValue = tile.dataset.roomFloor?.trim();
+                const floorLabel = isAllFloorsSelection
+                    ? 'All Floors'
+                    : (floorValue ? `Floor ${floorValue}` : '');
+
+                currentRoom = {
+                    roomNumber: primaryRoom,
+                    roomNumbers: aggregatedRooms.length ? aggregatedRooms : (primaryRoom ? [primaryRoom] : []),
+                    roomLabel,
+                    floor: floorValue
+                };
+
+                if (roomMenuTitle && roomLabel) {
+                    roomMenuTitle.textContent = roomLabel;
+                }
+                if (roomMenuFloor) {
+                    roomMenuFloor.textContent = floorLabel;
+                    roomMenuFloor.classList.toggle('d-none', !floorLabel);
+                }
+                if (viewOrdersLink) {
+                    const viewUrl = buildWorkOrdersLink(primaryRoom || '');
+                    viewOrdersLink.href = viewUrl || (workOrdersUrl || '#');
+                    const disabled = !primaryRoom;
+                    viewOrdersLink.classList.toggle('disabled', disabled);
+                    viewOrdersLink.setAttribute('aria-disabled', disabled.toString());
+                }
+
+                if (createWorkOrderButton) {
+                    createWorkOrderButton.disabled = !(createUrl && currentRoom?.roomNumber && getLayoutModal());
+                }
+
+                setActiveTile(tile);
+                roomMenu.classList.add('show');
+                positionMenu(tile);
+                fetchRoomWorkOrders(currentRoom.roomNumbers);
+            };
+
+            const handleTileActivation = (tile, event) => {
+                if (!(tile instanceof HTMLElement)) {
+                    return;
+                }
+                const target = event.target;
+                if (target instanceof HTMLElement && target.closest('a')) {
+                    return;
+                }
+
+                const hasRoomContext = propertyId > 0 &&
+                    Number(tile.dataset.roomId || '0') > 0 &&
+                    tile.dataset.roomNumber;
+
+                if (hasRoomContext && summaryUrl) {
+                    event.preventDefault();
+                    openRoomMenu(tile);
+                    return;
+                }
+
+                const url = tile.dataset.navigateUrl;
+                if (url) {
+                    event.preventDefault();
+                    window.location.href = url;
+                }
+            };
+
+            clickableTiles.forEach(tile => {
+                if (!(tile instanceof HTMLElement)) {
+                    return;
+                }
+                tile.addEventListener('click', (event) => handleTileActivation(tile, event));
+                tile.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleTileActivation(tile, event);
+                    }
+                });
+            });
+
+            closeMenuButton?.addEventListener('click', closeRoomMenu);
+            document.addEventListener('click', (event) => {
+                if (!roomMenu) {
+                    return;
+                }
+                if (roomMenu.contains(event.target) || (activeTile && activeTile.contains(event.target))) {
+                    return;
+                }
+                closeRoomMenu();
+            });
+            window.addEventListener('scroll', () => closeRoomMenu(), true);
+            window.addEventListener('resize', () => closeRoomMenu());
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    closeRoomMenu();
+                }
+            });
+
+            createWorkOrderButton?.addEventListener('click', () => {
+                const modalInstance = getLayoutModal();
+                if (!modalInstance || !workOrderForm || !currentRoom?.roomNumber) {
+                    return;
+                }
+
+                const selectedRoom = { ...currentRoom };
+                workOrderForm.reset();
+                if (propertyInput && propertyId > 0) {
+                    propertyInput.value = propertyId.toString();
+                }
+                if (roomNumberInput) {
+                    roomNumberInput.value = selectedRoom.roomNumber;
+                }
+                if (roomLabelInput) {
+                    roomLabelInput.value = selectedRoom.roomLabel ?? selectedRoom.roomNumber;
+                }
+                if (roomDisplay) {
+                    const label = selectedRoom.roomLabel ?? selectedRoom.roomNumber ?? 'Selected Room';
+                    const multiFloor = Array.isArray(selectedRoom.roomNumbers) && selectedRoom.roomNumbers.length > 1;
+                    const floor = multiFloor ? 'All Floors' : (selectedRoom.floor ? `Floor ${selectedRoom.floor}` : '');
+                    roomDisplay.textContent = floor ? `${label} Â· ${floor}` : label;
+                }
+                if (dueDateInput) {
+                    dueDateInput.value = dueDateInput.dataset.defaultValue || '';
+                }
+                if (formStatus) {
+                    formStatus.classList.add('d-none');
+                    formStatus.textContent = '';
+                    formStatus.classList.remove('alert-success', 'alert-danger');
+                }
+                closeRoomMenu();
+                modalInstance.show();
+                issueInput?.focus();
+            });
+
+            modalEl?.addEventListener('hidden.bs.modal', () => {
+                if (formStatus) {
+                    formStatus.classList.add('d-none');
+                    formStatus.textContent = '';
+                    formStatus.classList.remove('alert-success', 'alert-danger');
+                }
+            });
+
+            const showFormStatus = (variant, message) => {
+                if (!formStatus) {
+                    return;
+                }
+                formStatus.classList.remove('d-none', 'alert-success', 'alert-danger');
+                formStatus.classList.add(variant === 'success' ? 'alert-success' : 'alert-danger');
+                formStatus.textContent = message;
+            };
+
+            workOrderForm?.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (!createUrl || !tokenInput) {
+                    return;
+                }
+                const submitButton = workOrderForm.querySelector('button[type="submit"]');
+                submitButton?.setAttribute('disabled', 'disabled');
+
+                const payload = {
+                    propertyId: Number(propertyInput?.value || propertyId),
+                    roomNumber: roomNumberInput?.value?.trim(),
+                    roomLabel: roomLabelInput?.value?.trim(),
+                    issue: issueInput?.value?.trim() || '',
+                    details: detailsInput?.value?.trim() || null,
+                    workOrderTypeId: parseInt(workOrderForm.querySelector('select[name="WorkOrderTypeId"]')?.value || '', 10) || null,
+                    departmentId: parseInt(workOrderForm.querySelector('select[name="DepartmentId"]')?.value || '', 10) || null,
+                    dueDate: dueDateInput?.value || null
+                };
+
+                if (!payload.roomNumber) {
+                    showFormStatus('danger', 'Select a room before submitting.');
+                    submitButton?.removeAttribute('disabled');
+                    return;
+                }
+
+                if (!payload.issue) {
+                    showFormStatus('danger', 'Issue description is required.');
+                    submitButton?.removeAttribute('disabled');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(createUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': tokenInput.value
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        const message = result?.message ?? 'Unable to create work order. Please try again.';
+                        showFormStatus('danger', message);
+                        submitButton?.removeAttribute('disabled');
+                        return;
+                    }
+
+                    showFormStatus('success', 'Work order created successfully.');
+                    if (issueInput) {
+                        issueInput.value = '';
+                    }
+                    if (detailsInput) {
+                        detailsInput.value = '';
+                    }
+                    if (dueDateInput) {
+                        dueDateInput.value = dueDateInput.dataset.defaultValue || '';
+                    }
+
+                    if (currentRoom?.roomNumbers?.length) {
+                        fetchRoomWorkOrders(currentRoom.roomNumbers);
+                    }
+
+                    setTimeout(() => {
+                        const modalInstance = getLayoutModal();
+                        modalInstance?.hide();
+                    }, 900);
+                } catch (error) {
+                    showFormStatus('danger', 'Something went wrong while creating the work order.');
+                } finally {
+                    submitButton?.removeAttribute('disabled');
+                }
+            });
+        })();
+    </script>
