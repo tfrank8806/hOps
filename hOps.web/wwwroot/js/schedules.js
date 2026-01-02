@@ -306,9 +306,16 @@
 
         let dragRow = null;
 
+        const sortSelect = document.getElementById('scheduleSort');
+
         rows().forEach(row => {
             row.addEventListener('dragstart', event => {
-                if (!event.target.closest('[data-row-handle]')) {
+                if (row.getAttribute('draggable') !== 'true') {
+                    event.preventDefault();
+                    return;
+                }
+                if (event.target.closest('button, a, form, input, select, textarea') &&
+                    !event.target.closest('[data-row-handle]')) {
                     event.preventDefault();
                     return;
                 }
@@ -370,8 +377,8 @@
             if (!employeeIds.length) {
                 return;
             }
-
-            setReorderStatus('Saving orderâ€¦', 'text-muted');
+            ensureCustomSortSelected();
+            setReorderStatus('Saving order…', 'text-muted');
 
             try {
                 const token = getScheduleAntiforgeryToken();
@@ -409,6 +416,27 @@
                 statusElement.classList.add(className);
             }
         }
+
+        function ensureCustomSortSelected() {
+            const value = 'CustomOrder';
+            if (!sortSelect) {
+                return;
+            }
+            if (sortSelect.value === value) {
+                return;
+            }
+            sortSelect.value = value;
+            Array.from(sortSelect.options).forEach(option => {
+                option.selected = option.value === value;
+            });
+        }
+
+            statusElement.textContent = message;
+            statusElement.classList.remove('d-none', 'text-muted', 'text-success', 'text-danger');
+            if (className) {
+                statusElement.classList.add(className);
+            }
+        }
     }
 
     function getScheduleAntiforgeryToken() {
@@ -424,3 +452,5 @@
         };
     }
 })();
+
+

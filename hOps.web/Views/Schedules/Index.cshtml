@@ -7,10 +7,9 @@
     string? successMessage = Model.AlertMessage;
     string? errorMessage = ViewBag.ScheduleError as string;
     var canReorderEmployees = Model.CanManage
-        && Model.Status == hOps.web.Models.ScheduleStatus.Draft
-        && Model.SortOption == hOps.web.ViewModels.Schedules.ScheduleSortOption.CustomOrder
         && Model.HasSchedule
-        && Model.ScheduleId.HasValue;
+        && Model.ScheduleId.HasValue
+        && (Model.Status == hOps.web.Models.ScheduleStatus.Draft || Model.Status == hOps.web.Models.ScheduleStatus.Posted);
 }
 
 <form id="scheduleAntiforgeryForm" method="post" class="d-none">
@@ -190,7 +189,7 @@
                     @if (canReorderEmployees)
                     {
                         <div class="schedule-reorder-hint text-muted small mb-1">
-                            Drag employee rows to change their order. Changes save automatically.
+                            Drag employee rows to change their order. Changes save automatically and switch the sort option to Custom order.
                         </div>
                         <div class="schedule-reorder-status text-muted small d-none mb-2" id="scheduleReorderStatus" role="status"></div>
                     }

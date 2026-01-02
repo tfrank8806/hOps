@@ -746,9 +746,9 @@ namespace hOps.web.Controllers
                 return NotFound(new { message = "Schedule not found." });
             }
 
-            if (schedule.Status != ScheduleStatus.Draft)
+            if (schedule.Status != ScheduleStatus.Draft && schedule.Status != ScheduleStatus.Posted)
             {
-                return BadRequest(new { message = "Only draft schedules can be reordered." });
+                return BadRequest(new { message = "This schedule cannot be reordered." });
             }
 
             var propertyEmployees = await _context.ScheduleEmployees
