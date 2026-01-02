@@ -747,6 +747,10 @@
                         .filter(id => Number.isInteger(id) && id > 0);
                 };
 
+                const refreshQuickMenu = async () => {
+                    await loadBookmarks(true);
+                };
+
                 const persistBookmarkOrder = async () => {
                     if (!allBookmarksContent) {
                         return;
@@ -775,6 +779,7 @@
                             throw new Error('Request failed');
                         }
                         showBookmarkOrderStatus('success', 'Bookmark order saved.');
+                        await refreshQuickMenu();
                     } catch (err) {
                         if (err.name === 'AbortError') {
                             return;
@@ -958,6 +963,29 @@
                     }
                 };
 
+                const persistQuickBookmarkFlag = async (bookmarkId, showInQuickMenu) => {
+                    try {
+                        const response = await fetch('/Bookmarks/UpdateQuickFlag', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'RequestVerificationToken': antiForgeryToken || ''
+                            },
+                            body: JSON.stringify({
+                                bookmarkId,
+                                showInQuickMenu
+                            })
+                        });
+                        if (!response.ok) {
+                            throw new Error('Request failed');
+                        }
+                        await refreshQuickMenu();
+                    } catch (error) {
+                        console.error('Unable to update quick bookmark', error);
+                        showBookmarkOrderStatus('danger', 'Unable to update Quick Bookmarks.');
+                    }
+                };
+
                 const getSectionIdFromGrid = (grid) => {
                     const value = grid?.dataset.sectionId;
                     if (!value) {
@@ -967,12 +995,34 @@
                     return Number.isInteger(parsed) ? parsed : null;
                 };
 
-                const updateTileSectionData = (tile, sectionId) => {
+                const isQuickGrid = (grid) => grid?.dataset.quick === 'true';
+
+                const getTileSectionId = (tile) => {
+                    if (!(tile instanceof HTMLElement)) {
+                        return null;
+                    }
+                    const value = tile.dataset.sectionId;
+                    if (!value) {
+                        return null;
+                    }
+                    const parsed = Number(value);
+                    return Number.isInteger(parsed) ? parsed : null;
+                };
+
+                const updateTileSectionData = (tile, sectionId, isQuick = false) => {
                     if (!(tile instanceof HTMLElement)) {
                         return;
                     }
+                    if (isQuick) {
+                        tile.dataset.quick = 'true';
+                        if (sectionId != null && !tile.dataset.sectionId) {
+                            tile.dataset.sectionId = sectionId.toString();
+                        }
+                        return;
+                    }
+                    delete tile.dataset.quick;
                     if (sectionId == null) {
-                        tile.dataset.sectionId = '';
+                        delete tile.dataset.sectionId;
                         return;
                     }
                     tile.dataset.sectionId = sectionId.toString();
@@ -1005,6 +1055,29 @@
                     event.currentTarget.classList.remove('bookmark-tile--drop-target');
                 };
 
+                const finalizeTileMove = (grid) => {
+                    if (!dragSourceTile || !(grid instanceof HTMLElement)) {
+                        return;
+                    }
+                    const bookmarkId = Number(dragSourceTile.dataset.bookmarkId);
+                    if (!Number.isInteger(bookmarkId) || bookmarkId <= 0) {
+                        return;
+                    }
+                    const targetIsQuick = isQuickGrid(grid);
+                    const sourceWasQuick = dragSourceTile.dataset.quick === 'true';
+                    const sourceSectionId = getTileSectionId(dragSourceTile);
+                    const gridSectionId = getSectionIdFromGrid(grid);
+                    const nextSectionId = targetIsQuick ? sourceSectionId : gridSectionId;
+                    updateTileSectionData(dragSourceTile, nextSectionId, targetIsQuick);
+                    if (sourceWasQuick !== targetIsQuick) {
+                        persistQuickBookmarkFlag(bookmarkId, targetIsQuick);
+                    }
+                    if (!targetIsQuick && (sourceSectionId ?? null) !== (nextSectionId ?? null)) {
+                        persistBookmarkSection(bookmarkId, nextSectionId);
+                    }
+                    persistBookmarkOrder();
+                };
+
                 const handleDropOnTile = (event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -1024,13 +1097,7 @@
                     } else {
                         grid.insertBefore(dragSourceTile, target.nextSibling);
                     }
-                    const targetSectionId = getSectionIdFromGrid(grid);
-                    const sourceSectionId = dragSourceTile.dataset.sectionId ? Number(dragSourceTile.dataset.sectionId) : null;
-                    updateTileSectionData(dragSourceTile, targetSectionId);
-                    if ((sourceSectionId ?? null) !== (targetSectionId ?? null)) {
-                        persistBookmarkSection(Number(dragSourceTile.dataset.bookmarkId), targetSectionId);
-                    }
-                    persistBookmarkOrder();
+                    finalizeTileMove(grid);
                 };
 
                 const handleGridDrop = (event) => {
@@ -1040,13 +1107,7 @@
                     }
                     const grid = event.currentTarget;
                     grid.appendChild(dragSourceTile);
-                    const targetSectionId = getSectionIdFromGrid(grid);
-                    const sourceSectionId = dragSourceTile.dataset.sectionId ? Number(dragSourceTile.dataset.sectionId) : null;
-                    updateTileSectionData(dragSourceTile, targetSectionId);
-                    if ((sourceSectionId ?? null) !== (targetSectionId ?? null)) {
-                        persistBookmarkSection(Number(dragSourceTile.dataset.bookmarkId), targetSectionId);
-                    }
-                    persistBookmarkOrder();
+                    finalizeTileMove(grid);
                 };
 
                 const initializeDragAndDrop = (grid) => {
@@ -1190,17 +1251,59 @@
                     return tile;
                 };
 
-                const createBookmarkGrid = (bookmarks, sectionId) => {
+                const createBookmarkGrid = (bookmarks, sectionId, options = {}) => {
+                    const isQuick = options.isQuick === true;
                     const grid = document.createElement('div');
-                    grid.className = 'bookmark-tiles-grid';
-                    grid.dataset.sectionId = sectionId != null ? sectionId.toString() : '';
+                    grid.className = `bookmark-tiles-grid${isQuick ? ' bookmark-tiles-grid--quick' : ''}`;
+                    if (isQuick) {
+                        grid.dataset.quick = 'true';
+                        grid.dataset.sectionId = '';
+                    } else if (sectionId != null) {
+                        grid.dataset.sectionId = sectionId.toString();
+                    } else {
+                        grid.dataset.sectionId = '';
+                    }
                     bookmarks.forEach(item => {
                         const tile = createBookmarkTile(item);
-                        updateTileSectionData(tile, sectionId ?? null);
+                        const tileSectionId = typeof item.sectionGroupId === 'number'
+                            ? item.sectionGroupId
+                            : sectionId ?? null;
+                        updateTileSectionData(tile, tileSectionId, isQuick);
                         grid.appendChild(tile);
                     });
                     initializeDragAndDrop(grid);
                     return grid;
+                };
+
+                const createQuickSectionBlock = (bookmarks) => {
+                    const wrapper = document.createElement('section');
+                    wrapper.className = 'bookmark-section-block bookmark-section-block--quick';
+                    wrapper.dataset.quickSection = 'true';
+
+                    const header = document.createElement('div');
+                    header.className = 'bookmark-section-header';
+
+                    const title = document.createElement('h3');
+                    title.className = 'bookmark-section-title';
+                    title.textContent = 'Quick Bookmarks';
+                    header.appendChild(title);
+
+                    wrapper.appendChild(header);
+
+                    const helper = document.createElement('p');
+                    helper.className = 'bookmark-section-helper text-muted small mb-3';
+                    helper.textContent = 'Drag bookmarks here to control what appears in the Quick Bookmarks menu.';
+                    wrapper.appendChild(helper);
+
+                    if (!Array.isArray(bookmarks) || bookmarks.length === 0) {
+                        const empty = document.createElement('p');
+                        empty.className = 'bookmark-section-empty mb-2';
+                        empty.textContent = 'No quick bookmarks yet.';
+                        wrapper.appendChild(empty);
+                    }
+
+                    wrapper.appendChild(createBookmarkGrid(Array.isArray(bookmarks) ? bookmarks : [], null, { isQuick: true }));
+                    return wrapper;
                 };
 
                 const createSectionBlock = (section) => {
@@ -1275,8 +1378,10 @@
 
                     const sections = Array.isArray(payload?.sections) ? payload.sections : [];
                     const ungrouped = Array.isArray(payload?.ungrouped) ? payload.ungrouped : [];
+                    const quick = Array.isArray(payload?.quick) ? payload.quick : [];
+                    const quickIds = new Set(quick.map(item => Number(item.id)).filter(id => Number.isInteger(id)));
 
-                    if (!sections.length && !ungrouped.length) {
+                    if (!sections.length && !ungrouped.length && !quick.length) {
                         bookmarkOrderStatus?.classList.add('d-none');
                         allBookmarksContent.innerHTML = '<div class="text-muted text-center py-4">No bookmarks yet.</div>';
                         return;
@@ -1284,10 +1389,19 @@
 
                     const wrapper = document.createElement('div');
                     wrapper.className = 'bookmark-sections-wrapper';
-                    wrapper.appendChild(createUngroupedBlock(ungrouped));
+                    wrapper.appendChild(createQuickSectionBlock(quick));
                     sections.forEach(section => {
-                        wrapper.appendChild(createSectionBlock(section));
+                        const filteredBookmarks = Array.isArray(section.bookmarks)
+                            ? section.bookmarks.filter(item => !quickIds.has(Number(item.id)))
+                            : [];
+                        wrapper.appendChild(createSectionBlock({
+                            id: section.id,
+                            name: section.name,
+                            bookmarks: filteredBookmarks
+                        }));
                     });
+                    const filteredUngrouped = ungrouped.filter(item => !quickIds.has(Number(item.id)));
+                    wrapper.appendChild(createUngroupedBlock(filteredUngrouped));
 
                     allBookmarksContent.innerHTML = '';
                     allBookmarksContent.appendChild(wrapper);
@@ -1295,8 +1409,8 @@
                     bookmarkOrderStatus?.classList.add('d-none');
                 };
 
-                const loadBookmarks = async () => {
-                    if (bookmarksLoaded || bookmarksLoading) {
+                const loadBookmarks = async (force = false) => {
+                    if ((!force && bookmarksLoaded) || bookmarksLoading) {
                         return;
                     }
                     bookmarksLoading = true;

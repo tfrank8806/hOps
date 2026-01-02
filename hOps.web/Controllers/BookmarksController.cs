@@ -459,7 +459,8 @@ namespace hOps.web.Controllers
                             Url = bookmark.Url,
                             Description = bookmark.Description,
                             SectionLabel = sectionLabel,
-                            SectionType = sectionType.ToString()
+                            SectionType = sectionType.ToString(),
+                            IsQuick = bookmark.ShowInQuickMenu
                         };
                     }
                 }
@@ -514,6 +515,14 @@ namespace hOps.web.Controllers
                 .Where(a => a.UserId == currentUser.Id)
                 .ToListAsync();
 
+            foreach (var assignment in assignmentsLookup)
+            {
+                if (bookmarkLookup.TryGetValue(assignment.BookmarkId, out var display))
+                {
+                    display.SectionGroupId = assignment.SectionGroupId;
+                }
+            }
+
             var assignedBookmarkIds = new HashSet<int>(assignmentsLookup.Select(a => a.BookmarkId));
 
             object ConvertDisplay(BookmarkDisplayModel display) => new
@@ -523,7 +532,9 @@ namespace hOps.web.Controllers
                 url = display.Url,
                 section = display.SectionLabel,
                 description = display.Description,
-                sectionType = display.SectionType
+                sectionType = display.SectionType,
+                sectionGroupId = display.SectionGroupId,
+                isQuick = display.IsQuick
             };
 
             var sectionsPayload = sectionGroups.Select(group =>
@@ -549,8 +560,15 @@ namespace hOps.web.Controllers
                 .Select(ConvertDisplay)
                 .ToList();
 
+            var quickDisplays = OrderDisplays(bookmarkLookup
+                .Where(kvp => kvp.Value.IsQuick)
+                .Select(kvp => kvp.Value))
+                .Select(ConvertDisplay)
+                .ToList();
+
             return Json(new
             {
+                quick = quickDisplays,
                 sections = sectionsPayload,
                 ungrouped = ungroupedDisplays
             });
@@ -646,6 +664,41 @@ namespace hOps.web.Controllers
 
             await _context.SaveChangesAsync();
             return Ok(new { success = true, count = orderedBookmarks.Count });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateQuickFlag([FromBody] BookmarkQuickUpdateRequest request)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            if (request == null || request.BookmarkId <= 0)
+            {
+                return BadRequest();
+            }
+
+            var bookmark = await _context.Bookmarks.FirstOrDefaultAsync(b => b.Id == request.BookmarkId);
+            if (bookmark == null)
+            {
+                return NotFound();
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+
+            if (!await CanModifyBookmarkAsync(bookmark, currentUser, roles, currentPropertyId))
+            {
+                return Forbid();
+            }
+
+            bookmark.ShowInQuickMenu = request.ShowInQuickMenu;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true, bookmarkId = bookmark.Id, isQuick = bookmark.ShowInQuickMenu });
         }
 
         [HttpPost]
@@ -853,6 +906,14 @@ namespace hOps.web.Controllers
             public string? Description { get; set; }
             public string SectionLabel { get; set; } = string.Empty;
             public string SectionType { get; set; } = string.Empty;
+            public int? SectionGroupId { get; set; }
+            public bool IsQuick { get; set; }
+        }
+
+        public sealed class BookmarkQuickUpdateRequest
+        {
+            public int BookmarkId { get; set; }
+            public bool ShowInQuickMenu { get; set; }
         }
     }
 }
