@@ -423,17 +423,24 @@
             padding-bottom: 0;
         }
 
+        .hotel-layout-card,
         .hotel-layout-fullscreen .card {
             height: 100%;
-        }
-
-        .hotel-layout-fullscreen .card-body {
             display: flex;
             flex-direction: column;
-            height: 100%;
-            gap: 1rem;
         }
 
+        .hotel-layout-card .card-body,
+        .hotel-layout-fullscreen .card-body {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .hotel-layout-card #layoutWidget,
         .hotel-layout-fullscreen #layoutWidget {
             flex: 1;
             display: flex;
@@ -441,6 +448,7 @@
             overflow: hidden;
         }
 
+        .hotel-layout-card #layoutWidget .layout-view,
         .hotel-layout-fullscreen #layoutWidget .layout-view {
             flex: 1;
             overflow: auto;
