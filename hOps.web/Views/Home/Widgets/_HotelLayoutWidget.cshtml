@@ -44,7 +44,9 @@
             var maxHeightAll = Math.Max(1, tilesByFloor.SelectMany(g => g).Max(t => t.Y + t.Height));
             var defaultFloor = tilesByFloor.First().Key;
 
-            <div class="layout-controls d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-3">
+            var hideLegendForPanel = ViewContext.ViewData["HideHotelLayoutLegend"] as bool? ?? false;
+
+            <div class="layout-controls d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-2 mb-2">
                 <div class="btn-group btn-group-sm layout-view-toggle" role="group" aria-label="Layout view mode">
                     <input class="btn-check" type="radio" name="layoutViewMode" id="layoutView_all" value="all" checked autocomplete="off">
                     <label class="btn btn-outline-primary layout-view-toggle__btn" for="layoutView_all">
@@ -68,18 +70,21 @@
                         </label>
                     }
                 </div>
-                <div class="layout-legends d-flex flex-column flex-lg-row gap-3 text-muted small">
-                    <div class="d-flex align-items-center gap-3">
-                        <span><span class="legend-swatch workorder"></span> Work Orders</span>
-                        <span><span class="legend-swatch lostfound"></span> Lost &amp; Found</span>
+                @if (!hideLegendForPanel)
+                {
+                    <div class="layout-legends d-flex flex-column flex-lg-row gap-3 text-muted small">
+                        <div class="d-flex align-items-center gap-3">
+                            <span><span class="legend-swatch workorder"></span> Work Orders</span>
+                            <span><span class="legend-swatch lostfound"></span> Lost &amp; Found</span>
+                        </div>
+                        <div class="layout-floor-legend d-flex align-items-center gap-2 flex-wrap">
+                            @foreach (var floorInfo in floorLegend)
+                            {
+                                <span class="layout-floor-pill" style="--floor-color:@floorInfo.Color">Floor @floorInfo.Floor</span>
+                            }
+                        </div>
                     </div>
-                    <div class="layout-floor-legend d-flex align-items-center gap-2 flex-wrap">
-                        @foreach (var floorInfo in floorLegend)
-                        {
-                            <span class="layout-floor-pill" style="--floor-color:@floorInfo.Color">Floor @floorInfo.Floor</span>
-                        }
-                    </div>
-                </div>
+                }
             </div>
 
             <div id="layoutOverlayView" class="layout-view">
