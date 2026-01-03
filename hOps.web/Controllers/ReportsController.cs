@@ -9,6 +9,7 @@ using ClosedXML.Excel;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
+using hOps.web.ViewModels.WorkOrders;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -93,13 +94,17 @@ namespace hOps.web.Controllers
             }
 
             var selectedPropertyIds = form.SelectedPropertyIds ?? new List<int>();
+            var shouldRefreshFilters = form.RefreshFiltersOnly;
             var viewModel = await BuildViewModelAsync(
                 form.SelectedReportType,
                 selectedPropertyIds,
                 form.IncludeAllProperties,
                 form.StartDate,
                 form.EndDate,
-                ModelState.IsValid);
+                ModelState.IsValid && !shouldRefreshFilters,
+                form);
+
+            viewModel.RefreshFiltersOnly = false;
 
             return View(viewModel);
         }
@@ -120,7 +125,8 @@ namespace hOps.web.Controllers
                 form.IncludeAllProperties,
                 form.StartDate,
                 form.EndDate,
-                ModelState.IsValid);
+                ModelState.IsValid,
+                form);
 
             if (viewModel.Result == null || !viewModel.Result.Rows.Any())
             {
@@ -140,7 +146,8 @@ namespace hOps.web.Controllers
             bool includeAllProperties = true,
             DateTime? startDate = null,
             DateTime? endDate = null,
-            bool runReport = true)
+            bool runReport = true,
+            ReportRequestViewModel? filterSource = null)
         {
             var user = await _userManager.GetUserAsync(User);
 
@@ -237,15 +244,349 @@ namespace hOps.web.Controllers
                 SelectedReportSupportsPropertyFilter = supportsPropertyFilter,
                 SelectedReportSupportsDateRange = supportsDateRange,
                 StartDate = normalizedStart,
-                EndDate = normalizedEnd
+                EndDate = normalizedEnd,
+                SelectedWorkOrderLocations = CloneStringList(filterSource?.SelectedWorkOrderLocations),
+                SelectedWorkOrderTypeIds = CloneIntList(filterSource?.SelectedWorkOrderTypeIds),
+                SelectedWorkOrderDepartmentIds = CloneIntList(filterSource?.SelectedWorkOrderDepartmentIds),
+                SelectedWorkOrderStatuses = CloneStringList(filterSource?.SelectedWorkOrderStatuses),
+                SelectedCalendarCategoryIds = CloneIntList(filterSource?.SelectedCalendarCategoryIds),
+                SelectedCalendarRecurrenceValues = CloneStringList(filterSource?.SelectedCalendarRecurrenceValues),
+                SelectedPassOnLogCreatorIds = CloneStringList(filterSource?.SelectedPassOnLogCreatorIds),
+                SelectedPhonebookTypeIds = CloneIntList(filterSource?.SelectedPhonebookTypeIds),
+                RefreshFiltersOnly = false
             };
+
+            viewModel.ReportMetadata = _reportDefinitions
+                .Select(r => new ReportMetadataViewModel
+                {
+                    Key = r.Key,
+                    Description = r.Description
+                })
+                .ToList();
+
+            await PopulateReportFilterOptionsAsync(viewModel, scopedPropertyIds);
 
             if (runReport && !string.IsNullOrWhiteSpace(selectedReportType) && definition != null)
             {
-                viewModel.Result = await RunReportAsync(definition, scopedPropertyIds, normalizedStart, normalizedEnd, user);
+                viewModel.Result = await RunReportAsync(definition, scopedPropertyIds, normalizedStart, normalizedEnd, user, viewModel);
             }
 
             return viewModel;
+        }
+
+        private static List<int> CloneIntList(IEnumerable<int>? source) =>
+            source?.Where(id => id > 0).Distinct().ToList() ?? new List<int>();
+
+        private static List<string> CloneStringList(IEnumerable<string>? source) =>
+            source?
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList()
+            ?? new List<string>();
+
+        private async Task PopulateReportFilterOptionsAsync(ReportRequestViewModel viewModel, IReadOnlyCollection<int> propertyIds)
+        {
+            var selectedKey = viewModel.SelectedReportType ?? string.Empty;
+
+            viewModel.ShowWorkOrderFilters = string.Equals(selectedKey, WorkOrdersReportKey, StringComparison.OrdinalIgnoreCase);
+            if (viewModel.ShowWorkOrderFilters)
+            {
+                await PopulateWorkOrderFilterOptionsAsync(viewModel, propertyIds);
+            }
+            else
+            {
+                viewModel.WorkOrderLocationOptions = new List<SelectListItem>();
+                viewModel.WorkOrderTypeOptions = new List<SelectListItem>();
+                viewModel.WorkOrderDepartmentOptions = new List<SelectListItem>();
+                viewModel.WorkOrderStatusOptions = new List<SelectListItem>();
+                viewModel.SelectedWorkOrderLocations.Clear();
+                viewModel.SelectedWorkOrderTypeIds.Clear();
+                viewModel.SelectedWorkOrderDepartmentIds.Clear();
+                viewModel.SelectedWorkOrderStatuses.Clear();
+            }
+
+            viewModel.ShowCalendarFilters = string.Equals(selectedKey, CalendarEventsReportKey, StringComparison.OrdinalIgnoreCase);
+            if (viewModel.ShowCalendarFilters)
+            {
+                await PopulateCalendarFilterOptionsAsync(viewModel, propertyIds);
+            }
+            else
+            {
+                viewModel.CalendarCategoryOptions = new List<SelectListItem>();
+                viewModel.CalendarRecurrenceOptions = new List<SelectListItem>();
+                viewModel.SelectedCalendarCategoryIds.Clear();
+                viewModel.SelectedCalendarRecurrenceValues.Clear();
+            }
+
+            viewModel.ShowPassOnLogFilters = string.Equals(selectedKey, PassOnLogsReportKey, StringComparison.OrdinalIgnoreCase);
+            if (viewModel.ShowPassOnLogFilters)
+            {
+                await PopulatePassOnLogFilterOptionsAsync(viewModel, propertyIds);
+            }
+            else
+            {
+                viewModel.PassOnLogCreatorOptions = new List<SelectListItem>();
+                viewModel.SelectedPassOnLogCreatorIds.Clear();
+            }
+
+            viewModel.ShowPhonebookFilters = string.Equals(selectedKey, PhonebookReportKey, StringComparison.OrdinalIgnoreCase);
+            if (viewModel.ShowPhonebookFilters)
+            {
+                await PopulatePhonebookFilterOptionsAsync(viewModel, propertyIds);
+            }
+            else
+            {
+                viewModel.PhonebookTypeOptions = new List<SelectListItem>();
+                viewModel.SelectedPhonebookTypeIds.Clear();
+            }
+        }
+
+        private async Task PopulateWorkOrderFilterOptionsAsync(ReportRequestViewModel viewModel, IReadOnlyCollection<int> propertyIds)
+        {
+            if (!propertyIds.Any())
+            {
+                viewModel.WorkOrderLocationOptions = new List<SelectListItem>();
+                viewModel.WorkOrderTypeOptions = new List<SelectListItem>();
+                viewModel.WorkOrderDepartmentOptions = new List<SelectListItem>();
+                viewModel.WorkOrderStatusOptions = WorkOrderStatusOptions.All
+                    .Select(status => new SelectListItem
+                    {
+                        Value = status.Key,
+                        Text = status.Label,
+                        Selected = false
+                    })
+                    .ToList();
+                viewModel.SelectedWorkOrderStatuses.Clear();
+                return;
+            }
+
+            var query = _context.WorkOrders.AsNoTracking();
+            if (propertyIds.Any())
+            {
+                query = query.Where(wo => wo.Properties.Any(p => propertyIds.Contains(p.PropertyId)));
+            }
+
+            var locationOptions = await query
+                .Select(wo => wo.Location)
+                .Where(location => !string.IsNullOrWhiteSpace(location))
+                .Distinct()
+                .OrderBy(location => location)
+                .Take(500)
+                .ToListAsync();
+
+            var selectedLocations = new HashSet<string>(viewModel.SelectedWorkOrderLocations, StringComparer.OrdinalIgnoreCase);
+            viewModel.WorkOrderLocationOptions = locationOptions
+                .Select(location => new SelectListItem
+                {
+                    Value = location,
+                    Text = location,
+                    Selected = selectedLocations.Contains(location)
+                })
+                .ToList();
+            viewModel.SelectedWorkOrderLocations = viewModel.WorkOrderLocationOptions
+                .Where(option => option.Selected)
+                .Select(option => option.Value)
+                .ToList();
+
+            var typeOptions = await _context.WorkOrderTypes
+                .AsNoTracking()
+                .OrderBy(type => type.Name)
+                .ToListAsync();
+
+            viewModel.WorkOrderTypeOptions = typeOptions
+                .Select(type => new SelectListItem
+                {
+                    Value = type.Id.ToString(CultureInfo.InvariantCulture),
+                    Text = NormalizeText(type.Name),
+                    Selected = viewModel.SelectedWorkOrderTypeIds.Contains(type.Id)
+                })
+                .ToList();
+            viewModel.SelectedWorkOrderTypeIds = viewModel.WorkOrderTypeOptions
+                .Where(option => option.Selected)
+                .Select(option => int.Parse(option.Value, CultureInfo.InvariantCulture))
+                .ToList();
+
+            var departmentQuery = _context.Departments
+                .Include(d => d.Property)
+                .AsNoTracking();
+
+            if (propertyIds.Any())
+            {
+                departmentQuery = departmentQuery.Where(d => !d.PropertyId.HasValue || propertyIds.Contains(d.PropertyId.Value));
+            }
+
+            var departments = await departmentQuery
+                .OrderBy(d => d.Property == null ? 1 : 0)
+                .ThenBy(d => d.Property!.Name)
+                .ThenBy(d => d.Name)
+                .ToListAsync();
+
+            viewModel.WorkOrderDepartmentOptions = departments
+                .Select(department =>
+                {
+                    var label = department.Property != null
+                        ? $"{department.Property.Name} · {department.Name}"
+                        : department.Name ?? "Department";
+
+                    return new SelectListItem
+                    {
+                        Value = department.Id.ToString(CultureInfo.InvariantCulture),
+                        Text = label!,
+                        Selected = viewModel.SelectedWorkOrderDepartmentIds.Contains(department.Id)
+                    };
+                })
+                .ToList();
+            viewModel.SelectedWorkOrderDepartmentIds = viewModel.WorkOrderDepartmentOptions
+                .Where(option => option.Selected)
+                .Select(option => int.Parse(option.Value, CultureInfo.InvariantCulture))
+                .ToList();
+
+            var statusLookup = new HashSet<string>(viewModel.SelectedWorkOrderStatuses, StringComparer.OrdinalIgnoreCase);
+            viewModel.WorkOrderStatusOptions = WorkOrderStatusOptions.All
+                .Select(status => new SelectListItem
+                {
+                    Value = status.Key,
+                    Text = status.Label,
+                    Selected = statusLookup.Contains(status.Key)
+                })
+                .ToList();
+            viewModel.SelectedWorkOrderStatuses = viewModel.WorkOrderStatusOptions
+                .Where(option => option.Selected)
+                .Select(option => option.Value)
+                .ToList();
+        }
+
+        private async Task PopulateCalendarFilterOptionsAsync(ReportRequestViewModel viewModel, IReadOnlyCollection<int> propertyIds)
+        {
+            var categoriesQuery = _context.CalendarCategories
+                .Include(c => c.Property)
+                .AsNoTracking();
+
+            if (propertyIds.Any())
+            {
+                categoriesQuery = categoriesQuery.Where(c => !c.PropertyId.HasValue || propertyIds.Contains(c.PropertyId.Value));
+            }
+
+            var categories = await categoriesQuery
+                .OrderBy(c => c.Property == null ? 1 : 0)
+                .ThenBy(c => c.Property!.Name)
+                .ThenBy(c => c.Name)
+                .ToListAsync();
+
+            viewModel.CalendarCategoryOptions = categories
+                .Select(category => new SelectListItem
+                {
+                    Value = category.Id.ToString(CultureInfo.InvariantCulture),
+                    Text = category.Property != null
+                        ? $"{category.Property.Name} · {category.Name}"
+                        : category.Name,
+                    Selected = viewModel.SelectedCalendarCategoryIds.Contains(category.Id)
+                })
+                .ToList();
+            viewModel.SelectedCalendarCategoryIds = viewModel.CalendarCategoryOptions
+                .Where(option => option.Selected)
+                .Select(option => int.Parse(option.Value, CultureInfo.InvariantCulture))
+                .ToList();
+
+            var recurrenceSelections = new HashSet<string>(viewModel.SelectedCalendarRecurrenceValues, StringComparer.OrdinalIgnoreCase);
+            viewModel.CalendarRecurrenceOptions = Enum.GetValues(typeof(CalendarRecurrenceType))
+                .Cast<CalendarRecurrenceType>()
+                .Select(recurrence => new SelectListItem
+                {
+                    Value = ((int)recurrence).ToString(CultureInfo.InvariantCulture),
+                    Text = GetEnumDisplayName(recurrence),
+                    Selected = recurrenceSelections.Contains(((int)recurrence).ToString(CultureInfo.InvariantCulture))
+                })
+                .ToList();
+            viewModel.SelectedCalendarRecurrenceValues = viewModel.CalendarRecurrenceOptions
+                .Where(option => option.Selected)
+                .Select(option => option.Value)
+                .ToList();
+        }
+
+        private async Task PopulatePassOnLogFilterOptionsAsync(ReportRequestViewModel viewModel, IReadOnlyCollection<int> propertyIds)
+        {
+            if (!propertyIds.Any())
+            {
+                viewModel.PassOnLogCreatorOptions = new List<SelectListItem>();
+                viewModel.SelectedPassOnLogCreatorIds.Clear();
+                return;
+            }
+
+            var creatorQuery = _context.PassOnLogs
+                .Include(l => l.CreatedBy)
+                .Include(l => l.Properties)
+                .AsNoTracking();
+
+            if (propertyIds.Any())
+            {
+                creatorQuery = creatorQuery.Where(l => l.Properties.Any(p => propertyIds.Contains(p.PropertyId)));
+            }
+
+            var creators = await creatorQuery
+                .Select(l => new { l.CreatedById, l.CreatedBy })
+                .Where(l => !string.IsNullOrWhiteSpace(l.CreatedById))
+                .ToListAsync();
+
+            var creatorOptions = creators
+                .GroupBy(l => l.CreatedById!)
+                .Select(group =>
+                {
+                    var user = group.First().CreatedBy;
+                    var label = FormatUser(user);
+                    if (string.IsNullOrWhiteSpace(label))
+                    {
+                        label = group.Key;
+                    }
+
+                    return new SelectListItem
+                    {
+                        Value = group.Key,
+                        Text = label,
+                        Selected = viewModel.SelectedPassOnLogCreatorIds.Contains(group.Key)
+                    };
+                })
+                .OrderBy(option => option.Text, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            viewModel.PassOnLogCreatorOptions = creatorOptions;
+            viewModel.SelectedPassOnLogCreatorIds = viewModel.PassOnLogCreatorOptions
+                .Where(option => option.Selected)
+                .Select(option => option.Value)
+                .ToList();
+        }
+
+        private async Task PopulatePhonebookFilterOptionsAsync(ReportRequestViewModel viewModel, IReadOnlyCollection<int> propertyIds)
+        {
+            if (!propertyIds.Any())
+            {
+                viewModel.PhonebookTypeOptions = new List<SelectListItem>();
+                viewModel.SelectedPhonebookTypeIds.Clear();
+                return;
+            }
+
+            var phonebookTypes = await _context.PhonebookTypes
+                .Include(t => t.Property)
+                .AsNoTracking()
+                .Where(t => t.PropertyId.HasValue && propertyIds.Contains(t.PropertyId.Value))
+                .OrderBy(t => t.Property!.Name)
+                .ThenBy(t => t.Name)
+                .ToListAsync();
+
+            viewModel.PhonebookTypeOptions = phonebookTypes
+                .Select(type => new SelectListItem
+                {
+                    Value = type.Id.ToString(CultureInfo.InvariantCulture),
+                    Text = $"{type.Property?.Name}: {type.Name}",
+                    Selected = viewModel.SelectedPhonebookTypeIds.Contains(type.Id)
+                })
+                .ToList();
+
+            viewModel.SelectedPhonebookTypeIds = viewModel.PhonebookTypeOptions
+                .Where(option => option.Selected)
+                .Select(option => int.Parse(option.Value, CultureInfo.InvariantCulture))
+                .ToList();
         }
 
         private async Task<ReportResultViewModel> RunReportAsync(
@@ -253,7 +594,8 @@ namespace hOps.web.Controllers
             IReadOnlyCollection<int> propertyIds,
             DateTime? startDate,
             DateTime? endDate,
-            ApplicationUser? currentUser)
+            ApplicationUser? currentUser,
+            ReportRequestViewModel filters)
         {
             switch (definition.Key)
             {
@@ -276,13 +618,13 @@ namespace hOps.web.Controllers
                 case LostFoundReportKey:
                     return await BuildLostFoundReport(definition, propertyIds, startDate, endDate);
                 case WorkOrdersReportKey:
-                    return await BuildWorkOrdersReport(definition, propertyIds, startDate, endDate);
+                    return await BuildWorkOrdersReport(definition, propertyIds, startDate, endDate, filters);
                 case CalendarEventsReportKey:
-                    return await BuildCalendarEventsReport(definition, propertyIds, startDate, endDate);
+                    return await BuildCalendarEventsReport(definition, propertyIds, startDate, endDate, filters);
                 case PassOnLogsReportKey:
-                    return await BuildPassOnLogsReport(definition, propertyIds, startDate, endDate);
+                    return await BuildPassOnLogsReport(definition, propertyIds, startDate, endDate, filters);
                 case PhonebookReportKey:
-                    return await BuildPhonebookReport(definition, propertyIds);
+                    return await BuildPhonebookReport(definition, propertyIds, filters);
                 case BookmarksReportKey:
                     return await BuildBookmarksReport(definition, propertyIds, currentUser);
                 case PackageLogReportKey:
@@ -687,7 +1029,8 @@ namespace hOps.web.Controllers
             ReportDefinition definition,
             IReadOnlyCollection<int> propertyIds,
             DateTime? startDate,
-            DateTime? endDate)
+            DateTime? endDate,
+            ReportRequestViewModel filters)
         {
             var headers = new List<string>
             {
@@ -699,6 +1042,8 @@ namespace hOps.web.Controllers
                 "Description",
                 "Department",
                 "Due Date",
+                "Completed",
+                "Current Status",
                 "Creator"
             };
 
@@ -719,6 +1064,7 @@ namespace hOps.web.Controllers
                 .Include(wo => wo.WorkOrderType)
                 .Include(wo => wo.Department)
                 .Include(wo => wo.CreatedBy)
+                .Include(wo => wo.ToDoItems)
                 .AsNoTracking()
                 .Where(wo => wo.Properties.Any(p => propertyIds.Contains(p.PropertyId)));
 
@@ -732,6 +1078,30 @@ namespace hOps.web.Controllers
             {
                 var endValue = endBoundary.Value;
                 query = query.Where(wo => wo.CreatedAt < endValue);
+            }
+
+            if (filters.SelectedWorkOrderLocations.Any())
+            {
+                var locations = filters.SelectedWorkOrderLocations;
+                query = query.Where(wo => locations.Contains(wo.Location));
+            }
+
+            if (filters.SelectedWorkOrderTypeIds.Any())
+            {
+                var selectedTypeIds = filters.SelectedWorkOrderTypeIds;
+                query = query.Where(wo => wo.WorkOrderTypeId.HasValue && selectedTypeIds.Contains(wo.WorkOrderTypeId.Value));
+            }
+
+            if (filters.SelectedWorkOrderDepartmentIds.Any())
+            {
+                var departmentIds = filters.SelectedWorkOrderDepartmentIds;
+                query = query.Where(wo => wo.DepartmentId.HasValue && departmentIds.Contains(wo.DepartmentId.Value));
+            }
+
+            if (filters.SelectedWorkOrderStatuses.Any())
+            {
+                var statuses = filters.SelectedWorkOrderStatuses;
+                query = query.Where(wo => wo.Status != null && statuses.Contains(wo.Status));
             }
 
             var orders = await query
@@ -755,6 +1125,12 @@ namespace hOps.web.Controllers
 
                     var departmentName = wo.Department?.Name;
                     var creator = FormatUser(wo.CreatedBy);
+                    var completedAt = wo.ToDoItems
+                        .Where(t => t.IsCompleted && t.CompletedAtUtc.HasValue)
+                        .Select(t => t.CompletedAtUtc)
+                        .OrderByDescending(dt => dt)
+                        .FirstOrDefault();
+                    var statusLabel = WorkOrderStatusOptions.GetLabel(wo.Status);
 
                     return (IReadOnlyList<string>)new List<string>
                     {
@@ -766,6 +1142,8 @@ namespace hOps.web.Controllers
                         NormalizeText(wo.Details),
                         NormalizeText(departmentName),
                         FormatDate(wo.DueDate),
+                        FormatDate(completedAt),
+                        NormalizeText(statusLabel),
                         creator
                     };
                 })
@@ -783,7 +1161,8 @@ namespace hOps.web.Controllers
             ReportDefinition definition,
             IReadOnlyCollection<int> propertyIds,
             DateTime? startDate,
-            DateTime? endDate)
+            DateTime? endDate,
+            ReportRequestViewModel filters)
         {
             var headers = new List<string>
             {
@@ -828,6 +1207,26 @@ namespace hOps.web.Controllers
                 query = query.Where(e => e.StartDate < endValue);
             }
 
+            if (filters.SelectedCalendarCategoryIds.Any())
+            {
+                var categoryIds = filters.SelectedCalendarCategoryIds;
+                query = query.Where(e => categoryIds.Contains(e.CalendarCategoryId));
+            }
+
+            if (filters.SelectedCalendarRecurrenceValues.Any())
+            {
+                var recurrenceValues = filters.SelectedCalendarRecurrenceValues
+                    .Select(value => int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : (int?)null)
+                    .Where(value => value.HasValue)
+                    .Select(value => value!.Value)
+                    .ToList();
+
+                if (recurrenceValues.Any())
+                {
+                    query = query.Where(e => recurrenceValues.Contains((int)e.Recurrence));
+                }
+            }
+
             var events = await query
                 .OrderBy(e => e.StartDate)
                 .ThenBy(e => e.Title)
@@ -870,7 +1269,8 @@ namespace hOps.web.Controllers
             ReportDefinition definition,
             IReadOnlyCollection<int> propertyIds,
             DateTime? startDate,
-            DateTime? endDate)
+            DateTime? endDate,
+            ReportRequestViewModel filters)
         {
             var headers = new List<string>
             {
@@ -911,6 +1311,12 @@ namespace hOps.web.Controllers
             {
                 var endValue = endBoundary.Value;
                 query = query.Where(l => l.CreatedAt < endValue);
+            }
+
+            if (filters.SelectedPassOnLogCreatorIds.Any())
+            {
+                var creatorIds = filters.SelectedPassOnLogCreatorIds;
+                query = query.Where(l => creatorIds.Contains(l.CreatedById));
             }
 
             var logs = await query
@@ -957,7 +1363,7 @@ namespace hOps.web.Controllers
             };
         }
 
-        private async Task<ReportResultViewModel> BuildPhonebookReport(ReportDefinition definition, IReadOnlyCollection<int> propertyIds)
+        private async Task<ReportResultViewModel> BuildPhonebookReport(ReportDefinition definition, IReadOnlyCollection<int> propertyIds, ReportRequestViewModel filters)
         {
             var headers = new List<string>
             {
@@ -986,12 +1392,20 @@ namespace hOps.web.Controllers
                 };
             }
 
-            var contacts = await _context.PhonebookContacts
+            var contactsQuery = _context.PhonebookContacts
                 .Include(c => c.PhonebookType).ThenInclude(t => t.Property)
                 .AsNoTracking()
                 .Where(c => c.PhonebookType != null
                     && c.PhonebookType.PropertyId.HasValue
-                    && propertyIds.Contains(c.PhonebookType.PropertyId.Value))
+                    && propertyIds.Contains(c.PhonebookType.PropertyId.Value));
+
+            if (filters.SelectedPhonebookTypeIds.Any())
+            {
+                var typeIds = filters.SelectedPhonebookTypeIds;
+                contactsQuery = contactsQuery.Where(c => c.PhonebookTypeId.HasValue && typeIds.Contains(c.PhonebookTypeId.Value));
+            }
+
+            var contacts = await contactsQuery
                 .Select(c => new
                 {
                     Contact = c,

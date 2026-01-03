@@ -6,27 +6,34 @@
 
 <h1 class="mb-4">Reports</h1>
 
-<div class="row g-4">
+<div class="row g-4 reports-layout">
     <div class="col-lg-4">
         <div class="card shadow-sm">
             <div class="card-header">
                 <strong>Report Filters</strong>
             </div>
             <div class="card-body">
-                <form method="post" class="vstack gap-3">
+                <form method="post" class="vstack gap-3" id="reportFiltersForm">
                     @Html.AntiForgeryToken()
                     <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert" style="display:@(ViewData.ModelState.ErrorCount > 0 ? "block" : "none")"></div>
 
+                    <input asp-for="RefreshFiltersOnly" type="hidden" id="refreshFiltersOnly" value="false" />
+
                     <div>
                         <label asp-for="SelectedReportType" class="form-label">Report</label>
-                        <select asp-for="SelectedReportType" class="form-select" asp-items="Model.AvailableReports">
+                        <select asp-for="SelectedReportType" class="form-select" id="reportSelect">
                             <option value="">Select a report...</option>
+                            @foreach (var report in Model.AvailableReports)
+                            {
+                                var reportMetadata = Model.ReportMetadata.FirstOrDefault(m => m.Key == report.Value);
+                                var description = reportMetadata?.Description ?? string.Empty;
+                                <option value="@report.Value" data-description="@description" @(report.Selected ? "selected" : null)>@report.Text</option>
+                            }
                         </select>
                         <span asp-validation-for="SelectedReportType" class="text-danger"></span>
-                        @if (!string.IsNullOrWhiteSpace(Model.SelectedReportDescription))
-                        {
-                            <div class="form-text">@Model.SelectedReportDescription</div>
-                        }
+                        <div class="form-text @(string.IsNullOrWhiteSpace(Model.SelectedReportDescription) ? "d-none" : string.Empty)" id="reportDescription">
+                            @Model.SelectedReportDescription
+                        </div>
                     </div>
 
                     @if (Model.AvailableProperties.Any())
@@ -87,6 +94,74 @@
                         </div>
                     }
 
+                    @if (Model.ShowWorkOrderFilters)
+                    {
+                        <div class="report-filter-group">
+                            <h6 class="text-uppercase small fw-bold mb-3">Work Order Filters</h6>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label">Locations</label>
+                                    <select asp-for="SelectedWorkOrderLocations" asp-items="Model.WorkOrderLocationOptions" class="form-select report-multiselect" multiple size="6"></select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Types</label>
+                                    <select asp-for="SelectedWorkOrderTypeIds" asp-items="Model.WorkOrderTypeOptions" class="form-select report-multiselect" multiple size="5"></select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Departments</label>
+                                    <select asp-for="SelectedWorkOrderDepartmentIds" asp-items="Model.WorkOrderDepartmentOptions" class="form-select report-multiselect" multiple size="5"></select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Statuses</label>
+                                    <select asp-for="SelectedWorkOrderStatuses" asp-items="Model.WorkOrderStatusOptions" class="form-select report-multiselect" multiple size="5"></select>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @if (Model.ShowCalendarFilters)
+                    {
+                        <div class="report-filter-group">
+                            <h6 class="text-uppercase small fw-bold mb-3">Calendar Filters</h6>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label">Categories</label>
+                                    <select asp-for="SelectedCalendarCategoryIds" asp-items="Model.CalendarCategoryOptions" class="form-select report-multiselect" multiple size="6"></select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Recurring</label>
+                                    <select asp-for="SelectedCalendarRecurrenceValues" asp-items="Model.CalendarRecurrenceOptions" class="form-select report-multiselect" multiple size="5"></select>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @if (Model.ShowPassOnLogFilters)
+                    {
+                        <div class="report-filter-group">
+                            <h6 class="text-uppercase small fw-bold mb-3">Pass On Log Filters</h6>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label">Creators</label>
+                                    <select asp-for="SelectedPassOnLogCreatorIds" asp-items="Model.PassOnLogCreatorOptions" class="form-select report-multiselect" multiple size="6"></select>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @if (Model.ShowPhonebookFilters)
+                    {
+                        <div class="report-filter-group">
+                            <h6 class="text-uppercase small fw-bold mb-3">Phonebook Filters</h6>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label">Types</label>
+                                    <select asp-for="SelectedPhonebookTypeIds" asp-items="Model.PhonebookTypeOptions" class="form-select report-multiselect" multiple size="6"></select>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
                     <div class="d-flex flex-wrap gap-2">
                         <button type="submit" class="btn btn-primary">Run Report</button>
                         @if (Model.HasResults)
@@ -121,8 +196,15 @@
                 <div class="card-body">
                     @if (Model.Result.Rows.Any())
                     {
-                        <div class="table-responsive">
-                            <table class="table table-striped table-bordered align-middle">
+                        @{
+                            var reportTableClasses = "table table-striped table-bordered align-middle report-table";
+                            if (string.Equals(Model.SelectedReportType, "bookmarks", StringComparison.OrdinalIgnoreCase))
+                            {
+                                reportTableClasses += " report-table--bookmarks";
+                            }
+                        }
+                        <div class="table-responsive report-table-wrapper">
+                            <table class="@reportTableClasses">
                                 <thead class="table-light">
                                     <tr>
                                         @foreach (var header in Model.Result.Headers)
@@ -160,6 +242,11 @@
         (function () {
             const includeAllCheckbox = document.getElementById('includeAllProperties');
             const propertySelection = document.getElementById('propertySelection');
+            const reportSelect = document.getElementById('reportSelect');
+            const reportDescription = document.getElementById('reportDescription');
+            const reportForm = document.getElementById('reportFiltersForm');
+            const refreshField = document.getElementById('refreshFiltersOnly');
+            let isAutoSubmitting = false;
 
             function syncPropertyState() {
                 if (!includeAllCheckbox || !propertySelection) {
@@ -180,6 +267,41 @@
                 includeAllCheckbox.addEventListener('change', syncPropertyState);
                 syncPropertyState();
             }
+
+            function updateReportDescription() {
+                if (!reportSelect || !reportDescription) {
+                    return;
+                }
+                const selectedOption = reportSelect.options[reportSelect.selectedIndex];
+                const description = selectedOption?.dataset?.description || '';
+                reportDescription.textContent = description;
+                reportDescription.classList.toggle('d-none', !description.trim());
+            }
+
+            if (reportSelect && reportForm && refreshField) {
+                reportSelect.addEventListener('change', () => {
+                    updateReportDescription();
+                    if (!reportSelect.value) {
+                        return;
+                    }
+                    isAutoSubmitting = true;
+                    refreshField.value = 'true';
+                    if (typeof reportForm.requestSubmit === 'function') {
+                        reportForm.requestSubmit();
+                    } else {
+                        reportForm.submit();
+                    }
+                });
+
+                reportForm.addEventListener('submit', () => {
+                    if (!isAutoSubmitting) {
+                        refreshField.value = 'false';
+                    }
+                    isAutoSubmitting = false;
+                });
+            }
+
+            updateReportDescription();
         })();
     </script>
 }
@@ -188,5 +310,37 @@
     .property-selection.disabled {
         opacity: 0.6;
         pointer-events: none;
+    }
+
+    .reports-layout .col-12,
+    .reports-layout .col-lg-4,
+    .reports-layout .col-lg-8 {
+        min-width: 0;
+    }
+
+    .report-filter-group {
+        border: 1px solid rgba(15, 46, 97, 0.12);
+        border-radius: 0.85rem;
+        background-color: #f8fafc;
+        padding: 1rem;
+    }
+
+    .report-multiselect {
+        min-height: 120px;
+    }
+
+    .report-table td {
+        word-break: break-word;
+        white-space: normal;
+    }
+
+    .report-table--bookmarks td:nth-child(4),
+    .report-table--bookmarks td:nth-child(7),
+    .report-table--bookmarks td:nth-child(10) {
+        max-width: 220px;
+    }
+
+    .report-table-wrapper {
+        overflow-x: auto;
     }
 </style>
