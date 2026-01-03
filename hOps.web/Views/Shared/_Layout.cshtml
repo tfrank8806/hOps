@@ -1764,7 +1764,21 @@
 
                 const handleHotelLayoutClick = event => {
                     event.preventDefault();
-                    window.open('/Home/HotelLayoutWidget?mode=popup', 'HotelLayoutPopup', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+                    const screenWidth = Math.max(window.screen?.availWidth || 1400, 1200);
+                    const screenHeight = Math.max(window.screen?.availHeight || 900, 800);
+                    const popupWidth = Math.min(screenWidth - 40, 1580);
+                    const popupHeight = Math.min(screenHeight - 40, 960);
+                    const left = Math.max(0, ((window.screenX || window.screenLeft || 0) + (window.outerWidth - popupWidth) / 2));
+                    const top = Math.max(0, ((window.screenY || window.screenTop || 0) + (window.outerHeight - popupHeight) / 2));
+                    const features = [
+                        `width=${Math.round(popupWidth)}`,
+                        `height=${Math.round(popupHeight)}`,
+                        `left=${Math.round(left)}`,
+                        `top=${Math.round(top)}`,
+                        'resizable=yes',
+                        'scrollbars=yes'
+                    ].join(',');
+                    window.open('/Home/HotelLayoutWidget?mode=popup', 'HotelLayoutPopup', features);
                     hideHotelLayoutPanel();
                 };
 
