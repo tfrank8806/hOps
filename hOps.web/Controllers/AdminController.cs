@@ -219,14 +219,14 @@ namespace hOps.web.Controllers
             var loginUrl = ExternalLoginUrl;
             var message = $@"
 Hi {user.FirstName},<br/><br/>
-An account has been created for you on HotelOps.<br/>
+An account has been created for you on GuestQuest.<br/>
 Use your email and the temporary password below to log in:<br/>
 <strong>Password:</strong> {tempPassword}<br/><br/>
-<a href=""{loginUrl}"">Log in to HotelOps</a><br/><br/>
+<a href=""{loginUrl}"">Log in to GuestQuest</a><br/><br/>
 Please change your password after logging in.<br/><br/>
-HotelOps Admin Team
+GuestQuest Admin Team
 ";
-            await _emailSender.SendEmailAsync(user.Email!, "Your HotelOps account is ready", message);
+            await _emailSender.SendEmailAsync(user.Email!, "Your GuestQuest account is ready", message);
 
             TempData["AdminUsersMessage"] = $"Created user {user.Email} and sent a temporary password.";
             return RedirectToAction(nameof(Users));
