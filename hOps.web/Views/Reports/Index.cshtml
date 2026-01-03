@@ -27,7 +27,14 @@
                             {
                                 var reportMetadata = Model.ReportMetadata.FirstOrDefault(m => m.Key == report.Value);
                                 var description = reportMetadata?.Description ?? string.Empty;
-                                <option value="@report.Value" data-description="@description" @(report.Selected ? "selected" : null)>@report.Text</option>
+                                if (report.Selected)
+                                {
+                                    <option value="@report.Value" data-description="@description" selected>@report.Text</option>
+                                }
+                                else
+                                {
+                                    <option value="@report.Value" data-description="@description">@report.Text</option>
+                                }
                             }
                         </select>
                         <span asp-validation-for="SelectedReportType" class="text-danger"></span>
@@ -196,12 +203,10 @@
                 <div class="card-body">
                     @if (Model.Result.Rows.Any())
                     {
-                        @{
-                            var reportTableClasses = "table table-striped table-bordered align-middle report-table";
-                            if (string.Equals(Model.SelectedReportType, "bookmarks", StringComparison.OrdinalIgnoreCase))
-                            {
-                                reportTableClasses += " report-table--bookmarks";
-                            }
+                        var reportTableClasses = "table table-striped table-bordered align-middle report-table";
+                        if (string.Equals(Model.SelectedReportType, "bookmarks", StringComparison.OrdinalIgnoreCase))
+                        {
+                            reportTableClasses += " report-table--bookmarks";
                         }
                         <div class="table-responsive report-table-wrapper">
                             <table class="@reportTableClasses">
