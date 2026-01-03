@@ -44,6 +44,8 @@ namespace hOps.web.ViewModels
         public List<SelectListItem> WorkOrderLocationOptions { get; set; } = new();
         public List<int> SelectedWorkOrderTypeIds { get; set; } = new();
         public List<SelectListItem> WorkOrderTypeOptions { get; set; } = new();
+        public List<int> SelectedWorkOrderTypePropertyIds { get; set; } = new();
+        public List<SelectListItem> WorkOrderTypePropertyOptions { get; set; } = new();
         public List<int> SelectedWorkOrderDepartmentIds { get; set; } = new();
         public List<SelectListItem> WorkOrderDepartmentOptions { get; set; } = new();
         public List<string> SelectedWorkOrderStatuses { get; set; } = new();

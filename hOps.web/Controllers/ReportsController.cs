@@ -247,6 +247,7 @@ namespace hOps.web.Controllers
                 EndDate = normalizedEnd,
                 SelectedWorkOrderLocations = CloneStringList(filterSource?.SelectedWorkOrderLocations),
                 SelectedWorkOrderTypeIds = CloneIntList(filterSource?.SelectedWorkOrderTypeIds),
+                SelectedWorkOrderTypePropertyIds = CloneIntList(filterSource?.SelectedWorkOrderTypePropertyIds),
                 SelectedWorkOrderDepartmentIds = CloneIntList(filterSource?.SelectedWorkOrderDepartmentIds),
                 SelectedWorkOrderStatuses = CloneStringList(filterSource?.SelectedWorkOrderStatuses),
                 SelectedCalendarCategoryIds = CloneIntList(filterSource?.SelectedCalendarCategoryIds),
@@ -299,9 +300,11 @@ namespace hOps.web.Controllers
                 viewModel.WorkOrderLocationOptions = new List<SelectListItem>();
                 viewModel.WorkOrderTypeOptions = new List<SelectListItem>();
                 viewModel.WorkOrderDepartmentOptions = new List<SelectListItem>();
+                viewModel.WorkOrderTypePropertyOptions = new List<SelectListItem>();
                 viewModel.WorkOrderStatusOptions = new List<SelectListItem>();
                 viewModel.SelectedWorkOrderLocations.Clear();
                 viewModel.SelectedWorkOrderTypeIds.Clear();
+                viewModel.SelectedWorkOrderTypePropertyIds.Clear();
                 viewModel.SelectedWorkOrderDepartmentIds.Clear();
                 viewModel.SelectedWorkOrderStatuses.Clear();
             }
@@ -349,6 +352,7 @@ namespace hOps.web.Controllers
                 viewModel.WorkOrderLocationOptions = new List<SelectListItem>();
                 viewModel.WorkOrderTypeOptions = new List<SelectListItem>();
                 viewModel.WorkOrderDepartmentOptions = new List<SelectListItem>();
+                viewModel.WorkOrderTypePropertyOptions = new List<SelectListItem>();
                 viewModel.WorkOrderStatusOptions = WorkOrderStatusOptions.All
                     .Select(status => new SelectListItem
                     {
@@ -357,6 +361,10 @@ namespace hOps.web.Controllers
                         Selected = false
                     })
                     .ToList();
+                viewModel.SelectedWorkOrderLocations.Clear();
+                viewModel.SelectedWorkOrderTypeIds.Clear();
+                viewModel.SelectedWorkOrderTypePropertyIds.Clear();
+                viewModel.SelectedWorkOrderDepartmentIds.Clear();
                 viewModel.SelectedWorkOrderStatuses.Clear();
                 return;
             }
@@ -389,16 +397,48 @@ namespace hOps.web.Controllers
                 .Select(option => option.Value)
                 .ToList();
 
-            var typeOptions = await _context.WorkOrderTypes
+            var accessibleProperties = await _context.Properties
+                .Where(p => propertyIds.Contains(p.Id))
+                .OrderBy(p => p.Name)
+                .ToListAsync();
+
+            viewModel.WorkOrderTypePropertyOptions = accessibleProperties
+                .Select(property => new SelectListItem
+                {
+                    Value = property.Id.ToString(CultureInfo.InvariantCulture),
+                    Text = property.Name,
+                    Selected = viewModel.SelectedWorkOrderTypePropertyIds.Contains(property.Id)
+                })
+                .ToList();
+            viewModel.SelectedWorkOrderTypePropertyIds = viewModel.WorkOrderTypePropertyOptions
+                .Where(option => option.Selected)
+                .Select(option => int.Parse(option.Value, CultureInfo.InvariantCulture))
+                .ToList();
+
+            var selectedTypePropertyIds = viewModel.SelectedWorkOrderTypePropertyIds;
+
+            var typeQuery = _context.WorkOrderTypes
+                .Include(type => type.Property)
                 .AsNoTracking()
-                .OrderBy(type => type.Name)
+                .Where(type => type.PropertyId.HasValue && propertyIds.Contains(type.PropertyId.Value));
+
+            if (selectedTypePropertyIds.Any())
+            {
+                typeQuery = typeQuery.Where(type => type.PropertyId.HasValue && selectedTypePropertyIds.Contains(type.PropertyId.Value));
+            }
+
+            var typeOptions = await typeQuery
+                .OrderBy(type => type.Property!.Name)
+                .ThenBy(type => type.Name)
                 .ToListAsync();
 
             viewModel.WorkOrderTypeOptions = typeOptions
                 .Select(type => new SelectListItem
                 {
                     Value = type.Id.ToString(CultureInfo.InvariantCulture),
-                    Text = NormalizeText(type.Name),
+                    Text = type.Property != null
+                        ? $"{type.Property.Name} · {type.Name}"
+                        : NormalizeText(type.Name),
                     Selected = viewModel.SelectedWorkOrderTypeIds.Contains(type.Id)
                 })
                 .ToList();

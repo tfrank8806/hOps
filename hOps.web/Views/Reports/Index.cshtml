@@ -107,6 +107,10 @@
                             <h6 class="text-uppercase small fw-bold mb-3">Work Order Filters</h6>
                             <div class="row g-3">
                                 <div class="col-12">
+                                    <label class="form-label">Type Properties</label>
+                                    <select asp-for="SelectedWorkOrderTypePropertyIds" asp-items="Model.WorkOrderTypePropertyOptions" class="form-select report-multiselect" multiple size="5"></select>
+                                </div>
+                                <div class="col-12">
                                     <label class="form-label">Locations</label>
                                     <select asp-for="SelectedWorkOrderLocations" asp-items="Model.WorkOrderLocationOptions" class="form-select report-multiselect" multiple size="6"></select>
                                 </div>
