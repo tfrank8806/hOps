@@ -122,6 +122,7 @@ namespace hOps.web.Controllers
                 "Department",
                 "Type",
                 "Issue",
+                "Details",
                 "Due Date",
                 "Created Date",
                 "Creator",
@@ -148,15 +149,16 @@ namespace hOps.web.Controllers
                 worksheet.Cell(rowNumber, 3).Value = order.Department ?? "Unassigned";
                 worksheet.Cell(rowNumber, 4).Value = order.WorkOrderType ?? string.Empty;
                 worksheet.Cell(rowNumber, 5).Value = order.Issue;
-                worksheet.Cell(rowNumber, 6).Value = order.DueDate;
+                worksheet.Cell(rowNumber, 6).Value = string.IsNullOrWhiteSpace(order.Details) ? string.Empty : order.Details;
+                worksheet.Cell(rowNumber, 7).Value = order.DueDate;
                 var createdLocal = _timeZoneService.ConvertToUserTime(order.CreatedAt);
-                worksheet.Cell(rowNumber, 7).Value = createdLocal;
-                worksheet.Cell(rowNumber, 8).Value = string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator;
-                worksheet.Cell(rowNumber, 9).Value = string.Join(Environment.NewLine, order.Properties);
-                worksheet.Cell(rowNumber, 10).Value = string.Join(Environment.NewLine, order.Attachments.Select(a => a.FileName));
+                worksheet.Cell(rowNumber, 8).Value = createdLocal;
+                worksheet.Cell(rowNumber, 9).Value = string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator;
+                worksheet.Cell(rowNumber, 10).Value = string.Join(Environment.NewLine, order.Properties);
+                worksheet.Cell(rowNumber, 11).Value = string.Join(Environment.NewLine, order.Attachments.Select(a => a.FileName));
 
-                worksheet.Cell(rowNumber, 6).Style.DateFormat.Format = "MMM dd, yyyy";
                 worksheet.Cell(rowNumber, 7).Style.DateFormat.Format = "MMM dd, yyyy";
+                worksheet.Cell(rowNumber, 8).Style.DateFormat.Format = "MMM dd, yyyy";
                 worksheet.Row(rowNumber).Style.Alignment.SetVertical(XLAlignmentVerticalValues.Top);
             }
 
@@ -1093,6 +1095,8 @@ namespace hOps.web.Controllers
                 "type_desc" => query.OrderByDescending(w => w.WorkOrderType != null ? w.WorkOrderType.Name : string.Empty).ThenByDescending(w => w.CreatedAt),
                 "issue" => query.OrderBy(w => w.Issue ?? string.Empty).ThenByDescending(w => w.CreatedAt),
                 "issue_desc" => query.OrderByDescending(w => w.Issue ?? string.Empty).ThenByDescending(w => w.CreatedAt),
+                "details" => query.OrderBy(w => w.Details ?? string.Empty).ThenByDescending(w => w.CreatedAt),
+                "details_desc" => query.OrderByDescending(w => w.Details ?? string.Empty).ThenByDescending(w => w.CreatedAt),
                 "due" => query.OrderBy(w => w.DueDate).ThenByDescending(w => w.CreatedAt),
                 "due_desc" => query.OrderByDescending(w => w.DueDate).ThenByDescending(w => w.CreatedAt),
                 "created" => query.OrderBy(w => w.CreatedAt),

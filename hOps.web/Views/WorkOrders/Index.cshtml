@@ -289,6 +289,11 @@
             min-width: 180px;
         }
 
+        .workorders-table .col-details {
+            width: 22%;
+            min-width: 160px;
+        }
+
         .workorders-table .col-due,
         .workorders-table .col-created {
             width: 6%;
@@ -556,15 +561,16 @@
                         <colgroup>
                             <col class="col-actions" />
                             <col class="col-status" />
-                        <col class="col-location" />
-                        <col class="col-department" />
-                        <col class="col-type" />
-                        <col class="col-issue" />
-                        <col class="col-due" />
-                        <col class="col-created" />
-                        <col class="col-attachments" />
-                        </colgroup>
-                        <thead class="table-light">
+                <col class="col-location" />
+                <col class="col-department" />
+                <col class="col-type" />
+                <col class="col-issue" />
+                <col class="col-details" />
+                <col class="col-due" />
+                <col class="col-created" />
+                <col class="col-attachments" />
+                </colgroup>
+                <thead class="table-light">
                             <tr>
                                 <th scope="col" class="text-center">Actions</th>
                                 <th scope="col">@SortableHeader("Status", "status")</th>
@@ -572,6 +578,7 @@
                                 <th scope="col">@SortableHeader("Department", "department")</th>
                                 <th scope="col">@SortableHeader("Type", "type")</th>
                                 <th scope="col">@SortableHeader("Issue", "issue")</th>
+                                <th scope="col">@SortableHeader("Details", "details")</th>
                                 <th scope="col">@SortableHeader("Due", "due")</th>
                                 <th scope="col">@SortableHeader("Created", "created")</th>
                                 <th scope="col" class="text-center" aria-label="Attachments">
@@ -585,7 +592,7 @@
                             @if (!Model.WorkOrders.Any())
                             {
                                 <tr>
-                                    <td colspan="9" class="text-center py-4">No work orders found. Adjust filters or create a new work order.</td>
+                                    <td colspan="10" class="text-center py-4">No work orders found. Adjust filters or create a new work order.</td>
                                 </tr>
                             }
                             else
@@ -688,10 +695,6 @@
                     </td>
                     <td class="col-location">
                         <div class="fw-semibold workorder-location">@order.Location</div>
-                        @if (!string.IsNullOrWhiteSpace(order.Details))
-                        {
-                            <small class="text-muted workorder-details">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Details))</small>
-                        }
                     </td>
                     <td class="col-department">
                         @if (!string.IsNullOrWhiteSpace(order.Department))
@@ -706,6 +709,16 @@
                     <td class="col-type">@order.WorkOrderType</td>
                     <td class="col-issue">
                         <div class="workorder-issue">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Issue))</div>
+                    </td>
+                    <td class="col-details">
+                        @if (!string.IsNullOrWhiteSpace(order.Details))
+                        {
+                            <div class="workorder-details">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Details))</div>
+                        }
+                        else
+                        {
+                            <span class="text-muted">No details</span>
+                        }
                     </td>
                     <td class="col-due @(isPastDue ? "fw-bold text-danger" : string.Empty)">
                         @order.DueDate.ToString("MM-dd-yy")
