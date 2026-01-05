@@ -5,7 +5,6 @@
     var property = Model.CurrentProperty;
     var hasProperty = property != null;
     var showBulletinForm = TempData["ShowBulletinForm"] is bool showFlag && showFlag;
-    var bulletinCollapseId = "bulletinFormCollapse";
     string EscapeTextareaValue(string? value) => string.IsNullOrEmpty(value)
         ? string.Empty
         : value.Replace("</textarea>", "&lt;/textarea&gt;");
@@ -20,7 +19,7 @@
                 <span class="text-muted small">Visible to everyone at @property!.Name</span>
             }
         </div>
-        <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#@bulletinCollapseId" aria-expanded="@(showBulletinForm ? "true" : "false")" aria-controls="@bulletinCollapseId" @(hasProperty ? string.Empty : "disabled")>
+        <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#newBulletinModal" @(hasProperty ? string.Empty : "disabled")>
             <span class="me-1" aria-hidden="true">+</span>
             <span>New Bulletin</span>
         </button>
@@ -30,10 +29,145 @@
         {
             <p class="text-muted mb-0">Select a property to collaborate with your team.</p>
         }
+        else if (!Model.BulletinPosts.Any())
+        {
+            <p class="text-muted mb-0">No bulletin posts yet. Start the conversation above.</p>
+        }
         else
         {
-            <div class="collapse bulletin-form-collapse @(showBulletinForm ? "show" : string.Empty)" id="@bulletinCollapseId">
-                <div class="border rounded-3 bg-light-subtle p-3 p-md-4 mb-4">
+            <div class="bulletin-list">
+                @foreach (var post in Model.BulletinPosts)
+                {
+                    var modalId = $"editBulletinModal_{post.Id}";
+                    var modalLabelId = $"{modalId}Label";
+                    <article class="bulletin-item mb-4 p-3 border rounded-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h3 class="h6 mb-1">@(!string.IsNullOrWhiteSpace(post.CreatedByName) ? post.CreatedByName : "Team Member")</h3>
+                                @{
+                                    var createdLocal = TimeZoneService.ConvertToUserTime(post.CreatedAt);
+                                    var updatedLocal = post.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(post.UpdatedAt.Value) : (DateTime?)null;
+                                }
+                                <p class="mb-2 text-muted small">Posted @createdLocal.ToString("g")
+                                @if (post.UpdatedAt.HasValue)
+                                {
+                                    <span class="ms-2">• Updated @updatedLocal?.ToString("g")
+                                        @if (!string.IsNullOrWhiteSpace(post.UpdatedByName))
+                                        {
+                                            <text>by @post.UpdatedByName</text>
+                                        }
+                                    </span>
+                                }
+                                </p>
+                            </div>
+                            @if (post.CanEdit)
+                            {
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#@modalId">Edit</button>
+                                    <form asp-action="DeleteBulletin" method="post" onsubmit="return confirm('Remove this bulletin entry?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@post.Id" />
+                                        <input type="hidden" name="propertyId" value="@property!.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </form>
+                                </div>
+                            }
+                        </div>
+                        <div class="bulletin-content rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(post.Content))</div>
+
+                        @if (post.Attachments.Any())
+                        {
+                            <div class="mt-2">
+                                <ul class="list-unstyled small mb-0">
+                                    @foreach (var attachment in post.Attachments)
+                                    {
+                                        <li class="mb-1">
+                                            <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+
+                        @if (post.CanEdit)
+                        {
+                            var postInitialHtml = RichTextRenderer.ToHtml(post.Content);
+                            <div class="modal fade" id="@modalId" tabindex="-1" aria-labelledby="@modalLabelId" aria-hidden="true">
+                                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="@modalLabelId">Edit Bulletin</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <form asp-action="UpdateBulletin" method="post" enctype="multipart/form-data">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="Id" value="@post.Id" />
+                                                <input type="hidden" name="PropertyId" value="@property!.Id" />
+                                                <div class="mb-3">
+                                                    <label class="form-label" for="bulletinContent_@post.Id">Edit message</label>
+                                                    <textarea class="form-control"
+                                                              id="bulletinContent_@post.Id"
+                                                              name="Content"
+                                                              rows="3"
+                                                              maxlength="2000"
+                                                              data-enable-mentions="true"
+                                                              data-rich-text="true"
+                                                              data-initial-html="@postInitialHtml">@Html.Raw(EscapeTextareaValue(post.Content))</textarea>
+                                                    <div class="form-text">Use the toolbar to emphasize changes before saving.</div>
+                                                </div>
+                                                @if (post.Attachments.Any())
+                                                {
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Current Attachments</label>
+                                                        <ul class="list-unstyled mb-2">
+                                                            @foreach (var attachment in post.Attachments)
+                                                            {
+                                                                var checkboxId = $"bulletinRemove_{post.Id}_{attachment.Id}";
+                                                                <li class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-2">
+                                                                    <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
+                                                                    <div class="form-check mb-0">
+                                                                        <input class="form-check-input" type="checkbox" name="AttachmentsToDelete" value="@attachment.Id" id="@checkboxId" />
+                                                                        <label class="form-check-label" for="@checkboxId">Remove</label>
+                                                                    </div>
+                                                                </li>
+                                                            }
+                                                        </ul>
+                                                        <div class="form-text">Select remove to delete existing files before saving.</div>
+                                                    </div>
+                                                }
+                                                <div class="mb-3">
+                                                    <label class="form-label" for="bulletinFiles_@post.Id">Add Attachments</label>
+                                                    <input class="form-control" type="file" id="bulletinFiles_@post.Id" name="Files" multiple />
+                                                    <div class="form-text">Attach additional files to share updated details.</div>
+                                                </div>
+                                                <div class="d-flex justify-content-end gap-2">
+                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@if (hasProperty)
+{
+    <div class="modal fade" id="newBulletinModal" tabindex="-1" aria-labelledby="newBulletinModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="newBulletinModalLabel">New Bulletin</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
                     <form asp-action="CreateBulletin" method="post" enctype="multipart/form-data">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="PropertyId" value="@property!.Id" />
@@ -48,130 +182,28 @@
                             <div class="form-text">Add photos or documents to give more context.</div>
                         </div>
                         <div class="d-flex justify-content-end gap-2">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#@bulletinCollapseId" aria-controls="@bulletinCollapseId">Cancel</button>
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                             <button type="submit" class="btn btn-primary">Post to Bulletin</button>
                         </div>
                     </form>
                 </div>
             </div>
-
-            @if (!Model.BulletinPosts.Any())
-            {
-                <p class="text-muted mb-0">No bulletin posts yet. Start the conversation above.</p>
-            }
-            else
-            {
-                <div class="bulletin-list">
-                    @foreach (var post in Model.BulletinPosts)
-                    {
-                        var collapseId = $"editBulletin_{post.Id}";
-                        <article class="bulletin-item mb-4 p-3 border rounded-3">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div>
-                                    <h3 class="h6 mb-1">@(!string.IsNullOrWhiteSpace(post.CreatedByName) ? post.CreatedByName : "Team Member")</h3>
-                                    @{
-                                        var createdLocal = TimeZoneService.ConvertToUserTime(post.CreatedAt);
-                                        var updatedLocal = post.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(post.UpdatedAt.Value) : (DateTime?)null;
-                                    }
-                                    <p class="mb-2 text-muted small">Posted @createdLocal.ToString("g")
-                                    @if (post.UpdatedAt.HasValue)
-                                    {
-                                        <span class="ms-2">Â· Updated @updatedLocal?.ToString("g")
-                                            @if (!string.IsNullOrWhiteSpace(post.UpdatedByName))
-                                            {
-                                                <text>by @post.UpdatedByName</text>
-                                            }
-                                        </span>
-                                    }
-                                    </p>
-                                </div>
-                                @if (post.CanEdit)
-                                {
-                                    <div class="btn-group">
-                                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">Edit</button>
-                                        <form asp-action="DeleteBulletin" method="post" onsubmit="return confirm('Remove this bulletin entry?');">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="id" value="@post.Id" />
-                                            <input type="hidden" name="propertyId" value="@property!.Id" />
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                        </form>
-                                    </div>
-                                }
-                            </div>
-                            <div class="bulletin-content rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(post.Content))</div>
-
-                            @if (post.Attachments.Any())
-                            {
-                                <div class="mt-2">
-                                    <ul class="list-unstyled small mb-0">
-                                        @foreach (var attachment in post.Attachments)
-                                        {
-                                            <li class="mb-1">
-                                                <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
-                                            </li>
-                                        }
-                                    </ul>
-                                </div>
-                            }
-
-                            @if (post.CanEdit)
-                            {
-                                <div class="collapse mt-3" id="@collapseId">
-                                    <form asp-action="UpdateBulletin" method="post" enctype="multipart/form-data" class="border-top pt-3">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="Id" value="@post.Id" />
-                                        <input type="hidden" name="PropertyId" value="@property!.Id" />
-                                        <div class="mb-3">
-                                            <label class="form-label" for="bulletinContent_@post.Id">Edit message</label>
-                                        @{
-                                            var postInitialHtml = RichTextRenderer.ToHtml(post.Content);
-                                        }
-                                        <textarea class="form-control"
-                                                  id="bulletinContent_@post.Id"
-                                                  name="Content"
-                                                  rows="3"
-                                                  maxlength="2000"
-                                                  data-enable-mentions="true"
-                                                  data-rich-text="true"
-                                                  data-initial-html="@postInitialHtml">@Html.Raw(EscapeTextareaValue(post.Content))</textarea>
-                                            <div class="form-text">Use the toolbar to emphasize changes before saving.</div>
-                                        </div>
-                                        @if (post.Attachments.Any())
-                                        {
-                                            <div class="mb-3">
-                                                <label class="form-label">Current Attachments</label>
-                                                <ul class="list-unstyled mb-2">
-                                                    @foreach (var attachment in post.Attachments)
-                                                    {
-                                                        var checkboxId = $"bulletinRemove_{post.Id}_{attachment.Id}";
-                                                        <li class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-2">
-                                                            <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
-                                                            <div class="form-check mb-0">
-                                                                <input class="form-check-input" type="checkbox" name="AttachmentsToDelete" value="@attachment.Id" id="@checkboxId" />
-                                                                <label class="form-check-label" for="@checkboxId">Remove</label>
-                                                            </div>
-                                                        </li>
-                                                    }
-                                                </ul>
-                                                <div class="form-text">Select remove to delete existing files before saving.</div>
-                                            </div>
-                                        }
-                                        <div class="mb-3">
-                                            <label class="form-label" for="bulletinFiles_@post.Id">Add Attachments</label>
-                                            <input class="form-control" type="file" id="bulletinFiles_@post.Id" name="Files" multiple />
-                                            <div class="form-text">Attach additional files to share updated details.</div>
-                                        </div>
-                                        <div class="d-flex justify-content-end gap-2">
-                                            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#@collapseId">Cancel</button>
-                                            <button type="submit" class="btn btn-primary">Save Changes</button>
-                                        </div>
-                                    </form>
-                                </div>
-                            }
-                        </article>
-                    }
-                </div>
-            }
-        }
+        </div>
     </div>
-</div>
+
+    @if (showBulletinForm)
+    {
+        <script>
+            (() => {
+                const modalEl = document.getElementById('newBulletinModal');
+                if (!modalEl) {
+                    return;
+                }
+                const modalInstance = window.bootstrap && bootstrap.Modal
+                    ? bootstrap.Modal.getOrCreateInstance(modalEl)
+                    : null;
+                modalInstance?.show();
+            })();
+        </script>
+    }
+}
