@@ -124,7 +124,8 @@ namespace hOps.web.Controllers
                 ModelState.AddModelError("Form.EndTime", "End time cannot be before start time when the event occurs on a single day.");
             }
 
-            var categoryExists = await _context.CalendarCategories.AnyAsync(c => c.Id == form.CategoryId);
+            var categoryExists = await FilterCalendarCategoriesByProperties(propertyIds)
+                .AnyAsync(c => c.Id == form.CategoryId);
             if (!categoryExists)
             {
                 ModelState.AddModelError("Form.CategoryId", "Select a valid category.");
@@ -221,7 +222,8 @@ namespace hOps.web.Controllers
                 return NotFound();
             }
 
-            var categoryOptions = await GetCalendarCategoryOptionsAsync();
+            var propertyIds = accessibleProperties.Select(p => p.Id).ToList();
+            var categoryOptions = await GetCalendarCategoryOptionsAsync(propertyIds);
 
             var form = new CalendarEventFormViewModel
             {
@@ -340,7 +342,8 @@ namespace hOps.web.Controllers
                 ModelState.AddModelError("Form.EndTime", "End time cannot be before start time when the event occurs on a single day.");
             }
 
-            var categoryExists = await _context.CalendarCategories.AnyAsync(c => c.Id == form.CategoryId);
+            var categoryExists = await FilterCalendarCategoriesByProperties(accessiblePropertyIds)
+                .AnyAsync(c => c.Id == form.CategoryId);
             if (!categoryExists)
             {
                 ModelState.AddModelError("Form.CategoryId", "Select a valid category.");
@@ -350,7 +353,7 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                var categoryOptions = await GetCalendarCategoryOptionsAsync();
+                var categoryOptions = await GetCalendarCategoryOptionsAsync(accessibleProperties.Select(p => p.Id));
 
                 form.ExistingAttachments = existingAttachments;
 
@@ -441,7 +444,8 @@ namespace hOps.web.Controllers
                 ? accessibleProperties.Where(p => p.Id == currentPropertyId.Value).ToList()
                 : accessibleProperties.ToList();
 
-            var categoryOptions = await GetCalendarCategoryOptionsAsync();
+            var propertyIds = visibleProperties.Select(p => p.Id).ToList();
+            var categoryOptions = await GetCalendarCategoryOptionsAsync(propertyIds);
 
             var form = formOverride ?? new CalendarEventFormViewModel();
             form.SelectedPropertyIds ??= new List<int>();
@@ -470,7 +474,6 @@ namespace hOps.web.Controllers
                 }
             }
 
-            var propertyIds = visibleProperties.Select(p => p.Id).ToList();
             form.SelectedPropertyIds = form.SelectedPropertyIds
                 .Where(id => propertyIds.Contains(id))
                 .Distinct()
@@ -580,9 +583,29 @@ namespace hOps.web.Controllers
             return properties;
         }
 
-        private async Task<List<SelectListItem>> GetCalendarCategoryOptionsAsync()
+        private IQueryable<CalendarCategory> FilterCalendarCategoriesByProperties(IEnumerable<int>? propertyIds)
         {
-            return await _context.CalendarCategories
+            var allowedIds = propertyIds?
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList() ?? new List<int>();
+
+            var query = _context.CalendarCategories.AsQueryable();
+            if (allowedIds.Any())
+            {
+                query = query.Where(c => !c.PropertyId.HasValue || allowedIds.Contains(c.PropertyId.Value));
+            }
+            else
+            {
+                query = query.Where(c => c.PropertyId == null);
+            }
+
+            return query;
+        }
+
+        private async Task<List<SelectListItem>> GetCalendarCategoryOptionsAsync(IEnumerable<int>? propertyIds = null)
+        {
+            return await FilterCalendarCategoriesByProperties(propertyIds)
                 .OrderBy(c => c.Name)
                 .Select(c => new SelectListItem
                 {
