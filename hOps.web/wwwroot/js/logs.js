@@ -824,7 +824,6 @@
         if (!colId || typeof colId !== 'string') {
             return null;
         }
-        const match = /^col-(
         const match = /^col-(\d+)$/.exec(colId);
         if (!match) {
             return null;
