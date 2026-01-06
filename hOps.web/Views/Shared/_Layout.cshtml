@@ -2165,9 +2165,9 @@
                         const canvas = await window.html2canvas(document.body, {
                             useCORS: true,
                             backgroundColor: '#ffffff',
-                            scale: Math.min(window.devicePixelRatio || 1, 2)
+                            scale: Math.min(window.devicePixelRatio || 1, 1.25)
                         });
-                        return canvas.toDataURL('image/png', 0.92);
+                        return canvas.toDataURL('image/jpeg', 0.85);
                     } catch (error) {
                         console.warn('Issue reporter: screenshot capture failed', error);
                         return null;

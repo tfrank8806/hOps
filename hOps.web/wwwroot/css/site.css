@@ -1317,9 +1317,9 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 .home-main-container {
     width: 100%;
-    max-width: 1500px;
+    max-width: 1650px;
     margin-inline: auto;
-    padding-inline: clamp(0.75rem, 3vw, 2.25rem);
+    padding-inline: clamp(0.5rem, 2vw, 1.5rem);
 }
 
 .home-main-container .content-surface.content-surface--flush {
@@ -1327,14 +1327,14 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 }
 
 .home-dashboard {
-    padding: clamp(0.85rem, 2.5vw, 2.25rem);
+    padding: clamp(0.65rem, 1.8vw, 1.5rem);
     background: rgba(255, 255, 255, 0.96);
-    border-radius: 1rem;
-    box-shadow: 0 20px 35px rgba(15, 46, 97, 0.07);
+    border-radius: 0.75rem;
+    box-shadow: 0 16px 28px rgba(15, 46, 97, 0.06);
 }
 
 .home-dashboard > .row + .row {
-    margin-top: clamp(1rem, 2vw, 1.75rem);
+    margin-top: clamp(0.75rem, 1.5vw, 1.25rem);
 }
 
 @media (max-width: 575.98px) {
@@ -1345,7 +1345,7 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 .home-dashboard .card-header,
 .home-dashboard .card-body {
-    padding: 0.85rem 1rem;
+    padding: 0.65rem 0.85rem;
 }
 
 .home-dashboard .card-body > :last-child {
@@ -1358,13 +1358,13 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 .home-dashboard .widget-list .widget-item {
     padding-bottom: 0.1rem;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
 }
 
 .home-widget-grid {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    column-gap: 1rem;
+    column-gap: 0.75rem;
     row-gap: var(--home-widget-row-gap, 12px);
     grid-auto-flow: row dense;
     grid-auto-rows: var(--home-widget-row-size, 30px);
@@ -1382,18 +1382,18 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     transition: transform 0.15s ease, box-shadow 0.15s ease;
     display: flex;
     flex-direction: column;
-    min-height: clamp(240px, var(--widget-height, 300px), calc(100vh - var(--main-header-height, 72px) - 4rem));
-    height: clamp(240px, var(--widget-height, 300px), calc(100vh - var(--main-header-height, 72px) - 4rem));
+    min-height: clamp(200px, var(--widget-height, 260px), calc(100vh - var(--main-header-height, 72px) - 3rem));
+    height: clamp(200px, var(--widget-height, 260px), calc(100vh - var(--main-header-height, 72px) - 3rem));
     grid-column: span var(--widget-span, 4);
     grid-row: span var(--widget-row-span, 10);
-    --widget-height: 300px;
+    --widget-height: 260px;
 }
 
 .home-widget-card {
-    max-height: var(--widget-height, 300px);
+    max-height: var(--widget-height, 260px);
     display: flex;
     flex-direction: column;
-    font-size: var(--font-body-size);
+    font-size: clamp(0.85rem, var(--font-body-size), 0.95rem);
     line-height: var(--font-body-line);
 }
 
@@ -1404,16 +1404,16 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 .home-widget-card__header {
     flex: 0 0 auto;
-    padding-bottom: 0.5rem;
-    padding-left: 0.2rem;
-    padding-right: 0.2rem;
-    font-size: var(--font-heading-6);
+    padding-bottom: 0.35rem;
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+    font-size: calc(var(--font-heading-6) * 0.9);
 }
 
 .home-widget-card__body {
     flex: 1 1 auto;
     overflow-y: auto;
-    padding-top: 0.75rem;
+    padding-top: 0.5rem;
 }
 
 .home-widget__editor {
