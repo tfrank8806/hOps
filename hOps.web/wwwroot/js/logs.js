@@ -1543,7 +1543,7 @@
         sidebarToggleLabelEl.textContent = label;
     }
     function ensureGridShim() {
-        if (typeof window === 'undefined' || typeof window.agGrid !== 'undefined') {
+        if (typeof window === 'undefined') {
             return;
         }
         window.agGrid = createAgGridShim();
