@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    ensureGridShim();
+
     const storageKey = 'hops.logs.v1';
     const defaultRows = 10;
     const defaultColumns = 6;
@@ -1482,6 +1484,411 @@
             label = open ? sidebarToggleCloseLabel : sidebarToggleOpenLabel;
         }
         sidebarToggleLabelEl.textContent = label;
+    }
+    function ensureGridShim() {
+        if (typeof window === 'undefined' || typeof window.agGrid !== 'undefined') {
+            return;
+        }
+        window.agGrid = createAgGridShim();
+    }
+
+    function createAgGridShim() {
+        class ColumnWrapper {
+            constructor(def, index) {
+                this.def = def || {};
+                this.index = index;
+                this.colId = this.def.colId || this.def.field || `col-${index}`;
+            }
+
+            getColId() {
+                return this.colId;
+            }
+        }
+
+        class RowNode {
+            constructor(rowIndex, data) {
+                this.rowIndex = rowIndex;
+                this.data = data;
+            }
+        }
+
+        class SimpleGrid {
+            constructor(element, options = {}) {
+                this.element = element;
+                this.options = options;
+                this.table = document.createElement('table');
+                this.table.className = 'logs-grid-table';
+                this.element.innerHTML = '';
+                this.element.appendChild(this.table);
+                this.columnDefs = [];
+                this.columnWrappers = [];
+                this.columnMap = new Map();
+                this.rowData = [];
+                this.cellElements = new Map();
+                this.selection = null;
+                this.firstDataRendered = false;
+            }
+
+            setColumnDefs(defs = []) {
+                this.columnDefs = Array.isArray(defs) ? defs : [];
+                this.columnWrappers = this.columnDefs.map((def, index) => new ColumnWrapper(def, index));
+                this.columnMap = new Map(this.columnWrappers.map(wrapper => [wrapper.getColId(), wrapper]));
+                this.render();
+            }
+
+            setRowData(data = []) {
+                this.rowData = Array.isArray(data) ? data : [];
+                this.render();
+                if (!this.firstDataRendered && typeof this.options.onFirstDataRendered === 'function') {
+                    this.firstDataRendered = true;
+                    window.requestAnimationFrame(() => this.options.onFirstDataRendered());
+                }
+            }
+
+            setFocusedCell(rowIndex, colId) {
+                const key = this.getCellKey(rowIndex, colId);
+                const cell = this.cellElements.get(key);
+                if (cell) {
+                    cell.focus();
+                }
+            }
+
+            ensureIndexVisible(rowIndex) {
+                const firstColumn = this.columnWrappers[0];
+                if (!firstColumn) {
+                    return;
+                }
+                const key = this.getCellKey(rowIndex, firstColumn.getColId());
+                const cell = this.cellElements.get(key);
+                if (cell) {
+                    cell.scrollIntoView({ block: 'nearest' });
+                }
+            }
+
+            clearRangeSelection() {
+                this.selection = null;
+                this.applySelectionHighlight();
+                this.notifySelectionChanged();
+            }
+
+            addCellRange(config = {}) {
+                const startRow = this.clampRowIndex(config.rowStartIndex ?? 0);
+                const endRow = this.clampRowIndex(config.rowEndIndex ?? startRow);
+                const columnIds = (config.columns || []).map(entry => {
+                    if (!entry) {
+                        return null;
+                    }
+                    if (typeof entry === 'string') {
+                        return entry;
+                    }
+                    if (typeof entry.getColId === 'function') {
+                        return entry.getColId();
+                    }
+                    return null;
+                }).filter(Boolean);
+                if (!columnIds.length) {
+                    return;
+                }
+                this.selection = {
+                    startRowIndex: Math.min(startRow, endRow),
+                    endRowIndex: Math.max(startRow, endRow),
+                    columnIds
+                };
+                this.applySelectionHighlight();
+                this.notifySelectionChanged();
+            }
+
+            getCellRanges() {
+                if (!this.selection) {
+                    return [];
+                }
+                const columns = this.selection.columnIds
+                    .map(id => this.columnMap.get(id))
+                    .filter(Boolean);
+                if (!columns.length) {
+                    return [];
+                }
+                return [{
+                    startRow: { rowIndex: this.selection.startRowIndex },
+                    endRow: { rowIndex: this.selection.endRowIndex },
+                    columns
+                }];
+            }
+
+            refreshCells() {
+                this.render();
+            }
+
+            sizeColumnsToFit() {
+                // no-op for shim
+            }
+
+            getDisplayedRowAtIndex(rowIndex) {
+                return new RowNode(rowIndex, this.rowData[rowIndex]);
+            }
+
+            get columnApi() {
+                return {
+                    getAllColumns: () => this.columnWrappers.slice()
+                };
+            }
+
+            render() {
+                const previousSelection = this.selection ? { ...this.selection } : null;
+                this.cellElements.clear();
+                const table = document.createElement('table');
+                table.className = 'logs-grid-table';
+
+                const thead = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+                const corner = document.createElement('th');
+                corner.className = 'logs-grid-table__corner';
+                headerRow.appendChild(corner);
+                this.columnWrappers.forEach((column) => {
+                    const th = document.createElement('th');
+                    th.scope = 'col';
+                    th.className = 'logs-grid-table__header';
+                    th.textContent = column.def.headerName || column.getColId();
+                    th.addEventListener('click', () => this.selectColumn(column.getColId()));
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
+
+                const tbody = document.createElement('tbody');
+                this.rowData.forEach((row, rowIndex) => {
+                    const tr = document.createElement('tr');
+                    const rowHeader = document.createElement('th');
+                    rowHeader.scope = 'row';
+                    rowHeader.className = 'logs-grid-table__row-header';
+                    rowHeader.textContent = rowIndex + 1;
+                    rowHeader.addEventListener('click', () => this.selectRow(rowIndex));
+                    tr.appendChild(rowHeader);
+
+                    this.columnWrappers.forEach((column, columnIndex) => {
+                        const td = document.createElement('td');
+                        const cell = document.createElement('div');
+                        cell.className = 'logs-grid-cell';
+                        cell.tabIndex = 0;
+                        cell.contentEditable = 'true';
+                        const colId = column.getColId();
+                        const node = new RowNode(rowIndex, row);
+                        const formatterParams = {
+                            value: row[colId],
+                            data: row,
+                            node,
+                            column
+                        };
+                        const formattedValue = typeof column.def.valueFormatter === 'function'
+                            ? column.def.valueFormatter(formatterParams)
+                            : (row[colId] ?? '');
+                        const className = typeof column.def.cellClass === 'function'
+                            ? column.def.cellClass(formatterParams)
+                            : column.def.cellClass;
+                        if (typeof className === 'string' && className.trim()) {
+                            className.split(' ').forEach(cls => cls && cell.classList.add(cls));
+                        }
+                        cell.textContent = formattedValue ?? '';
+                        cell.dataset.rawValue = row[colId] ?? '';
+                        cell.dataset.rowIndex = String(rowIndex);
+                        cell.dataset.columnIndex = String(columnIndex);
+                        cell.dataset.colId = colId;
+                        cell.addEventListener('focus', () => this.handleCellFocus(cell, node, column));
+                        cell.addEventListener('blur', () => this.handleCellBlur(cell, node, column));
+                        cell.addEventListener('keydown', (event) => this.handleCellKeyDown(event, cell));
+                        td.appendChild(cell);
+                        this.cellElements.set(this.getCellKey(rowIndex, colId), cell);
+                        tr.appendChild(td);
+                    });
+
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody);
+
+                this.element.innerHTML = '';
+                this.element.appendChild(table);
+                this.table = table;
+                this.selection = previousSelection;
+                this.applySelectionHighlight();
+                if (typeof this.options.onGridSizeChanged === 'function') {
+                    this.options.onGridSizeChanged();
+                }
+            }
+
+            handleCellFocus(cell, node, column) {
+                cell.classList.add('is-editing');
+                cell.textContent = cell.dataset.rawValue ?? '';
+                const rowIndex = Number(cell.dataset.rowIndex);
+                const colId = column.getColId();
+                this.selection = {
+                    startRowIndex: rowIndex,
+                    endRowIndex: rowIndex,
+                    columnIds: [colId]
+                };
+                this.applySelectionHighlight();
+                this.notifySelectionChanged();
+                if (typeof this.options.onCellEditingStarted === 'function') {
+                    this.options.onCellEditingStarted({ node, column });
+                }
+            }
+
+            handleCellBlur(cell, node, column) {
+                cell.classList.remove('is-editing');
+                const colId = column.getColId();
+                const newValue = (cell.textContent || '').trim();
+                cell.dataset.rawValue = newValue;
+                if (typeof this.options.onCellEditingStopped === 'function') {
+                    this.options.onCellEditingStopped({
+                        node,
+                        column,
+                        value: newValue
+                    });
+                } else {
+                    cell.textContent = newValue;
+                    this.updateRowValue(node.rowIndex, colId, newValue);
+                }
+            }
+
+            handleCellKeyDown(event, cell) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    cell.blur();
+                    const rowIndex = Number(cell.dataset.rowIndex);
+                    const columnIndex = Number(cell.dataset.columnIndex);
+                    this.moveFocus(rowIndex + 1, columnIndex);
+                    return;
+                }
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    cell.textContent = cell.dataset.rawValue ?? '';
+                    cell.blur();
+                    return;
+                }
+                const navigationKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+                if (!navigationKeys.includes(event.key)) {
+                    return;
+                }
+                event.preventDefault();
+                const rowIndex = Number(cell.dataset.rowIndex);
+                const columnIndex = Number(cell.dataset.columnIndex);
+                let targetRow = rowIndex;
+                let targetColumn = columnIndex;
+                switch (event.key) {
+                    case 'ArrowUp':
+                        targetRow -= 1;
+                        break;
+                    case 'ArrowDown':
+                        targetRow += 1;
+                        break;
+                    case 'ArrowLeft':
+                        targetColumn -= 1;
+                        break;
+                    case 'ArrowRight':
+                        targetColumn += 1;
+                        break;
+                    default:
+                        break;
+                }
+                this.moveFocus(targetRow, targetColumn);
+            }
+
+            moveFocus(rowIndex, columnIndex) {
+                if (rowIndex < 0 || columnIndex < 0) {
+                    return;
+                }
+                if (rowIndex >= this.rowData.length) {
+                    rowIndex = this.rowData.length - 1;
+                }
+                const column = this.columnWrappers[columnIndex];
+                if (!column) {
+                    return;
+                }
+                const key = this.getCellKey(rowIndex, column.getColId());
+                const target = this.cellElements.get(key);
+                if (target) {
+                    target.focus();
+                }
+            }
+
+            selectRow(rowIndex) {
+                if (rowIndex < 0 || rowIndex >= this.rowData.length) {
+                    return;
+                }
+                const columnIds = this.columnWrappers.map(column => column.getColId());
+                this.selection = {
+                    startRowIndex: rowIndex,
+                    endRowIndex: rowIndex,
+                    columnIds
+                };
+                this.applySelectionHighlight();
+                this.notifySelectionChanged();
+            }
+
+            selectColumn(colId) {
+                if (!this.columnMap.has(colId)) {
+                    return;
+                }
+                this.selection = {
+                    startRowIndex: 0,
+                    endRowIndex: Math.max(0, this.rowData.length - 1),
+                    columnIds: [colId]
+                };
+                this.applySelectionHighlight();
+                this.notifySelectionChanged();
+            }
+
+            updateRowValue(rowIndex, colId, value) {
+                if (!this.rowData[rowIndex]) {
+                    return;
+                }
+                this.rowData[rowIndex][colId] = value;
+            }
+
+            applySelectionHighlight() {
+                this.cellElements.forEach(cell => cell.classList.remove('is-selected'));
+                if (!this.selection) {
+                    return;
+                }
+                const startRow = this.clampRowIndex(this.selection.startRowIndex);
+                const endRow = this.clampRowIndex(this.selection.endRowIndex);
+                const columnIds = this.selection.columnIds.filter(id => this.columnMap.has(id));
+                for (let rowIndex = startRow; rowIndex <= endRow; rowIndex += 1) {
+                    columnIds.forEach((colId) => {
+                        const cell = this.cellElements.get(this.getCellKey(rowIndex, colId));
+                        if (cell) {
+                            cell.classList.add('is-selected');
+                        }
+                    });
+                }
+            }
+
+            notifySelectionChanged() {
+                if (typeof this.options.onRangeSelectionChanged === 'function') {
+                    this.options.onRangeSelectionChanged();
+                }
+                if (typeof this.options.onSelectionChanged === 'function') {
+                    this.options.onSelectionChanged();
+                }
+            }
+
+            clampRowIndex(index) {
+                if (this.rowData.length === 0) {
+                    return 0;
+                }
+                if (index == null || Number.isNaN(index)) {
+                    return 0;
+                }
+                return Math.min(Math.max(0, index), this.rowData.length - 1);
+            }
+
+            getCellKey(rowIndex, colId) {
+                return `${rowIndex}:${colId}`;
+            }
+        }
+
+        return {
+            createGrid: (element, options) => new SimpleGrid(element, options)
+        };
     }
 })();
 
