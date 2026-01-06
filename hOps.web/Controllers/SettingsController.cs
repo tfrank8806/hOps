@@ -1065,6 +1065,7 @@ namespace hOps.web.Controllers
                     Id = r.Id,
                     PropertyId = propertyId,
                     RoomNumber = r.RoomNumber?.Trim() ?? string.Empty,
+                    Abbreviation = NormalizeRoomAbbreviation(r.Abbreviation),
                     Floor = r.Floor,
                     RoomType = r.RoomType?.Trim() ?? string.Empty,
                     Description = string.IsNullOrWhiteSpace(r.Description) ? null : r.Description.Trim()
@@ -1085,6 +1086,7 @@ namespace hOps.web.Controllers
                 if (incomingById.TryGetValue(existing.Id, out var updated))
                 {
                     existing.RoomNumber = updated.RoomNumber;
+                    existing.Abbreviation = updated.Abbreviation;
                     existing.Floor = updated.Floor;
                     existing.RoomType = updated.RoomType;
                     existing.Description = updated.Description;
@@ -1102,6 +1104,7 @@ namespace hOps.web.Controllers
                 {
                     PropertyId = propertyId,
                     RoomNumber = room.RoomNumber,
+                    Abbreviation = room.Abbreviation,
                     Floor = room.Floor,
                     RoomType = room.RoomType,
                     Description = room.Description
@@ -1137,6 +1140,7 @@ namespace hOps.web.Controllers
                 using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
                 var lineNumber = 0;
                 var skippedHeader = false;
+                var headerHasAbbreviation = false;
 
                 while (!reader.EndOfStream)
                 {
@@ -1153,6 +1157,7 @@ namespace hOps.web.Controllers
                     if (!skippedHeader && columns.Length > 0 &&
                         columns[0].Trim().Equals("RoomNumber", System.StringComparison.OrdinalIgnoreCase))
                     {
+                        headerHasAbbreviation = columns.Any(c => c.Trim().Equals("Abbreviation", StringComparison.OrdinalIgnoreCase));
                         skippedHeader = true;
                         continue;
                     }
@@ -1163,16 +1168,19 @@ namespace hOps.web.Controllers
                         continue;
                     }
 
-                    var floorText = columns.ElementAtOrDefault(1)?.Trim();
+                    var hasAbbreviationColumn = headerHasAbbreviation || columns.Length >= 5;
+                    var abbreviation = hasAbbreviationColumn ? NormalizeRoomAbbreviation(columns.ElementAtOrDefault(1)) : null;
+                    var floorText = columns.ElementAtOrDefault(hasAbbreviationColumn ? 3 : 1)?.Trim();
                     int.TryParse(floorText, out var floor);
 
-                    var roomType = columns.ElementAtOrDefault(2)?.Trim() ?? string.Empty;
-                    var description = columns.ElementAtOrDefault(3)?.Trim();
+                    var roomType = columns.ElementAtOrDefault(hasAbbreviationColumn ? 2 : 2)?.Trim() ?? string.Empty;
+                    var description = columns.ElementAtOrDefault(hasAbbreviationColumn ? 4 : 3)?.Trim();
 
                     importedRooms.Add(new Room
                     {
                         PropertyId = propertyId,
                         RoomNumber = roomNumber,
+                        Abbreviation = abbreviation,
                         Floor = floor,
                         RoomType = roomType,
                         Description = string.IsNullOrWhiteSpace(description) ? null : description
@@ -1208,9 +1216,25 @@ namespace hOps.web.Controllers
         [HttpGet]
         public IActionResult DownloadRoomsTemplate()
         {
-            const string content = "RoomNumber,Floor,RoomType,Description\r\n101,1,Standard,Near elevator\r\n";
+            const string content = "RoomNumber,Abbreviation,RoomType,Floor,Description\r\n101,A1,Standard,1,Near elevator\r\n";
             var bytes = Encoding.UTF8.GetBytes(content);
             return File(bytes, "text/csv", "rooms-template.csv");
+        }
+
+        private static string? NormalizeRoomAbbreviation(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var trimmed = value.Trim();
+            if (trimmed.Length > 3)
+            {
+                trimmed = trimmed[..3];
+            }
+
+            return trimmed.ToUpperInvariant();
         }
 
         // - Layout Editor & Save -

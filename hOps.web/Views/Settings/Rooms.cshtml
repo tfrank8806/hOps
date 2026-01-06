@@ -67,8 +67,9 @@
         <thead class="table-light">
             <tr>
                 <th>Room Number</th>
-                <th>Floor</th>
+                <th>Abbreviation</th>
                 <th>Room Type</th>
+                <th>Floor</th>
                 <th>Description</th>
                 <th>Action</th>
             </tr>
@@ -77,18 +78,21 @@
             @for (int i = 0; i < Model.Count; i++)
             {
                 <tr>
-                    <td>
+                    <td class="w-25">
                         <input type="hidden" name="rooms[@i].Id" value="@Model[i].Id" />
                         <input type="hidden" name="rooms[@i].PropertyId" value="@propertyId" />
                         <input name="rooms[@i].RoomNumber" value="@Model[i].RoomNumber" class="form-control" />
                     </td>
-                    <td>
-                        <input name="rooms[@i].Floor" value="@Model[i].Floor" class="form-control" />
+                    <td class="w-15">
+                        <input name="rooms[@i].Abbreviation" value="@Model[i].Abbreviation" class="form-control text-uppercase" maxlength="3" placeholder="2-3 chars" />
                     </td>
-                    <td>
+                    <td class="w-20">
                         <input name="rooms[@i].RoomType" value="@Model[i].RoomType" class="form-control" />
                     </td>
-                    <td>
+                    <td class="w-15">
+                        <input name="rooms[@i].Floor" value="@Model[i].Floor" class="form-control" />
+                    </td>
+                    <td class="w-25">
                         <input name="rooms[@i].Description" value="@Model[i].Description" class="form-control" />
                     </td>
                     <td>
@@ -103,8 +107,9 @@
                     <input type="hidden" name="rooms[#].PropertyId" value="@propertyId" />
                     <input name="rooms[#].RoomNumber" class="form-control" placeholder="Room #" />
                 </td>
-                <td><input name="rooms[#].Floor" class="form-control" placeholder="Floor" /></td>
+                <td><input name="rooms[#].Abbreviation" class="form-control text-uppercase" maxlength="3" placeholder="2-3 chars" /></td>
                 <td><input name="rooms[#].RoomType" class="form-control" placeholder="Room Type" /></td>
+                <td><input name="rooms[#].Floor" class="form-control" placeholder="Floor" /></td>
                 <td><input name="rooms[#].Description" class="form-control" placeholder="Description" /></td>
                 <td><button type="button" class="btn btn-danger btn-sm btn-delete-row">Delete</button></td>
             </tr>
