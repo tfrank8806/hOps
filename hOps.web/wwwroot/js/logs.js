@@ -1328,7 +1328,7 @@
     function createFileName(name) {
         const sanitized = (name ?? '').toString().replace(/[\\/:*?"<>|]/g, '_').trim();
         const fallback = sanitized || 'log';
-        return ${fallback}.xlsx;
+        return `${fallback}.xlsx`;
     }
     function handleAddTab() {
         const name = window.prompt('Name for the new log', generateDefaultLogName());
