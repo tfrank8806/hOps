@@ -17,6 +17,7 @@
     const logSubtitleEl = document.getElementById('logSubtitle');
     const gridElement = document.getElementById('logsGrid');
     const placeholderEl = document.getElementById('spreadsheetPlaceholder');
+    const defaultPlaceholderMarkup = placeholderEl?.innerHTML ?? '';
     const addRowButton = document.getElementById('addRowBtn');
     const insertRowButton = document.getElementById('insertRowBtn');
     const deleteRowButton = document.getElementById('deleteRowBtn');
@@ -38,6 +39,9 @@
     const closeSidebarButton = document.getElementById('closeLogsSidebarBtn');
     const logsLayoutElement = document.getElementById('logsLayout');
     const logsSidebarOverlayElement = document.getElementById('logsSidebarOverlay');
+    const sidebarToggleLabelEl = toggleSidebarButton?.querySelector('[data-sidebar-toggle-label]');
+    const sidebarToggleOpenLabel = toggleSidebarButton?.dataset.openLabel || 'Show Logs';
+    const sidebarToggleCloseLabel = toggleSidebarButton?.dataset.closeLabel || 'Hide Logs';
     const exportExcelButton = document.getElementById('exportExcelBtn');
     const undoButton = document.getElementById('undoBtn');
     const zoomInButton = document.getElementById('zoomInBtn');
@@ -47,6 +51,12 @@
     const logTabsEmptyStateElement = document.getElementById('logTabsEmptyState');
     const logTabsScrollElement = document.getElementById('logTabsScroll');
     const addLogTabButton = document.getElementById('addTabBtn');
+    const GRID_INIT_RETRY_DELAY = 200;
+    const GRID_INIT_WARNING_THRESHOLD = 10;
+    let gridInitAttempts = 0;
+    let gridInitRetryHandle = null;
+    let pendingLogRenderId = null;
+    const DESKTOP_BREAKPOINT = 992;
 
     let logs = loadLogs();
     let currentLogId = restoreActiveLogId();
@@ -61,7 +71,7 @@
     initialize();
 
     function initialize() {
-        initializeGrid();
+        attemptGridInitialization();
         renderLogList();
         renderLogTabs();
         updateLogManagementButtons();
@@ -74,6 +84,7 @@
             selectLog(logs[0].id);
         }
         handleSidebarResize();
+        updateSidebarToggleLabel();
         updateZoomButtonState();
     }
 
@@ -103,8 +114,12 @@
         window.addEventListener('resize', handleSidebarResize);
     }
 
-    function initializeGrid() {
-        if (gridInitialized || !gridElement || typeof agGrid === 'undefined') {
+    function attemptGridInitialization() {
+        if (gridInitialized || !gridElement) {
+            return;
+        }
+        if (typeof window.agGrid === 'undefined') {
+            scheduleGridRetry();
             return;
         }
         gridInitialized = true;
@@ -134,8 +149,42 @@
                 focusFirstCell();
             }
         };
-        gridApi = agGrid.createGrid(gridElement, gridOptions);
+        gridApi = window.agGrid.createGrid(gridElement, gridOptions);
         gridColumnApi = gridApi.columnApi;
+        if (pendingLogRenderId) {
+            const pendingLog = logs.find((log) => log.id === pendingLogRenderId);
+            pendingLogRenderId = null;
+            if (pendingLog) {
+                renderGridForLog(pendingLog);
+            }
+        }
+    }
+
+    function ensureGridReady() {
+        if (gridApi) {
+            return true;
+        }
+        attemptGridInitialization();
+        return !!gridApi;
+    }
+
+    function scheduleGridRetry() {
+        if (gridInitRetryHandle) {
+            return;
+        }
+        const shouldShowPlaceholderState = pendingLogRenderId != null || logs.length > 0;
+        if (shouldShowPlaceholderState) {
+            if (gridInitAttempts >= GRID_INIT_WARNING_THRESHOLD) {
+                showGridUnavailableState();
+            } else if (gridInitAttempts === 0) {
+                showGridLoadingMessage();
+            }
+        }
+        gridInitRetryHandle = window.setTimeout(() => {
+            gridInitRetryHandle = null;
+            attemptGridInitialization();
+        }, GRID_INIT_RETRY_DELAY);
+        gridInitAttempts += 1;
     }
 
     function renderLogList() {
@@ -233,7 +282,13 @@
         persistActiveLogId();
         logTitleEl && (logTitleEl.textContent = targetLog.name);
         logSubtitleEl && (logSubtitleEl.textContent = `${targetLog.data.length} rows, ${targetLog.data[0]?.length ?? defaultColumns} columns`);
-        renderGridForLog(targetLog);
+        pendingLogRenderId = targetLog.id;
+        if (ensureGridReady()) {
+            pendingLogRenderId = null;
+            renderGridForLog(targetLog);
+        } else {
+            showGridLoadingMessage();
+        }
         renderLogList();
         renderLogTabs();
         updateLogManagementButtons();
@@ -753,7 +808,7 @@
         trail.slice().reverse().forEach((entry) => {
             const item = document.createElement('div');
             item.className = 'list-group-item';
-            item.innerHTML = `<div class="fw-semibold">${entry.user}</div><div class="text-muted small">${formatAuditTimestamp(entry.timestamp)}</div><div>${entry.action}${entry.details ? ` — ${entry.details}` : ''}</div>`;
+            item.innerHTML = `<div class="fw-semibold">${entry.user}</div><div class="text-muted small">${formatAuditTimestamp(entry.timestamp)}</div><div>${entry.action}${entry.details ? ` â€” ${entry.details}` : ''}</div>`;
             auditLogListElement.appendChild(item);
         });
     }
@@ -1344,33 +1399,89 @@
     }
 
     function showPlaceholder() {
+        resetPlaceholderContent();
         placeholderEl?.classList.remove('d-none');
         gridElement?.classList.add('d-none');
+    }
+
+    function showGridLoadingMessage() {
+        placeholderEl?.classList.remove('d-none');
+        gridElement?.classList.add('d-none');
+        setPlaceholderMessage('Loading log grid', 'One moment while we prepare your workspace.');
+    }
+
+    function showGridUnavailableState() {
+        placeholderEl?.classList.remove('d-none');
+        gridElement?.classList.add('d-none');
+        setPlaceholderMessage('Unable to load log grid', 'Check your connection and refresh this page once you are back online.');
+    }
+
+    function resetPlaceholderContent() {
+        if (placeholderEl && defaultPlaceholderMarkup) {
+            placeholderEl.innerHTML = defaultPlaceholderMarkup;
+        }
+    }
+
+    function setPlaceholderMessage(title, message) {
+        if (!placeholderEl) {
+            return;
+        }
+        placeholderEl.innerHTML = `<p class="mb-1 fw-semibold">${title}</p><p class="mb-0">${message}</p>`;
     }
 
     function handleSidebarToggle() {
         if (!logsLayoutElement) {
             return;
         }
-        const willCollapse = logsLayoutElement.classList.toggle('sidebar-collapsed');
-        logsSidebarOverlayElement && (logsSidebarOverlayElement.style.display = willCollapse ? 'block' : 'none');
+        if (isDesktopLayout()) {
+            logsLayoutElement.classList.toggle('sidebar-collapsed');
+        } else {
+            const willOpen = !logsLayoutElement.classList.contains('sidebar-open');
+            logsLayoutElement.classList.toggle('sidebar-open', willOpen);
+            document.body.classList.toggle('logs-sidebar-open', willOpen);
+        }
+        updateSidebarToggleLabel();
     }
 
     function closeSidebar() {
-        if (logsLayoutElement && logsLayoutElement.classList.contains('sidebar-collapsed')) {
-            logsLayoutElement.classList.remove('sidebar-collapsed');
+        if (!logsLayoutElement) {
+            return;
         }
-        logsSidebarOverlayElement && (logsSidebarOverlayElement.style.display = 'none');
+        logsLayoutElement.classList.remove('sidebar-open');
+        document.body.classList.remove('logs-sidebar-open');
+        updateSidebarToggleLabel();
     }
 
     function handleSidebarResize() {
         if (!logsLayoutElement) {
             return;
         }
-        if (window.innerWidth >= 992) {
+        if (isDesktopLayout()) {
+            logsLayoutElement.classList.remove('sidebar-open');
+            document.body.classList.remove('logs-sidebar-open');
+        } else {
             logsLayoutElement.classList.remove('sidebar-collapsed');
-            logsSidebarOverlayElement && (logsSidebarOverlayElement.style.display = 'none');
         }
+        updateSidebarToggleLabel();
+    }
+
+    function isDesktopLayout() {
+        return window.innerWidth >= DESKTOP_BREAKPOINT;
+    }
+
+    function updateSidebarToggleLabel() {
+        if (!toggleSidebarButton || !sidebarToggleLabelEl) {
+            return;
+        }
+        let label = sidebarToggleCloseLabel;
+        if (isDesktopLayout()) {
+            const collapsed = logsLayoutElement?.classList.contains('sidebar-collapsed');
+            label = collapsed ? sidebarToggleOpenLabel : sidebarToggleCloseLabel;
+        } else {
+            const open = logsLayoutElement?.classList.contains('sidebar-open');
+            label = open ? sidebarToggleCloseLabel : sidebarToggleOpenLabel;
+        }
+        sidebarToggleLabelEl.textContent = label;
     }
 })();
 
