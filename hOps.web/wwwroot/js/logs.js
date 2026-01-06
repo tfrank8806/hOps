@@ -60,6 +60,7 @@
     let pendingLogRenderId = null;
     const DESKTOP_BREAKPOINT = 992;
 
+    let appInitialized = false;
     let logs = loadLogs();
     let currentLogId = restoreActiveLogId();
     let gridApi = null;
@@ -70,9 +71,17 @@
     let auditLogModalInstance = null;
     const logHistory = new Map();
 
-    initialize();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize, { once: true });
+    } else {
+        initialize();
+    }
 
     function initialize() {
+        if (appInitialized) {
+            return;
+        }
+        appInitialized = true;
         attemptGridInitialization();
         renderLogList();
         renderLogTabs();
