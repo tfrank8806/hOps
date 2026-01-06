@@ -2178,8 +2178,9 @@
 
                 const beginPageScreenshotCapture = () => {
                     if (screenshotCapturePromise) {
-                        return;
+                        return screenshotCapturePromise;
                     }
+                    latestScreenshotDataUrl = null;
                     // capture the page before the modal appears so admins see the pre-click state
                     screenshotCapturePromise = captureScreenshot()
                         .then(dataUrl => {
@@ -2193,10 +2194,20 @@
                         .finally(() => {
                             screenshotCapturePromise = null;
                         });
+                    return screenshotCapturePromise;
                 };
 
-                fabButton.addEventListener('click', () => {
+                fabButton.addEventListener('pointerdown', () => {
                     beginPageScreenshotCapture();
+                });
+
+                fabButton.addEventListener('click', async event => {
+                    event.preventDefault();
+                    try {
+                        await beginPageScreenshotCapture();
+                    } catch {
+                        // capture failure is non-blocking
+                    }
                     modalInstance.show();
                 });
 
@@ -2231,12 +2242,10 @@
                     submitBtn.textContent = 'Submitting...';
                     submitBtn.setAttribute('disabled', 'disabled');
 
-                    if (screenshotCapturePromise) {
-                        try {
-                            await screenshotCapturePromise;
-                        } catch {
-                            // best effort capture; failures fall back to submitting without a screenshot
-                        }
+                    try {
+                        await screenshotCapturePromise;
+                    } catch {
+                        // best effort capture; failures fall back to submitting without a screenshot
                     }
 
                     const payload = {
