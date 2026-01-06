@@ -409,6 +409,51 @@
                 </div>
             </main>
         </div>
+
+        @if (SignInManager.IsSignedIn(User))
+        {
+            <div class="issue-report-fab" aria-live="polite">
+                <button type="button"
+                        class="btn btn-primary issue-report-fab__button"
+                        id="issueReportFab"
+                        aria-label="Report an issue"
+                        title="Report an issue">
+                    !
+                </button>
+            </div>
+
+            <div class="modal fade" id="issueReportModal" tabindex="-1" aria-labelledby="issueReportModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-end modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="issueReportModalLabel">Report an Issue</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="issueReportForm" novalidate>
+                                <div class="mb-3">
+                                    <label class="form-label" for="issueDetails">Details of the issue<span class="text-danger">*</span></label>
+                                    <textarea class="form-control"
+                                              id="issueDetails"
+                                              name="details"
+                                              rows="5"
+                                              maxlength="4000"
+                                              placeholder="Describe what happened"
+                                              required></textarea>
+                                    <div class="form-text">We will automatically include the page you are on and a screenshot of the current view.</div>
+                                </div>
+                                <div class="alert d-none" id="issueReportAlert" role="alert"></div>
+                                <div class="d-flex justify-content-end gap-2">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" id="issueReportSubmit" class="btn btn-primary">Submit</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
         @if (showTodoSidebar)
         {
             <button type="button"
@@ -2074,6 +2119,140 @@
             setInterval(fetchAccessRequestCount, 30000);
         })();
     </script>
+
+    @if (SignInManager.IsSignedIn(User))
+    {
+        <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous"></script>
+        <script>
+            (() => {
+                const fabButton = document.getElementById('issueReportFab');
+                const modalEl = document.getElementById('issueReportModal');
+                const form = document.getElementById('issueReportForm');
+                const detailsInput = document.getElementById('issueDetails');
+                const alertEl = document.getElementById('issueReportAlert');
+                const submitBtn = document.getElementById('issueReportSubmit');
+                const antiforgeryInput = document.querySelector('#globalAntiforgeryForm input[name="__RequestVerificationToken"]');
+
+                if (!fabButton || !modalEl || !form || !window.bootstrap) {
+                    return;
+                }
+
+                const modalInstance = new bootstrap.Modal(modalEl);
+
+                const resetAlert = () => {
+                    if (!alertEl) {
+                        return;
+                    }
+                    alertEl.classList.add('d-none');
+                    alertEl.classList.remove('alert-danger', 'alert-success');
+                    alertEl.textContent = '';
+                };
+
+                const showAlert = (variant, message) => {
+                    if (!alertEl) {
+                        return;
+                    }
+                    alertEl.classList.remove('d-none', 'alert-danger', 'alert-success');
+                    alertEl.classList.add(variant === 'success' ? 'alert-success' : 'alert-danger');
+                    alertEl.textContent = message;
+                };
+
+                const captureScreenshot = async () => {
+                    if (!window.html2canvas) {
+                        return null;
+                    }
+                    try {
+                        const canvas = await window.html2canvas(document.body, {
+                            useCORS: true,
+                            backgroundColor: '#ffffff',
+                            scale: Math.min(window.devicePixelRatio || 1, 2)
+                        });
+                        return canvas.toDataURL('image/png', 0.92);
+                    } catch (error) {
+                        console.warn('Issue reporter: screenshot capture failed', error);
+                        return null;
+                    }
+                };
+
+                fabButton.addEventListener('click', () => {
+                    modalInstance.show();
+                });
+
+                modalEl.addEventListener('shown.bs.modal', () => {
+                    detailsInput?.focus();
+                });
+
+                modalEl.addEventListener('hidden.bs.modal', () => {
+                    form.reset();
+                    resetAlert();
+                    if (submitBtn) {
+                        submitBtn.removeAttribute('disabled');
+                        submitBtn.textContent = submitBtn.dataset.defaultText || 'Submit';
+                    }
+                });
+
+                form.addEventListener('submit', async event => {
+                    event.preventDefault();
+                    if (!submitBtn) {
+                        return;
+                    }
+
+                    const details = detailsInput?.value.trim() ?? '';
+                    if (!details) {
+                        showAlert('danger', 'Please describe the issue so we can investigate.');
+                        detailsInput?.focus();
+                        return;
+                    }
+
+                    resetAlert();
+                    submitBtn.dataset.defaultText = submitBtn.dataset.defaultText || submitBtn.textContent || 'Submit';
+                    submitBtn.textContent = 'Submitting...';
+                    submitBtn.setAttribute('disabled', 'disabled');
+
+                    const payload = {
+                        details,
+                        pageUrl: window.location.href,
+                        screenshotDataUrl: await captureScreenshot()
+                    };
+
+                    try {
+                        const response = await fetch('@Url.Action("ReportIssue", "Support")', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'RequestVerificationToken': antiforgeryInput?.value ?? ''
+                            },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) {
+                            let errorMessage = 'Unable to submit your report right now.';
+                            try {
+                                const data = await response.json();
+                                if (data?.message) {
+                                    errorMessage = data.message;
+                                }
+                            } catch {
+                                // ignore parse errors
+                            }
+                            throw new Error(errorMessage);
+                        }
+
+                        showAlert('success', 'Thanks! Your report has been sent to the admin team.');
+                        window.setTimeout(() => {
+                            modalInstance.hide();
+                        }, 1200);
+                    } catch (error) {
+                        console.error('Issue reporter error', error);
+                        showAlert('danger', error.message || 'Unable to submit your report right now.');
+                    } finally {
+                        submitBtn.removeAttribute('disabled');
+                        submitBtn.textContent = submitBtn.dataset.defaultText || 'Submit';
+                    }
+                });
+            })();
+        </script>
+    }
 
     @if (SignInManager.IsSignedIn(User))
     {

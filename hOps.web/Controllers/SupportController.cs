@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Net.Http.Headers;
 
 namespace hOps.web.Controllers
 {
@@ -139,6 +140,82 @@ namespace hOps.web.Controllers
             return View();
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReportIssue([FromBody] IssueReportRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                var firstError = ModelState.Values.SelectMany(v => v.Errors).FirstOrDefault()?.ErrorMessage ?? "Please provide details about the issue.";
+                return BadRequest(new { message = firstError });
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var trimmedDetails = request.Details?.Trim();
+            if (string.IsNullOrWhiteSpace(trimmedDetails))
+            {
+                return BadRequest(new { message = "Please describe the issue you encountered." });
+            }
+
+            var admins = await _userManager.GetUsersInRoleAsync("Admin");
+            if (admins == null || admins.Count == 0)
+            {
+                _logger.LogWarning("Issue report could not be delivered because no administrators are configured.");
+                return StatusCode(500, new { message = "Unable to deliver your report. Administrators are not configured." });
+            }
+
+            var recipients = admins
+                .Select(a => new { a.Email, Name = BuildDisplayName(a) })
+                .Where(a => !string.IsNullOrWhiteSpace(a.Email))
+                .ToList();
+
+            if (recipients.Count == 0)
+            {
+                _logger.LogWarning("Issue report could not be delivered because administrator emails are missing.");
+                return StatusCode(500, new { message = "Unable to deliver your report. Administrator emails are not available." });
+            }
+
+            var attachments = new List<EmailAttachment>();
+            var screenshotWarning = default(string?);
+            if (TryCreateScreenshotAttachment(request.ScreenshotDataUrl, out var screenshotAttachment, out var warning))
+            {
+                if (screenshotAttachment != null)
+                {
+                    attachments.Add(screenshotAttachment);
+                }
+            }
+            screenshotWarning = warning;
+
+            var property = ViewBag.CurrentProperty as Property;
+            var pageUrl = string.IsNullOrWhiteSpace(request.PageUrl)
+                ? $"{Request.Scheme}://{Request.Host}{Request.Path}{Request.QueryString}"
+                : request.PageUrl.Trim();
+
+            var body = BuildIssueEmailBody(trimmedDetails!, user, property, pageUrl, attachments.Count > 0, screenshotWarning);
+            var subject = $"[Issue Report] {BuildDisplayName(user) ?? user.Email ?? user.UserName ?? "User"} @ {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC";
+
+            foreach (var recipient in recipients)
+            {
+                try
+                {
+                    await _emailSender.SendEmailAsync(recipient.Email!, subject, body, attachments);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to send issue report email to {Recipient}", recipient.Email);
+                }
+            }
+
+            _logger.LogInformation("Issue report submitted by {UserId} for {Page}", user.Id, pageUrl);
+
+            return Ok(new { message = "Thanks for letting us know. Our team has been notified." });
+        }
+
         private SupportTicketViewModel CreateFormModel(ApplicationUser? user)
         {
             return new SupportTicketViewModel
@@ -204,6 +281,40 @@ namespace hOps.web.Controllers
             return builder.ToString();
         }
 
+        private string BuildIssueEmailBody(string details, ApplicationUser user, Property? property, string? pageUrl, bool hasScreenshot, string? screenshotWarning)
+        {
+            var builder = new StringBuilder();
+            builder.Append("<p>An in-app issue report was submitted.</p>");
+            builder.Append("<table style=\"border-collapse:collapse; width:100%; max-width:640px;\">");
+            AppendRow(builder, "Reported by", _htmlEncoder.Encode(BuildDisplayName(user) ?? user.Email ?? "App User"));
+            AppendRow(builder, "Email", _htmlEncoder.Encode(user.Email ?? "Not provided"));
+            if (property != null)
+            {
+                AppendRow(builder, "Current property", _htmlEncoder.Encode($"{property.Name} ({property.Code})"));
+            }
+            AppendRow(builder, "Page URL", _htmlEncoder.Encode(string.IsNullOrWhiteSpace(pageUrl) ? "Unknown" : pageUrl));
+            var userAgent = Request.Headers[HeaderNames.UserAgent].ToString();
+            if (!string.IsNullOrWhiteSpace(userAgent))
+            {
+                AppendRow(builder, "Browser", _htmlEncoder.Encode(userAgent));
+            }
+            AppendRow(builder, "Screenshot", hasScreenshot ? "Included as attachment" : "Not captured");
+            if (!string.IsNullOrWhiteSpace(screenshotWarning))
+            {
+                AppendRow(builder, "Screenshot status", _htmlEncoder.Encode(screenshotWarning));
+            }
+            builder.Append("</table>");
+            builder.Append("<hr style=\"margin:1.5rem 0;\" />");
+            builder.Append("<p style=\"margin-bottom:0.5rem;\"><strong>Details</strong></p>");
+            var encodedDetails = _htmlEncoder.Encode(details)
+                .Replace("\r\n", "<br />", StringComparison.Ordinal)
+                .Replace("\n", "<br />", StringComparison.Ordinal)
+                .Replace("\r", "<br />", StringComparison.Ordinal);
+            builder.Append("<div style=\"white-space:pre-wrap;\">").Append(encodedDetails).Append("</div>");
+
+            return builder.ToString();
+        }
+
         private void AppendRow(StringBuilder builder, string label, string value)
         {
             builder.Append("<tr>")
@@ -231,6 +342,72 @@ namespace hOps.web.Controllers
             "image/bmp",
             "application/pdf"
         };
+
+        private const int ScreenshotAttachmentMaxBytes = 3 * 1024 * 1024;
+
+        private bool TryCreateScreenshotAttachment(string? dataUrl, out EmailAttachment? attachment, out string? warning)
+        {
+            attachment = null;
+            warning = null;
+
+            if (string.IsNullOrWhiteSpace(dataUrl))
+            {
+                return false;
+            }
+
+            var commaIndex = dataUrl.IndexOf(',', StringComparison.Ordinal);
+            if (commaIndex < 0 || commaIndex >= dataUrl.Length - 1)
+            {
+                warning = "Screenshot data was invalid.";
+                return false;
+            }
+
+            var metadata = dataUrl[..commaIndex];
+            var base64 = dataUrl[(commaIndex + 1)..];
+
+            string contentType = "image/png";
+            if (metadata.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                var semicolonIndex = metadata.IndexOf(';');
+                if (semicolonIndex > 5)
+                {
+                    contentType = metadata.Substring(5, semicolonIndex - 5);
+                }
+            }
+
+            try
+            {
+                var bytes = Convert.FromBase64String(base64);
+                if (bytes.Length == 0)
+                {
+                    return false;
+                }
+
+                if (bytes.Length > ScreenshotAttachmentMaxBytes)
+                {
+                    warning = $"Screenshot exceeded the {ScreenshotAttachmentMaxBytes / (1024 * 1024)} MB limit and was skipped.";
+                    return false;
+                }
+
+                var extension = contentType switch
+                {
+                    "image/jpeg" => "jpg",
+                    "image/jpg" => "jpg",
+                    "image/gif" => "gif",
+                    "image/webp" => "webp",
+                    "image/bmp" => "bmp",
+                    _ => "png"
+                };
+
+                attachment = new EmailAttachment($"issue-screenshot-{DateTime.UtcNow:yyyyMMddHHmmss}.{extension}", bytes, contentType);
+                return true;
+            }
+            catch (FormatException)
+            {
+                warning = "Screenshot data could not be decoded.";
+                return false;
+            }
+        }
 
         private async Task<IReadOnlyCollection<EmailAttachment>> ProcessAttachmentsAsync(SupportTicketViewModel model)
         {
