@@ -878,6 +878,7 @@ namespace hOps.web.Controllers
                     LayoutId = entry.Layout.Id,
                     RoomId = hasRoom ? entry.Room!.Id : 0,
                     RoomNumber = displayLabel,
+                    Abbreviation = hasRoom ? entry.Room!.Abbreviation : null,
                     LocationKey = hasRoom ? entry.Room!.RoomNumber : null,
                     RoomType = hasRoom ? entry.Room!.RoomType : (isConnector ? "Connector" : string.Empty),
                     Floor = entry.Layout.Floor,

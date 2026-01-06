@@ -117,7 +117,7 @@
                              data-room-floor="@overlayFloor"
                              data-floor-list="@string.Join(",", floors)"
                              data-location-key="@locationKey">
-                            <strong class="tile-label" data-room-full-label="@label">@label</strong>
+                            <strong class="tile-label" data-room-full-label="@label" data-room-abbreviation="@representative.Abbreviation">@label</strong>
                             @if (floors.Count > 1)
                             {
                                 <span class="tile-type text-muted">All Floors</span>
@@ -166,7 +166,7 @@
                                      data-room-id="@tile.RoomId"
                                      data-room-floor="@tile.Floor"
                                      data-location-key="@(string.IsNullOrWhiteSpace(tile.LocationKey) ? $"room:{tile.RoomId}" : tile.LocationKey)">
-                                    <span class="tile-room" data-room-full-label="@label">@label</span>
+                                    <span class="tile-room" data-room-full-label="@label" data-room-abbreviation="@tile.Abbreviation">@label</span>
                                     @if (!string.IsNullOrWhiteSpace(tile.RoomType))
                                     {
                                         <span class="tile-type">@tile.RoomType</span>

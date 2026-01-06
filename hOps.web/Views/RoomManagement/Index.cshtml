@@ -26,6 +26,7 @@ else if (TempData["RoomImportMessage"] is string importMessage)
         <thead>
             <tr>
                 <th>Room Number</th>
+                <th>Abbreviation</th>
                 <th>Room Type</th>
                 <th>Floor</th>
                 <th>Description</th>
@@ -38,6 +39,9 @@ else if (TempData["RoomImportMessage"] is string importMessage)
                     <td>
                         <input asp-for="@Model[i].RoomNumber" class="form-control" />
                         <input type="hidden" asp-for="@Model[i].Id" />
+                    </td>
+                    <td>
+                        <input asp-for="@Model[i].Abbreviation" class="form-control text-uppercase" maxlength="3" placeholder="2-3 chars" />
                     </td>
                     <td>
                         <input asp-for="@Model[i].RoomType" class="form-control" />
@@ -55,6 +59,7 @@ else if (TempData["RoomImportMessage"] is string importMessage)
                     <input name="rooms[@Model.Count].RoomNumber" class="form-control" placeholder="New Room" />
                     <input type="hidden" name="rooms[@Model.Count].Id" value="0" />
                 </td>
+                <td><input name="rooms[@Model.Count].Abbreviation" class="form-control text-uppercase" maxlength="3" placeholder="2-3 chars" /></td>
                 <td><input name="rooms[@Model.Count].RoomType" class="form-control" /></td>
                 <td><input name="rooms[@Model.Count].Floor" class="form-control" /></td>
                 <td><input name="rooms[@Model.Count].Description" class="form-control" /></td>

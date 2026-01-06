@@ -8,6 +8,8 @@ namespace hOps.web.Models
         public int PropertyId { get; set; }
         public Property Property { get; set; } = null!;
         public string RoomNumber { get; set; } = null!;
+        [StringLength(3)]
+        public string? Abbreviation { get; set; }
         public int Floor { get; set; }
         public string RoomType { get; set; } = null!;
         public string? Description { get; set; }

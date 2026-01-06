@@ -74,6 +74,8 @@ namespace hOps.web.Controllers
             foreach (var room in rooms)
             {
                 room.PropertyId = propertyId;
+                room.RoomNumber = room.RoomNumber?.Trim() ?? string.Empty;
+                room.Abbreviation = NormalizeAbbreviation(room.Abbreviation);
                 if (room.Id == 0)
                     _context.Rooms.Add(room);
                 else
@@ -87,8 +89,8 @@ namespace hOps.web.Controllers
         public FileResult DownloadTemplate()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("RoomNumber,RoomType,Floor,Description");
-            sb.AppendLine("101,Standard,1,Sample room");
+            sb.AppendLine("RoomNumber,Abbreviation,RoomType,Floor,Description");
+            sb.AppendLine("101,A1,Standard,1,Sample room");
             var bytes = Encoding.UTF8.GetBytes(sb.ToString());
             return File(bytes, "text/csv", "room_template.csv");
         }
@@ -133,13 +135,16 @@ namespace hOps.web.Controllers
                 var parts = line.Split(',');
                 if (parts.Length < 4) continue;
 
+                var hasAbbreviationColumn = parts.Length >= 5;
+
                 var room = new Room
                 {
                     PropertyId = propertyId,
                     RoomNumber = parts[0].Trim(),
-                    RoomType = parts[1].Trim(),
-                    Floor = int.TryParse(parts[2].Trim(), out var fl) ? fl : 0,
-                    Description = parts[3].Trim()
+                    Abbreviation = hasAbbreviationColumn ? NormalizeAbbreviation(parts[1]) : null,
+                    RoomType = hasAbbreviationColumn ? parts[2].Trim() : parts[1].Trim(),
+                    Floor = int.TryParse((hasAbbreviationColumn ? parts[3] : parts[2]).Trim(), out var fl) ? fl : 0,
+                    Description = (hasAbbreviationColumn ? parts[4] : parts[3]).Trim()
                 };
                 rooms.Add(room);
             }
@@ -158,6 +163,22 @@ namespace hOps.web.Controllers
 
             TempData["RoomImportMessage"] = $"{rooms.Count} rooms imported successfully.";
             return RedirectToAction(nameof(Index), new { propertyId });
+        }
+
+        private static string? NormalizeAbbreviation(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var trimmed = value.Trim();
+            if (trimmed.Length > 3)
+            {
+                trimmed = trimmed[..3];
+            }
+
+            return trimmed.ToUpperInvariant();
         }
     }
 }

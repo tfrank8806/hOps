@@ -73,6 +73,7 @@ namespace hOps.web.ViewModels.Home
         public int LayoutId { get; set; }
         public int RoomId { get; set; }
         public string RoomNumber { get; set; } = string.Empty;
+        public string? Abbreviation { get; set; }
         public string? LocationKey { get; set; }
         public string RoomType { get; set; } = string.Empty;
         public int Floor { get; set; }

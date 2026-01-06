@@ -84,12 +84,14 @@
                         return;
                     }
                     const fullLabel = (label.dataset.roomFullLabel || label.textContent || '').trim();
+                    const preferredAbbreviation = (label.dataset.roomAbbreviation || '').trim();
                     if (!fullLabel) {
                         label.removeAttribute('title');
                         label.classList.remove('tile-text--abbreviated');
                         return;
                     }
                     label.dataset.roomFullLabel = fullLabel;
+                    label.dataset.roomAbbreviation = preferredAbbreviation;
                     label.textContent = fullLabel;
                     label.classList.remove('tile-text--abbreviated');
                     label.removeAttribute('title');
@@ -103,7 +105,7 @@
                         return;
                     }
 
-                    const abbreviation = buildRoomLabelAbbreviation(fullLabel);
+                    const abbreviation = preferredAbbreviation || buildRoomLabelAbbreviation(fullLabel);
                     if (!abbreviation || abbreviation === fullLabel) {
                         label.setAttribute('title', fullLabel);
                         return;
