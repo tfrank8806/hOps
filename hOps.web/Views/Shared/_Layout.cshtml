@@ -2132,6 +2132,8 @@
                 const alertEl = document.getElementById('issueReportAlert');
                 const submitBtn = document.getElementById('issueReportSubmit');
                 const antiforgeryInput = document.querySelector('#globalAntiforgeryForm input[name="__RequestVerificationToken"]');
+                let latestScreenshotDataUrl = null;
+                let screenshotCapturePromise = null;
 
                 if (!fabButton || !modalEl || !form || !window.bootstrap) {
                     return;
@@ -2174,7 +2176,27 @@
                     }
                 };
 
+                const beginPageScreenshotCapture = () => {
+                    if (screenshotCapturePromise) {
+                        return;
+                    }
+                    // capture the page before the modal appears so admins see the pre-click state
+                    screenshotCapturePromise = captureScreenshot()
+                        .then(dataUrl => {
+                            latestScreenshotDataUrl = dataUrl;
+                            return dataUrl;
+                        })
+                        .catch(() => {
+                            latestScreenshotDataUrl = null;
+                            return null;
+                        })
+                        .finally(() => {
+                            screenshotCapturePromise = null;
+                        });
+                };
+
                 fabButton.addEventListener('click', () => {
+                    beginPageScreenshotCapture();
                     modalInstance.show();
                 });
 
@@ -2209,10 +2231,18 @@
                     submitBtn.textContent = 'Submitting...';
                     submitBtn.setAttribute('disabled', 'disabled');
 
+                    if (screenshotCapturePromise) {
+                        try {
+                            await screenshotCapturePromise;
+                        } catch {
+                            // best effort capture; failures fall back to submitting without a screenshot
+                        }
+                    }
+
                     const payload = {
                         details,
                         pageUrl: window.location.href,
-                        screenshotDataUrl: await captureScreenshot()
+                        screenshotDataUrl: latestScreenshotDataUrl
                     };
 
                     try {
