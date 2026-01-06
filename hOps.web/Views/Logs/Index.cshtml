@@ -100,126 +100,12 @@
                     </div>
                 </div>
                 <div class="card-body d-flex flex-column">
-                    <div class="spreadsheet-toolbar mb-3" id="spreadsheetToolbar" aria-label="Formatting toolbar">
-                        <div class="d-flex flex-wrap align-items-center gap-3">
-                            <div class="btn-group" role="group" aria-label="Font styles">
-                                <button class="btn btn-outline-secondary btn-sm" type="button" id="boldBtn" disabled title="Bold">
-                                    <span class="fw-bold">B</span>
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" type="button" id="italicBtn" disabled title="Italic">
-                                    <span class="fst-italic">I</span>
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" type="button" id="underlineBtn" disabled title="Underline">
-                                    <span class="text-decoration-underline">U</span>
-                                </button>
-                            </div>
-                            <div class="d-flex flex-wrap gap-2">
-                                <select class="form-select form-select-sm" id="fontFamilySelect" disabled aria-label="Font family">
-                                    <option value="">Font Family</option>
-                                    <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif">Segoe UI</option>
-                                    <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
-                                    <option value="'Times New Roman', Times, serif">Times New Roman</option>
-                                    <option value="'Courier New', Courier, monospace">Courier New</option>
-                                </select>
-                                <select class="form-select form-select-sm" id="fontSizeSelect" disabled aria-label="Font size">
-                                    <option value="">Font Size</option>
-                                    <option value="12px">12</option>
-                                    <option value="14px">14</option>
-                                    <option value="16px">16</option>
-                                    <option value="18px">18</option>
-                                    <option value="20px">20</option>
-                                    <option value="24px">24</option>
-                                </select>
-                                <div class="d-flex align-items-center gap-2 number-format-control">
-                                    <label class="form-label form-label-sm mb-0 text-muted" for="numberFormatSelect">Format</label>
-                                    <select class="form-select form-select-sm" id="numberFormatSelect" disabled aria-label="Number format">
-                                        <option value="" disabled hidden>Mixed Selection</option>
-                                        <option value="general" selected>General</option>
-                                        <option value="number">Number</option>
-                                        <option value="currency">Currency</option>
-                                        <option value="percent">Percentage</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="btn-group" role="group" aria-label="Alignment">
-                                <button class="btn btn-outline-secondary btn-sm" type="button" id="alignLeftBtn" disabled title="Align left">
-                                    <span aria-hidden="true">L</span>
-                                    <span class="visually-hidden">Align left</span>
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" type="button" id="alignCenterBtn" disabled title="Align center">
-                                    <span aria-hidden="true">C</span>
-                                    <span class="visually-hidden">Align center</span>
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" type="button" id="alignRightBtn" disabled title="Align right">
-                                    <span aria-hidden="true">R</span>
-                                    <span class="visually-hidden">Align right</span>
-                                </button>
-                            </div>
-                            <div class="d-flex flex-wrap align-items-center gap-3">
-                                <div class="d-flex align-items-center gap-2 color-control">
-                                    <label class="form-label form-label-sm mb-0 text-muted" for="textColorInput">Text</label>
-                                    <input type="color" class="form-control form-control-color form-control-color-sm" id="textColorInput" value="#000000" data-default-color="#000000" title="Text color" disabled />
-                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="clearTextColorBtn" disabled>Clear</button>
-                                </div>
-                                <div class="d-flex align-items-center gap-2 color-control">
-                                    <label class="form-label form-label-sm mb-0 text-muted" for="fillColorInput">Fill</label>
-                                    <input type="color" class="form-control form-control-color form-control-color-sm" id="fillColorInput" value="#ffffff" data-default-color="#ffffff" title="Fill color" disabled />
-                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="clearFillColorBtn" disabled>Clear</button>
-                                </div>
-                                <div class="d-flex align-items-center gap-2 alternating-control">
-                                    <label class="form-label form-label-sm mb-0 text-muted" for="alternateRowFormatSelect">Rows</label>
-                                    <select class="form-select form-select-sm" id="alternateRowFormatSelect" disabled aria-label="Alternating rows">
-                                        <option value="" selected>Alternating Rows</option>
-                                        <option value="blue">Cool Blue</option>
-                                        <option value="gray">Soft Gray</option>
-                                        <option value="green">Mint Green</option>
-                                        <option value="gold">Warm Gold</option>
-                                        <option value="clear">Remove Pattern</option>
-                                    </select>
-                                </div>
-                                <div class="d-flex align-items-center gap-2 border-control">
-                                    <label class="form-label form-label-sm mb-0 text-muted" for="borderStyleSelect">Border</label>
-                                    <select class="form-select form-select-sm w-auto" id="borderStyleSelect" disabled aria-label="Border style">
-                                        <option value="">None</option>
-                                        <option value="thin">Thin</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="thick">Thick</option>
-                                        <option value="dashed">Dashed</option>
-                                    </select>
-                                    <select class="form-select form-select-sm w-auto" id="borderPlacementSelect" disabled aria-label="Border placement">
-                                        <option value="all" selected>All Borders</option>
-                                        <option value="top">Top Only</option>
-                                        <option value="right">Right Only</option>
-                                        <option value="bottom">Bottom Only</option>
-                                        <option value="left">Left Only</option>
-                                    </select>
-                                    <input type="color" class="form-control form-control-color form-control-color-sm" id="borderColorInput" value="#000000" data-default-color="#000000" title="Border color" disabled />
-                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="clearBorderBtn" disabled>Clear</button>
-                                </div>
-                            </div>
-                            <div class="btn-group" role="group" aria-label="Cell merging">
-                                <button class="btn btn-outline-secondary btn-sm" type="button" id="mergeCellsBtn" disabled title="Merge cells">
-                                    <span aria-hidden="true">Merge</span>
-                                    <span class="visually-hidden">Merge cells</span>
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" type="button" id="unmergeCellsBtn" disabled title="Unmerge cells">
-                                    <span aria-hidden="true">Split</span>
-                                    <span class="visually-hidden">Unmerge cells</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
                     <div id="spreadsheetContainer" class="spreadsheet-container">
                         <div class="text-center text-muted" id="spreadsheetPlaceholder">
                             <p class="mb-1 fw-semibold">No log selected</p>
                             <p class="mb-0">Pick a log from the list or create a new one to start tracking.</p>
                         </div>
-                        <div class="table-responsive d-none" id="spreadsheetWrapper">
-                            <table class="table table-bordered spreadsheet-table" id="spreadsheetTable">
-                                <thead></thead>
-                                <tbody></tbody>
-                            </table>
-                        </div>
+                        <div class="ag-theme-quartz spreadsheet-grid d-none" id="logsGrid" role="grid" aria-label="Custom log grid"></div>
                     </div>
                     <div class="log-tabs-bar mt-3 pt-2 border-top" id="logTabsBar" aria-label="Open logs tabs">
                         <div class="log-tabs-scroll flex-grow-1" id="logTabsScroll">
@@ -255,6 +141,8 @@
 </div>
 
 @section Styles {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.2.0/styles/ag-grid.css" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.2.0/styles/ag-theme-quartz.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="~/css/logs.css" asp-append-version="true" />
 }
 
@@ -263,6 +151,8 @@
         window.hOps = window.hOps || {};
         window.hOps.currentUser = @Html.Raw(JsonSerializer.Serialize(currentUserInfo));
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.2.0/dist/ag-grid-community.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
     <script src="~/js/logs.js" asp-append-version="true"></script>
 }
+

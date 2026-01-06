@@ -96,22 +96,6 @@
     align-items: center;
 }
 
-.border-control select {
-    min-width: 110px;
-}
-
-.border-control {
-    white-space: nowrap;
-}
-
-.alternating-control select {
-    min-width: 150px;
-}
-
-.number-format-control select {
-    min-width: 140px;
-}
-
 @media (min-width: 992px) {
     .logs-sidebar {
         position: relative;
@@ -347,102 +331,24 @@
     border-radius: 999px;
 }
 
-#spreadsheetWrapper {
+.spreadsheet-grid {
     position: relative;
     flex: 1 1 auto;
-    overflow: auto;
-    --spreadsheet-zoom-scale: 1;
-}
-
-#spreadsheetWrapper .spreadsheet-table {
-    font-size: calc(1rem * var(--spreadsheet-zoom-scale));
-}
-
-.logs-page .form-label-sm {
-    font-size: 0.75rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    font-weight: 600;
-}
-
-.logs-page .form-control-color.form-control-color-sm {
-    width: 2.5rem;
-    height: 2.5rem;
-    padding: 0.125rem;
-}
-
-.logs-page .color-control .btn {
-    white-space: nowrap;
-}
-
-.spreadsheet-toolbar {
-    background-color: #f8f9fa;
+    min-height: 420px;
     border: 1px solid #e2e6ea;
-    border-radius: 0.5rem;
-    padding: 0.75rem;
+    border-radius: 0.75rem;
+    font-size: var(--logs-grid-font-size, 1rem);
 }
 
-.spreadsheet-toolbar .btn-group .btn[disabled],
-.spreadsheet-toolbar .form-select[disabled] {
-    opacity: 0.6;
+.spreadsheet-grid .ag-root-wrapper {
+    border-radius: 0.75rem;
 }
 
-.spreadsheet-toolbar .form-select {
-    min-width: 140px;
-}
-
-.spreadsheet-toolbar .btn.active,
-.spreadsheet-toolbar .btn[aria-pressed="true"] {
-    background-color: #0d6efd;
-    color: #fff;
-}
-
-.spreadsheet-table {
-    table-layout: fixed;
-    width: 100%;
-    border-color: #d9dde3;
-}
-
-.spreadsheet-table thead th {
-    background-color: #f1f3f5;
-    text-align: center;
+.spreadsheet-grid .ag-header {
     font-weight: 600;
-    border-color: #d9dde3;
-    user-select: none;
-    padding: calc(0.5rem * var(--spreadsheet-zoom-scale));
-}
-
-.spreadsheet-table tbody th {
-    background-color: #f7f8fa;
-    font-weight: 600;
-    text-align: center;
-    border-color: #d9dde3;
-    user-select: none;
-    width: calc(40px * var(--spreadsheet-zoom-scale));
-    padding: calc(0.5rem * var(--spreadsheet-zoom-scale));
-}
-
-.spreadsheet-table tbody td {
-    vertical-align: middle;
-    border-color: #e3e6eb;
-    background-color: #fff;
-    padding: calc(0.5rem * var(--spreadsheet-zoom-scale));
-    min-width: calc(120px * var(--spreadsheet-zoom-scale));
-    max-width: calc(200px * var(--spreadsheet-zoom-scale));
-    overflow-wrap: anywhere;
-}
-
-.spreadsheet-table tbody tr:nth-child(odd) td {
-    background-color: #ffffff;
-}
-
-.spreadsheet-table tbody tr:nth-child(even) td {
-    background-color: #f9fbff;
-}
-
-.spreadsheet-table tbody td:focus {
-    outline: 2px solid #0d6efd;
-    outline-offset: -2px;
+    font-size: 0.85em;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
 .mail-log-card .card-header {
@@ -481,25 +387,6 @@
     background-color: #f8f9fa;
 }
 
-.spreadsheet-table tbody td.selected-cell {
-    box-shadow: inset 0 0 0 2px #0d6efd;
-    background-color: #e3f2ff;
-}
-
-.spreadsheet-table tbody td.fill-preview {
-    outline: 2px dashed rgba(13, 110, 253, 0.6);
-    outline-offset: -2px;
-}
-
-.spreadsheet-table tbody td.formula-reference-target {
-    outline: 2px dashed #f0ad4e;
-    outline-offset: -2px;
-}
-
-.spreadsheet-table tbody td.editing-cell {
-    background-color: #eef5ff;
-}
-
 #spreadsheetPlaceholder {
     position: absolute;
     inset: 0;
@@ -508,22 +395,6 @@
     align-items: center;
     justify-content: center;
     pointer-events: none;
-}
-
-.fill-handle {
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    background-color: #0d6efd;
-    border: 2px solid #ffffff;
-    border-radius: 2px;
-    box-shadow: 0 0 0 1px rgba(13, 110, 253, 0.4);
-    cursor: crosshair;
-    z-index: 5;
-}
-
-.fill-handle.d-none {
-    display: none !important;
 }
 
 @media (max-width: 991.98px) {
@@ -541,8 +412,8 @@
         justify-content: flex-start;
     }
 
-    .spreadsheet-table tbody td {
-        min-width: 100px;
+    .spreadsheet-grid {
+        min-height: 320px;
     }
 
     #logTabsBar {

@@ -1,17 +1,22 @@
 (function () {
+    'use strict';
+
     const storageKey = 'hops.logs.v1';
     const defaultRows = 10;
     const defaultColumns = 6;
     const storageActiveLogKey = `${storageKey}.active`;
+    const DEFAULT_USER_NAME = 'Unknown user';
+    const MIN_ZOOM = 0.75;
+    const MAX_ZOOM = 1.5;
+    const ZOOM_STEP = 0.1;
+    const MAX_HISTORY_LENGTH = 25;
 
     const logListEl = document.getElementById('logList');
     const logEmptyStateEl = document.getElementById('logEmptyState');
     const logTitleEl = document.getElementById('logTitle');
     const logSubtitleEl = document.getElementById('logSubtitle');
-    const spreadsheetContainerEl = document.getElementById('spreadsheetContainer');
-    const spreadsheetWrapperEl = document.getElementById('spreadsheetWrapper');
-    const spreadsheetTableEl = document.getElementById('spreadsheetTable');
-    const spreadsheetPlaceholderEl = document.getElementById('spreadsheetPlaceholder');
+    const gridElement = document.getElementById('logsGrid');
+    const placeholderEl = document.getElementById('spreadsheetPlaceholder');
     const addRowButton = document.getElementById('addRowBtn');
     const insertRowButton = document.getElementById('insertRowBtn');
     const deleteRowButton = document.getElementById('deleteRowBtn');
@@ -30,31 +35,9 @@
     const auditLogListElement = document.getElementById('auditLogList');
     const auditLogEmptyStateElement = document.getElementById('auditLogEmptyState');
     const toggleSidebarButton = document.getElementById('toggleSidebarBtn');
-    const sidebarToggleLabel = toggleSidebarButton?.querySelector('[data-sidebar-toggle-label]') ?? null;
     const closeSidebarButton = document.getElementById('closeLogsSidebarBtn');
     const logsLayoutElement = document.getElementById('logsLayout');
     const logsSidebarOverlayElement = document.getElementById('logsSidebarOverlay');
-
-    const boldButton = document.getElementById('boldBtn');
-    const italicButton = document.getElementById('italicBtn');
-    const underlineButton = document.getElementById('underlineBtn');
-    const fontSizeSelect = document.getElementById('fontSizeSelect');
-    const fontFamilySelect = document.getElementById('fontFamilySelect');
-    const alignLeftButton = document.getElementById('alignLeftBtn');
-    const alignCenterButton = document.getElementById('alignCenterBtn');
-    const alignRightButton = document.getElementById('alignRightBtn');
-    const mergeCellsButton = document.getElementById('mergeCellsBtn');
-    const unmergeCellsButton = document.getElementById('unmergeCellsBtn');
-    const textColorInput = document.getElementById('textColorInput');
-    const fillColorInput = document.getElementById('fillColorInput');
-    const alternateRowFormatSelect = document.getElementById('alternateRowFormatSelect');
-    const clearTextColorButton = document.getElementById('clearTextColorBtn');
-    const clearFillColorButton = document.getElementById('clearFillColorBtn');
-    const borderStyleSelect = document.getElementById('borderStyleSelect');
-    const borderPlacementSelect = document.getElementById('borderPlacementSelect');
-    const borderColorInput = document.getElementById('borderColorInput');
-    const clearBorderButton = document.getElementById('clearBorderBtn');
-    const numberFormatSelect = document.getElementById('numberFormatSelect');
     const exportExcelButton = document.getElementById('exportExcelBtn');
     const undoButton = document.getElementById('undoBtn');
     const zoomInButton = document.getElementById('zoomInBtn');
@@ -65,169 +48,547 @@
     const logTabsScrollElement = document.getElementById('logTabsScroll');
     const addLogTabButton = document.getElementById('addTabBtn');
 
-    const HEX_COLOR_REGEX = /^#(?:[0-9a-f]{3}){1,2}$/i;
-    const SINGLE_CELL_REFERENCE_REGEX = /^([A-Za-z]+)(\d+)$/;
-    const FORMULA_FUNCTIONS = {
-        SUM: createAggregateFormula((values) => values.reduce((total, value) => total + value, 0), {
-            emptyResult: 0
-        }),
-        AVERAGE: createAggregateFormula((values) => values.reduce((sum, value) => sum + value, 0) / values.length, {
-            emptyResult: '#DIV/0!'
-        }),
-        MIN: createAggregateFormula((values) => values.reduce((min, value) => Math.min(min, value))),
-        MAX: createAggregateFormula((values) => values.reduce((max, value) => Math.max(max, value))),
-        COUNT: (args) => {
-            const extraction = extractNumericValues(args);
-            if (extraction.error) {
-                return extraction.error;
-            }
-            return extraction.values.length;
-        }
-    };
-    const MAX_HISTORY_LENGTH = 50;
-    const MIN_ZOOM = 0.5;
-    const MAX_ZOOM = 2;
-    const ZOOM_STEP = 0.1;
-    const MAX_AUDIT_ENTRIES = 500;
-    const DEFAULT_USER_NAME = 'Unknown user';
-    const BORDER_STYLE_CONFIG = {
-        thin: { width: '1px', style: 'solid' },
-        medium: { width: '2px', style: 'solid' },
-        thick: { width: '3px', style: 'solid' },
-        dashed: { width: '2px', style: 'dashed' }
-    };
-    const BORDER_STYLE_LOOKUP = Object.entries(BORDER_STYLE_CONFIG).reduce((lookup, [key, config]) => {
-        lookup[`${config.width} ${config.style}`] = key;
-        return lookup;
-    }, {});
-    const BORDER_SIDE_KEYS = ['borderTop', 'borderRight', 'borderBottom', 'borderLeft'];
-    const BORDER_PLACEMENT_SIDES = {
-        all: [...BORDER_SIDE_KEYS],
-        top: ['borderTop'],
-        right: ['borderRight'],
-        bottom: ['borderBottom'],
-        left: ['borderLeft']
-    };
-    const BORDER_PLACEMENT_LABELS = {
-        all: 'all borders',
-        top: 'top border',
-        right: 'right border',
-        bottom: 'bottom border',
-        left: 'left border'
-    };
-    const ALTERNATING_ROW_THEMES = {
-        blue: { label: 'Cool Blue', odd: '#ffffff', even: '#edf2ff' },
-        gray: { label: 'Soft Gray', odd: '#ffffff', even: '#f5f6f8' },
-        green: { label: 'Mint Green', odd: '#ffffff', even: '#e9f8ef' },
-        gold: { label: 'Warm Gold', odd: '#ffffff', even: '#fff4e0' }
-    };
-    const CELL_REFERENCE_REGEX = /([A-Za-z]+)(\d+)/g;
-    const DEFAULT_CURRENCY_CODE = getDefaultCurrencyCode();
-    const numberFormatterCache = new Map();
-    const LG_BREAKPOINT = 992;
-
-    if (!logListEl) {
-        return;
-    }
-
     let logs = loadLogs();
     let currentLogId = restoreActiveLogId();
+    let gridApi = null;
+    let gridColumnApi = null;
+    let gridInitialized = false;
     let selectionRange = null;
-    let anchorCell = null;
-    let activeEditingCell = null;
     let zoomLevel = 1;
-    let isMouseSelecting = false;
-    let selectionDragAnchor = null;
     let auditLogModalInstance = null;
-    let fillHandleElement = null;
-    let isFillDragging = false;
-    let fillDragStartRange = null;
-    let fillDragTargetRange = null;
-    let fillPreviewCells = [];
-    let lastClipboardSnapshot = null;
-    let formulaReferenceCursor = null;
-    let formulaReferenceHighlightCell = null;
-    let formulaReferenceToken = null;
-    let suppressFormulaInputHandler = false;
-
     const logHistory = new Map();
-    const formattingMemory = {
-        bold: false,
-        italic: false,
-        underline: false,
-        align: '',
-        fontSize: '',
-        fontFamily: '',
-        numberFormat: 'general',
-        textColor: '#000000',
-        fillColor: '#FFFFFF',
-        borderStyle: '',
-        borderColor: '#000000',
-        borderPlacement: 'all'
-    };
 
-    function clamp(value, min, max) {
-        if (value < min) {
-            return min;
+    initialize();
+
+    function initialize() {
+        initializeGrid();
+        renderLogList();
+        renderLogTabs();
+        updateLogManagementButtons();
+        wireEventListeners();
+        if (logs.length === 0) {
+            showPlaceholder();
+        } else if (currentLogId) {
+            selectLog(currentLogId);
+        } else {
+            selectLog(logs[0].id);
         }
-        if (value > max) {
-            return max;
-        }
-        return value;
+        handleSidebarResize();
+        updateZoomButtonState();
     }
 
-    function modulo(value, modulus) {
-        if (!modulus) {
-            return 0;
-        }
-        return ((value % modulus) + modulus) % modulus;
+    function wireEventListeners() {
+        createLogForm?.addEventListener('submit', handleCreateLog);
+        logNameInput?.addEventListener('input', () => logNameInput.classList.remove('is-invalid'));
+        importLogButton?.addEventListener('click', () => importLogInput?.click());
+        importLogInput?.addEventListener('change', handleImportLogChange);
+        addRowButton?.addEventListener('click', addRowToLog);
+        insertRowButton?.addEventListener('click', insertRowAboveSelection);
+        deleteRowButton?.addEventListener('click', deleteSelectedRows);
+        addColumnButton?.addEventListener('click', addColumnToLog);
+        deleteColumnButton?.addEventListener('click', deleteSelectedColumns);
+        clearLogButton?.addEventListener('click', clearCurrentLog);
+        duplicateLogButton?.addEventListener('click', duplicateCurrentLog);
+        deleteLogButton?.addEventListener('click', deleteCurrentLog);
+        renameLogButton?.addEventListener('click', renameCurrentLog);
+        viewAuditLogButton?.addEventListener('click', openAuditLogModal);
+        exportExcelButton?.addEventListener('click', exportCurrentLogToExcel);
+        undoButton?.addEventListener('click', undoLastChange);
+        zoomInButton?.addEventListener('click', () => changeZoom(ZOOM_STEP));
+        zoomOutButton?.addEventListener('click', () => changeZoom(-ZOOM_STEP));
+        addLogTabButton?.addEventListener('click', handleAddTab);
+        toggleSidebarButton?.addEventListener('click', handleSidebarToggle);
+        closeSidebarButton?.addEventListener('click', closeSidebar);
+        logsSidebarOverlayElement?.addEventListener('click', closeSidebar);
+        window.addEventListener('resize', handleSidebarResize);
     }
 
-    function getDefaultCurrencyCode() {
-        const candidates = [];
-        if (typeof window !== 'undefined' && window.hOps && typeof window.hOps.currencyCode === 'string') {
-            candidates.push(window.hOps.currencyCode);
+    function initializeGrid() {
+        if (gridInitialized || !gridElement || typeof agGrid === 'undefined') {
+            return;
         }
-        const docCurrency = document.documentElement?.dataset?.currency;
-        if (typeof docCurrency === 'string') {
-            candidates.push(docCurrency);
-        }
-        for (const candidate of candidates) {
-            const code = candidate.trim().toUpperCase();
-            if (/^[A-Z]{3}$/.test(code)) {
-                return code;
+        gridInitialized = true;
+        const gridOptions = {
+            defaultColDef: {
+                editable: true,
+                resizable: true,
+                sortable: false,
+                filter: false,
+                suppressHeaderMenuButton: true
+            },
+            rowSelection: 'single',
+            suppressRowClickSelection: true,
+            enableRangeSelection: true,
+            enableFillHandle: true,
+            animateRows: false,
+            undoRedoCellEditing: false,
+            readOnlyEdit: false,
+            getRowId: (params) => String(params.data.__rowIndex),
+            onGridSizeChanged: () => gridApi?.sizeColumnsToFit(),
+            onCellEditingStarted: () => pushUndoState(),
+            onCellEditingStopped: handleCellEditStopped,
+            onRangeSelectionChanged: syncSelectionFromGrid,
+            onSelectionChanged: syncSelectionFromGrid,
+            onFirstDataRendered: () => {
+                gridApi?.sizeColumnsToFit();
+                focusFirstCell();
             }
-        }
-        return 'USD';
-    }
-
-    function cloneFormat(format) {
-        if (!format || typeof format !== 'object') {
-            return undefined;
-        }
-        return JSON.parse(JSON.stringify(format));
-    }
-
-    function cloneCellData(cell) {
-        if (!cell) {
-            return createCell();
-        }
-        const cloned = {
-            value: typeof cell.value === 'string' ? cell.value : String(cell.value ?? '')
         };
-        const clonedFormat = cloneFormat(cell.format);
-        if (clonedFormat) {
-            cloned.format = clonedFormat;
-        }
-        return cloned;
+        gridApi = agGrid.createGrid(gridElement, gridOptions);
+        gridColumnApi = gridApi.columnApi;
     }
 
-    function cloneLogData(data) {
-        return data.map((row) => {
-            if (!Array.isArray(row)) {
-                return [];
+    function renderLogList() {
+        if (!logListEl) {
+            return;
+        }
+        logListEl.innerHTML = '';
+        if (logs.length === 0) {
+            logEmptyStateEl?.classList.remove('d-none');
+            return;
+        }
+        logEmptyStateEl?.classList.add('d-none');
+        logs.forEach((log) => {
+            const item = document.createElement('div');
+            item.className = `list-group-item log-item ${log.id === currentLogId ? 'active' : ''}`;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn-link p-0 text-start flex-grow-1 log-item-select';
+            button.textContent = log.name;
+            button.addEventListener('click', () => selectLog(log.id));
+            item.appendChild(button);
+            logListEl.appendChild(item);
+        });
+    }
+
+    function renderLogTabs() {
+        if (!logTabsContainer) {
+            return;
+        }
+        logTabsContainer.innerHTML = '';
+        if (logs.length === 0) {
+            logTabsBarElement?.classList.add('log-tabs-bar--empty');
+            logTabsEmptyStateElement?.classList.remove('d-none');
+            return;
+        }
+        logTabsBarElement?.classList.remove('log-tabs-bar--empty');
+        logTabsEmptyStateElement?.classList.add('d-none');
+        logs.forEach((log, index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `btn btn-sm log-tab ${log.id === currentLogId ? 'active' : ''}`;
+            button.textContent = log.name;
+            button.addEventListener('click', () => selectLog(log.id));
+            button.addEventListener('keydown', (event) => handleTabKeyNavigation(event, index));
+            logTabsContainer.appendChild(button);
+        });
+        scrollActiveTabIntoView('auto');
+    }
+
+    function handleTabKeyNavigation(event, tabIndex) {
+        if (!logTabsContainer) {
+            return;
+        }
+        if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            const nextIndex = (tabIndex + 1) % logTabsContainer.children.length;
+            logTabsContainer.children[nextIndex]?.focus();
+        } else if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            const previousIndex = (tabIndex - 1 + logTabsContainer.children.length) % logTabsContainer.children.length;
+            logTabsContainer.children[previousIndex]?.focus();
+        }
+    }
+
+    function scrollActiveTabIntoView(behavior = 'auto') {
+        if (!logTabsContainer || !logTabsScrollElement) {
+            return;
+        }
+        const activeTab = logTabsContainer.querySelector('.log-tab.active');
+        if (!activeTab) {
+            return;
+        }
+        const parentRect = logTabsScrollElement.getBoundingClientRect();
+        const tabRect = activeTab.getBoundingClientRect();
+        if (tabRect.left < parentRect.left) {
+            logTabsScrollElement.scrollTo({ left: logTabsScrollElement.scrollLeft - (parentRect.left - tabRect.left) - 12, behavior });
+        } else if (tabRect.right > parentRect.right) {
+            logTabsScrollElement.scrollTo({ left: logTabsScrollElement.scrollLeft + (tabRect.right - parentRect.right) + 12, behavior });
+        }
+    }
+
+    function getCurrentLog() {
+        if (!currentLogId) {
+            return null;
+        }
+        return logs.find((log) => log.id === currentLogId) ?? null;
+    }
+
+    function selectLog(logId) {
+        const targetLog = logs.find((log) => log.id === logId);
+        if (!targetLog) {
+            return;
+        }
+        currentLogId = targetLog.id;
+        persistActiveLogId();
+        logTitleEl && (logTitleEl.textContent = targetLog.name);
+        logSubtitleEl && (logSubtitleEl.textContent = `${targetLog.data.length} rows, ${targetLog.data[0]?.length ?? defaultColumns} columns`);
+        renderGridForLog(targetLog);
+        renderLogList();
+        renderLogTabs();
+        updateLogManagementButtons();
+        selectionRange = null;
+        updateUndoButtonState();
+        scrollActiveTabIntoView('smooth');
+    }
+
+    function renderGridForLog(log) {
+        if (!gridApi || !gridElement) {
+            return;
+        }
+        const columnDefs = buildColumnDefs(log);
+        const rowData = buildRowData(log);
+        gridApi.setColumnDefs(columnDefs);
+        gridApi.setRowData(rowData);
+        gridApi.sizeColumnsToFit();
+        gridElement.classList.remove('d-none');
+        placeholderEl?.classList.add('d-none');
+        requestAnimationFrame(() => {
+            focusFirstCell();
+            syncSelectionFromGrid();
+        });
+    }
+
+    function buildColumnDefs(log) {
+        const columnCount = log.data[0]?.length ?? defaultColumns;
+        const defs = [];
+        for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+            const fieldKey = getFieldKey(columnIndex);
+            defs.push({
+                headerName: columnLabel(columnIndex),
+                colId: fieldKey,
+                field: fieldKey,
+                editable: true,
+                flex: 1,
+                minWidth: 120,
+                valueFormatter: (params) => getCellDisplayValue(log, params.node.rowIndex, columnIndex),
+                cellClass: (params) => getCellClass(log, params.node.rowIndex, columnIndex)
+            });
+        }
+        return defs;
+    }
+
+    function buildRowData(log) {
+        const columnCount = log.data[0]?.length ?? defaultColumns;
+        return log.data.map((row, rowIndex) => {
+            const record = { __rowIndex: rowIndex };
+            for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+                ensureCellExists(log, rowIndex, columnIndex);
+                record[getFieldKey(columnIndex)] = row[columnIndex].value ?? '';
             }
-            return row.map((cell) => cloneCellData(cell));
+            return record;
+        });
+    }
+
+    function handleCellEditStopped(event) {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const rowIndex = event.node?.rowIndex;
+        const columnIndex = getColumnIndexFromField(event.column?.getColId());
+        if (rowIndex == null || columnIndex == null) {
+            return;
+        }
+        ensureCellExists(log, rowIndex, columnIndex);
+        const rawValue = event.value == null ? '' : String(event.value);
+        const cell = log.data[rowIndex][columnIndex];
+        if (cell.value === rawValue) {
+            refreshGridCells([{ rowIndex, columnIndex }]);
+            return;
+        }
+        const previousValue = cell.value ?? '';
+        cell.value = rawValue;
+        recordAudit(log, 'Updated cell', `Updated ${formatCellLabel(rowIndex, columnIndex)} from ${formatAuditValue(previousValue)} to ${formatAuditValue(rawValue)}.`);
+        persistLogs();
+        renderGridForLog(log);
+    }
+
+    function refreshGridCells(cells = []) {
+        if (!gridApi) {
+            return;
+        }
+        if (!cells.length) {
+            gridApi.refreshCells({ force: true });
+            return;
+        }
+        const rowNodes = [];
+        const columns = [];
+        cells.forEach(({ rowIndex, columnIndex }) => {
+            const node = gridApi.getDisplayedRowAtIndex(rowIndex);
+            if (node) {
+                rowNodes.push(node);
+            }
+            const fieldKey = getFieldKey(columnIndex);
+            if (!columns.includes(fieldKey)) {
+                columns.push(fieldKey);
+            }
+        });
+        gridApi.refreshCells({ rowNodes, columns, force: true });
+    }
+
+    function syncSelectionFromGrid() {
+        if (!gridApi) {
+            return;
+        }
+        const ranges = gridApi.getCellRanges();
+        if (!ranges || ranges.length === 0) {
+            selectionRange = null;
+            updateActionButtons();
+            return;
+        }
+        const latest = ranges[ranges.length - 1];
+        const startRow = Math.min(latest.startRow?.rowIndex ?? 0, latest.endRow?.rowIndex ?? 0);
+        const endRow = Math.max(latest.startRow?.rowIndex ?? 0, latest.endRow?.rowIndex ?? 0);
+        const columns = (latest.columns ?? []).map((col) => getColumnIndexFromField(col.getColId())).filter((index) => index != null);
+        const startColumn = Math.min(...columns);
+        const endColumn = Math.max(...columns);
+        selectionRange = {
+            startRow: Math.max(0, startRow),
+            endRow: Math.max(0, endRow),
+            startColumn: Math.max(0, startColumn),
+            endColumn: Math.max(0, endColumn)
+        };
+        updateActionButtons();
+    }
+
+    function focusFirstCell() {
+        if (!gridApi) {
+            return;
+        }
+        gridApi.ensureIndexVisible(0);
+        gridApi.setFocusedCell(0, getFieldKey(0));
+    }
+
+    function setSelection(targetRow, targetColumn) {
+        if (!gridApi) {
+            return;
+        }
+        const fieldKey = getFieldKey(targetColumn);
+        gridApi.clearRangeSelection();
+        gridApi.addCellRange({
+            rowStartIndex: targetRow,
+            rowEndIndex: targetRow,
+            columns: [fieldKey]
+        });
+        gridApi.setFocusedCell(targetRow, fieldKey);
+        syncSelectionFromGrid();
+    }
+
+    function getSelectionOrDefault(log) {
+        const rowCount = log.data.length;
+        const columnCount = log.data[0]?.length ?? defaultColumns;
+        if (!selectionRange) {
+            return {
+                startRow: 0,
+                endRow: Math.max(0, rowCount - 1),
+                startColumn: 0,
+                endColumn: Math.max(0, columnCount - 1)
+            };
+        }
+        return {
+            startRow: clamp(selectionRange.startRow, 0, rowCount - 1),
+            endRow: clamp(selectionRange.endRow, 0, rowCount - 1),
+            startColumn: clamp(selectionRange.startColumn, 0, columnCount - 1),
+            endColumn: clamp(selectionRange.endColumn, 0, columnCount - 1)
+        };
+    }
+
+    function addRowToLog() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        pushUndoState();
+        const newRow = Array.from({ length: log.data[0]?.length ?? defaultColumns }, () => createCell());
+        log.data.push(newRow);
+        recordAudit(log, 'Row added', 'Appended a new row to the log.');
+        persistLogs();
+        renderGridForLog(log);
+        setSelection(Math.max(0, log.data.length - 1), 0);
+    }
+
+    function insertRowAboveSelection() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const range = getSelectionOrDefault(log);
+        pushUndoState();
+        const insertIndex = clamp(range.startRow, 0, log.data.length);
+        const template = log.data[0]?.length ?? defaultColumns;
+        const newRow = Array.from({ length: template }, () => createCell());
+        log.data.splice(insertIndex, 0, newRow);
+        recordAudit(log, 'Row inserted', `Inserted a new row above row ${insertIndex + 1}.`);
+        persistLogs();
+        renderGridForLog(log);
+        setSelection(insertIndex, 0);
+    }
+
+    function deleteSelectedRows() {
+        const log = getCurrentLog();
+        if (!log || log.data.length <= 1) {
+            return;
+        }
+        const range = getSelectionOrDefault(log);
+        const rowCount = range.endRow - range.startRow + 1;
+        if (rowCount >= log.data.length) {
+            return;
+        }
+        pushUndoState();
+        log.data.splice(range.startRow, rowCount);
+        recordAudit(log, 'Rows deleted', `Deleted ${rowCount} row(s).`);
+        persistLogs();
+        renderGridForLog(log);
+        setSelection(Math.max(0, range.startRow - 1), 0);
+    }
+
+    function addColumnToLog() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        pushUndoState();
+        log.data.forEach((row) => row.push(createCell()));
+        recordAudit(log, 'Column added', 'Appended a new column to the log.');
+        persistLogs();
+        renderGridForLog(log);
+    }
+
+    function deleteSelectedColumns() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const range = getSelectionOrDefault(log);
+        const columnCount = range.endColumn - range.startColumn + 1;
+        const totalColumns = log.data[0]?.length ?? defaultColumns;
+        if (columnCount >= totalColumns) {
+            return;
+        }
+        pushUndoState();
+        log.data.forEach((row) => row.splice(range.startColumn, columnCount));
+        recordAudit(log, 'Columns deleted', `Deleted ${columnCount} column(s).`);
+        persistLogs();
+        renderGridForLog(log);
+    }
+
+    function clearCurrentLog() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        if (!window.confirm('Clear all cells in this log? This cannot be undone.')) {
+            return;
+        }
+        pushUndoState();
+        log.data = createEmptyData();
+        recordAudit(log, 'Cleared log', 'All cells were cleared.');
+        persistLogs();
+        renderGridForLog(log);
+        setSelection(0, 0);
+    }
+
+    function duplicateCurrentLog() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const clone = {
+            id: generateId(),
+            name: generateDuplicateLogName(log.name),
+            data: cloneLogData(log.data),
+            auditTrail: (log.auditTrail ?? []).slice()
+        };
+        logs.push(clone);
+        recordAudit(clone, 'Log created', 'Duplicated from an existing log.');
+        persistLogs();
+        renderLogList();
+        renderLogTabs();
+        selectLog(clone.id);
+    }
+
+    function deleteCurrentLog() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        if (!window.confirm(`Delete "${log.name}" permanently?`)) {
+            return;
+        }
+        logs = logs.filter((item) => item.id !== log.id);
+        persistLogs();
+        renderLogList();
+        renderLogTabs();
+        if (logs.length) {
+            selectLog(logs[0].id);
+        } else {
+            currentLogId = null;
+            persistActiveLogId();
+            showPlaceholder();
+            updateLogManagementButtons();
+        }
+    }
+
+    function renameCurrentLog() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
+        }
+        const newName = window.prompt('Rename log', log.name);
+        if (!newName) {
+            return;
+        }
+        const trimmed = newName.trim();
+        if (!trimmed || trimmed === log.name) {
+            return;
+        }
+        log.name = trimmed;
+        recordAudit(log, 'Renamed log', `Renamed to ${trimmed}.`);
+        persistLogs();
+        renderLogList();
+        renderLogTabs();
+        logTitleEl && (logTitleEl.textContent = log.name);
+    }
+
+    function updateActionButtons() {
+        const hasSelection = !!selectionRange;
+        deleteRowButton && (deleteRowButton.disabled = !hasSelection);
+        insertRowButton && (insertRowButton.disabled = !hasSelection);
+        deleteColumnButton && (deleteColumnButton.disabled = !hasSelection);
+    }
+
+    function updateLogManagementButtons() {
+        const hasLog = logs.length > 0;
+        [
+            addRowButton,
+            insertRowButton,
+            deleteRowButton,
+            addColumnButton,
+            deleteColumnButton,
+            clearLogButton,
+            duplicateLogButton,
+            deleteLogButton,
+            renameLogButton,
+            viewAuditLogButton,
+            exportExcelButton,
+            undoButton,
+            zoomInButton,
+            zoomOutButton
+        ].forEach((button) => {
+            if (button) {
+                button.disabled = !hasLog;
+            }
         });
     }
 
@@ -236,31 +597,15 @@
         if (!log) {
             return;
         }
-        const snapshot = {
-            data: cloneLogData(log.data),
-            selectionRange: selectionRange ? { ...selectionRange } : null,
-            anchorCell: anchorCell ? { ...anchorCell } : null
-        };
         const history = logHistory.get(log.id) ?? [];
-        history.push(snapshot);
+        history.push({
+            data: cloneLogData(log.data)
+        });
         if (history.length > MAX_HISTORY_LENGTH) {
             history.shift();
         }
         logHistory.set(log.id, history);
         updateUndoButtonState();
-    }
-
-    function updateUndoButtonState() {
-        if (!undoButton) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            undoButton.disabled = true;
-            return;
-        }
-        const history = logHistory.get(log.id);
-        undoButton.disabled = !(history && history.length);
     }
 
     function undoLastChange() {
@@ -274,241 +619,164 @@
         }
         const snapshot = history.pop();
         log.data = cloneLogData(snapshot.data);
-        selectionRange = snapshot.selectionRange ? { ...snapshot.selectionRange } : null;
-        anchorCell = snapshot.anchorCell ? { ...snapshot.anchorCell } : null;
-        recordAudit(log, 'Undo', 'Reverted the most recent change.');
+        recordAudit(log, 'Undo', 'Reverted the last change.');
         persistLogs();
-        renderSpreadsheet(log);
-        if (selectionRange) {
-            restoreSelection();
-        } else {
-            setToolbarEnabled(false);
-        }
+        renderGridForLog(log);
         updateUndoButtonState();
     }
 
-    function applyZoomLevel() {
-        if (!spreadsheetWrapperEl) {
+    function updateUndoButtonState() {
+        const log = getCurrentLog();
+        if (!log || !undoButton) {
+            undoButton && (undoButton.disabled = true);
             return;
         }
-        spreadsheetWrapperEl.style.setProperty('--spreadsheet-zoom-scale', zoomLevel.toString());
-    }
-
-    function updateZoomButtonState() {
-        if (!zoomInButton || !zoomOutButton) {
-            return;
-        }
-        const hasLog = !!getCurrentLog();
-        zoomInButton.disabled = !hasLog || zoomLevel >= MAX_ZOOM - 0.001;
-        zoomOutButton.disabled = !hasLog || zoomLevel <= MIN_ZOOM + 0.001;
-    }
-
-    function setZoom(level) {
-        const clamped = clamp(level, MIN_ZOOM, MAX_ZOOM);
-        const rounded = Math.round(clamped * 100) / 100;
-        if (Math.abs(rounded - zoomLevel) < 0.001) {
-            return;
-        }
-        zoomLevel = rounded;
-        applyZoomLevel();
-        updateZoomButtonState();
+        const history = logHistory.get(log.id);
+        undoButton.disabled = !(history && history.length);
     }
 
     function changeZoom(delta) {
         setZoom(zoomLevel + delta);
     }
 
-    function isPrintableKey(event) {
-        if (!event || typeof event.key !== 'string') {
-            return false;
+    function setZoom(level) {
+        const next = clamp(Math.round(level * 100) / 100, MIN_ZOOM, MAX_ZOOM);
+        if (Math.abs(next - zoomLevel) < 0.01) {
+            return;
         }
-        if (event.ctrlKey || event.metaKey || event.altKey) {
-            return false;
+        zoomLevel = next;
+        if (gridElement) {
+            gridElement.style.setProperty('--logs-grid-font-size', `${zoomLevel}rem`);
         }
-        if (event.key.length === 1) {
-            return event.key >= ' ';
-        }
-        return false;
+        updateZoomButtonState();
     }
 
-    function createCell(value = '', format = {}) {
-        return {
-            value: typeof value === 'string' ? value : String(value ?? ''),
-            format: normalizeFormat(format)
+    function updateZoomButtonState() {
+        if (zoomInButton) {
+            zoomInButton.disabled = zoomLevel >= MAX_ZOOM - 0.01 || !logs.length;
+        }
+        if (zoomOutButton) {
+            zoomOutButton.disabled = zoomLevel <= MIN_ZOOM + 0.01 || !logs.length;
+        }
+    }
+
+    function handleCreateLog(event) {
+        event.preventDefault();
+        if (!logNameInput) {
+            return;
+        }
+        const name = logNameInput.value.trim();
+        if (!name) {
+            logNameInput.classList.add('is-invalid');
+            return;
+        }
+        const log = createLog(name);
+        logs.push(log);
+        recordAudit(log, 'Log created', 'Created a new custom log.');
+        persistLogs();
+        renderLogList();
+        renderLogTabs();
+        selectLog(log.id);
+        logNameInput.value = '';
+    }
+
+    function handleImportLogChange(event) {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement) || !input.files?.length) {
+            return;
+        }
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = (loadEvent) => {
+            const data = new Uint8Array(loadEvent.target?.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            if (!worksheet) {
+                return;
+            }
+            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            const log = createLogFromData(generateDefaultLogName(), rows);
+            logs.push(log);
+            recordAudit(log, 'Log imported', `Imported from ${file.name}.`);
+            persistLogs();
+            renderLogList();
+            renderLogTabs();
+            selectLog(log.id);
         };
+        reader.readAsArrayBuffer(file);
+        input.value = '';
     }
 
-    function normalizeImportedValue(value) {
-        if (value == null) {
-            return '';
+    function exportCurrentLogToExcel() {
+        const log = getCurrentLog();
+        if (!log) {
+            return;
         }
-        if (value instanceof Date) {
-            return value.toISOString();
-        }
-        if (typeof value === 'number') {
-            if (!Number.isFinite(value)) {
-                return '';
-            }
-            return String(value);
-        }
-        if (typeof value === 'boolean') {
-            return value ? 'TRUE' : 'FALSE';
-        }
-        return String(value);
+        const sheetData = log.data.map((row) => row.map((cell) => cell.value ?? ''));
+        const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, createSheetName(log.name));
+        const workbookArray = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([workbookArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = createFileName(log.name);
+        link.click();
+        URL.revokeObjectURL(url);
     }
 
-    function normalizeFormat(format) {
-        if (!format || typeof format !== 'object') {
-            return {};
+    function openAuditLogModal() {
+        const log = getCurrentLog();
+        if (!log || !auditLogModalElement) {
+            return;
         }
-        const normalized = {};
-        if (format.bold) {
-            normalized.bold = true;
+        if (!auditLogModalInstance && window.bootstrap) {
+            auditLogModalInstance = new window.bootstrap.Modal(auditLogModalElement);
         }
-        if (format.italic) {
-            normalized.italic = true;
+        renderAuditTrail(log);
+        auditLogModalInstance?.show();
+    }
+
+    function renderAuditTrail(log) {
+        if (!auditLogListElement || !auditLogEmptyStateElement) {
+            return;
         }
-        if (format.underline) {
-            normalized.underline = true;
+        auditLogListElement.innerHTML = '';
+        const trail = ensureAuditTrail(log);
+        if (trail.length === 0) {
+            auditLogEmptyStateElement.classList.remove('d-none');
+            return;
         }
-        if (typeof format.fontSize === 'string' && format.fontSize.trim().length) {
-            normalized.fontSize = format.fontSize.trim();
-        }
-        if (typeof format.fontFamily === 'string' && format.fontFamily.trim().length) {
-            normalized.fontFamily = format.fontFamily.trim();
-        }
-        if (typeof format.numberFormat === 'string') {
-            const formatKey = format.numberFormat.trim().toLowerCase();
-            if (['number', 'currency', 'percent'].includes(formatKey)) {
-                normalized.numberFormat = formatKey;
-            }
-        }
-        if (typeof format.align === 'string' && ['left', 'center', 'right'].includes(format.align)) {
-            normalized.align = format.align;
-        }
-        if (isValidHexColor(format.textColor)) {
-            normalized.textColor = normalizeHexColor(format.textColor);
-        }
-        if (isValidHexColor(format.fillColor)) {
-            normalized.fillColor = normalizeHexColor(format.fillColor);
-        }
-        if (typeof format.border === 'string' && format.border.trim().length) {
-            normalized.border = format.border.trim();
-        }
-        BORDER_SIDE_KEYS.forEach((key) => {
-            if (typeof format[key] === 'string' && format[key].trim().length) {
-                normalized[key] = format[key].trim();
-            }
+        auditLogEmptyStateElement.classList.add('d-none');
+        trail.slice().reverse().forEach((entry) => {
+            const item = document.createElement('div');
+            item.className = 'list-group-item';
+            item.innerHTML = `<div class="fw-semibold">${entry.user}</div><div class="text-muted small">${formatAuditTimestamp(entry.timestamp)}</div><div>${entry.action}${entry.details ? ` — ${entry.details}` : ''}</div>`;
+            auditLogListElement.appendChild(item);
         });
-        if (format.merge && typeof format.merge === 'object') {
-            const rowSpan = Number(format.merge.rowSpan);
-            const colSpan = Number(format.merge.colSpan);
-            if (rowSpan > 0 && colSpan > 0) {
-                normalized.merge = {
-                    rowSpan,
-                    colSpan
-                };
-            }
-        }
-        if (format.mergedInto && typeof format.mergedInto === 'object') {
-            const row = Number(format.mergedInto.row);
-            const column = Number(format.mergedInto.column);
-            if (!Number.isNaN(row) && !Number.isNaN(column)) {
-                normalized.mergedInto = { row, column };
-            }
-        }
-        return normalized;
-    }
-
-    function normalizeCell(cell) {
-        if (cell && typeof cell === 'object' && 'value' in cell) {
-            return createCell(cell.value, cell.format);
-        }
-        if (typeof cell === 'string') {
-            return createCell(cell, {});
-        }
-        if (cell == null) {
-            return createCell('', {});
-        }
-        return createCell(String(cell ?? ''), {});
-    }
-
-    function isValidHexColor(value) {
-        return typeof value === 'string' && HEX_COLOR_REGEX.test(value.trim());
-    }
-
-    function normalizeHexColor(value) {
-        if (!isValidHexColor(value)) {
-            return '';
-        }
-        const trimmed = value.trim();
-        if (trimmed.length === 4) {
-            const expanded = trimmed
-                .slice(1)
-                .split('')
-                .map((char) => char + char)
-                .join('');
-            return `#${expanded.toUpperCase()}`;
-        }
-        return trimmed.toUpperCase();
-    }
-
-    function getDefaultColorValue(input, fallback) {
-        if (!input) {
-            return fallback;
-        }
-        const candidate = input.dataset?.defaultColor;
-        return isValidHexColor(candidate) ? normalizeHexColor(candidate) : fallback;
-    }
-
-    function updateColorInputState(input, clearButton, colorValue, fallback) {
-        if (input) {
-            const defaultColor = getDefaultColorValue(input, fallback);
-            if (isValidHexColor(colorValue)) {
-                const normalized = normalizeHexColor(colorValue);
-                input.value = normalized;
-                input.dataset.appliedColor = normalized;
-            } else {
-                input.value = defaultColor;
-                input.dataset.appliedColor = '';
-            }
-        }
-        if (clearButton) {
-            clearButton.disabled = !isValidHexColor(colorValue);
-        }
-    }
-
-    function createEmptyData(rows = defaultRows, columns = defaultColumns) {
-        return Array.from({ length: rows }, () => Array.from({ length: columns }, () => createCell()));
     }
 
     function createLog(name) {
         return {
             id: generateId(),
-            name,
+            name: name.trim(),
             data: createEmptyData(),
             auditTrail: []
         };
     }
 
     function createLogFromData(name, rows) {
-        const normalizedRows = Array.isArray(rows)
-            ? rows.map((row) => (Array.isArray(row) ? row : []))
-            : [];
-
-        const maxImportedColumns = normalizedRows.reduce((max, row) => Math.max(max, row.length), 0);
-        const totalRows = Math.max(normalizedRows.length, defaultRows);
-        const totalColumns = Math.max(maxImportedColumns, defaultColumns);
-        const data = createEmptyData(totalRows, totalColumns);
-
-        normalizedRows.forEach((row, rowIndex) => {
-            row.forEach((cellValue, columnIndex) => {
-                if (rowIndex < data.length && columnIndex < data[rowIndex].length) {
-                    data[rowIndex][columnIndex] = createCell(normalizeImportedValue(cellValue));
-                }
+        const normalizedRows = Array.isArray(rows) && rows.length ? rows : [];
+        const columnCount = normalizedRows.reduce((max, row) => Math.max(max, Array.isArray(row) ? row.length : 0), defaultColumns);
+        const data = Array.from({ length: Math.max(normalizedRows.length, defaultRows) }, (_, rowIndex) => {
+            return Array.from({ length: columnCount }, (_, columnIndex) => {
+                const row = normalizedRows[rowIndex];
+                const value = Array.isArray(row) ? row[columnIndex] ?? '' : '';
+                return createCell(String(value ?? ''));
             });
         });
-
         return {
             id: generateId(),
             name,
@@ -517,83 +785,55 @@
         };
     }
 
-    function generateUniqueLogName(baseName) {
-        const trimmed = typeof baseName === 'string' ? baseName.trim() : '';
-        const defaultName = trimmed.length ? trimmed : 'Imported Log';
-        let candidate = defaultName;
-        let counter = 2;
-        const existingNames = new Set(logs.map((log) => log.name));
-        while (existingNames.has(candidate)) {
-            candidate = `${defaultName} (${counter})`;
-            counter += 1;
-        }
-        return candidate;
+    function createEmptyData(rows = defaultRows, columns = defaultColumns) {
+        return Array.from({ length: rows }, () => Array.from({ length: columns }, () => createCell()));
     }
 
-    function generateDuplicateLogName(originalName) {
-        const trimmed = typeof originalName === 'string' ? originalName.trim() : '';
-        const baseName = trimmed.length ? `${trimmed} (Copy)` : 'Duplicated Log';
-        const existingNames = new Set(logs.map((log) => log.name));
-        if (!existingNames.has(baseName)) {
-            return baseName;
-        }
-        let counter = 2;
-        let candidate = `${baseName} ${counter}`;
-        while (existingNames.has(candidate)) {
-            counter += 1;
-            candidate = `${baseName} ${counter}`;
-        }
-        return candidate;
+    function createCell(value = '') {
+        return { value: value ?? '' };
     }
 
-    function generateDefaultLogName() {
-        const baseName = 'Log';
-        const existingNames = new Set(
-            logs
-                .map((log) => (typeof log.name === 'string' ? log.name.trim() : ''))
-                .filter((name) => name.length)
-        );
-
-        if (!existingNames.has(`${baseName} 1`)) {
-            return `${baseName} 1`;
-        }
-
-        let counter = 2;
-        let candidate = `${baseName} ${counter}`;
-        while (existingNames.has(candidate)) {
-            counter += 1;
-            candidate = `${baseName} ${counter}`;
-        }
-        return candidate;
+    function cloneLogData(data) {
+        return data.map((row) => row.map((cell) => ({ value: cell.value ?? '' })));
     }
 
-    function restoreActiveLogId() {
-        try {
-            const stored = localStorage.getItem(storageActiveLogKey);
-            if (!stored) {
-                return null;
-            }
-            const trimmed = stored.trim();
-            if (!trimmed) {
-                return null;
-            }
-            return logs.some((log) => log.id === trimmed) ? trimmed : null;
-        } catch (error) {
-            console.warn('Unable to restore previously active log id', error);
+    function ensureCellExists(log, row, column) {
+        if (!Array.isArray(log.data[row])) {
+            log.data[row] = [];
+        }
+        if (!log.data[row][column]) {
+            log.data[row][column] = createCell();
+        }
+    }
+
+    function columnLabel(index) {
+        let label = '';
+        let current = index;
+        while (current >= 0) {
+            label = String.fromCharCode((current % 26) + 65) + label;
+            current = Math.floor(current / 26) - 1;
+        }
+        return label;
+    }
+
+    function getFieldKey(columnIndex) {
+        return `col-${columnIndex}`;
+    }
+
+    function getColumnIndexFromField(colId) {
+        if (!colId || typeof colId !== 'string') {
             return null;
         }
+        const match = /^col-(
+        const match = /^col-(\d+)$/.exec(colId);
+        if (!match) {
+            return null;
+        }
+        return Number(match[1]);
     }
 
-    function persistActiveLogId() {
-        try {
-            if (currentLogId) {
-                localStorage.setItem(storageActiveLogKey, currentLogId);
-            } else {
-                localStorage.removeItem(storageActiveLogKey);
-            }
-        } catch (error) {
-            console.warn('Unable to persist active log id', error);
-        }
+    function formatCellLabel(row, column) {
+        return `${columnLabel(column)}${row + 1}`;
     }
 
     function loadLogs() {
@@ -612,762 +852,309 @@
         return [];
     }
 
+    function persistLogs() {
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(logs));
+        } catch (error) {
+            console.warn('Unable to persist logs', error);
+        }
+    }
+
+    function persistActiveLogId() {
+        try {
+            if (currentLogId) {
+                localStorage.setItem(storageActiveLogKey, currentLogId);
+            } else {
+                localStorage.removeItem(storageActiveLogKey);
+            }
+        } catch (error) {
+            console.warn('Unable to persist active log id', error);
+        }
+    }
+
+    function restoreActiveLogId() {
+        try {
+            const stored = localStorage.getItem(storageActiveLogKey);
+            if (!stored) {
+                return null;
+            }
+            const trimmed = stored.trim();
+            if (!trimmed) {
+                return null;
+            }
+            return trimmed;
+        } catch (error) {
+            console.warn('Unable to restore active log id', error);
+            return null;
+        }
+    }
+
     function normalizeLog(log) {
         if (!log || typeof log !== 'object') {
             return createLog('Log');
         }
-
-        const rows = Array.isArray(log.data) && log.data.length > 0 ? log.data.length : defaultRows;
-        const firstRow = Array.isArray(log.data) && log.data.length > 0 && Array.isArray(log.data[0]) ? log.data[0] : null;
-        const cols = Array.isArray(firstRow) && firstRow.length > 0 ? firstRow.length : defaultColumns;
-        const data = createEmptyData(rows, cols);
-
+        const rows = Array.isArray(log.data) && log.data.length ? log.data.length : defaultRows;
+        const columns = Array.isArray(log.data?.[0]) && log.data[0].length ? log.data[0].length : defaultColumns;
+        const data = createEmptyData(rows, columns);
         if (Array.isArray(log.data)) {
             log.data.forEach((row, rowIndex) => {
                 if (!Array.isArray(row)) {
                     return;
                 }
-                row.forEach((value, colIndex) => {
-                    if (rowIndex < data.length && colIndex < data[rowIndex].length) {
-                        data[rowIndex][colIndex] = normalizeCell(value);
+                row.forEach((cell, columnIndex) => {
+                    if (rowIndex < rows && columnIndex < columns) {
+                        data[rowIndex][columnIndex] = createCell(String(cell?.value ?? cell ?? ''));
                     }
                 });
             });
         }
-
         const auditTrail = Array.isArray(log.auditTrail)
             ? log.auditTrail.map(normalizeAuditEntry).filter(Boolean)
             : [];
-
         return {
             id: log.id ?? generateId(),
-            name: typeof log.name === 'string' && log.name.trim().length ? log.name.trim() : 'Untitled Log',
+            name: typeof log.name === 'string' && log.name.trim() ? log.name.trim() : 'Untitled Log',
             data,
             auditTrail
         };
-    }
-
-    function generateId(prefix = 'log') {
-        // Use cryptographically secure random values for ID
-        let randomPart;
-        if (window.crypto && window.crypto.getRandomValues) {
-            // 8 bytes = 16 hex characters
-            const array = new Uint8Array(8);
-            window.crypto.getRandomValues(array);
-            randomPart = Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
-        } else {
-            // Fallback to Math.random() if crypto is not available (not recommended)
-            randomPart = Math.random().toString(16).slice(2);
-        }
-        return `${prefix}_${Date.now()}_${randomPart}`;
     }
 
     function normalizeAuditEntry(entry) {
         if (!entry || typeof entry !== 'object') {
             return null;
         }
-        const id = typeof entry.id === 'string' && entry.id.trim().length ? entry.id : generateId('audit');
+        const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id : generateId('audit');
         const timestampValue = typeof entry.timestamp === 'string' ? entry.timestamp : '';
         const timestamp = new Date(timestampValue);
-        const sanitizedTimestamp = Number.isNaN(timestamp.getTime())
-            ? new Date().toISOString()
-            : timestamp.toISOString();
-        const userName = typeof entry.user === 'string' && entry.user.trim().length ? entry.user.trim() : DEFAULT_USER_NAME;
-        const action = typeof entry.action === 'string' && entry.action.trim().length ? entry.action.trim() : 'Update';
+        const normalizedTimestamp = Number.isNaN(timestamp.getTime()) ? new Date().toISOString() : timestamp.toISOString();
+        const userName = typeof entry.user === 'string' && entry.user.trim() ? entry.user.trim() : DEFAULT_USER_NAME;
+        const action = typeof entry.action === 'string' && entry.action.trim() ? entry.action.trim() : 'Update';
         const details = typeof entry.details === 'string' ? entry.details : '';
-
-        return {
-            id,
-            timestamp: sanitizedTimestamp,
-            user: userName,
-            action,
-            details
-        };
+        return { id, timestamp: normalizedTimestamp, user: userName, action, details };
     }
 
     function ensureAuditTrail(log) {
-        if (!log) {
-            return [];
-        }
-        if (!Array.isArray(log.auditTrail)) {
+        if (!log.auditTrail) {
             log.auditTrail = [];
         }
         return log.auditTrail;
     }
 
+    function recordAudit(log, action, details = '') {
+        const trail = ensureAuditTrail(log);
+        trail.push({
+            id: generateId('audit'),
+            user: getCurrentUserName(),
+            timestamp: new Date().toISOString(),
+            action,
+            details
+        });
+    }
+
     function getCurrentUserName() {
         const user = window.hOps?.currentUser;
-        if (user && typeof user === 'object') {
-            const name = typeof user.name === 'string' ? user.name.trim() : '';
-            if (name.length) {
-                return name;
-            }
+        if (user && typeof user === 'object' && typeof user.name === 'string' && user.name.trim()) {
+            return user.name.trim();
         }
         return DEFAULT_USER_NAME;
     }
 
-    function recordAudit(log, action, details = '') {
-        if (!log) {
-            return;
-        }
-        const title = typeof action === 'string' && action.trim().length ? action.trim() : 'Update';
-        const message = typeof details === 'string' ? details : '';
-        const trail = ensureAuditTrail(log);
-        trail.push({
-            id: generateId('audit'),
-            timestamp: new Date().toISOString(),
-            user: getCurrentUserName(),
-            action: title,
-            details: message
-        });
-        if (trail.length > MAX_AUDIT_ENTRIES) {
-            trail.splice(0, trail.length - MAX_AUDIT_ENTRIES);
-        }
-        if (log.id === currentLogId) {
-            updateLogManagementButtons();
-            if (isAuditModalOpen()) {
-                renderAuditTrail(log);
-            }
-        }
-    }
-
-    function isAuditModalOpen() {
-        return !!auditLogModalElement && auditLogModalElement.classList.contains('show');
-    }
-
     function formatAuditTimestamp(value) {
-        const date = value ? new Date(value) : null;
-        if (!date || Number.isNaN(date.getTime())) {
-            return 'Unknown time';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return '';
         }
-        return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+        return date.toLocaleString();
     }
 
-    function renderAuditTrail(log) {
-        if (!auditLogListElement || !auditLogEmptyStateElement) {
-            return;
+    function formatAuditValue(value) {
+        if (value == null || value === '') {
+            return 'blank';
         }
-        auditLogListElement.innerHTML = '';
-        const entries = [...ensureAuditTrail(log)].sort((a, b) => {
-            const aTime = new Date(a.timestamp).getTime();
-            const bTime = new Date(b.timestamp).getTime();
-            if (Number.isNaN(aTime) && Number.isNaN(bTime)) {
-                return 0;
-            }
-            if (Number.isNaN(aTime)) {
-                return 1;
-            }
-            if (Number.isNaN(bTime)) {
-                return -1;
-            }
-            return bTime - aTime;
-        });
-
-        if (!entries.length) {
-            auditLogEmptyStateElement.classList.remove('d-none');
-            return;
-        }
-
-        auditLogEmptyStateElement.classList.add('d-none');
-
-        entries.forEach((entry) => {
-            const item = document.createElement('div');
-            item.className = 'list-group-item audit-log-entry';
-
-            const header = document.createElement('div');
-            header.className = 'd-flex justify-content-between align-items-start flex-wrap gap-2';
-
-            const title = document.createElement('h6');
-            title.className = 'mb-1 fw-semibold';
-            title.textContent = entry.action;
-
-            const meta = document.createElement('small');
-            meta.className = 'text-muted';
-            meta.textContent = `${entry.user} â€¢ ${formatAuditTimestamp(entry.timestamp)}`;
-
-            header.appendChild(title);
-            header.appendChild(meta);
-            item.appendChild(header);
-
-            if (entry.details) {
-                const detailsEl = document.createElement('p');
-                detailsEl.className = 'mb-0 text-muted';
-                detailsEl.textContent = entry.details;
-                item.appendChild(detailsEl);
-            }
-
-            auditLogListElement.appendChild(item);
-        });
+        return `"${value}"`;
     }
 
-    function updateLogManagementButtons() {
-        const log = getCurrentLog();
-        const hasLog = !!log;
-
-        if (duplicateLogButton) {
-            duplicateLogButton.disabled = !hasLog;
+    function getCellDisplayValue(log, row, column) {
+        const value = evaluateCellValue(log, row, column, new Set());
+        if (value == null) {
+            return '';
         }
-
-        if (deleteLogButton) {
-            deleteLogButton.disabled = !hasLog;
+        if (typeof value === 'number') {
+            return formatGeneralNumber(value);
         }
+        return value;
+    }
 
-        if (renameLogButton) {
-            renameLogButton.disabled = !hasLog;
-        }
-
-        if (viewAuditLogButton) {
-            if (!hasLog) {
-                viewAuditLogButton.disabled = true;
-                viewAuditLogButton.textContent = 'View History';
-            } else {
-                viewAuditLogButton.disabled = false;
-                const count = ensureAuditTrail(log).length;
-                viewAuditLogButton.textContent = count ? `View History (${count})` : 'View History';
+    function getCellClass(log, row, column) {
+        const rawValue = log.data[row]?.[column]?.value ?? '';
+        if (typeof rawValue === 'string' && rawValue.startsWith('=')) {
+            const evaluated = evaluateCellValue(log, row, column, new Set());
+            if (typeof evaluated === 'string' && evaluated.startsWith('#')) {
+                return 'text-danger fw-semibold';
             }
         }
-    }
-
-    function persistLogs() {
-        localStorage.setItem(storageKey, JSON.stringify(logs));
-    }
-
-    function renderLogList() {
-        logListEl.querySelectorAll('.log-item').forEach((item) => item.remove());
-
-        if (!logs.length) {
-            logEmptyStateEl?.classList.remove('d-none');
-            renderLogTabs();
-            updateLogManagementButtons();
-            return;
-        }
-
-        logEmptyStateEl?.classList.add('d-none');
-
-        logs.forEach((log) => {
-            const isActive = log.id === currentLogId;
-            const item = document.createElement('div');
-            item.className = 'list-group-item list-group-item-action log-item py-2 px-3';
-            if (isActive) {
-                item.classList.add('active');
-            }
-            item.dataset.logId = log.id;
-            item.tabIndex = 0;
-
-            const selectButton = document.createElement('button');
-            selectButton.type = 'button';
-            selectButton.className = 'log-item-select btn btn-link btn-sm px-0 py-0 text-start text-truncate';
-            selectButton.textContent = log.name;
-            selectButton.addEventListener('click', (event) => {
-                event.stopPropagation();
-                selectLog(log.id);
-            });
-
-            item.addEventListener('click', () => selectLog(log.id));
-            item.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    selectLog(log.id);
-                }
-            });
-
-            item.appendChild(selectButton);
-            logListEl.appendChild(item);
-        });
-
-        renderLogTabs();
-        updateLogManagementButtons();
-    }
-
-    function renderLogTabs() {
-        if (!logTabsContainer) {
-            return;
-        }
-
-        logTabsContainer.innerHTML = '';
-
-        if (!logs.length) {
-            logTabsBarElement?.classList.add('log-tabs-bar--empty');
-            logTabsEmptyStateElement?.classList.remove('d-none');
-            return;
-        }
-
-        logTabsBarElement?.classList.remove('log-tabs-bar--empty');
-        logTabsEmptyStateElement?.classList.add('d-none');
-
-        logs.forEach((log, index) => {
-            const tabButton = document.createElement('button');
-            tabButton.type = 'button';
-            tabButton.className = 'log-tab';
-            tabButton.textContent = log.name || `Log ${index + 1}`;
-            tabButton.title = log.name || 'Unnamed log';
-            tabButton.setAttribute('role', 'tab');
-            tabButton.setAttribute('aria-selected', log.id === currentLogId ? 'true' : 'false');
-            tabButton.tabIndex = 0;
-            if (log.id === currentLogId) {
-                tabButton.classList.add('active');
-            }
-
-            tabButton.addEventListener('click', () => {
-                if (log.id !== currentLogId) {
-                    selectLog(log.id);
-                }
-            });
-
-            tabButton.addEventListener('dblclick', (event) => {
-                event.preventDefault();
-                renameLog(log.id);
-            });
-
-            tabButton.addEventListener('keydown', (event) => handleTabKeyNavigation(event, index));
-
-            logTabsContainer.appendChild(tabButton);
-        });
-
-        scrollActiveTabIntoView();
-    }
-
-    function handleTabKeyNavigation(event, tabIndex) {
-        if (!logs.length) {
-            return;
-        }
-
-        const key = event.key;
-        if (!key) {
-            return;
-        }
-
-        if (key === 'ArrowRight') {
-            event.preventDefault();
-            const nextIndex = (tabIndex + 1) % logs.length;
-            selectLog(logs[nextIndex].id);
-            return;
-        }
-
-        if (key === 'ArrowLeft') {
-            event.preventDefault();
-            const previousIndex = (tabIndex - 1 + logs.length) % logs.length;
-            selectLog(logs[previousIndex].id);
-            return;
-        }
-
-        if (key === 'Home') {
-            event.preventDefault();
-            selectLog(logs[0].id);
-            return;
-        }
-
-        if (key === 'End') {
-            event.preventDefault();
-            selectLog(logs[logs.length - 1].id);
-        }
-    }
-
-    function scrollActiveTabIntoView(behavior = 'auto') {
-        if (!(logTabsContainer instanceof HTMLElement) || !(logTabsScrollElement instanceof HTMLElement)) {
-            return;
-        }
-
-        const activeTab = logTabsContainer.querySelector('.log-tab.active');
-        if (!(activeTab instanceof HTMLElement)) {
-            return;
-        }
-
-        const tabLeft = activeTab.offsetLeft;
-        const tabRight = tabLeft + activeTab.offsetWidth;
-        const visibleLeft = logTabsScrollElement.scrollLeft;
-        const visibleRight = visibleLeft + logTabsScrollElement.clientWidth;
-
-        if (tabLeft >= visibleLeft && tabRight <= visibleRight) {
-            return;
-        }
-
-        const targetLeft = Math.max(tabLeft - 16, 0);
-        logTabsScrollElement.scrollTo({
-            left: targetLeft,
-            behavior
-        });
-    }
-
-    function getCurrentLog() {
-        return logs.find((log) => log.id === currentLogId) ?? null;
-    }
-
-    function selectLog(logId, options = {}) {
-        selectionRange = null;
-        anchorCell = null;
-
-        const targetLog = logs.find((entry) => entry.id === logId) ?? null;
-        currentLogId = targetLog?.id ?? null;
-
-        renderLogList();
-
-        if (!targetLog) {
-            persistActiveLogId();
-            showPlaceholder();
-            return;
-        }
-
-        persistActiveLogId();
-
-        if (options.scrollTab !== false) {
-            scrollActiveTabIntoView('smooth');
-        }
-
-        if (!logHistory.has(targetLog.id)) {
-            logHistory.set(targetLog.id, []);
-        }
-        logTitleEl.textContent = targetLog.name;
-        logSubtitleEl.textContent = 'Changes are saved automatically in this browser.';
-        addRowButton.disabled = false;
-        insertRowButton.disabled = false;
-        deleteRowButton.disabled = false;
-        addColumnButton.disabled = false;
-        deleteColumnButton.disabled = false;
-        clearLogButton.disabled = false;
-        if (exportExcelButton) {
-            exportExcelButton.disabled = typeof XLSX === 'undefined';
-        }
-        updateUndoButtonState();
-        updateZoomButtonState();
-        applyZoomLevel();
-        spreadsheetPlaceholderEl.classList.add('d-none');
-        spreadsheetWrapperEl.classList.remove('d-none');
-        renderSpreadsheet(targetLog);
-        focusFirstCell();
-    }
-
-    function showPlaceholder() {
-        logTitleEl.textContent = 'Select a log';
-        logSubtitleEl.textContent = 'Choose or create a log to start editing.';
-        addRowButton.disabled = true;
-        insertRowButton.disabled = true;
-        deleteRowButton.disabled = true;
-        addColumnButton.disabled = true;
-        deleteColumnButton.disabled = true;
-        clearLogButton.disabled = true;
-        if (exportExcelButton) {
-            exportExcelButton.disabled = true;
-        }
-        spreadsheetPlaceholderEl.classList.remove('d-none');
-        spreadsheetWrapperEl.classList.add('d-none');
-        selectionRange = null;
-        anchorCell = null;
-        setToolbarEnabled(false);
-        updateUndoButtonState();
-        updateZoomButtonState();
-        updateLogManagementButtons();
-        setFillPreview(null);
-        updateFillHandlePosition();
-    }
-
-    function parseCellReference(reference) {
-        if (typeof reference !== 'string') {
-            return null;
-        }
-        const normalized = reference.trim().toUpperCase();
-        const match = normalized.match(SINGLE_CELL_REFERENCE_REGEX);
-        if (!match) {
-            return null;
-        }
-        const letters = match[1];
-        const rowIndex = Number(match[2]) - 1;
-        if (!Number.isInteger(rowIndex) || rowIndex < 0) {
-            return null;
-        }
-        let columnIndex = 0;
-        for (let i = 0; i < letters.length; i++) {
-            columnIndex *= 26;
-            columnIndex += letters.charCodeAt(i) - 64;
-        }
-        columnIndex -= 1;
-        if (columnIndex < 0) {
-            return null;
-        }
-        return { row: rowIndex, column: columnIndex };
+        return '';
     }
 
     function evaluateCellValue(log, row, column, visited = new Set()) {
-        if (!log || !Array.isArray(log.data[row])) {
-            return '';
-        }
-        ensureCellExists(log, row, column);
-        const cell = log.data[row][column];
-        if (!cell) {
-            return '';
-        }
-        const rawValue = typeof cell.value === 'string' ? cell.value : String(cell.value ?? '');
-        if (!rawValue.startsWith('=')) {
-            return rawValue;
-        }
-
         const key = `${row}:${column}`;
         if (visited.has(key)) {
             return '#CYCLE!';
         }
         visited.add(key);
-
-        const expression = rawValue.slice(1).trim();
-        if (!expression.length) {
-            visited.delete(key);
-            return '';
+        ensureCellExists(log, row, column);
+        const cell = log.data[row][column];
+        const value = cell.value ?? '';
+        if (typeof value === 'string' && value.startsWith('=')) {
+            try {
+                const tokens = tokenizeFormula(value.slice(1));
+                const parser = createFormulaParser(tokens);
+                const ast = parser.parseExpression();
+                return evaluateFormulaAst(ast, log, visited);
+            } catch (error) {
+                return normalizeFormulaError(error);
+            }
         }
-
-        const result = evaluateFormulaExpression(log, expression, visited);
         visited.delete(key);
-        return result;
-    }
-
-    function evaluateFormulaExpression(log, expression, visited) {
-        const tokens = tokenizeFormula(expression);
-        if (!tokens) {
-            return '#ERROR';
-        }
-        const parser = createFormulaParser(tokens);
-        let ast;
-        try {
-            ast = parser.parseExpression();
-            if (parser.hasMoreTokens()) {
-                return '#ERROR';
-            }
-        } catch (error) {
-            return normalizeFormulaError(error);
-        }
-
-        try {
-            const value = evaluateFormulaAst(ast, log, visited);
-            if (Array.isArray(value)) {
-                return '#VALUE!';
-            }
-            if (value === true) {
-                return 1;
-            }
-            if (value === false) {
-                return 0;
-            }
-            return value;
-        } catch (error) {
-            return normalizeFormulaError(error);
-        }
+        return value;
     }
 
     function normalizeFormulaError(error) {
-        if (typeof error === 'string' && error.startsWith('#')) {
-            return error;
+        const message = typeof error?.message === 'string' ? error.message : '';
+        if (!message) {
+            return '#ERROR!';
         }
-        if (error && typeof error.message === 'string' && error.message.startsWith('#')) {
-            return error.message;
+        if (/divide/i.test(message)) {
+            return '#DIV/0!';
         }
-        return '#ERROR';
+        if (/reference/i.test(message)) {
+            return '#REF!';
+        }
+        return '#ERROR!';
     }
 
     function tokenizeFormula(expression) {
         const tokens = [];
         let index = 0;
-        const length = expression.length;
-        while (index < length) {
+        while (index < expression.length) {
             const char = expression[index];
             if (/\s/.test(char)) {
                 index += 1;
                 continue;
             }
-            if (char === '(') {
-                tokens.push({ type: 'parenOpen' });
+            if (/[0-9.]/.test(char)) {
+                let buffer = char;
                 index += 1;
+                while (index < expression.length && /[0-9.]/.test(expression[index])) {
+                    buffer += expression[index];
+                    index += 1;
+                }
+                tokens.push({ type: 'number', value: buffer });
                 continue;
             }
-            if (char === ')') {
-                tokens.push({ type: 'parenClose' });
+            if (/[A-Za-z]/.test(char)) {
+                let buffer = char;
                 index += 1;
+                while (index < expression.length && /[A-Za-z0-9]/.test(expression[index])) {
+                    buffer += expression[index];
+                    index += 1;
+                }
+                if (expression[index] === '(') {
+                    tokens.push({ type: 'function', value: buffer.toUpperCase() });
+                } else {
+                    tokens.push({ type: 'cell', value: buffer.toUpperCase() });
+                }
                 continue;
             }
-            if (char === ',') {
-                tokens.push({ type: 'comma' });
-                index += 1;
-                continue;
-            }
-            if (char === ':') {
-                tokens.push({ type: 'colon' });
-                index += 1;
-                continue;
-            }
-            if (char === '+' || char === '-' || char === '*' || char === '/') {
+            if (char === '(' || char === ')' || char === ',' || char === ':' || char === '+' || char === '-' || char === '*' || char === '/' || char === '^') {
                 tokens.push({ type: 'operator', value: char });
                 index += 1;
                 continue;
             }
-            if (/[0-9.]/.test(char)) {
-                let hasDecimal = false;
-                const start = index;
-                while (index < length) {
-                    const current = expression[index];
-                    if (current === '.') {
-                        if (hasDecimal) {
-                            return null;
-                        }
-                        hasDecimal = true;
-                        index += 1;
-                        continue;
-                    }
-                    if (/[0-9]/.test(current)) {
-                        index += 1;
-                        continue;
-                    }
-                    break;
-                }
-                const numberText = expression.slice(start, index);
-                if (!numberText.length || numberText === '.') {
-                    return null;
-                }
-                const numericValue = Number(numberText);
-                if (!Number.isFinite(numericValue)) {
-                    return null;
-                }
-                tokens.push({ type: 'number', value: numericValue });
-                continue;
-            }
-            if (/[A-Za-z_]/.test(char)) {
-                const start = index;
-                index += 1;
-                while (index < length && /[A-Za-z0-9_]/.test(expression[index])) {
-                    index += 1;
-                }
-                const text = expression.slice(start, index);
-                if (/^[A-Za-z]+\d+$/.test(text)) {
-                    tokens.push({ type: 'cell', value: text.toUpperCase() });
-                } else {
-                    tokens.push({ type: 'identifier', value: text.toUpperCase() });
-                }
-                continue;
-            }
-            return null;
+            throw new Error(`Unexpected character: ${char}`);
         }
         return tokens;
     }
 
     function createFormulaParser(tokens) {
         let position = 0;
-
         function peek(offset = 0) {
-            return tokens[position + offset] ?? null;
+            return tokens[position + offset];
         }
-
         function match(type, value) {
-            const token = tokens[position];
-            if (!token || token.type !== type) {
-                return null;
+            const token = peek();
+            if (token && token.type === type && (!value || token.value === value)) {
+                position += 1;
+                return token;
             }
-            if (value !== undefined && token.value !== value) {
-                return null;
-            }
-            position += 1;
-            return token;
+            return null;
         }
-
         function expect(type, value) {
             const token = match(type, value);
             if (!token) {
-                throw '#ERROR';
+                throw new Error(`Expected ${value ?? type}`);
             }
             return token;
         }
-
-        function check(type, value) {
-            const token = tokens[position];
-            if (!token || token.type !== type) {
-                return false;
-            }
-            if (value !== undefined && token.value !== value) {
-                return false;
-            }
-            return true;
-        }
-
         function parseExpression() {
             let node = parseTerm();
             while (true) {
-                const token = peek();
-                if (!token || token.type !== 'operator' || (token.value !== '+' && token.value !== '-')) {
+                const operator = match('operator', '+') || match('operator', '-');
+                if (!operator) {
                     break;
                 }
-                position += 1;
-                const right = parseTerm();
-                node = { type: 'binary', operator: token.value, left: node, right };
+                node = { type: 'binary', operator: operator.value, left: node, right: parseTerm() };
             }
             return node;
         }
-
         function parseTerm() {
             let node = parseFactor();
             while (true) {
-                const token = peek();
-                if (!token || token.type !== 'operator' || (token.value !== '*' && token.value !== '/')) {
+                const operator = match('operator', '*') || match('operator', '/') || match('operator', '^');
+                if (!operator) {
                     break;
                 }
-                position += 1;
-                const right = parseFactor();
-                node = { type: 'binary', operator: token.value, left: node, right };
+                node = { type: 'binary', operator: operator.value, left: node, right: parseFactor() };
             }
             return node;
         }
-
         function parseFactor() {
-            const token = peek();
-            if (token && token.type === 'operator' && (token.value === '+' || token.value === '-')) {
-                position += 1;
-                const argument = parseFactor();
-                return { type: 'unary', operator: token.value, argument };
+            const unary = match('operator', '+') || match('operator', '-');
+            if (unary) {
+                return { type: 'unary', operator: unary.value, argument: parseFactor() };
             }
-            return parsePrimary();
-        }
-
-        function parsePrimary() {
-            const token = peek();
-            if (!token) {
-                throw '#ERROR';
+            if (match('operator', '(')) {
+                const expression = parseExpression();
+                expect('operator', ')');
+                return expression;
             }
-            if (token.type === 'number') {
-                position += 1;
-                return { type: 'number', value: token.value };
-            }
-            if (token.type === 'cell') {
-                position += 1;
-                let node = { type: 'cell', reference: token.value };
-                if (check('colon')) {
-                    position += 1;
-                    const endToken = match('cell');
-                    if (!endToken) {
-                        throw '#REF!';
-                    }
-                    node = { type: 'range', start: token.value, end: endToken.value };
-                }
-                return node;
-            }
-            if (token.type === 'identifier') {
-                position += 1;
-                expect('parenOpen');
+            const functionToken = match('function');
+            if (functionToken) {
+                expect('operator', '(');
                 const args = [];
-                if (!check('parenClose')) {
+                if (!match('operator', ')')) {
                     do {
                         args.push(parseExpression());
-                    } while (match('comma'));
+                    } while (match('operator', ','));
+                    expect('operator', ')');
                 }
-                expect('parenClose');
-                return { type: 'function', name: token.value, args };
+                return { type: 'function', name: functionToken.value, args };
             }
-            if (token.type === 'parenOpen') {
-                position += 1;
-                const expr = parseExpression();
-                expect('parenClose');
-                return expr;
+            const cellToken = match('cell');
+            if (cellToken) {
+                if (match('operator', ':')) {
+                    const endCell = expect('cell');
+                    return { type: 'range', start: cellToken.value, end: endCell.value };
+                }
+                return { type: 'cell', reference: cellToken.value };
             }
-            throw '#ERROR';
+            const numberToken = match('number');
+            if (numberToken) {
+                return { type: 'number', value: Number(numberToken.value) };
+            }
+            throw new Error('Invalid formula');
         }
-
-        return {
-            parseExpression,
-            hasMoreTokens: () => position < tokens.length
-        };
+        return { parseExpression };
     }
 
     function evaluateFormulaAst(node, log, visited) {
@@ -1380,35 +1167,16 @@
                 return evaluateRangeValues(node.start, node.end, log, visited);
             case 'unary': {
                 const value = evaluateFormulaAst(node.argument, log, visited);
-                if (isErrorValue(value)) {
-                    return value;
+                if (node.operator === '-') {
+                    return -coerceValueToNumber(value);
                 }
-                if (Array.isArray(value)) {
-                    return '#VALUE!';
-                }
-                const numeric = coerceValueToNumber(value);
-                if (numeric == null) {
-                    return '#VALUE!';
-                }
-                return node.operator === '-' ? -numeric : numeric;
+                return value;
             }
             case 'binary': {
                 const left = evaluateFormulaAst(node.left, log, visited);
-                if (isErrorValue(left)) {
-                    return left;
-                }
                 const right = evaluateFormulaAst(node.right, log, visited);
-                if (isErrorValue(right)) {
-                    return right;
-                }
-                if (Array.isArray(left) || Array.isArray(right)) {
-                    return '#VALUE!';
-                }
                 const leftNumber = coerceValueToNumber(left);
                 const rightNumber = coerceValueToNumber(right);
-                if (leftNumber == null || rightNumber == null) {
-                    return '#VALUE!';
-                }
                 switch (node.operator) {
                     case '+':
                         return leftNumber + rightNumber;
@@ -1421,34 +1189,45 @@
                             return '#DIV/0!';
                         }
                         return leftNumber / rightNumber;
+                    case '^':
+                        return leftNumber ** rightNumber;
                     default:
-                        return '#ERROR';
+                        return '#ERROR!';
                 }
             }
             case 'function': {
-                const evaluatedArgs = node.args.map((arg) => evaluateFormulaAst(arg, log, visited));
-                for (const value of evaluatedArgs) {
-                    if (isErrorValue(value)) {
-                        return value;
-                    }
+                const args = node.args.map((arg) => evaluateFormulaAst(arg, log, visited));
+                switch (node.name) {
+                    case 'SUM':
+                        return args.reduce((sum, value) => sum + coerceValueToNumber(value), 0);
+                    case 'AVERAGE':
+                        if (!args.length) {
+                            return '#DIV/0!';
+                        }
+                        return args.reduce((sum, value) => sum + coerceValueToNumber(value), 0) / args.length;
+                    case 'MIN':
+                        return Math.min(...args.map((value) => coerceValueToNumber(value)));
+                    case 'MAX':
+                        return Math.max(...args.map((value) => coerceValueToNumber(value)));
+                    default:
+                        return '#NAME?';
                 }
-                const formulaFn = FORMULA_FUNCTIONS[node.name];
-                if (!formulaFn) {
-                    return '#NAME?';
-                }
-                return formulaFn(evaluatedArgs);
             }
             default:
-                return '#ERROR';
+                return '#ERROR!';
         }
     }
 
     function evaluateCellReferenceValue(reference, log, visited) {
-        const coordinates = parseCellReference(reference);
-        if (!coordinates) {
+        const coords = parseCellReference(reference);
+        if (!coords) {
             return '#REF!';
         }
-        return evaluateCellValue(log, coordinates.row, coordinates.column, visited);
+        const { row, column } = coords;
+        if (row < 0 || column < 0 || row >= log.data.length || column >= (log.data[0]?.length ?? 0)) {
+            return '#REF!';
+        }
+        return evaluateCellValue(log, row, column, visited);
     }
 
     function evaluateRangeValues(startReference, endReference, log, visited) {
@@ -1457,171 +1236,46 @@
         if (!start || !end) {
             return '#REF!';
         }
+        const minRow = Math.min(start.row, end.row);
+        const maxRow = Math.max(start.row, end.row);
+        const minColumn = Math.min(start.column, end.column);
+        const maxColumn = Math.max(start.column, end.column);
         const values = [];
-        const startRow = Math.min(start.row, end.row);
-        const endRow = Math.max(start.row, end.row);
-        const startColumn = Math.min(start.column, end.column);
-        const endColumn = Math.max(start.column, end.column);
-        for (let row = startRow; row <= endRow; row++) {
-            for (let column = startColumn; column <= endColumn; column++) {
+        for (let row = minRow; row <= maxRow; row++) {
+            for (let column = minColumn; column <= maxColumn; column++) {
                 values.push(evaluateCellValue(log, row, column, visited));
             }
         }
-        return values;
+        return values.map((value) => coerceValueToNumber(value));
     }
 
-    function adjustFormulaReferences(formula, rowDelta, columnDelta) {
-        if (typeof formula !== 'string' || !formula.startsWith('=')) {
-            return formula;
+    function parseCellReference(reference) {
+        const match = /^([A-Za-z]+)(\d+)$/.exec(reference);
+        if (!match) {
+            return null;
         }
-        if (!rowDelta && !columnDelta) {
-            return formula;
+        const letters = match[1].toUpperCase();
+        const row = Number(match[2]) - 1;
+        let column = 0;
+        for (let i = 0; i < letters.length; i++) {
+            column *= 26;
+            column += letters.charCodeAt(i) - 64;
         }
-        const body = formula.slice(1);
-        const replaced = body.replace(CELL_REFERENCE_REGEX, (match) => {
-            const normalized = match.toUpperCase();
-            const coordinates = parseCellReference(normalized);
-            if (!coordinates) {
-                return match;
-            }
-            const nextRow = coordinates.row + rowDelta;
-            const nextColumn = coordinates.column + columnDelta;
-            if (nextRow < 0 || nextColumn < 0) {
-                return match;
-            }
-            return formatCellLabel(nextRow, nextColumn);
-        });
-        return `=${replaced}`;
-    }
-
-    function isErrorValue(value) {
-        return typeof value === 'string' && value.startsWith('#');
+        return { row, column: column - 1 };
     }
 
     function coerceValueToNumber(value) {
-        if (value == null) {
-            return 0;
-        }
-        if (typeof value === 'number') {
-            return Number.isFinite(value) ? value : null;
-        }
-        if (typeof value === 'boolean') {
-            return value ? 1 : 0;
-        }
-        if (typeof value === 'string') {
-            const trimmed = value.trim();
-            if (!trimmed.length) {
+        if (Array.isArray(value)) {
+            if (!value.length) {
                 return 0;
             }
-            const numeric = Number(trimmed);
-            if (Number.isFinite(numeric)) {
-                return numeric;
-            }
-            return null;
+            return coerceValueToNumber(value[0]);
         }
-        return null;
-    }
-
-    function extractNumericValues(values) {
-        const collected = [];
-        for (const value of values) {
-            const extraction = extractNumericValuesFromValue(value);
-            if (extraction.error) {
-                return { error: extraction.error };
-            }
-            collected.push(...extraction.values);
+        const number = Number(value);
+        if (Number.isNaN(number)) {
+            return 0;
         }
-        return { values: collected };
-    }
-
-    function extractNumericValuesFromValue(value) {
-        if (Array.isArray(value)) {
-            return extractNumericValues(value);
-        }
-        if (isErrorValue(value)) {
-            return { error: value };
-        }
-        if (value == null) {
-            return { values: [] };
-        }
-        if (typeof value === 'number') {
-            if (Number.isFinite(value)) {
-                return { values: [value] };
-            }
-            return { values: [] };
-        }
-        if (typeof value === 'boolean') {
-            return { values: [value ? 1 : 0] };
-        }
-        if (typeof value === 'string') {
-            const trimmed = value.trim();
-            if (!trimmed.length) {
-                return { values: [] };
-            }
-            const numeric = Number(trimmed);
-            if (Number.isFinite(numeric)) {
-                return { values: [numeric] };
-            }
-            return { values: [] };
-        }
-        return { values: [] };
-    }
-
-    function createAggregateFormula(reducer, options = {}) {
-        return (args) => {
-            const extraction = extractNumericValues(args);
-            if (extraction.error) {
-                return extraction.error;
-            }
-            const numbers = extraction.values;
-            if (!numbers.length) {
-                if (Object.prototype.hasOwnProperty.call(options, 'emptyResult')) {
-                    return options.emptyResult;
-                }
-                return '#VALUE!';
-            }
-            return reducer(numbers);
-        };
-    }
-
-    function getCellDisplayValue(log, row, column) {
-        const value = evaluateCellValue(log, row, column, new Set());
-        const cellFormat = log.data[row]?.[column]?.format;
-        return formatDisplayValue(value, cellFormat);
-    }
-
-    function formatDisplayValue(value, format = {}) {
-        if (value == null) {
-            return '';
-        }
-        const numberFormat = typeof format?.numberFormat === 'string' ? format.numberFormat : '';
-        if (numberFormat && numberFormat !== 'general') {
-            const formatted = formatNumericValue(value, numberFormat);
-            if (formatted !== null) {
-                return formatted;
-            }
-        }
-        if (typeof value === 'number') {
-            return formatGeneralNumber(value);
-        }
-        return value;
-    }
-
-    function formatNumericValue(value, formatKey) {
-        const numericValue = typeof value === 'number' ? value : Number(value);
-        if (!Number.isFinite(numericValue)) {
-            return typeof value === 'string' ? value : null;
-        }
-        switch (formatKey) {
-            case 'number':
-                return getNumberFormatter('number').format(numericValue);
-            case 'currency':
-                return getNumberFormatter('currency').format(numericValue);
-            case 'percent':
-                return getNumberFormatter('percent').format(numericValue);
-            default:
-                return formatGeneralNumber(numericValue);
-        }
+        return number;
     }
 
     function formatGeneralNumber(value) {
@@ -1632,3234 +1286,92 @@
         return String(rounded);
     }
 
-    function getNumberFormatter(key) {
-        if (numberFormatterCache.has(key)) {
-            return numberFormatterCache.get(key);
-        }
-        let formatter;
-        switch (key) {
-            case 'number':
-                formatter = new Intl.NumberFormat(undefined, {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 4,
-                    useGrouping: true
-                });
-                break;
-            case 'currency':
-                formatter = new Intl.NumberFormat(undefined, {
-                    style: 'currency',
-                    currency: DEFAULT_CURRENCY_CODE,
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-                break;
-            case 'percent':
-                formatter = new Intl.NumberFormat(undefined, {
-                    style: 'percent',
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 2
-                });
-                break;
-            default:
-                formatter = new Intl.NumberFormat();
-                break;
-        }
-        numberFormatterCache.set(key, formatter);
-        return formatter;
+    function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
     }
 
-    function renderSpreadsheet(log) {
-        stopEditingActiveCell({ commit: true });
-
-        const data = log.data;
-        const columnCount = data[0]?.length ?? defaultColumns;
-        const headerRow = document.createElement('tr');
-        headerRow.appendChild(document.createElement('th'));
-
-        for (let colIndex = 0; colIndex < columnCount; colIndex++) {
-            const th = document.createElement('th');
-            th.scope = 'col';
-            th.textContent = columnLabel(colIndex);
-            headerRow.appendChild(th);
-        }
-
-        const thead = spreadsheetTableEl.querySelector('thead');
-        thead.innerHTML = '';
-        thead.appendChild(headerRow);
-
-        const tbody = spreadsheetTableEl.querySelector('tbody');
-        tbody.innerHTML = '';
-
-        data.forEach((row, rowIndex) => {
-            const tr = document.createElement('tr');
-            const rowHeader = document.createElement('th');
-            rowHeader.scope = 'row';
-            rowHeader.textContent = (rowIndex + 1).toString();
-            tr.appendChild(rowHeader);
-
-            for (let colIndex = 0; colIndex < columnCount; colIndex++) {
-                ensureCellExists(log, rowIndex, colIndex);
-                const cellData = log.data[rowIndex][colIndex];
-
-                if (cellData.format?.mergedInto) {
-                    continue;
-                }
-
-                const td = document.createElement('td');
-                td.contentEditable = 'false';
-                td.dataset.row = String(rowIndex);
-                td.dataset.column = String(colIndex);
-                td.dataset.editing = 'false';
-                td.tabIndex = 0;
-                td.textContent = getCellDisplayValue(log, rowIndex, colIndex);
-                applyCellFormatting(td, cellData.format);
-                td.addEventListener('input', handleCellInput);
-                td.addEventListener('mousedown', handleCellMouseDown);
-                td.addEventListener('mouseenter', handleCellMouseEnter);
-                td.addEventListener('focus', handleCellFocus);
-                td.addEventListener('keydown', handleCellKeyDown);
-                td.addEventListener('dblclick', handleCellDoubleClick);
-                td.addEventListener('blur', handleCellBlur);
-
-                const merge = cellData.format?.merge;
-                if (merge) {
-                    td.rowSpan = merge.rowSpan;
-                    td.colSpan = merge.colSpan;
-                }
-
-                tr.appendChild(td);
-            }
-
-            tbody.appendChild(tr);
-        });
-
-        restoreSelection();
+    function generateId(prefix = 'log') {
+        const randomPart = Math.random().toString(16).slice(2, 10);
+        return `${prefix}_${Date.now()}_${randomPart}`;
     }
 
-    function ensureCellExists(log, row, column) {
-        if (!Array.isArray(log.data[row])) {
-            log.data[row] = [];
+    function generateDuplicateLogName(baseName) {
+        let counter = 2;
+        let candidate = `${baseName} ${counter}`;
+        const names = new Set(logs.map((log) => log.name));
+        while (names.has(candidate)) {
+            counter += 1;
+            candidate = `${baseName} ${counter}`;
         }
-        if (!log.data[row][column]) {
-            log.data[row][column] = createCell();
-        }
+        return candidate;
     }
 
-    function getActiveRowRange(log) {
-        if (selectionRange) {
-            return {
-                startRow: clamp(selectionRange.startRow, 0, Math.max(0, log.data.length - 1)),
-                endRow: clamp(selectionRange.endRow, 0, Math.max(0, log.data.length - 1))
-            };
+    function generateDefaultLogName() {
+        const base = 'Imported Log';
+        const names = new Set(logs.map((log) => log.name));
+        if (!names.has(base)) {
+            return base;
         }
-        const totalRows = Math.max(log.data.length, 1);
-        const lastRow = totalRows - 1;
-        return { startRow: lastRow, endRow: lastRow };
+        let counter = 2;
+        let candidate = `${base} ${counter}`;
+        while (names.has(candidate)) {
+            counter += 1;
+            candidate = `${base} ${counter}`;
+        }
+        return candidate;
     }
 
-    function getActiveColumnRange(log) {
-        const totalColumns = Math.max(log.data[0]?.length ?? 0, 1);
-        if (selectionRange) {
-            return {
-                startColumn: clamp(selectionRange.startColumn, 0, totalColumns - 1),
-                endColumn: clamp(selectionRange.endColumn, 0, totalColumns - 1)
-            };
-        }
-        const lastColumn = totalColumns - 1;
-        return { startColumn: lastColumn, endColumn: lastColumn };
+    function createSheetName(name) {
+        const sanitized = (name ?? '').toString().replace(/[\[\]\\/*:?]/g, ' ').trim();
+        return sanitized || 'Sheet1';
     }
 
-    function removeMergesIntersectingRows(log, startRow, endRow) {
-        if (!log) {
-            return;
-        }
-        for (let row = 0; row < log.data.length; row++) {
-            const rowData = log.data[row];
-            if (!Array.isArray(rowData)) {
-                continue;
-            }
-            for (let column = 0; column < rowData.length; column++) {
-                const cell = rowData[column];
-                if (!cell?.format?.merge) {
-                    continue;
-                }
-                const mergeEndRow = row + cell.format.merge.rowSpan - 1;
-                if (mergeEndRow < startRow || row > endRow) {
-                    continue;
-                }
-                unmergeCell(row, column);
-            }
-        }
+    function createFileName(name) {
+        const sanitized = (name ?? '').toString().replace(/[\\/:*?"<>|]/g, '_').trim();
+        const fallback = sanitized || 'log';
+        return ${fallback}.xlsx;
     }
-
-    function removeMergesIntersectingColumns(log, startColumn, endColumn) {
-        if (!log) {
-            return;
-        }
-        for (let row = 0; row < log.data.length; row++) {
-            const rowData = log.data[row];
-            if (!Array.isArray(rowData)) {
-                continue;
-            }
-            for (let column = 0; column < rowData.length; column++) {
-                const cell = rowData[column];
-                if (!cell?.format?.merge) {
-                    continue;
-                }
-                const mergeEndColumn = column + cell.format.merge.colSpan - 1;
-                if (mergeEndColumn < startColumn || column > endColumn) {
-                    continue;
-                }
-                unmergeCell(row, column);
-            }
-        }
-    }
-
-    function shiftMergedIntoRows(log, startIndex, delta) {
-        if (!log || !Number.isInteger(delta) || delta === 0) {
-            return;
-        }
-        for (let row = 0; row < log.data.length; row++) {
-            const rowData = log.data[row];
-            if (!Array.isArray(rowData)) {
-                continue;
-            }
-            for (let column = 0; column < rowData.length; column++) {
-                const cell = rowData[column];
-                if (cell?.format?.mergedInto && cell.format.mergedInto.row >= startIndex) {
-                    cell.format.mergedInto.row = Math.max(0, cell.format.mergedInto.row + delta);
-                }
-            }
-        }
-    }
-
-    function shiftMergedIntoColumns(log, startIndex, delta) {
-        if (!log || !Number.isInteger(delta) || delta === 0) {
-            return;
-        }
-        for (let row = 0; row < log.data.length; row++) {
-            const rowData = log.data[row];
-            if (!Array.isArray(rowData)) {
-                continue;
-            }
-            for (let column = 0; column < rowData.length; column++) {
-                const cell = rowData[column];
-                if (cell?.format?.mergedInto && cell.format.mergedInto.column >= startIndex) {
-                    cell.format.mergedInto.column = Math.max(0, cell.format.mergedInto.column + delta);
-                }
-            }
-        }
-    }
-
-    function columnLabel(index) {
-        const alphabetLength = 26;
-        let label = '';
-        let current = index;
-        do {
-            label = String.fromCharCode(65 + (current % alphabetLength)) + label;
-            current = Math.floor(current / alphabetLength) - 1;
-        } while (current >= 0);
-        return label;
-    }
-
-    function formatCellLabel(row, column) {
-        return `${columnLabel(column)}${row + 1}`;
-    }
-
-    function isFormulaValue(text) {
-        if (typeof text !== 'string') {
-            return false;
-        }
-        return text.trim().startsWith('=');
-    }
-
-    function describeSelection(range) {
-        if (!range) {
-            return 'selected cells';
-        }
-        const startLabel = formatCellLabel(range.startRow, range.startColumn);
-        const endLabel = formatCellLabel(range.endRow, range.endColumn);
-        if (startLabel === endLabel) {
-            return `cell ${startLabel}`;
-        }
-        return `cells ${startLabel} to ${endLabel}`;
-    }
-
-    function formatAuditValue(value) {
-        if (value === null || value === undefined) {
-            return 'empty';
-        }
-        const text = value.toString();
-        if (!text.trim().length) {
-            return 'empty';
-        }
-        return `"${text}"`;
-    }
-
-    function handleCellInput(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
-        if (suppressFormulaInputHandler) {
-            suppressFormulaInputHandler = false;
-            return;
-        }
-        if (target.dataset.editing === 'true') {
-            if (isFormulaValue(target.textContent ?? '')) {
-                formulaReferenceToken = null;
-                clearFormulaReferenceHighlight();
-                formulaReferenceCursor = null;
-            } else {
-                resetFormulaReferenceState();
-            }
-        }
-    }
-
-    function handleCellMouseDown(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
-        if (activeEditingCell &&
-            activeEditingCell !== target &&
-            activeEditingCell.dataset.editing === 'true' &&
-            isFormulaValue(activeEditingCell.textContent ?? '')) {
-            event.preventDefault();
-            const rowIndex = Number(target.dataset.row ?? '-1');
-            const columnIndex = Number(target.dataset.column ?? '-1');
-            if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
-                return;
-            }
-            const displayCoords = getDisplayCellCoordinates(rowIndex, columnIndex);
-            if (!displayCoords) {
-                return;
-            }
-            setFormulaReferenceFromClick(displayCoords.row, displayCoords.column);
-            return;
-        }
-        if (target.dataset.editing === 'true') {
-            return;
-        }
-        const rowIndex = Number(target.dataset.row ?? '-1');
-        const columnIndex = Number(target.dataset.column ?? '-1');
-        if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
-            return;
-        }
-
-        const display = getDisplayCellCoordinates(rowIndex, columnIndex);
-        if (!display) {
-            return;
-        }
-
-        const isLeftButton = event.button === 0;
-        let dragAnchor = anchorCell ? { ...anchorCell } : null;
-
-        if (event.shiftKey && anchorCell) {
-            setSelection(anchorCell.row, anchorCell.column, display.row, display.column);
-            dragAnchor = { ...anchorCell };
-        } else {
-            anchorCell = { row: display.row, column: display.column };
-            dragAnchor = { ...anchorCell };
-            setSelection(display.row, display.column, display.row, display.column);
-        }
-
-        if (isLeftButton && dragAnchor) {
-            event.preventDefault();
-            beginSelectionDrag(dragAnchor);
-        }
-    }
-
-    function beginSelectionDrag(anchor) {
-        if (!anchor) {
-            return;
-        }
-        selectionDragAnchor = { ...anchor };
-        if (!isMouseSelecting) {
-            isMouseSelecting = true;
-            document.addEventListener('mouseup', handleDocumentMouseUp);
-        }
-    }
-
-    function handleCellMouseEnter(event) {
-        if (!isMouseSelecting || !selectionDragAnchor) {
-            return;
-        }
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
-        if (target.dataset.editing === 'true') {
-            return;
-        }
-        const rowIndex = Number(target.dataset.row ?? '-1');
-        const columnIndex = Number(target.dataset.column ?? '-1');
-        if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
-            return;
-        }
-        const display = getDisplayCellCoordinates(rowIndex, columnIndex);
-        if (!display) {
-            return;
-        }
-        setSelection(selectionDragAnchor.row, selectionDragAnchor.column, display.row, display.column, { focus: false });
-    }
-
-    function handleDocumentMouseUp() {
-        isMouseSelecting = false;
-        selectionDragAnchor = null;
-        document.removeEventListener('mouseup', handleDocumentMouseUp);
-    }
-
-    function handleCellFocus(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
-        if (target.dataset.editing === 'true') {
-            return;
-        }
-        const rowIndex = Number(target.dataset.row ?? '-1');
-        const columnIndex = Number(target.dataset.column ?? '-1');
-        if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
-            return;
-        }
-        const display = getDisplayCellCoordinates(rowIndex, columnIndex);
-        if (!display) {
-            return;
-        }
-        anchorCell = { row: display.row, column: display.column };
-        setSelection(display.row, display.column, display.row, display.column, { focus: false });
-    }
-
-    function beginEditingCell(cell, options = {}) {
-        if (!(cell instanceof HTMLElement)) {
-            return;
-        }
-        if (cell.dataset.editing === 'true') {
-            return;
-        }
-        const selectionMode = options.selectionMode === 'end' ? 'end' : 'all';
-        stopEditingActiveCell({ commit: true });
-        resetFormulaReferenceState();
-        const rowIndex = Number(cell.dataset.row ?? '-1');
-        const columnIndex = Number(cell.dataset.column ?? '-1');
-        let originalValue = cell.textContent ?? '';
-        const log = getCurrentLog();
-        if (log && !Number.isNaN(rowIndex) && !Number.isNaN(columnIndex)) {
-            ensureCellExists(log, rowIndex, columnIndex);
-            const dataCell = log.data[rowIndex][columnIndex];
-            originalValue = dataCell.value ?? '';
-            cell.textContent = originalValue;
-        }
-        cell.dataset.originalValue = originalValue;
-        cell.dataset.editing = 'true';
-        cell.contentEditable = 'true';
-        cell.classList.add('editing-cell');
-        activeEditingCell = cell;
-        requestAnimationFrame(() => {
-            if (typeof cell.focus === 'function') {
-                try {
-                    cell.focus({ preventScroll: true });
-                } catch (error) {
-                    cell.focus();
-                }
-            }
-            selectCellContents(cell, selectionMode);
-        });
-    }
-
-    function selectCellContents(cell, mode = 'all') {
-        if (!(cell instanceof HTMLElement) || typeof window.getSelection !== 'function') {
-            return;
-        }
-        const selection = window.getSelection();
-        if (!selection) {
-            return;
-        }
-        selection.removeAllRanges();
-        const range = document.createRange();
-        range.selectNodeContents(cell);
-        if (mode === 'end') {
-            range.collapse(false);
-        }
-        selection.addRange(range);
-    }
-
-    function getCaretPosition(element) {
-        if (!element) {
-            return null;
-        }
-        const selection = typeof window.getSelection === 'function' ? window.getSelection() : null;
-        if (!selection || selection.rangeCount === 0) {
-            return null;
-        }
-        const range = selection.getRangeAt(0);
-        if (!element.contains(range.startContainer)) {
-            return null;
-        }
-        const preRange = range.cloneRange();
-        preRange.selectNodeContents(element);
-        preRange.setEnd(range.startContainer, range.startOffset);
-        return preRange.toString().length;
-    }
-
-    function setCaretPosition(element, offset) {
-        const selection = typeof window.getSelection === 'function' ? window.getSelection() : null;
-        if (!selection || !element) {
-            return;
-        }
-        const range = document.createRange();
-        let remaining = Math.max(0, offset);
-        let nodeFound = null;
-        let nodeOffset = 0;
-
-        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
-        while (walker.nextNode()) {
-            const node = walker.currentNode;
-            const length = node.textContent?.length ?? 0;
-            if (remaining <= length) {
-                nodeFound = node;
-                nodeOffset = remaining;
-                break;
-            }
-            remaining -= length;
-        }
-
-        if (!nodeFound) {
-            const textNode = element.firstChild instanceof Text ? element.firstChild : document.createTextNode('');
-            if (!element.contains(textNode)) {
-                element.appendChild(textNode);
-            }
-            nodeFound = textNode;
-            nodeOffset = nodeFound.textContent?.length ?? 0;
-        }
-
-        range.setStart(nodeFound, nodeOffset);
-        range.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(range);
-    }
-
-    function replaceFormulaReferenceText(text) {
-        if (!activeEditingCell) {
-            return;
-        }
-        const currentText = activeEditingCell.textContent ?? '';
-        let start = formulaReferenceToken ? formulaReferenceToken.start : getCaretPosition(activeEditingCell);
-        if (start == null) {
-            start = currentText.length;
-        }
-        const end = formulaReferenceToken ? formulaReferenceToken.end : start;
-        const nextText = currentText.slice(0, start) + text + currentText.slice(end);
-        suppressFormulaInputHandler = true;
-        activeEditingCell.textContent = nextText;
-        suppressFormulaInputHandler = false;
-        formulaReferenceToken = { start, end: start + text.length };
-        setCaretPosition(activeEditingCell, formulaReferenceToken.end);
-    }
-
-    function clearFormulaReferenceHighlight() {
-        if (formulaReferenceHighlightCell) {
-            formulaReferenceHighlightCell.classList.remove('formula-reference-target');
-            formulaReferenceHighlightCell = null;
-        }
-    }
-
-    function highlightFormulaReferenceCell(row, column) {
-        const cellEl = getCellElement(row, column);
-        clearFormulaReferenceHighlight();
-        if (cellEl) {
-            cellEl.classList.add('formula-reference-target');
-            formulaReferenceHighlightCell = cellEl;
-        }
-    }
-
-    function resetFormulaReferenceState() {
-        formulaReferenceCursor = null;
-        formulaReferenceToken = null;
-        clearFormulaReferenceHighlight();
-    }
-
-    function getEditingCellCoordinates() {
-        if (!activeEditingCell) {
-            return null;
-        }
-        const rowIndex = Number(activeEditingCell.dataset.row ?? '-1');
-        const columnIndex = Number(activeEditingCell.dataset.column ?? '-1');
-        if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
-            return null;
-        }
-        return { row: rowIndex, column: columnIndex };
-    }
-
-    function ensureFormulaReferenceCursorInitialized() {
-        if (formulaReferenceCursor) {
-            return;
-        }
-        const coords = getEditingCellCoordinates();
-        if (coords) {
-            formulaReferenceCursor = { ...coords };
-        }
-    }
-
-    function insertFormulaReference(row, column) {
-        if (!activeEditingCell) {
-            return;
-        }
-        replaceFormulaReferenceText(formatCellLabel(row, column));
-        focusCellElement(activeEditingCell);
-    }
-
-    function setFormulaReferenceFromClick(row, column) {
-        formulaReferenceCursor = { row, column };
-        insertFormulaReference(row, column);
-        highlightFormulaReferenceCell(row, column);
-    }
-
-    function handleFormulaReferenceNavigation(directionKey) {
-        const log = getCurrentLog();
-        if (!log || !activeEditingCell) {
-            return;
-        }
-        ensureFormulaReferenceCursorInitialized();
-        const rowCount = log.data.length;
-        const columnCount = log.data[0]?.length ?? 0;
-        if (!rowCount || !columnCount) {
-            return;
-        }
-        const coords = formulaReferenceCursor ?? getEditingCellCoordinates();
-        if (!coords) {
-            return;
-        }
-        let nextRow = coords.row;
-        let nextColumn = coords.column;
-        switch (directionKey) {
-            case 'ArrowUp':
-                nextRow -= 1;
-                break;
-            case 'ArrowDown':
-                nextRow += 1;
-                break;
-            case 'ArrowLeft':
-                nextColumn -= 1;
-                break;
-            case 'ArrowRight':
-                nextColumn += 1;
-                break;
-            default:
-                break;
-        }
-        nextRow = clamp(nextRow, 0, rowCount - 1);
-        nextColumn = clamp(nextColumn, 0, columnCount - 1);
-        formulaReferenceCursor = { row: nextRow, column: nextColumn };
-        insertFormulaReference(nextRow, nextColumn);
-        highlightFormulaReferenceCell(nextRow, nextColumn);
-    }
-
-    function stopEditingActiveCell(options = {}) {
-        if (!activeEditingCell) {
-            return;
-        }
-        const commit = options.commit !== false;
-        const cell = activeEditingCell;
-        const rowIndex = Number(cell.dataset.row ?? '-1');
-        const columnIndex = Number(cell.dataset.column ?? '-1');
-        const originalValue = cell.dataset.originalValue ?? '';
-        const log = getCurrentLog();
-        let shouldRefresh = false;
-
-        if (log && !Number.isNaN(rowIndex) && !Number.isNaN(columnIndex)) {
-            ensureCellExists(log, rowIndex, columnIndex);
-            const dataCell = log.data[rowIndex][columnIndex];
-            if (commit) {
-                const newValue = cell.textContent ?? '';
-                const previousValue = dataCell.value ?? '';
-                if (newValue !== dataCell.value) {
-                    pushUndoState();
-                    dataCell.value = newValue;
-                    recordAudit(log, 'Updated cell', `Updated ${formatCellLabel(rowIndex, columnIndex)} from ${formatAuditValue(previousValue)} to ${formatAuditValue(newValue)}.`);
-                    persistLogs();
-                    shouldRefresh = true;
-                }
-                cell.textContent = getCellDisplayValue(log, rowIndex, columnIndex);
-            } else {
-                cell.textContent = getCellDisplayValue(log, rowIndex, columnIndex);
-            }
-        } else if (!commit) {
-            cell.textContent = originalValue;
-        }
-
-        cell.contentEditable = 'false';
-        cell.dataset.editing = 'false';
-        cell.classList.remove('editing-cell');
-        delete cell.dataset.originalValue;
-        if (activeEditingCell === cell) {
-            activeEditingCell = null;
-        }
-        resetFormulaReferenceState();
-
-        if (shouldRefresh && log) {
-            const targetRow = rowIndex;
-            const targetColumn = columnIndex;
-            requestAnimationFrame(() => {
-                const currentLog = getCurrentLog();
-                if (!currentLog || currentLog.id !== log.id) {
-                    return;
-                }
-                renderSpreadsheet(currentLog);
-                if (selectionRange) {
-                    restoreSelection();
-                } else if (!Number.isNaN(targetRow) && !Number.isNaN(targetColumn)) {
-                    anchorCell = { row: targetRow, column: targetColumn };
-                    setSelection(targetRow, targetColumn, targetRow, targetColumn, { focus: false });
-                }
-            });
-        }
-        if (!shouldRefresh && !activeEditingCell && selectionRange) {
-            requestAnimationFrame(() => {
-                focusSelectionCell(selectionRange, { checkVisibility: true });
-            });
-        }
-    }
-
-    function handleCellDoubleClick(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
-        event.preventDefault();
-        const rowIndex = Number(target.dataset.row ?? '-1');
-        const columnIndex = Number(target.dataset.column ?? '-1');
-        if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
-            return;
-        }
-        anchorCell = { row: rowIndex, column: columnIndex };
-        beginEditingCell(target, { selectionMode: 'all' });
-    }
-
-    function handleCellBlur(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
-        if (target.dataset.editing === 'true') {
-            stopEditingActiveCell({ commit: true });
-        }
-    }
-
-    function handleCellKeyDown(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
-        const rowIndex = Number(target.dataset.row ?? '-1');
-        const columnIndex = Number(target.dataset.column ?? '-1');
-        if (Number.isNaN(rowIndex) || Number.isNaN(columnIndex)) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        const rowCount = log.data.length;
-        const columnCount = log.data[0]?.length ?? 0;
-        if (!rowCount || !columnCount) {
-            return;
-        }
-
-        const isEditing = target.dataset.editing === 'true';
-        if (isEditing) {
-            if (isFormulaValue(target.textContent ?? '') &&
-                (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
-                !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
-                event.preventDefault();
-                handleFormulaReferenceNavigation(event.key);
-                return;
-            }
-            switch (event.key) {
-                case 'Enter':
-                    event.preventDefault();
-                    stopEditingActiveCell({ commit: true });
-                    moveSelection(event.shiftKey ? -1 : 1, 0);
-                    break;
-                case 'Tab':
-                    event.preventDefault();
-                    stopEditingActiveCell({ commit: true });
-                    moveSelection(0, event.shiftKey ? -1 : 1, { wrap: true });
-                    break;
-                case 'Escape':
-                    event.preventDefault();
-                    stopEditingActiveCell({ commit: false });
-                    anchorCell = { row: rowIndex, column: columnIndex };
-                    setSelection(rowIndex, columnIndex, rowIndex, columnIndex);
-                    break;
-                default:
-                    break;
-            }
-            return;
-        }
-
-        switch (event.key) {
-            case 'ArrowUp':
-                event.preventDefault();
-                navigateSelection(rowIndex, columnIndex, -1, 0, event.shiftKey);
-                break;
-            case 'ArrowDown':
-                event.preventDefault();
-                navigateSelection(rowIndex, columnIndex, 1, 0, event.shiftKey);
-                break;
-            case 'ArrowLeft':
-                event.preventDefault();
-                navigateSelection(rowIndex, columnIndex, 0, -1, event.shiftKey);
-                break;
-            case 'ArrowRight':
-                event.preventDefault();
-                navigateSelection(rowIndex, columnIndex, 0, 1, event.shiftKey);
-                break;
-            case 'Tab':
-                event.preventDefault();
-                moveSelection(0, event.shiftKey ? -1 : 1, { wrap: true });
-                break;
-            case 'Enter':
-                event.preventDefault();
-                beginEditingCell(target, { selectionMode: 'all' });
-                break;
-            case 'F2':
-                event.preventDefault();
-                beginEditingCell(target, { selectionMode: 'end' });
-                break;
-            case 'Backspace':
-            case 'Delete': {
-                event.preventDefault();
-                const activeLog = getCurrentLog();
-                if (!activeLog) {
-                    return;
-                }
-                const rangeToClear = selectionRange ? { ...selectionRange } : {
-                    startRow: rowIndex,
-                    endRow: rowIndex,
-                    startColumn: columnIndex,
-                    endColumn: columnIndex
-                };
-                let hasChanges = false;
-                forEachCellInSelection(rangeToClear, ({ cellData }) => {
-                    if (cellData.value) {
-                        hasChanges = true;
-                    }
-                }, { includeHidden: true });
-                if (!hasChanges) {
-                    return;
-                }
-                pushUndoState();
-                forEachCellInSelection(rangeToClear, ({ cellData }) => {
-                    cellData.value = '';
-                }, { includeHidden: true });
-                selectionRange = {
-                    startRow: rangeToClear.startRow,
-                    endRow: rangeToClear.endRow,
-                    startColumn: rangeToClear.startColumn,
-                    endColumn: rangeToClear.endColumn
-                };
-                recordAudit(activeLog, 'Cleared cells', `Cleared ${describeSelection(selectionRange)}.`);
-                persistLogs();
-                renderSpreadsheet(activeLog);
-                anchorCell = { row: rangeToClear.startRow, column: rangeToClear.startColumn };
-                setSelection(rangeToClear.startRow, rangeToClear.startColumn, rangeToClear.endRow, rangeToClear.endColumn);
-                break;
-            }
-            default:
-                if (isPrintableKey(event)) {
-                    event.preventDefault();
-                    beginEditingCell(target, { selectionMode: 'all' });
-                    requestAnimationFrame(() => {
-                        if (target.dataset.editing === 'true') {
-                            target.textContent = '';
-                            if (event.key.length === 1) {
-                                target.textContent = event.key;
-                                selectCellContents(target, 'end');
-                            }
-                        }
-                    });
-                }
-                break;
-        }
-    }
-
-    function navigateSelection(rowIndex, columnIndex, deltaRow, deltaColumn, extend) {
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        const rowCount = log.data.length;
-        const columnCount = log.data[0]?.length ?? 0;
-        if (!rowCount || !columnCount) {
-            return;
-        }
-        const targetRow = clamp(rowIndex + deltaRow, 0, rowCount - 1);
-        const targetColumn = clamp(columnIndex + deltaColumn, 0, columnCount - 1);
-        if (extend) {
-            const anchor = anchorCell ?? { row: rowIndex, column: columnIndex };
-            if (!anchorCell) {
-                anchorCell = { row: anchor.row, column: anchor.column };
-            }
-            ensureCellExists(log, anchor.row, anchor.column);
-            ensureCellExists(log, targetRow, targetColumn);
-            setSelection(anchor.row, anchor.column, targetRow, targetColumn);
-        } else {
-            ensureCellExists(log, targetRow, targetColumn);
-            anchorCell = { row: targetRow, column: targetColumn };
-            setSelection(targetRow, targetColumn, targetRow, targetColumn);
-        }
-    }
-
-    function isSpreadsheetNavigationTarget(target) {
-        if (target === document || target === document.body || target === document.documentElement) {
-            return true;
-        }
-        if (!(target instanceof HTMLElement)) {
-            return false;
-        }
-        if (target.isContentEditable) {
-            return false;
-        }
-        const tagName = target.tagName;
-        if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || tagName === 'BUTTON') {
-            return false;
-        }
-        return !!target.closest('#spreadsheetContainer');
-    }
-
-    function handleGlobalSpreadsheetKeyDown(event) {
-        if (!selectionRange) {
-            return;
-        }
-        if (activeEditingCell) {
-            return;
-        }
-        const key = event.key;
-        if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'ArrowLeft' && key !== 'ArrowRight') {
-            return;
-        }
-        if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) {
-            return;
-        }
-        if (!isSpreadsheetNavigationTarget(event.target)) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        let rowIndex = selectionRange.endRow;
-        let columnIndex = selectionRange.endColumn;
-        if (document.activeElement instanceof HTMLElement) {
-            const activeCell = document.activeElement.closest('#spreadsheetTable tbody td[data-row][data-column]');
-            if (activeCell) {
-                const activeRow = Number(activeCell.dataset.row ?? '-1');
-                const activeColumn = Number(activeCell.dataset.column ?? '-1');
-                if (!Number.isNaN(activeRow) && !Number.isNaN(activeColumn)) {
-                    rowIndex = activeRow;
-                    columnIndex = activeColumn;
-                }
-            }
-        }
-        event.preventDefault();
-        switch (key) {
-            case 'ArrowUp':
-                navigateSelection(rowIndex, columnIndex, -1, 0, event.shiftKey);
-                break;
-            case 'ArrowDown':
-                navigateSelection(rowIndex, columnIndex, 1, 0, event.shiftKey);
-                break;
-            case 'ArrowLeft':
-                navigateSelection(rowIndex, columnIndex, 0, -1, event.shiftKey);
-                break;
-            case 'ArrowRight':
-                navigateSelection(rowIndex, columnIndex, 0, 1, event.shiftKey);
-                break;
-            default:
-                break;
-        }
-    }
-
-    function moveSelection(deltaRow, deltaColumn, options = {}) {
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        const rowCount = log.data.length;
-        const columnCount = log.data[0]?.length ?? 0;
-        if (!rowCount || !columnCount) {
-            return;
-        }
-        const currentRow = selectionRange ? selectionRange.endRow : 0;
-        const currentColumn = selectionRange ? selectionRange.endColumn : 0;
-        let targetRow = currentRow + deltaRow;
-        let targetColumn = currentColumn + deltaColumn;
-        if (options.wrap) {
-            if (targetColumn > columnCount - 1) {
-                targetColumn = 0;
-                targetRow = currentRow + 1;
-            } else if (targetColumn < 0) {
-                targetColumn = columnCount - 1;
-                targetRow = currentRow - 1;
-            }
-        }
-        targetRow = clamp(targetRow, 0, rowCount - 1);
-        targetColumn = clamp(targetColumn, 0, columnCount - 1);
-        ensureCellExists(log, targetRow, targetColumn);
-        anchorCell = { row: targetRow, column: targetColumn };
-        setSelection(targetRow, targetColumn, targetRow, targetColumn);
-    }
-
-    function addRow() {
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        pushUndoState();
-        const columns = log.data[0]?.length ?? defaultColumns;
-        const newRowIndex = log.data.length;
-        log.data.push(Array.from({ length: columns }, () => createCell()));
-        recordAudit(log, 'Added row', `Added row ${newRowIndex + 1}.`);
-        persistLogs();
-        renderSpreadsheet(log);
-    }
-
-    function insertRow() {
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        pushUndoState();
-        const columnCount = log.data[0]?.length ?? defaultColumns;
-        const selectionColumn = selectionRange ? selectionRange.startColumn : 0;
-        const targetRange = getActiveRowRange(log);
-        const insertIndex = targetRange.startRow;
-        const newRow = Array.from({ length: columnCount }, () => createCell());
-        log.data.splice(insertIndex, 0, newRow);
-        shiftMergedIntoRows(log, insertIndex, 1);
-        recordAudit(log, 'Inserted row', `Inserted row ${insertIndex + 1}.`);
-        persistLogs();
-        renderSpreadsheet(log);
-        const maxColumn = Math.max((log.data[0]?.length ?? 1) - 1, 0);
-        const nextColumn = clamp(selectionColumn, 0, maxColumn);
-        anchorCell = { row: insertIndex, column: nextColumn };
-        setSelection(insertIndex, nextColumn, insertIndex, nextColumn);
-    }
-
-    function deleteSelectedRows() {
-        const log = getCurrentLog();
-        if (!log || !log.data.length) {
-            return;
-        }
-        const targetRange = getActiveRowRange(log);
-        const rowCount = targetRange.endRow - targetRange.startRow + 1;
-        if (rowCount <= 0) {
-            return;
-        }
-        pushUndoState();
-        const selectionColumn = selectionRange ? selectionRange.startColumn : 0;
-        removeMergesIntersectingRows(log, targetRange.startRow, targetRange.endRow);
-        for (let row = targetRange.endRow; row >= targetRange.startRow; row--) {
-            log.data.splice(row, 1);
-        }
-        if (!log.data.length) {
-            log.data = createEmptyData();
-        }
-        shiftMergedIntoRows(log, targetRange.endRow + 1, -rowCount);
-        const detail = rowCount === 1
-            ? `Deleted row ${targetRange.startRow + 1}.`
-            : `Deleted rows ${targetRange.startRow + 1}-${targetRange.endRow + 1}.`;
-        recordAudit(log, 'Deleted rows', detail);
-        persistLogs();
-        renderSpreadsheet(log);
-        const nextRow = Math.max(0, Math.min(targetRange.startRow, log.data.length - 1));
-        const maxColumn = Math.max((log.data[0]?.length ?? 1) - 1, 0);
-        const nextColumn = clamp(selectionColumn, 0, maxColumn);
-        anchorCell = { row: nextRow, column: nextColumn };
-        setSelection(nextRow, nextColumn, nextRow, nextColumn);
-    }
-
-    function addColumn() {
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        pushUndoState();
-        let columnCount = defaultColumns;
-        if (log.data.length && Array.isArray(log.data[0])) {
-            columnCount = log.data[0].length;
-        } else if (!log.data.length) {
-            log.data = createEmptyData();
-            columnCount = log.data[0].length;
-        }
-
-        const newColumnIndex = columnCount;
-        log.data.forEach((row) => {
-            if (Array.isArray(row)) {
-                row.push(createCell());
-            }
-        });
-        recordAudit(log, 'Added column', `Added column ${columnLabel(newColumnIndex)}.`);
-        persistLogs();
-        renderSpreadsheet(log);
-    }
-
-    function deleteSelectedColumns() {
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        const columnCount = log.data[0]?.length ?? 0;
-        if (!columnCount) {
-            return;
-        }
-        const targetRange = getActiveColumnRange(log);
-        const removeCount = targetRange.endColumn - targetRange.startColumn + 1;
-        if (removeCount <= 0) {
-            return;
-        }
-        pushUndoState();
-        const selectionRow = selectionRange ? selectionRange.startRow : 0;
-        removeMergesIntersectingColumns(log, targetRange.startColumn, targetRange.endColumn);
-        for (let row = 0; row < log.data.length; row++) {
-            const rowData = log.data[row] ?? [];
-            for (let column = targetRange.endColumn; column >= targetRange.startColumn; column--) {
-                if (column < rowData.length) {
-                    rowData.splice(column, 1);
-                }
-            }
-            if (!rowData.length) {
-                rowData.push(createCell());
-            }
-        }
-        shiftMergedIntoColumns(log, targetRange.endColumn + 1, -removeCount);
-        const detail = removeCount === 1
-            ? `Deleted column ${columnLabel(targetRange.startColumn)}.`
-            : `Deleted columns ${columnLabel(targetRange.startColumn)}-${columnLabel(targetRange.endColumn)}.`;
-        recordAudit(log, 'Deleted columns', detail);
-        persistLogs();
-        renderSpreadsheet(log);
-        const nextRow = clamp(selectionRow, 0, Math.max(log.data.length - 1, 0));
-        const nextColumn = clamp(targetRange.startColumn, 0, Math.max((log.data[0]?.length ?? 1) - 1, 0));
-        anchorCell = { row: nextRow, column: nextColumn };
-        setSelection(nextRow, nextColumn, nextRow, nextColumn);
-    }
-
-    function clearCurrentLog() {
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        pushUndoState();
-        const rows = log.data.length || defaultRows;
-        const cols = log.data[0]?.length || defaultColumns;
-        log.data = createEmptyData(rows, cols);
-        selectionRange = null;
-        anchorCell = null;
-        recordAudit(log, 'Cleared log', `Cleared all cells in "${log.name}".`);
-        persistLogs();
-        renderSpreadsheet(log);
-        focusFirstCell();
-    }
-
-    function handleCreateLog(event) {
-        event.preventDefault();
-        const formData = new FormData(createLogForm);
-        const name = (formData.get('logName') || '').toString().trim();
+    function handleAddTab() {
+        const name = window.prompt('Name for the new log', generateDefaultLogName());
         if (!name) {
-            logNameInput?.classList.add('is-invalid');
             return;
         }
-        logNameInput?.classList.remove('is-invalid');
-        const newLog = createLog(name);
-        logs.push(newLog);
-        logHistory.set(newLog.id, []);
-        recordAudit(newLog, 'Log created', 'Log created manually.');
+        const log = createLog(name.trim());
+        logs.push(log);
         persistLogs();
-        createLogForm.reset();
-        const createLogCollapse = document.getElementById('createLogFormSection');
-        if (createLogCollapse) {
-            if (typeof bootstrap !== 'undefined' && bootstrap?.Collapse) {
-                const collapse = bootstrap.Collapse.getOrCreateInstance(createLogCollapse);
-                collapse.hide();
-            } else {
-                createLogCollapse.classList.remove('show');
-            }
-        }
-        selectLog(newLog.id);
-    }
-
-    function handleAddTabClick() {
-        const name = generateDefaultLogName();
-        const newLog = createLog(name);
-        logs.push(newLog);
-        logHistory.set(newLog.id, []);
-        recordAudit(newLog, 'Log created', 'New tab added from tabs bar.');
-        persistLogs();
-        selectLog(newLog.id);
-    }
-
-    function triggerImportLogPicker() {
-        if (!importLogInput) {
-            return;
-        }
-        importLogInput.click();
-    }
-
-    async function handleImportLogInputChange(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLInputElement)) {
-            return;
-        }
-        const file = target.files?.[0];
-        if (!file) {
-            return;
-        }
-
-        try {
-            if (typeof XLSX === 'undefined') {
-                throw new Error('XLSX library is not available');
-            }
-
-            const extension = (file.name.split('.').pop() || '').toLowerCase();
-            let workbook;
-            if (extension === 'csv') {
-                const textContent = await file.text();
-                workbook = XLSX.read(textContent, { type: 'string' });
-            } else {
-                const buffer = await file.arrayBuffer();
-                workbook = XLSX.read(buffer, { type: 'array' });
-            }
-
-            if (!workbook.SheetNames?.length) {
-                throw new Error('Imported file does not contain any sheets');
-            }
-
-            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            if (!worksheet) {
-                throw new Error('Unable to read the first worksheet');
-            }
-
-            const rows = XLSX.utils.sheet_to_json(worksheet, {
-                header: 1,
-                defval: '',
-                blankrows: true
-            });
-
-            const baseName = file.name.replace(/\.[^/.]+$/, '');
-            const logName = generateUniqueLogName(baseName);
-            const newLog = createLogFromData(logName, rows);
-            logs.push(newLog);
-            logHistory.set(newLog.id, []);
-            recordAudit(newLog, 'Log imported', `Imported from "${file.name}".`);
-            persistLogs();
-            selectLog(newLog.id);
-        } catch (error) {
-            console.error('Failed to import log', error);
-            window.alert('Unable to import the selected file. Please ensure it is a valid .xls, .xlsx, or .csv document.');
-        } finally {
-            target.value = '';
-        }
-    }
-
-    function renameLog(logId = currentLogId) {
-        const log = logs.find((entry) => entry.id === logId);
-        if (!log) {
-            return;
-        }
-        const currentName = log.name ?? 'Untitled Log';
-        const nextName = window.prompt('Rename log', currentName);
-        if (nextName == null) {
-            return;
-        }
-        const trimmed = nextName.trim();
-        if (!trimmed || trimmed === currentName) {
-            return;
-        }
-        log.name = trimmed;
-        recordAudit(log, 'Log renamed', `Renamed to "${trimmed}".`);
-        persistLogs();
+        renderLogList();
+        renderLogTabs();
         selectLog(log.id);
     }
 
-    function duplicateLog(logId = currentLogId) {
-        const source = logs.find((log) => log.id === logId);
-        if (!source) {
-            return;
-        }
-        const duplicateName = generateDuplicateLogName(source.name);
-        const newLog = {
-            id: generateId(),
-            name: duplicateName,
-            data: cloneLogData(source.data),
-            auditTrail: []
-        };
-        logs.push(newLog);
-        logHistory.set(newLog.id, []);
-        recordAudit(newLog, 'Log duplicated', `Created by duplicating "${source.name}".`);
-        recordAudit(source, 'Log duplicated', `Duplicated to create "${newLog.name}".`);
-        persistLogs();
-        selectLog(newLog.id);
-    }
-
-    function deleteLog(logId = currentLogId) {
-        if (!logId) {
-            return;
-        }
-        const index = logs.findIndex((log) => log.id === logId);
-        if (index === -1) {
-            return;
-        }
-        const log = logs[index];
-        const confirmed = window.confirm(`Delete log "${log.name}"? This action cannot be undone.`);
-        if (!confirmed) {
-            return;
-        }
-        logs.splice(index, 1);
-        logHistory.delete(log.id);
-        if (auditLogModalElement && auditLogModalElement.classList.contains('show') && typeof bootstrap !== 'undefined' && bootstrap?.Modal) {
-            bootstrap.Modal.getOrCreateInstance(auditLogModalElement).hide();
-        }
-        let nextLogId = null;
-        if (logs.length) {
-            nextLogId = logs[index]?.id ?? logs[index - 1]?.id ?? logs[0].id;
-        }
-        const deletingCurrent = currentLogId === log.id;
-        if (deletingCurrent) {
-            currentLogId = null;
-        }
-        persistLogs();
-        if (deletingCurrent) {
-            if (nextLogId) {
-                selectLog(nextLogId);
-            } else {
-                renderLogList();
-                persistActiveLogId();
-                showPlaceholder();
-            }
-        } else {
-            renderLogList();
-        }
-    }
-
-    function openAuditLogModal() {
-        const log = getCurrentLog();
-        if (!log || !auditLogModalElement) {
-            return;
-        }
-        renderAuditTrail(log);
-        if (typeof bootstrap !== 'undefined' && bootstrap?.Modal) {
-            auditLogModalInstance = bootstrap.Modal.getOrCreateInstance(auditLogModalElement);
-            auditLogModalInstance.show();
-        }
-    }
-
-    function focusFirstCell() {
-        const firstCell = spreadsheetTableEl.querySelector('tbody td');
-        if (!(firstCell instanceof HTMLElement)) {
-            setToolbarEnabled(!!selectionRange);
-            return;
-        }
-        const row = Number(firstCell.dataset.row ?? '-1');
-        const column = Number(firstCell.dataset.column ?? '-1');
-        if (!Number.isNaN(row) && !Number.isNaN(column)) {
-            anchorCell = { row, column };
-            setSelection(row, column, row, column);
-            firstCell.focus();
-        }
-    }
-
-    function focusCellElement(cell) {
-        if (!cell || typeof cell.focus !== 'function') {
-            return;
-        }
-        try {
-            cell.focus({ preventScroll: true });
-        } catch (error) {
-            cell.focus();
-        }
-    }
-
-    function focusSelectionCell(range = selectionRange, options = {}) {
-        if (!range) {
-            return;
-        }
-        const target = getCellElement(range.endRow, range.endColumn) ||
-            getCellElement(range.startRow, range.startColumn);
-        if (!target) {
-            return;
-        }
-        if (options.checkVisibility) {
-            const rect = target.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) {
-                return;
-            }
-        }
-        focusCellElement(target);
-    }
-
-    function setSelection(startRow, startColumn, endRow, endColumn, options = {}) {
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        stopEditingActiveCell({ commit: true });
-        const normalized = {
-            startRow: Math.min(startRow, endRow),
-            endRow: Math.max(startRow, endRow),
-            startColumn: Math.min(startColumn, endColumn),
-            endColumn: Math.max(startColumn, endColumn)
-        };
-
-        selectionRange = normalized;
-        highlightSelection();
-        setToolbarEnabled(true);
-        updateToolbarState();
-
-        if (options.focus !== false) {
-            focusSelectionCell(normalized);
-        }
-    }
-
-    function highlightSelection() {
-        spreadsheetTableEl.querySelectorAll('tbody td.selected-cell').forEach((cell) => cell.classList.remove('selected-cell'));
-        setFillPreview(null);
-        if (!selectionRange) {
-            updateFillHandlePosition();
-            return;
-        }
-        const seen = new Set();
-        forEachCellInSelection(selectionRange, ({ row, column }) => {
-            const key = `${row}:${column}`;
-            if (seen.has(key)) {
-                return;
-            }
-            seen.add(key);
-            const cellEl = getCellElement(row, column);
-            if (cellEl) {
-                cellEl.classList.add('selected-cell');
-            }
-        });
-        updateFillHandlePosition();
-    }
-
-    function restoreSelection() {
-        if (!selectionRange) {
-            setToolbarEnabled(false);
-            return;
-        }
-        highlightSelection();
-        updateToolbarState();
-        focusSelectionCell(selectionRange, { checkVisibility: true });
-    }
-
-    function setFillPreview(range) {
-        if (!Array.isArray(fillPreviewCells)) {
-            fillPreviewCells = [];
-        }
-        fillPreviewCells.forEach((cell) => cell.classList.remove('fill-preview'));
-        fillPreviewCells = [];
-        if (!range) {
-            return;
-        }
-        for (let row = range.startRow; row <= range.endRow; row++) {
-            for (let column = range.startColumn; column <= range.endColumn; column++) {
-                const cellEl = getCellElement(row, column);
-                if (cellEl) {
-                    cellEl.classList.add('fill-preview');
-                    fillPreviewCells.push(cellEl);
-                }
-            }
-        }
-    }
-
-    function ensureFillHandleElement() {
-        if (fillHandleElement || !spreadsheetWrapperEl) {
-            return;
-        }
-        fillHandleElement = document.createElement('div');
-        fillHandleElement.className = 'fill-handle d-none';
-        fillHandleElement.setAttribute('aria-hidden', 'true');
-        fillHandleElement.addEventListener('mousedown', handleFillHandleMouseDown);
-        spreadsheetWrapperEl.appendChild(fillHandleElement);
-    }
-
-    function updateFillHandlePosition() {
-        if (!fillHandleElement || !spreadsheetWrapperEl) {
-            return;
-        }
-        if (!selectionRange || spreadsheetWrapperEl.classList.contains('d-none')) {
-            fillHandleElement.classList.add('d-none');
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            fillHandleElement.classList.add('d-none');
-            return;
-        }
-        const selectionInfo = getSelectionInfo();
-        if (selectionInfo.hasMergedCells || selectionInfo.hasExternalMerge) {
-            fillHandleElement.classList.add('d-none');
-            return;
-        }
-        const cellEl = getCellElement(selectionRange.endRow, selectionRange.endColumn);
-        if (!cellEl) {
-            fillHandleElement.classList.add('d-none');
-            return;
-        }
-        const wrapperRect = spreadsheetWrapperEl.getBoundingClientRect();
-        const cellRect = cellEl.getBoundingClientRect();
-        const size = fillHandleElement.offsetWidth || 10;
-        const left = cellRect.right - wrapperRect.left + spreadsheetWrapperEl.scrollLeft - size / 2;
-        const top = cellRect.bottom - wrapperRect.top + spreadsheetWrapperEl.scrollTop - size / 2;
-        fillHandleElement.style.left = `${left}px`;
-        fillHandleElement.style.top = `${top}px`;
-        fillHandleElement.classList.remove('d-none');
-    }
-
-    function handleFillHandleMouseDown(event) {
-        if (event.button !== 0 || !selectionRange) {
-            return;
-        }
-        event.preventDefault();
-        event.stopPropagation();
-        fillDragStartRange = { ...selectionRange };
-        fillDragTargetRange = null;
-        isFillDragging = true;
-        document.addEventListener('mousemove', handleFillMouseMove);
-        document.addEventListener('mouseup', handleFillMouseUp);
-    }
-
-    function handleFillMouseMove(event) {
-        if (!isFillDragging || !fillDragStartRange) {
-            return;
-        }
-        const resolved = resolveCellFromPoint(event.clientX, event.clientY);
-        if (!resolved) {
-            fillDragTargetRange = null;
-            setFillPreview(null);
-            return;
-        }
-        const display = getDisplayCellCoordinates(resolved.row, resolved.column);
-        if (!display) {
-            fillDragTargetRange = null;
-            setFillPreview(null);
-            return;
-        }
-        const targetRange = determineFillTargetRange(display.row, display.column);
-        fillDragTargetRange = targetRange;
-        setFillPreview(targetRange);
-    }
-
-    function handleFillMouseUp(event) {
-        if (!isFillDragging) {
-            return;
-        }
-        event.preventDefault();
-        document.removeEventListener('mousemove', handleFillMouseMove);
-        document.removeEventListener('mouseup', handleFillMouseUp);
-        isFillDragging = false;
-        const sourceRange = fillDragStartRange ? { ...fillDragStartRange } : null;
-        const targetRange = fillDragTargetRange ? { ...fillDragTargetRange } : null;
-        fillDragStartRange = null;
-        fillDragTargetRange = null;
-        setFillPreview(null);
-        if (!sourceRange || !targetRange) {
-            updateFillHandlePosition();
-            return;
-        }
-        fillSelectionIntoRange(sourceRange, targetRange);
-    }
-
-    function resolveCellFromPoint(clientX, clientY) {
-        const element = document.elementFromPoint(clientX, clientY);
-        if (!(element instanceof Element)) {
-            return null;
-        }
-        return resolveCellFromElement(element);
-    }
-
-    function resolveCellFromElement(element) {
-        let current = element;
-        while (current && current !== document.body) {
-            if (current instanceof HTMLElement && current.matches('td[data-row][data-column]')) {
-                const row = Number(current.dataset.row ?? '-1');
-                const column = Number(current.dataset.column ?? '-1');
-                if (!Number.isNaN(row) && !Number.isNaN(column)) {
-                    return { row, column, element: current };
-                }
-            }
-            current = current.parentElement;
-        }
-        return null;
-    }
-
-    function determineFillTargetRange(targetRow, targetColumn) {
-        if (!fillDragStartRange) {
-            return null;
-        }
-        const source = fillDragStartRange;
-        const verticalDistance = targetRow < source.startRow ? source.startRow - targetRow :
-            targetRow > source.endRow ? targetRow - source.endRow : 0;
-        const horizontalDistance = targetColumn < source.startColumn ? source.startColumn - targetColumn :
-            targetColumn > source.endColumn ? targetColumn - source.endColumn : 0;
-
-        if (verticalDistance === 0 && horizontalDistance === 0) {
-            return null;
-        }
-
-        if (verticalDistance >= horizontalDistance) {
-            if (targetRow < source.startRow) {
-                return {
-                    startRow: targetRow,
-                    endRow: source.startRow - 1,
-                    startColumn: source.startColumn,
-                    endColumn: source.endColumn
-                };
-            }
-            return {
-                startRow: source.endRow + 1,
-                endRow: targetRow,
-                startColumn: source.startColumn,
-                endColumn: source.endColumn
-            };
-        }
-
-        if (targetColumn < source.startColumn) {
-            return {
-                startRow: source.startRow,
-                endRow: source.endRow,
-                startColumn: targetColumn,
-                endColumn: source.startColumn - 1
-            };
-        }
-        return {
-            startRow: source.startRow,
-            endRow: source.endRow,
-            startColumn: source.endColumn + 1,
-            endColumn: targetColumn
-        };
-    }
-
-    function fillSelectionIntoRange(sourceRange, targetRange) {
-        if (!selectionRange) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        const selectionInfo = getSelectionInfo();
-        if (selectionInfo.hasMergedCells || selectionInfo.hasExternalMerge) {
-            updateFillHandlePosition();
-            return;
-        }
-        pushUndoState();
-        const sourceHeight = sourceRange.endRow - sourceRange.startRow + 1;
-        const sourceWidth = sourceRange.endColumn - sourceRange.startColumn + 1;
-        let changed = false;
-        for (let row = targetRange.startRow; row <= targetRange.endRow; row++) {
-            for (let column = targetRange.startColumn; column <= targetRange.endColumn; column++) {
-                const mappedRow = sourceRange.startRow + modulo(row - sourceRange.startRow, sourceHeight);
-                const mappedColumn = sourceRange.startColumn + modulo(column - sourceRange.startColumn, sourceWidth);
-                const sourceCell = getRawCell(mappedRow, mappedColumn);
-                if (!sourceCell) {
-                    continue;
-                }
-                ensureCellExists(log, row, column);
-                const targetCell = log.data[row][column];
-                const previousValue = targetCell.value ?? '';
-                const previousFormat = JSON.stringify(targetCell.format ?? {});
-                const rowDelta = row - mappedRow;
-                const columnDelta = column - mappedColumn;
-                const cloned = cloneCellData(sourceCell);
-                if (typeof cloned.value === 'string' && cloned.value.startsWith('=')) {
-                    cloned.value = adjustFormulaReferences(cloned.value, rowDelta, columnDelta);
-                }
-                targetCell.value = cloned.value ?? '';
-                if (cloned.format) {
-                    targetCell.format = cloneFormat(cloned.format) || {};
-                } else if (targetCell.format) {
-                    delete targetCell.format;
-                }
-                const nextFormatSnapshot = JSON.stringify(targetCell.format ?? {});
-                if (previousValue !== (targetCell.value ?? '') || previousFormat !== nextFormatSnapshot) {
-                    changed = true;
-                }
-            }
-        }
-        if (!changed) {
-            const history = logHistory.get(log.id);
-            history?.pop();
-            updateUndoButtonState();
-            updateFillHandlePosition();
-            return;
-        }
-        const sourceDescription = describeSelection(sourceRange);
-        const targetDescription = describeSelection(targetRange);
-        persistLogs();
-        renderSpreadsheet(log);
-        recordAudit(log, 'Filled cells', `Copied ${sourceDescription} into ${targetDescription}.`);
-        const combinedRange = {
-            startRow: Math.min(sourceRange.startRow, targetRange.startRow),
-            endRow: Math.max(sourceRange.endRow, targetRange.endRow),
-            startColumn: Math.min(sourceRange.startColumn, targetRange.startColumn),
-            endColumn: Math.max(sourceRange.endColumn, targetRange.endColumn)
-        };
-        anchorCell = { row: sourceRange.startRow, column: sourceRange.startColumn };
-        setSelection(combinedRange.startRow, combinedRange.startColumn, combinedRange.endRow, combinedRange.endColumn);
-    }
-
-    function isSpreadsheetEventTarget(target) {
-        if (!spreadsheetWrapperEl) {
-            return false;
-        }
-        if (target instanceof Node && spreadsheetWrapperEl.contains(target)) {
-            return true;
-        }
-        const active = document.activeElement;
-        return active instanceof Node && spreadsheetWrapperEl.contains(active);
-    }
-
-    function parseClipboardText(text) {
-        if (typeof text !== 'string' || !text.length) {
-            return [];
-        }
-        const sanitized = text.replace(/\r/g, '');
-        const lines = sanitized.split('\n');
-        if (lines.length && lines[lines.length - 1] === '') {
-            lines.pop();
-        }
-        return lines.map((line) => line.split('\t'));
-    }
-
-    function handleCopyEvent(event) {
-        if (!selectionRange || activeEditingCell) {
-            return;
-        }
-        if (!isSpreadsheetEventTarget(event.target)) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        const height = selectionRange.endRow - selectionRange.startRow + 1;
-        const width = selectionRange.endColumn - selectionRange.startColumn + 1;
-        const textRows = [];
-        const snapshot = [];
-        for (let rowOffset = 0; rowOffset < height; rowOffset++) {
-            const textRow = [];
-            const snapshotRow = [];
-            for (let columnOffset = 0; columnOffset < width; columnOffset++) {
-                const row = selectionRange.startRow + rowOffset;
-                const column = selectionRange.startColumn + columnOffset;
-                const cell = getRawCell(row, column);
-                const cloned = cloneCellData(cell);
-                const displayValue = getCellDisplayValue(log, row, column);
-                textRow.push(displayValue ?? '');
-                snapshotRow.push(cloned);
-            }
-            textRows.push(textRow);
-            snapshot.push(snapshotRow);
-        }
-        lastClipboardSnapshot = {
-            width,
-            height,
-            data: snapshot
-        };
-        if (event instanceof ClipboardEvent && event.clipboardData) {
-            const text = textRows.map((row) => row.join('\t')).join('\n');
-            event.clipboardData.setData('text/plain', text);
-            try {
-                event.clipboardData.setData('application/x-hops-log-cells', JSON.stringify(lastClipboardSnapshot));
-            } catch (error) {
-                console.warn('Unable to serialize clipboard data', error);
-            }
-            event.preventDefault();
-        }
-    }
-
-    function handlePasteEvent(event) {
-        if (!selectionRange || activeEditingCell) {
-            return;
-        }
-        if (!isSpreadsheetEventTarget(event.target)) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        let textMatrix = [];
-        let customData = null;
-        let hasPlainText = false;
-        if (event instanceof ClipboardEvent && event.clipboardData) {
-            const text = event.clipboardData.getData('text/plain');
-            if (typeof text === 'string' && text.length > 0) {
-                hasPlainText = true;
-            }
-            textMatrix = parseClipboardText(text);
-            const custom = event.clipboardData.getData('application/x-hops-log-cells');
-            if (custom) {
-                try {
-                    const parsed = JSON.parse(custom);
-                    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.data)) {
-                        customData = parsed;
-                    }
-                } catch (error) {
-                    console.warn('Unable to parse custom clipboard data', error);
-                }
-            }
-        }
-        if (!customData && !hasPlainText && lastClipboardSnapshot) {
-            customData = lastClipboardSnapshot;
-        }
-        if ((!textMatrix || !textMatrix.length) && (!customData || !customData.data?.length)) {
-            return;
-        }
-        event.preventDefault();
-        const inferredRowCount = textMatrix?.length ?? 0;
-        const inferredColumnCount = textMatrix?.reduce((max, row) => Math.max(max, row.length), 0) ?? 0;
-        const customRowCount = customData?.height ?? (customData?.data?.length ?? 0);
-        const customColumnCount = customData?.width ?? (customData?.data?.[0]?.length ?? 0);
-        const rowCount = Math.max(inferredRowCount, customRowCount);
-        const columnCount = Math.max(inferredColumnCount, customColumnCount);
-        if (!rowCount || !columnCount) {
-            return;
-        }
-        pushUndoState();
-        let changed = false;
-        const pasteRange = {
-            startRow: selectionRange.startRow,
-            endRow: selectionRange.startRow + rowCount - 1,
-            startColumn: selectionRange.startColumn,
-            endColumn: selectionRange.startColumn + columnCount - 1
-        };
-        for (let rowOffset = 0; rowOffset < rowCount; rowOffset++) {
-            for (let columnOffset = 0; columnOffset < columnCount; columnOffset++) {
-                const row = selectionRange.startRow + rowOffset;
-                const column = selectionRange.startColumn + columnOffset;
-                ensureCellExists(log, row, column);
-                const targetCell = log.data[row][column];
-                const previousValue = targetCell.value ?? '';
-                const previousFormat = JSON.stringify(targetCell.format ?? {});
-                let appliedValue = '';
-                const customCell = customData?.data?.[rowOffset]?.[columnOffset];
-                if (customCell) {
-                    appliedValue = customCell.value ?? '';
-                    if (customCell.format) {
-                        targetCell.format = cloneFormat(customCell.format) || {};
-                    } else if (targetCell.format) {
-                        delete targetCell.format;
-                    }
-                } else {
-                    appliedValue = textMatrix?.[rowOffset]?.[columnOffset] ?? '';
-                }
-                targetCell.value = appliedValue;
-                const nextFormat = JSON.stringify(targetCell.format ?? {});
-                if (previousValue !== (targetCell.value ?? '') || previousFormat !== nextFormat) {
-                    changed = true;
-                }
-            }
-        }
-        if (!changed) {
-            const history = logHistory.get(log.id);
-            history?.pop();
-            updateUndoButtonState();
-            return;
-        }
-        persistLogs();
-        renderSpreadsheet(log);
-        recordAudit(log, 'Pasted cells', `Pasted into ${describeSelection(pasteRange)}.`);
-        setSelection(pasteRange.startRow, pasteRange.startColumn, pasteRange.endRow, pasteRange.endColumn);
-    }
-
-    function setToolbarEnabled(enabled) {
-        const controls = [
-            boldButton,
-            italicButton,
-            underlineButton,
-            fontSizeSelect,
-            fontFamilySelect,
-            numberFormatSelect,
-            alignLeftButton,
-            alignCenterButton,
-            alignRightButton,
-            mergeCellsButton,
-            unmergeCellsButton,
-            textColorInput,
-            fillColorInput,
-            alternateRowFormatSelect,
-            clearTextColorButton,
-            clearFillColorButton,
-            borderStyleSelect,
-            borderPlacementSelect,
-            borderColorInput,
-            clearBorderButton
-        ];
-        controls.forEach((control) => {
-            if (!control) {
-                return;
-            }
-            control.disabled = !enabled;
-        });
-    }
-
-    function updateToolbarState() {
-        if (!selectionRange) {
-            setToolbarEnabled(false);
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            setToolbarEnabled(false);
-            return;
-        }
-
-        const boldState = getUniformFormatValue('bold');
-        const italicState = getUniformFormatValue('italic');
-        const underlineState = getUniformFormatValue('underline');
-        const alignState = getUniformFormatValue('align');
-        const fontSizeState = getUniformFormatValue('fontSize');
-        const fontFamilyState = getUniformFormatValue('fontFamily');
-        const textColorState = getUniformFormatValue('textColor');
-        const fillColorState = getUniformFormatValue('fillColor');
-        const numberFormatState = getUniformFormatValue('numberFormat');
-        const borderState = getUniformBorderSample();
-
-        const boldActive = boldState === null ? !!formattingMemory.bold : boldState === undefined ? false : !!boldState;
-        const italicActive = italicState === null ? !!formattingMemory.italic : italicState === undefined ? false : !!italicState;
-        const underlineActive = underlineState === null ? !!formattingMemory.underline : underlineState === undefined ? false : !!underlineState;
-
-        if (boldState !== undefined && boldState !== null) {
-            formattingMemory.bold = !!boldState;
-        }
-        if (italicState !== undefined && italicState !== null) {
-            formattingMemory.italic = !!italicState;
-        }
-        if (underlineState !== undefined && underlineState !== null) {
-            formattingMemory.underline = !!underlineState;
-        }
-
-        setToggleState(boldButton, boldActive);
-        setToggleState(italicButton, italicActive);
-        setToggleState(underlineButton, underlineActive);
-
-        let fontSizeValue = '';
-        if (typeof fontSizeState === 'string' && fontSizeState.length) {
-            fontSizeValue = fontSizeState;
-            formattingMemory.fontSize = fontSizeState;
-        } else if (fontSizeState === null) {
-            fontSizeValue = formattingMemory.fontSize;
-        }
-        if (fontSizeSelect) {
-            fontSizeSelect.value = fontSizeValue || '';
-        }
-
-        let fontFamilyValue = '';
-        if (typeof fontFamilyState === 'string' && fontFamilyState.length) {
-            fontFamilyValue = fontFamilyState;
-            formattingMemory.fontFamily = fontFamilyState;
-        } else if (fontFamilyState === null) {
-            fontFamilyValue = formattingMemory.fontFamily;
-        }
-        if (fontFamilySelect) {
-            fontFamilySelect.value = fontFamilyValue || '';
-        }
-
-        let numberFormatValue = '';
-        if (typeof numberFormatState === 'string' && numberFormatState.length) {
-            numberFormatValue = numberFormatState;
-            formattingMemory.numberFormat = numberFormatState;
-        } else if (numberFormatState === null) {
-            numberFormatValue = 'general';
-            formattingMemory.numberFormat = 'general';
-        } else {
-            numberFormatValue = '';
-        }
-        if (numberFormatSelect) {
-            numberFormatSelect.value = numberFormatValue;
-        }
-
-        let alignValue = '';
-        if (typeof alignState === 'string' && alignState.length) {
-            alignValue = alignState;
-            formattingMemory.align = alignState;
-        } else if (alignState === null) {
-            alignValue = formattingMemory.align;
-        }
-
-        setToggleState(alignLeftButton, alignValue === 'left');
-        setToggleState(alignCenterButton, alignValue === 'center');
-        setToggleState(alignRightButton, alignValue === 'right');
-
-        let appliedTextColor;
-        if (typeof textColorState === 'string' && textColorState.length) {
-            appliedTextColor = normalizeHexColor(textColorState);
-            formattingMemory.textColor = appliedTextColor;
-        } else if (textColorState === null) {
-            appliedTextColor = formattingMemory.textColor;
-        }
-
-        let appliedFillColor;
-        if (typeof fillColorState === 'string' && fillColorState.length) {
-            appliedFillColor = normalizeHexColor(fillColorState);
-            formattingMemory.fillColor = appliedFillColor;
-        } else if (fillColorState === null) {
-            appliedFillColor = formattingMemory.fillColor;
-        }
-
-        updateColorInputState(textColorInput, clearTextColorButton, appliedTextColor, '#000000');
-        updateColorInputState(fillColorInput, clearFillColorButton, appliedFillColor, '#ffffff');
-
-        let borderStyleValue = '';
-        let borderColorValue = formattingMemory.borderColor;
-        if (typeof borderState === 'string' && borderState.length) {
-            const parsedBorder = parseBorderValue(borderState);
-            if (parsedBorder?.styleKey) {
-                borderStyleValue = parsedBorder.styleKey;
-                formattingMemory.borderStyle = parsedBorder.styleKey;
-            }
-            if (parsedBorder?.color) {
-                borderColorValue = parsedBorder.color;
-                formattingMemory.borderColor = parsedBorder.color;
-            }
-        } else if (borderState === null) {
-            borderStyleValue = '';
-            borderColorValue = formattingMemory.borderColor;
-        } else if (borderState === undefined) {
-            borderStyleValue = '';
-            borderColorValue = formattingMemory.borderColor;
-        } else {
-            borderStyleValue = formattingMemory.borderStyle;
-            borderColorValue = formattingMemory.borderColor;
-        }
-
-        if (borderStyleSelect) {
-            borderStyleSelect.value = borderStyleValue || '';
-        }
-        if (borderPlacementSelect) {
-            borderPlacementSelect.value = formattingMemory.borderPlacement || 'all';
-        }
-        updateColorInputState(borderColorInput, clearBorderButton, borderColorValue, '#000000');
-        if (clearBorderButton) {
-            clearBorderButton.disabled = !selectionHasBorders();
-        }
-
-        const selectionInfo = getSelectionInfo();
-        if (mergeCellsButton) {
-            mergeCellsButton.disabled = selectionInfo.totalCells <= 1 || selectionInfo.hasExternalMerge;
-        }
-        if (unmergeCellsButton) {
-            unmergeCellsButton.disabled = !selectionInfo.hasMergedCells;
-        }
-    }
-
-    function setToggleState(button, isActive) {
-        if (!button) {
-            return;
-        }
-        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-        button.classList.toggle('active', isActive);
-    }
-
-    function getSelectionInfo() {
-        if (!selectionRange) {
-            return { totalCells: 0, hasMergedCells: false };
-        }
-        let hasMergedCells = false;
-        let hasExternalMerge = false;
-        for (let row = selectionRange.startRow; row <= selectionRange.endRow; row++) {
-            for (let column = selectionRange.startColumn; column <= selectionRange.endColumn; column++) {
-                const cell = getRawCell(row, column);
-                if (!cell) {
-                    continue;
-                }
-                if (cell.format?.merge || cell.format?.mergedInto) {
-                    hasMergedCells = true;
-                }
-                if (cell.format?.mergedInto) {
-                    const masterRef = cell.format.mergedInto;
-                    if (masterRef.row < selectionRange.startRow || masterRef.row > selectionRange.endRow ||
-                        masterRef.column < selectionRange.startColumn || masterRef.column > selectionRange.endColumn) {
-                        hasExternalMerge = true;
-                    }
-                }
-            }
-        }
-        const totalCells = (selectionRange.endRow - selectionRange.startRow + 1) *
-            (selectionRange.endColumn - selectionRange.startColumn + 1);
-        return { totalCells, hasMergedCells, hasExternalMerge };
-    }
-
-    function getUniformFormatValue(key) {
-        if (!selectionRange) {
-            return undefined;
-        }
-        let initialValue;
-        let isFirst = true;
-        let isMixed = false;
-        let hasAnyValue = false;
-        forEachCellInSelection(selectionRange, ({ cellData }) => {
-            const value = cellData.format?.[key];
-            if (value !== undefined) {
-                hasAnyValue = true;
-            }
-            if (isFirst) {
-                initialValue = value;
-                isFirst = false;
-                return;
-            }
-            if (initialValue !== value) {
-                isMixed = true;
-            }
-        });
-        if (isMixed) {
-            return undefined;
-        }
-        if (!hasAnyValue) {
-            return null;
-        }
-        return initialValue;
-    }
-
-    function getCellBorderSample(format) {
-        if (!format) {
-            return '';
-        }
-        for (const key of BORDER_SIDE_KEYS) {
-            const value = typeof format[key] === 'string' ? format[key].trim() : '';
-            if (value.length) {
-                return value;
-            }
-        }
-        if (typeof format.border === 'string' && format.border.trim().length) {
-            return format.border.trim();
-        }
-        return '';
-    }
-
-    function cellHasAnyBorder(format) {
-        if (!format) {
-            return false;
-        }
-        if (typeof format.border === 'string' && format.border.trim().length) {
-            return true;
-        }
-        return BORDER_SIDE_KEYS.some((key) => typeof format[key] === 'string' && format[key].trim().length);
-    }
-
-    function selectionHasBorders() {
-        if (!selectionRange) {
-            return false;
-        }
-        let hasBorder = false;
-        forEachCellInSelection(selectionRange, ({ cellData }) => {
-            if (cellHasAnyBorder(cellData.format)) {
-                hasBorder = true;
-            }
-        });
-        return hasBorder;
-    }
-
-    function getUniformBorderSample() {
-        if (!selectionRange) {
-            return undefined;
-        }
-        let sample;
-        let hasAny = false;
-        let mixed = false;
-        forEachCellInSelection(selectionRange, ({ cellData }) => {
-            const candidate = getCellBorderSample(cellData.format);
-            if (!candidate) {
-                return;
-            }
-            hasAny = true;
-            if (!sample) {
-                sample = candidate;
-                return;
-            }
-            if (sample !== candidate) {
-                mixed = true;
-            }
-        });
-        if (mixed) {
-            return undefined;
-        }
-        if (!hasAny) {
-            return null;
-        }
-        return sample;
-    }
-
-    function applyCellFormatting(td, format = {}) {
-        td.style.fontWeight = format.bold ? '700' : '';
-        td.style.fontStyle = format.italic ? 'italic' : '';
-        td.style.textDecoration = format.underline ? 'underline' : '';
-        td.style.fontSize = format.fontSize ?? '';
-        td.style.fontFamily = format.fontFamily ?? '';
-        td.style.textAlign = format.align ?? '';
-        td.style.color = format.textColor ?? '';
-        td.style.backgroundColor = format.fillColor ?? '';
-        td.style.border = '';
-        BORDER_SIDE_KEYS.forEach((sideKey) => {
-            td.style[sideKey] = format[sideKey] ?? '';
-        });
-        if (format.border && !BORDER_SIDE_KEYS.some((key) => typeof format[key] === 'string' && format[key].trim().length)) {
-            td.style.border = format.border;
-        }
-    }
-
-    function getCellElement(row, column) {
-        return spreadsheetTableEl.querySelector(`tbody td[data-row="${row}"][data-column="${column}"]`);
-    }
-
-    function getDisplayCellCoordinates(row, column) {
-        const log = getCurrentLog();
-        if (!log) {
-            return null;
-        }
-        if (!log.data[row] || !log.data[row][column]) {
-            return null;
-        }
-        const cell = log.data[row][column];
-        if (cell.format?.mergedInto) {
-            return getDisplayCellCoordinates(cell.format.mergedInto.row, cell.format.mergedInto.column);
-        }
-        return { row, column };
-    }
-
-    function getRawCell(row, column) {
-        const log = getCurrentLog();
-        if (!log || !Array.isArray(log.data[row])) {
-            return null;
-        }
-        return log.data[row][column] ?? null;
-    }
-
-    function forEachCellInSelection(range, callback, options = {}) {
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        const includeHidden = options.includeHidden ?? false;
-        const seen = new Set();
-        for (let row = range.startRow; row <= range.endRow; row++) {
-            for (let column = range.startColumn; column <= range.endColumn; column++) {
-                if (!Array.isArray(log.data[row]) || !log.data[row][column]) {
-                    continue;
-                }
-                const rawCell = log.data[row][column];
-                if (!includeHidden && rawCell.format?.mergedInto) {
-                    const key = `${rawCell.format.mergedInto.row}:${rawCell.format.mergedInto.column}`;
-                    if (seen.has(key)) {
-                        continue;
-                    }
-                    seen.add(key);
-                    const masterCell = getRawCell(rawCell.format.mergedInto.row, rawCell.format.mergedInto.column);
-                    if (!masterCell) {
-                        continue;
-                    }
-                    callback({
-                        row: rawCell.format.mergedInto.row,
-                        column: rawCell.format.mergedInto.column,
-                        cellData: masterCell
-                    });
-                    continue;
-                }
-
-                const key = `${row}:${column}`;
-                if (seen.has(key)) {
-                    continue;
-                }
-                seen.add(key);
-                callback({ row, column, cellData: rawCell });
-            }
-        }
-    }
-
-    function updateSelectedCellStyles() {
-        if (!selectionRange) {
-            return;
-        }
-        forEachCellInSelection(selectionRange, ({ row, column, cellData }) => {
-            const cellEl = getCellElement(row, column);
-            if (cellEl) {
-                applyCellFormatting(cellEl, cellData.format);
-            }
-        });
-    }
-
-    function refreshSelectionDisplayValues(range) {
-        if (!range) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        forEachCellInSelection(range, ({ row, column }) => {
-            const cellEl = getCellElement(row, column);
-            if (cellEl && cellEl.dataset.editing !== 'true') {
-                cellEl.textContent = getCellDisplayValue(log, row, column);
-            }
-        }, { includeHidden: true });
-    }
-
-    function toggleFormat(key) {
-        if (!selectionRange) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        pushUndoState();
-        const currentValue = !!getUniformFormatValue(key);
-        const targetValue = !currentValue;
-        let changed = false;
-        forEachCellInSelection(selectionRange, ({ cellData }) => {
-            cellData.format = cellData.format || {};
-            if (targetValue) {
-                if (!cellData.format[key]) {
-                    cellData.format[key] = true;
-                    changed = true;
-                }
-            } else if (cellData.format[key]) {
-                delete cellData.format[key];
-                changed = true;
-            }
-        });
-        if (!changed) {
-            const history = logHistory.get(log.id);
-            history?.pop();
-            updateUndoButtonState();
-            return;
-        }
-        const label = key === 'bold' ? 'bold formatting' : key === 'italic' ? 'italic formatting' : 'underline formatting';
-        const actionTitle = targetValue ? `Applied ${label}` : `Removed ${label}`;
-        recordAudit(log, actionTitle, `${actionTitle} on ${describeSelection(selectionRange)}.`);
-        persistLogs();
-        if (Object.prototype.hasOwnProperty.call(formattingMemory, key)) {
-            formattingMemory[key] = targetValue;
-        }
-        updateSelectedCellStyles();
-        updateToolbarState();
-    }
-
-    function setAlignment(alignment) {
-        if (!selectionRange) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        pushUndoState();
-        const normalizedAlignment = alignment || '';
-        let changed = false;
-        forEachCellInSelection(selectionRange, ({ cellData }) => {
-            cellData.format = cellData.format || {};
-            const current = cellData.format.align || '';
-            if (normalizedAlignment) {
-                if (current !== normalizedAlignment) {
-                    cellData.format.align = normalizedAlignment;
-                    changed = true;
-                }
-            } else if (current) {
-                delete cellData.format.align;
-                changed = true;
-            }
-        });
-        if (!changed) {
-            const history = logHistory.get(log.id);
-            history?.pop();
-            updateUndoButtonState();
-            return;
-        }
-        const actionTitle = normalizedAlignment ? `Set alignment to ${normalizedAlignment}` : 'Cleared alignment';
-        recordAudit(log, actionTitle, `${actionTitle} for ${describeSelection(selectionRange)}.`);
-        persistLogs();
-        formattingMemory.align = normalizedAlignment;
-        updateSelectedCellStyles();
-        updateToolbarState();
-    }
-
-    function setFontSize(size) {
-        if (!selectionRange) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        pushUndoState();
-        const normalizedSize = size || '';
-        let changed = false;
-        forEachCellInSelection(selectionRange, ({ cellData }) => {
-            cellData.format = cellData.format || {};
-            const current = cellData.format.fontSize || '';
-            if (normalizedSize) {
-                if (current !== normalizedSize) {
-                    cellData.format.fontSize = normalizedSize;
-                    changed = true;
-                }
-            } else if (current) {
-                delete cellData.format.fontSize;
-                changed = true;
-            }
-        });
-        if (!changed) {
-            const history = logHistory.get(log.id);
-            history?.pop();
-            updateUndoButtonState();
-            return;
-        }
-        const actionTitle = normalizedSize ? `Set font size to ${normalizedSize}` : 'Cleared font size';
-        recordAudit(log, actionTitle, `${actionTitle} for ${describeSelection(selectionRange)}.`);
-        persistLogs();
-        formattingMemory.fontSize = normalizedSize;
-        updateSelectedCellStyles();
-        updateToolbarState();
-    }
-
-    function setFontFamily(family) {
-        if (!selectionRange) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        pushUndoState();
-        const normalizedFamily = family || '';
-        let changed = false;
-        forEachCellInSelection(selectionRange, ({ cellData }) => {
-            cellData.format = cellData.format || {};
-            const current = cellData.format.fontFamily || '';
-            if (normalizedFamily) {
-                if (current !== normalizedFamily) {
-                    cellData.format.fontFamily = normalizedFamily;
-                    changed = true;
-                }
-            } else if (current) {
-                delete cellData.format.fontFamily;
-                changed = true;
-            }
-        });
-        if (!changed) {
-            const history = logHistory.get(log.id);
-            history?.pop();
-            updateUndoButtonState();
-            return;
-        }
-        const actionTitle = normalizedFamily ? `Set font family to ${normalizedFamily}` : 'Cleared font family';
-        recordAudit(log, actionTitle, `${actionTitle} for ${describeSelection(selectionRange)}.`);
-        persistLogs();
-        formattingMemory.fontFamily = normalizedFamily;
-        updateSelectedCellStyles();
-        updateToolbarState();
-    }
-
-    function setNumberFormat(formatKey) {
-        if (!selectionRange) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        const normalizedKey = (formatKey || '').toLowerCase();
-        const allowed = new Set(['number', 'currency', 'percent']);
-        const appliedKey = allowed.has(normalizedKey) ? normalizedKey : 'general';
-        pushUndoState();
-        let changed = false;
-        forEachCellInSelection(selectionRange, ({ cellData }) => {
-            cellData.format = cellData.format || {};
-            const current = cellData.format.numberFormat || '';
-            if (appliedKey === 'general') {
-                if (current) {
-                    delete cellData.format.numberFormat;
-                    changed = true;
-                }
-            } else if (current !== appliedKey) {
-                cellData.format.numberFormat = appliedKey;
-                changed = true;
-            }
-        });
-        if (!changed) {
-            const history = logHistory.get(log.id);
-            history?.pop();
-            updateUndoButtonState();
-            return;
-        }
-        const labelMap = {
-            number: 'number format',
-            currency: 'currency format',
-            percent: 'percentage format'
-        };
-        const actionTitle = appliedKey === 'general'
-            ? 'Cleared number format'
-            : `Applied ${labelMap[appliedKey] ?? appliedKey}`;
-        recordAudit(log, 'Updated number format', `${actionTitle} for ${describeSelection(selectionRange)}.`);
-        persistLogs();
-        formattingMemory.numberFormat = appliedKey;
-        refreshSelectionDisplayValues(selectionRange);
-        updateSelectedCellStyles();
-        updateToolbarState();
-    }
-
-    function applyColorToSelection(key, color) {
-        if (!selectionRange) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        pushUndoState();
-        const normalized = isValidHexColor(color) ? normalizeHexColor(color) : null;
-        let changed = false;
-        forEachCellInSelection(selectionRange, ({ cellData }) => {
-            cellData.format = cellData.format || {};
-            const current = cellData.format[key] || '';
-            if (normalized) {
-                if (current !== normalized) {
-                    cellData.format[key] = normalized;
-                    changed = true;
-                }
-            } else if (current) {
-                delete cellData.format[key];
-                changed = true;
-            }
-        });
-        if (!changed) {
-            const history = logHistory.get(log.id);
-            history?.pop();
-            updateUndoButtonState();
-            return;
-        }
-        const label = key === 'textColor' ? 'text color' : 'fill color';
-        const actionTitle = normalized ? `Set ${label} to ${normalized}` : `Cleared ${label}`;
-        recordAudit(log, actionTitle, `${actionTitle} for ${describeSelection(selectionRange)}.`);
-        persistLogs();
-        if (key === 'textColor') {
-            formattingMemory.textColor = normalized || getDefaultColorValue(textColorInput, '#000000');
-        } else if (key === 'fillColor') {
-            formattingMemory.fillColor = normalized || getDefaultColorValue(fillColorInput, '#ffffff');
-        }
-        updateSelectedCellStyles();
-        updateToolbarState();
-    }
-
-    function setTextColor(color) {
-        applyColorToSelection('textColor', color);
-    }
-
-    function setFillColor(color) {
-        applyColorToSelection('fillColor', color);
-    }
-
-    function clearTextColor() {
-        applyColorToSelection('textColor', null);
-    }
-
-    function clearFillColor() {
-        applyColorToSelection('fillColor', null);
-    }
-
-    function applyAlternatingRows(themeKey) {
-        if (!selectionRange || !ALTERNATING_ROW_THEMES[themeKey]) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        const theme = ALTERNATING_ROW_THEMES[themeKey];
-        pushUndoState();
-        let changed = false;
-        forEachCellInSelection(selectionRange, ({ row, cellData }) => {
-            cellData.format = cellData.format || {};
-            const stripeIndex = Math.abs(row - selectionRange.startRow) % 2 === 0 ? 'odd' : 'even';
-            const targetColor = theme[stripeIndex];
-            if (cellData.format.fillColor !== targetColor) {
-                cellData.format.fillColor = targetColor;
-                changed = true;
-            }
-        });
-        if (!changed) {
-            const history = logHistory.get(log.id);
-            history?.pop();
-            updateUndoButtonState();
-            return;
-        }
-        recordAudit(log, 'Applied alternating rows', `Applied ${theme.label} alternating rows to ${describeSelection(selectionRange)}.`);
-        persistLogs();
-        updateSelectedCellStyles();
-        updateToolbarState();
-    }
-
-    function clearAlternatingRows() {
-        if (!selectionRange) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        pushUndoState();
-        let changed = false;
-        forEachCellInSelection(selectionRange, ({ cellData }) => {
-            if (cellData.format?.fillColor) {
-                delete cellData.format.fillColor;
-                changed = true;
-            }
-        });
-        if (!changed) {
-            const history = logHistory.get(log.id);
-            history?.pop();
-            updateUndoButtonState();
-            return;
-        }
-        recordAudit(log, 'Cleared alternating rows', `Removed alternating row fills from ${describeSelection(selectionRange)}.`);
-        persistLogs();
-        updateSelectedCellStyles();
-        updateToolbarState();
-    }
-
-    function handleAlternateRowFormatChange(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLSelectElement)) {
-            return;
-        }
-        const value = target.value;
-        if (!value) {
-            return;
-        }
-        if (value === 'clear') {
-            clearAlternatingRows();
-        } else if (ALTERNATING_ROW_THEMES[value]) {
-            applyAlternatingRows(value);
-        }
-        target.selectedIndex = 0;
-    }
-
-    function resolveBorderColor(colorCandidate) {
-        if (isValidHexColor(colorCandidate)) {
-            return normalizeHexColor(colorCandidate);
-        }
-        const fallback = borderColorInput ? getDefaultColorValue(borderColorInput, '#000000') : '#000000';
-        if (isValidHexColor(fallback)) {
-            return normalizeHexColor(fallback);
-        }
-        return '#000000';
-    }
-
-    function parseBorderValue(borderValue) {
-        if (typeof borderValue !== 'string') {
-            return null;
-        }
-        const parts = borderValue.trim().split(/\s+/);
-        if (parts.length < 3) {
-            return null;
-        }
-        const [width, style, colorPart] = parts;
-        const styleKey = BORDER_STYLE_LOOKUP[`${width} ${style}`] ?? '';
-        if (!styleKey) {
-            return null;
-        }
-        const normalizedColor = normalizeHexColor(colorPart);
-        if (!normalizedColor) {
-            return { styleKey, color: formattingMemory.borderColor };
-        }
-        return { styleKey, color: normalizedColor };
-    }
-
-    function getSelectedBorderPlacement() {
-        const selectValue = borderPlacementSelect?.value;
-        if (selectValue && BORDER_PLACEMENT_SIDES[selectValue]) {
-            return selectValue;
-        }
-        const memoryValue = formattingMemory.borderPlacement || 'all';
-        return BORDER_PLACEMENT_SIDES[memoryValue] ? memoryValue : 'all';
-    }
-
-    function getBorderSidesForPlacement(placement) {
-        return BORDER_PLACEMENT_SIDES[placement] ?? BORDER_PLACEMENT_SIDES.all;
-    }
-
-    function clearAllBorderStyles(format) {
-        if (!format) {
-            return false;
-        }
-        let removed = false;
-        if (format.border) {
-            delete format.border;
-            removed = true;
-        }
-        BORDER_SIDE_KEYS.forEach((key) => {
-            if (format[key]) {
-                delete format[key];
-                removed = true;
-            }
-        });
-        return removed;
-    }
-
-    function applyBorderStyle(styleKey, options = {}) {
-        const placement = options.placement || getSelectedBorderPlacement();
-        if (!styleKey) {
-            formattingMemory.borderStyle = '';
-        }
-        if (!selectionRange) {
-            if (styleKey) {
-                formattingMemory.borderStyle = styleKey;
-                formattingMemory.borderPlacement = placement;
-                const resolvedColor = resolveBorderColor(options.color ?? borderColorInput?.value ?? formattingMemory.borderColor);
-                formattingMemory.borderColor = resolvedColor;
-            }
-            updateToolbarState();
-            return;
-        }
-
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-
-        pushUndoState();
-        const styleConfig = styleKey ? BORDER_STYLE_CONFIG[styleKey] : null;
-        const colorValue = styleConfig ? resolveBorderColor(options.color ?? borderColorInput?.value ?? formattingMemory.borderColor) : '';
-        const borderValue = styleConfig ? `${styleConfig.width} ${styleConfig.style} ${colorValue}` : '';
-        const placementSides = getBorderSidesForPlacement(placement);
-        let changed = false;
-
-        forEachCellInSelection(selectionRange, ({ cellData }) => {
-            cellData.format = cellData.format || {};
-            if (styleConfig) {
-                if (placement === 'all') {
-                    if (cellData.format.border !== borderValue) {
-                        cellData.format.border = borderValue;
-                        changed = true;
-                    }
-                    BORDER_SIDE_KEYS.forEach((key) => {
-                        if (cellData.format[key]) {
-                            delete cellData.format[key];
-                            changed = true;
-                        }
-                    });
-                } else {
-                    if (cellData.format.border) {
-                        delete cellData.format.border;
-                        changed = true;
-                    }
-                    placementSides.forEach((sideKey) => {
-                        if (cellData.format[sideKey] !== borderValue) {
-                            cellData.format[sideKey] = borderValue;
-                            changed = true;
-                        }
-                    });
-                }
-            } else if (clearAllBorderStyles(cellData.format)) {
-                changed = true;
-            }
-        });
-
-        if (!changed) {
-            const history = logHistory.get(log.id);
-            history?.pop();
-            updateUndoButtonState();
-            updateFillHandlePosition();
-            return;
-        }
-
-        const placementLabel = BORDER_PLACEMENT_LABELS[placement] ?? 'borders';
-        const description = styleConfig ? `Applied ${styleKey} ${placementLabel}` : 'Cleared borders';
-        recordAudit(log, styleConfig ? 'Applied borders' : 'Cleared borders', `${description} for ${describeSelection(selectionRange)}.`);
-        persistLogs();
-        if (styleConfig) {
-            formattingMemory.borderStyle = styleKey;
-            formattingMemory.borderColor = colorValue;
-            formattingMemory.borderPlacement = placement;
-        } else {
-            formattingMemory.borderStyle = '';
-        }
-        updateSelectedCellStyles();
-        updateToolbarState();
-    }
-
-    function clearBorder() {
-        applyBorderStyle('');
-    }
-
-    function handleBorderStyleChange(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLSelectElement)) {
-            return;
-        }
-        const styleKey = target.value;
-        applyBorderStyle(styleKey);
-    }
-
-    function handleBorderPlacementChange(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLSelectElement)) {
-            return;
-        }
-        const placement = BORDER_PLACEMENT_SIDES[target.value] ? target.value : 'all';
-        formattingMemory.borderPlacement = placement;
-    }
-
-    function handleBorderColorPreview(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLInputElement)) {
-            return;
-        }
-        if (isValidHexColor(target.value)) {
-            formattingMemory.borderColor = normalizeHexColor(target.value);
-        }
-    }
-
-    function handleBorderColorChange(event) {
-        const target = event.target;
-        if (!(target instanceof HTMLInputElement)) {
-            return;
-        }
-        const normalizedColor = resolveBorderColor(target.value || formattingMemory.borderColor);
-        formattingMemory.borderColor = normalizedColor;
-        const styleKey = borderStyleSelect?.value || formattingMemory.borderStyle;
-        if (styleKey) {
-            applyBorderStyle(styleKey, { color: normalizedColor, placement: getSelectedBorderPlacement() });
-        } else {
-            updateToolbarState();
-        }
-    }
-
-    function handleClearBorderClick() {
-        clearBorder();
-    }
-
-    function isLargeViewport() {
-        return window.innerWidth >= LG_BREAKPOINT;
+    function showPlaceholder() {
+        placeholderEl?.classList.remove('d-none');
+        gridElement?.classList.add('d-none');
     }
 
     function handleSidebarToggle() {
         if (!logsLayoutElement) {
             return;
         }
-        if (isLargeViewport()) {
-            const willCollapse = !logsLayoutElement.classList.contains('sidebar-collapsed');
-            logsLayoutElement.classList.toggle('sidebar-collapsed', willCollapse);
-            logsLayoutElement.classList.remove('sidebar-open');
-            if (document.body) {
-                document.body.classList.remove('logs-sidebar-open');
-            }
-        } else {
-            const isOpen = logsLayoutElement.classList.toggle('sidebar-open');
-            if (document.body) {
-                document.body.classList.toggle('logs-sidebar-open', isOpen);
-            }
-            logsLayoutElement.classList.remove('sidebar-collapsed');
-        }
-        syncSidebarToggleState();
+        const willCollapse = logsLayoutElement.classList.toggle('sidebar-collapsed');
+        logsSidebarOverlayElement && (logsSidebarOverlayElement.style.display = willCollapse ? 'block' : 'none');
     }
 
     function closeSidebar() {
-        if (!logsLayoutElement) {
-            return;
+        if (logsLayoutElement && logsLayoutElement.classList.contains('sidebar-collapsed')) {
+            logsLayoutElement.classList.remove('sidebar-collapsed');
         }
-        if (isLargeViewport()) {
-            logsLayoutElement.classList.add('sidebar-collapsed');
-        } else {
-            logsLayoutElement.classList.remove('sidebar-open');
-            if (document.body) {
-                document.body.classList.remove('logs-sidebar-open');
-            }
-        }
-        if (logsSidebarOverlayElement) {
-            logsSidebarOverlayElement.classList.remove('active');
-        }
-        syncSidebarToggleState();
+        logsSidebarOverlayElement && (logsSidebarOverlayElement.style.display = 'none');
     }
 
     function handleSidebarResize() {
         if (!logsLayoutElement) {
             return;
         }
-        if (isLargeViewport()) {
-            logsLayoutElement.classList.remove('sidebar-open');
-            if (document.body) {
-                document.body.classList.remove('logs-sidebar-open');
-            }
-        } else {
+        if (window.innerWidth >= 992) {
             logsLayoutElement.classList.remove('sidebar-collapsed');
+            logsSidebarOverlayElement && (logsSidebarOverlayElement.style.display = 'none');
         }
-        if (logsSidebarOverlayElement) {
-            logsSidebarOverlayElement.classList.remove('active');
-        }
-        syncSidebarToggleState();
-    }
-
-    function syncSidebarToggleState() {
-        if (!toggleSidebarButton) {
-            return;
-        }
-        const isExpanded = isLargeViewport()
-            ? !logsLayoutElement?.classList.contains('sidebar-collapsed')
-            : !!logsLayoutElement?.classList.contains('sidebar-open');
-        toggleSidebarButton.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
-        const openLabel = toggleSidebarButton.dataset.openLabel ?? toggleSidebarButton.textContent ?? '';
-        const closeLabel = toggleSidebarButton.dataset.closeLabel ?? toggleSidebarButton.textContent ?? '';
-        const appliedLabel = isExpanded ? closeLabel : openLabel;
-        if (sidebarToggleLabel) {
-            sidebarToggleLabel.textContent = appliedLabel;
-        } else if (toggleSidebarButton.textContent) {
-            toggleSidebarButton.textContent = appliedLabel;
-        }
-        if (appliedLabel) {
-            toggleSidebarButton.setAttribute('aria-label', appliedLabel);
-        }
-    }
-
-    function exportCurrentLogToExcel() {
-        const log = getCurrentLog();
-        if (!log || typeof XLSX === 'undefined') {
-            return;
-        }
-
-        const rowCount = Math.max(log.data.length, 1);
-        let columnCount = 0;
-        for (let row = 0; row < log.data.length; row++) {
-            const length = Array.isArray(log.data[row]) ? log.data[row].length : 0;
-            if (length > columnCount) {
-                columnCount = length;
-            }
-        }
-        columnCount = Math.max(columnCount, 1);
-
-        const sheetData = Array.from({ length: rowCount }, () => Array.from({ length: columnCount }, () => ''));
-        const merges = [];
-
-        for (let row = 0; row < rowCount; row++) {
-            for (let column = 0; column < columnCount; column++) {
-                const cell = log.data[row]?.[column];
-                if (!cell) {
-                    continue;
-                }
-                if (cell.format?.mergedInto) {
-                    continue;
-                }
-                sheetData[row][column] = cell.value ?? '';
-                if (cell.format?.merge) {
-                    const merge = cell.format.merge;
-                    merges.push({
-                        s: { r: row, c: column },
-                        e: { r: row + merge.rowSpan - 1, c: column + merge.colSpan - 1 }
-                    });
-                }
-            }
-        }
-
-        const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
-        if (merges.length) {
-            worksheet['!merges'] = merges;
-        }
-
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, createSheetName(log.name));
-        const workbookArray = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-        const blob = new Blob([workbookArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${createFileName(log.name)}.xlsx`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 0);
-    }
-
-    function createSheetName(name) {
-        const sanitized = (name ?? '').toString().replace(/[\[\]\\/*:?]/g, ' ').trim();
-        if (!sanitized) {
-            return 'Log';
-        }
-        return sanitized.slice(0, 31) || 'Log';
-    }
-
-    function createFileName(name) {
-        const sanitized = (name ?? '').toString().replace(/[\\/:*?"<>|]/g, '_').trim();
-        const fallback = sanitized || 'log';
-        return fallback.slice(0, 64);
-    }
-
-    function mergeSelectedCells() {
-        if (!selectionRange) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        const rows = selectionRange.endRow - selectionRange.startRow + 1;
-        const columns = selectionRange.endColumn - selectionRange.startColumn + 1;
-        if (rows === 1 && columns === 1) {
-            return;
-        }
-
-        const masterRow = selectionRange.startRow;
-        const masterColumn = selectionRange.startColumn;
-        const selectionDescription = describeSelection(selectionRange);
-
-        for (let row = selectionRange.startRow; row <= selectionRange.endRow; row++) {
-            for (let column = selectionRange.startColumn; column <= selectionRange.endColumn; column++) {
-                const cell = getRawCell(row, column);
-                if (!cell?.format?.mergedInto) {
-                    continue;
-                }
-                const masterRef = cell.format.mergedInto;
-                if (masterRef.row < selectionRange.startRow || masterRef.row > selectionRange.endRow ||
-                    masterRef.column < selectionRange.startColumn || masterRef.column > selectionRange.endColumn) {
-                    return;
-                }
-            }
-        }
-
-        // Unmerge any existing merges within the selection
-        pushUndoState();
-        const affectedMasters = [];
-        forEachCellInSelection(selectionRange, ({ row, column, cellData }) => {
-            if (cellData.format?.merge) {
-                affectedMasters.push({ row, column });
-            }
-        }, { includeHidden: true });
-        affectedMasters.forEach(({ row, column }) => unmergeCell(row, column));
-
-        const masterCell = getRawCell(masterRow, masterColumn);
-        if (!masterCell) {
-            return;
-        }
-
-        const values = [];
-        for (let row = selectionRange.startRow; row <= selectionRange.endRow; row++) {
-            for (let column = selectionRange.startColumn; column <= selectionRange.endColumn; column++) {
-                const cell = getRawCell(row, column);
-                if (!cell) {
-                    continue;
-                }
-                if (row === masterRow && column === masterColumn) {
-                    values.push(cell.value);
-                    continue;
-                }
-                values.push(cell.value);
-                cell.value = '';
-                cell.format = cell.format || {};
-                delete cell.format.merge;
-                cell.format.mergedInto = { row: masterRow, column: masterColumn };
-            }
-        }
-
-        masterCell.value = values.join(' ').trim();
-        masterCell.format = masterCell.format || {};
-        masterCell.format.merge = {
-            rowSpan: rows,
-            colSpan: columns
-        };
-        delete masterCell.format.mergedInto;
-
-        recordAudit(log, 'Merged cells', `Merged ${selectionDescription} into ${formatCellLabel(masterRow, masterColumn)}.`);
-        persistLogs();
-        renderSpreadsheet(log);
-        anchorCell = { row: masterRow, column: masterColumn };
-        setSelection(masterRow, masterColumn, masterRow, masterColumn);
-    }
-
-    function unmergeSelectedCells() {
-        if (!selectionRange) {
-            return;
-        }
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        const masters = [];
-        forEachCellInSelection(selectionRange, ({ row, column, cellData }) => {
-            if (cellData.format?.merge) {
-                masters.push({ row, column });
-            }
-        });
-        if (!masters.length) {
-            const single = getRawCell(selectionRange.startRow, selectionRange.startColumn);
-            if (single?.format?.mergedInto) {
-                masters.push({ row: single.format.mergedInto.row, column: single.format.mergedInto.column });
-            }
-        }
-        if (!masters.length) {
-            return;
-        }
-        pushUndoState();
-        masters.forEach(({ row, column }) => unmergeCell(row, column));
-        const selectionDescription = describeSelection(selectionRange);
-        recordAudit(log, 'Unmerged cells', `Unmerged ${selectionDescription}.`);
-        persistLogs();
-        renderSpreadsheet(log);
-        const master = masters[0];
-        anchorCell = { row: master.row, column: master.column };
-        setSelection(master.row, master.column, master.row, master.column);
-    }
-
-    function unmergeCell(row, column) {
-        const log = getCurrentLog();
-        if (!log) {
-            return;
-        }
-        const cell = getRawCell(row, column);
-        if (!cell || !cell.format?.merge) {
-            return;
-        }
-        const merge = cell.format.merge;
-        delete cell.format.merge;
-        for (let r = row; r < row + merge.rowSpan; r++) {
-            for (let c = column; c < column + merge.colSpan; c++) {
-                if (r === row && c === column) {
-                    continue;
-                }
-                ensureCellExists(log, r, c);
-                const target = log.data[r][c];
-                if (!target.format) {
-                    target.format = {};
-                }
-                delete target.format.mergedInto;
-            }
-        }
-    }
-
-    addRowButton?.addEventListener('click', addRow);
-    insertRowButton?.addEventListener('click', insertRow);
-    deleteRowButton?.addEventListener('click', deleteSelectedRows);
-    addColumnButton?.addEventListener('click', addColumn);
-    deleteColumnButton?.addEventListener('click', deleteSelectedColumns);
-    clearLogButton?.addEventListener('click', clearCurrentLog);
-
-    boldButton?.addEventListener('click', () => toggleFormat('bold'));
-    italicButton?.addEventListener('click', () => toggleFormat('italic'));
-    underlineButton?.addEventListener('click', () => toggleFormat('underline'));
-
-    alignLeftButton?.addEventListener('click', () => setAlignment('left'));
-    alignCenterButton?.addEventListener('click', () => setAlignment('center'));
-    alignRightButton?.addEventListener('click', () => setAlignment('right'));
-
-    fontSizeSelect?.addEventListener('change', (event) => {
-        const target = event.target;
-        if (target instanceof HTMLSelectElement) {
-            setFontSize(target.value);
-        }
-    });
-    fontFamilySelect?.addEventListener('change', (event) => {
-        const target = event.target;
-        if (target instanceof HTMLSelectElement) {
-            setFontFamily(target.value);
-        }
-    });
-    numberFormatSelect?.addEventListener('change', (event) => {
-        const target = event.target;
-        if (target instanceof HTMLSelectElement) {
-            setNumberFormat(target.value);
-        }
-    });
-
-    textColorInput?.addEventListener('input', (event) => {
-        const target = event.target;
-        if (target instanceof HTMLInputElement) {
-            setTextColor(target.value);
-        }
-    });
-
-    textColorInput?.addEventListener('change', (event) => {
-        const target = event.target;
-        if (target instanceof HTMLInputElement) {
-            setTextColor(target.value);
-        }
-    });
-
-    fillColorInput?.addEventListener('input', (event) => {
-        const target = event.target;
-        if (target instanceof HTMLInputElement) {
-            setFillColor(target.value);
-        }
-    });
-
-    fillColorInput?.addEventListener('change', (event) => {
-        const target = event.target;
-        if (target instanceof HTMLInputElement) {
-            setFillColor(target.value);
-        }
-    });
-
-    clearTextColorButton?.addEventListener('click', clearTextColor);
-    clearFillColorButton?.addEventListener('click', clearFillColor);
-    alternateRowFormatSelect?.addEventListener('change', handleAlternateRowFormatChange);
-    clearBorderButton?.addEventListener('click', handleClearBorderClick);
-
-    borderStyleSelect?.addEventListener('change', handleBorderStyleChange);
-    borderPlacementSelect?.addEventListener('change', handleBorderPlacementChange);
-    borderColorInput?.addEventListener('input', handleBorderColorPreview);
-    borderColorInput?.addEventListener('change', handleBorderColorChange);
-
-    mergeCellsButton?.addEventListener('click', mergeSelectedCells);
-    unmergeCellsButton?.addEventListener('click', unmergeSelectedCells);
-
-    exportExcelButton?.addEventListener('click', exportCurrentLogToExcel);
-    undoButton?.addEventListener('click', undoLastChange);
-    zoomInButton?.addEventListener('click', () => changeZoom(ZOOM_STEP));
-    zoomOutButton?.addEventListener('click', () => changeZoom(-ZOOM_STEP));
-
-    createLogForm?.addEventListener('submit', handleCreateLog);
-    logNameInput?.addEventListener('input', () => {
-        logNameInput?.classList.remove('is-invalid');
-    });
-
-    importLogButton?.addEventListener('click', triggerImportLogPicker);
-    importLogInput?.addEventListener('change', handleImportLogInputChange);
-
-    duplicateLogButton?.addEventListener('click', () => duplicateLog());
-    deleteLogButton?.addEventListener('click', () => deleteLog());
-    renameLogButton?.addEventListener('click', () => renameLog());
-    viewAuditLogButton?.addEventListener('click', openAuditLogModal);
-    addLogTabButton?.addEventListener('click', handleAddTabClick);
-    toggleSidebarButton?.addEventListener('click', handleSidebarToggle);
-    closeSidebarButton?.addEventListener('click', closeSidebar);
-    logsSidebarOverlayElement?.addEventListener('click', closeSidebar);
-
-    document.addEventListener('copy', handleCopyEvent);
-    document.addEventListener('paste', handlePasteEvent);
-    document.addEventListener('keydown', handleGlobalSpreadsheetKeyDown);
-    window.addEventListener('resize', handleSidebarResize);
-
-    handleSidebarResize();
-    syncSidebarToggleState();
-
-    ensureFillHandleElement();
-    if (spreadsheetWrapperEl) {
-        spreadsheetWrapperEl.addEventListener('scroll', updateFillHandlePosition);
-    }
-    if (typeof window !== 'undefined') {
-        window.addEventListener('resize', updateFillHandlePosition);
-    }
-
-    applyZoomLevel();
-    updateZoomButtonState();
-    updateUndoButtonState();
-    renderLogList();
-    if (currentLogId) {
-        selectLog(currentLogId, { scrollTab: false });
-    } else if (logs.length) {
-        selectLog(logs[0].id, { scrollTab: false });
-    } else {
-        showPlaceholder();
     }
 })();
+
