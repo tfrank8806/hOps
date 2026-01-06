@@ -13,46 +13,46 @@
     const ZOOM_STEP = 0.1;
     const MAX_HISTORY_LENGTH = 25;
 
-    const logListEl = document.getElementById('logList');
-    const logEmptyStateEl = document.getElementById('logEmptyState');
-    const logTitleEl = document.getElementById('logTitle');
-    const logSubtitleEl = document.getElementById('logSubtitle');
-    const gridElement = document.getElementById('logsGrid');
-    const placeholderEl = document.getElementById('spreadsheetPlaceholder');
-    const defaultPlaceholderMarkup = placeholderEl?.innerHTML ?? '';
-    const addRowButton = document.getElementById('addRowBtn');
-    const insertRowButton = document.getElementById('insertRowBtn');
-    const deleteRowButton = document.getElementById('deleteRowBtn');
-    const addColumnButton = document.getElementById('addColumnBtn');
-    const deleteColumnButton = document.getElementById('deleteColumnBtn');
-    const clearLogButton = document.getElementById('clearLogBtn');
-    const createLogForm = document.getElementById('createLogForm');
-    const logNameInput = document.getElementById('logNameInput');
-    const importLogButton = document.getElementById('importLogBtn');
-    const importLogInput = document.getElementById('importLogInput');
-    const duplicateLogButton = document.getElementById('duplicateLogBtn');
-    const deleteLogButton = document.getElementById('deleteLogBtn');
-    const renameLogButton = document.getElementById('renameLogBtn');
-    const viewAuditLogButton = document.getElementById('viewAuditLogBtn');
-    const auditLogModalElement = document.getElementById('auditLogModal');
-    const auditLogListElement = document.getElementById('auditLogList');
-    const auditLogEmptyStateElement = document.getElementById('auditLogEmptyState');
-    const toggleSidebarButton = document.getElementById('toggleSidebarBtn');
-    const closeSidebarButton = document.getElementById('closeLogsSidebarBtn');
-    const logsLayoutElement = document.getElementById('logsLayout');
-    const logsSidebarOverlayElement = document.getElementById('logsSidebarOverlay');
-    const sidebarToggleLabelEl = toggleSidebarButton?.querySelector('[data-sidebar-toggle-label]');
-    const sidebarToggleOpenLabel = toggleSidebarButton?.dataset.openLabel || 'Show Logs';
-    const sidebarToggleCloseLabel = toggleSidebarButton?.dataset.closeLabel || 'Hide Logs';
-    const exportExcelButton = document.getElementById('exportExcelBtn');
-    const undoButton = document.getElementById('undoBtn');
-    const zoomInButton = document.getElementById('zoomInBtn');
-    const zoomOutButton = document.getElementById('zoomOutBtn');
-    const logTabsContainer = document.getElementById('logTabs');
-    const logTabsBarElement = document.getElementById('logTabsBar');
-    const logTabsEmptyStateElement = document.getElementById('logTabsEmptyState');
-    const logTabsScrollElement = document.getElementById('logTabsScroll');
-    const addLogTabButton = document.getElementById('addTabBtn');
+    let logListEl = null;
+    let logEmptyStateEl = null;
+    let logTitleEl = null;
+    let logSubtitleEl = null;
+    let gridElement = null;
+    let placeholderEl = null;
+    let defaultPlaceholderMarkup = '';
+    let addRowButton = null;
+    let insertRowButton = null;
+    let deleteRowButton = null;
+    let addColumnButton = null;
+    let deleteColumnButton = null;
+    let clearLogButton = null;
+    let createLogForm = null;
+    let logNameInput = null;
+    let importLogButton = null;
+    let importLogInput = null;
+    let duplicateLogButton = null;
+    let deleteLogButton = null;
+    let renameLogButton = null;
+    let viewAuditLogButton = null;
+    let auditLogModalElement = null;
+    let auditLogListElement = null;
+    let auditLogEmptyStateElement = null;
+    let toggleSidebarButton = null;
+    let closeSidebarButton = null;
+    let logsLayoutElement = null;
+    let logsSidebarOverlayElement = null;
+    let sidebarToggleLabelEl = null;
+    let sidebarToggleOpenLabel = 'Show Logs';
+    let sidebarToggleCloseLabel = 'Hide Logs';
+    let exportExcelButton = null;
+    let undoButton = null;
+    let zoomInButton = null;
+    let zoomOutButton = null;
+    let logTabsContainer = null;
+    let logTabsBarElement = null;
+    let logTabsEmptyStateElement = null;
+    let logTabsScrollElement = null;
+    let addLogTabButton = null;
     const GRID_INIT_RETRY_DELAY = 200;
     const GRID_INIT_WARNING_THRESHOLD = 10;
     let gridInitAttempts = 0;
@@ -82,6 +82,7 @@
             return;
         }
         appInitialized = true;
+        assignDomReferences();
         attemptGridInitialization();
         renderLogList();
         renderLogTabs();
@@ -97,6 +98,53 @@
         handleSidebarResize();
         updateSidebarToggleLabel();
         updateZoomButtonState();
+    }
+
+    function assignDomReferences() {
+        logListEl = document.getElementById('logList');
+        logEmptyStateEl = document.getElementById('logEmptyState');
+        logTitleEl = document.getElementById('logTitle');
+        logSubtitleEl = document.getElementById('logSubtitle');
+        gridElement = document.getElementById('logsGrid');
+        placeholderEl = document.getElementById('spreadsheetPlaceholder');
+        if (placeholderEl && !defaultPlaceholderMarkup) {
+            defaultPlaceholderMarkup = placeholderEl.innerHTML;
+        }
+        addRowButton = document.getElementById('addRowBtn');
+        insertRowButton = document.getElementById('insertRowBtn');
+        deleteRowButton = document.getElementById('deleteRowBtn');
+        addColumnButton = document.getElementById('addColumnBtn');
+        deleteColumnButton = document.getElementById('deleteColumnBtn');
+        clearLogButton = document.getElementById('clearLogBtn');
+        createLogForm = document.getElementById('createLogForm');
+        logNameInput = document.getElementById('logNameInput');
+        importLogButton = document.getElementById('importLogBtn');
+        importLogInput = document.getElementById('importLogInput');
+        duplicateLogButton = document.getElementById('duplicateLogBtn');
+        deleteLogButton = document.getElementById('deleteLogBtn');
+        renameLogButton = document.getElementById('renameLogBtn');
+        viewAuditLogButton = document.getElementById('viewAuditLogBtn');
+        auditLogModalElement = document.getElementById('auditLogModal');
+        auditLogListElement = document.getElementById('auditLogList');
+        auditLogEmptyStateElement = document.getElementById('auditLogEmptyState');
+        toggleSidebarButton = document.getElementById('toggleSidebarBtn');
+        closeSidebarButton = document.getElementById('closeLogsSidebarBtn');
+        logsLayoutElement = document.getElementById('logsLayout');
+        logsSidebarOverlayElement = document.getElementById('logsSidebarOverlay');
+        exportExcelButton = document.getElementById('exportExcelBtn');
+        undoButton = document.getElementById('undoBtn');
+        zoomInButton = document.getElementById('zoomInBtn');
+        zoomOutButton = document.getElementById('zoomOutBtn');
+        logTabsContainer = document.getElementById('logTabs');
+        logTabsBarElement = document.getElementById('logTabsBar');
+        logTabsEmptyStateElement = document.getElementById('logTabsEmptyState');
+        logTabsScrollElement = document.getElementById('logTabsScroll');
+        addLogTabButton = document.getElementById('addTabBtn');
+        if (toggleSidebarButton) {
+            sidebarToggleLabelEl = toggleSidebarButton.querySelector('[data-sidebar-toggle-label]');
+            sidebarToggleOpenLabel = toggleSidebarButton.dataset.openLabel || sidebarToggleOpenLabel;
+            sidebarToggleCloseLabel = toggleSidebarButton.dataset.closeLabel || sidebarToggleCloseLabel;
+        }
     }
 
     function wireEventListeners() {
