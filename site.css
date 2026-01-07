@@ -1,3 +1,10 @@
+:root {
+    --ui-scale: 0.8;
+}
+
+html {
+    font-size: calc(100% * var(--ui-scale));
+}
 
 .direct-messages-widget--composer-hidden .direct-messages-widget__thread {
     display: none;
@@ -43,3 +50,4 @@
     }
 }
 
+.root-ui-scale-comment
