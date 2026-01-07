@@ -2,8 +2,15 @@
     --ui-scale: 0.8;
 }
 
-html {
-    font-size: calc(100% * var(--ui-scale));
+body {
+    overflow-x: hidden;
+}
+
+.ui-scale-wrapper {
+    transform: scale(var(--ui-scale));
+    transform-origin: top left;
+    width: calc(100% / var(--ui-scale));
+    min-height: calc(100vh / var(--ui-scale));
 }
 
 .direct-messages-widget--composer-hidden .direct-messages-widget__thread {
