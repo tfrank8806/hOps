@@ -617,6 +617,10 @@
                 continue;
             }
             if (!current.textContent && current.childNodes.length === 0) {
+                const tagName = current.tagName ? current.tagName.toLowerCase() : '';
+                if (tagName === 'br') {
+                    continue;
+                }
                 toRemove.push(current);
             }
         }
