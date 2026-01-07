@@ -372,7 +372,7 @@
 .logs-grid-table__header,
 .logs-grid-table__row-header {
     background-color: #f8fafc;
-    font-size: 0.75rem;
+    font-size: 0.75em;
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -398,7 +398,7 @@
 .logs-grid-cell {
     min-height: 44px;
     padding: 0.5rem;
-    font-size: 0.95rem;
+    font-size: 0.95em;
     line-height: 1.3;
     white-space: pre-wrap;
     word-break: break-word;
