@@ -149,14 +149,16 @@
             var forceFullWidth = string.Equals(widgetId, HomeWidgetIds.HotelLayout, StringComparison.OrdinalIgnoreCase);
             var effectiveSize = forceFullWidth ? HomeWidgetSize.Full : widget.Size;
             var sizeValue = effectiveSize.ToString().ToLowerInvariant();
-            var defaultSpan = effectiveSize switch
-            {
-                HomeWidgetSize.Full => 12,
-                HomeWidgetSize.Half => 6,
-                HomeWidgetSize.Third => 4,
-                HomeWidgetSize.Quarter => 3,
-                _ => 4
-            };
+            var defaultSpan = string.Equals(widgetId, HomeWidgetIds.PassOnLogs, StringComparison.OrdinalIgnoreCase)
+                ? 8
+                : effectiveSize switch
+                {
+                    HomeWidgetSize.Full => 12,
+                    HomeWidgetSize.Half => 6,
+                    HomeWidgetSize.Third => 4,
+                    HomeWidgetSize.Quarter => 3,
+                    _ => 4
+                };
             var storedSpan = widget.CustomSpan.HasValue ? Math.Clamp(widget.CustomSpan.Value, 1, 12) : (int?)null;
             var appliedSpan = forceFullWidth ? 12 : storedSpan ?? defaultSpan;
             var showCustomLabel = !forceFullWidth && storedSpan.HasValue && appliedSpan != defaultSpan;
