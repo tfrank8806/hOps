@@ -49,6 +49,7 @@
     }
     var rawAvatarModel = ViewBag.CurrentUserAvatar as UserAvatarViewModel;
     var fallbackProfileName = rawAvatarModel?.Name ?? (User?.Identity?.Name ?? "My Profile");
+    var todayDisplay = TimeZoneService.ConvertToUserTime(DateTime.UtcNow).ToString("dddd, MMM d");
     var profileAvatarModel = rawAvatarModel != null
         ? new UserAvatarViewModel
         {
@@ -115,6 +116,9 @@
                 </div>
             </div>
             <ul class="nav align-items-center">
+                <li class="nav-item me-3 text-muted small d-none d-lg-block">
+                    @todayDisplay
+                </li>
                 @if (SignInManager.IsSignedIn(User))
                 {
                     var userProps = ViewBag.UserProperties as List<Property>;
