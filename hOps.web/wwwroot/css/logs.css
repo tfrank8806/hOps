@@ -1,5 +1,5 @@
 .logs-page {
-    min-height: calc(100vh - 280px);
+    min-height: calc(100vh - calc(280px * var(--ui-scale)));
     gap: 1.5rem;
 }
 
@@ -17,8 +17,8 @@
 }
 
 .logs-sidebar {
-    flex: 0 0 320px;
-    max-width: 320px;
+    flex: 0 0 calc(320px * var(--ui-scale));
+    max-width: calc(320px * var(--ui-scale));
     min-height: 0;
     transition: transform 0.25s ease, opacity 0.25s ease, margin 0.25s ease;
     display: flex;
@@ -128,7 +128,7 @@
     .logs-sidebar {
         position: fixed;
         inset: 0 auto 0 0;
-        width: min(100%, 320px);
+        width: min(100%, calc(320px * var(--ui-scale)));
         max-width: 100%;
         padding: 1rem;
         transform: translateX(-100%);
@@ -143,7 +143,7 @@
 
     .logs-layout.sidebar-open .logs-sidebar {
         transform: translateX(0);
-        box-shadow: 0 20px 45px rgba(15, 46, 97, 0.18);
+        box-shadow: 0 calc(20px * var(--ui-scale)) calc(45px * var(--ui-scale)) rgba(15, 46, 97, 0.18);
     }
 
     .logs-sidebar-overlay {
@@ -177,7 +177,7 @@
 }
 
 .logs-page .card {
-    border: 1px solid #e2e6ea;
+    border: calc(1px * var(--ui-scale)) solid #e2e6ea;
 }
 
 .logs-page .card-body {
@@ -232,7 +232,7 @@
 
 .audit-log-entry {
     border: 0;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: calc(1px * var(--ui-scale)) solid #e5e7eb;
     border-radius: 0;
 }
 
@@ -252,7 +252,7 @@
 }
 
 .spreadsheet-container {
-    min-height: 420px;
+    min-height: calc(420px * var(--ui-scale));
     position: relative;
     flex: 1 1 auto;
     display: flex;
@@ -260,7 +260,7 @@
 }
 
 #logTabsBar {
-    border: 1px solid #e3e6eb;
+    border: calc(1px * var(--ui-scale)) solid #e3e6eb;
     border-radius: 0.65rem;
     padding: 0.25rem 0.5rem;
     display: flex;
@@ -287,8 +287,8 @@
 }
 
 .log-tab {
-    border: 1px solid transparent;
-    border-bottom: 2px solid transparent;
+    border: calc(1px * var(--ui-scale)) solid transparent;
+    border-bottom: calc(2px * var(--ui-scale)) solid transparent;
     border-radius: 0.55rem 0.55rem 0 0;
     background-color: transparent;
     padding: 0.35rem 0.85rem;
@@ -310,7 +310,7 @@
     border-color: #cfd4e6;
     border-bottom-color: #ffffff;
     color: #0f172a;
-    box-shadow: 0 -2px 6px rgba(15, 23, 42, 0.15);
+    box-shadow: 0 calc(-2px * var(--ui-scale)) calc(6px * var(--ui-scale)) rgba(15, 23, 42, 0.15);
 }
 
 .log-tabs-add {
@@ -323,19 +323,19 @@
 }
 
 .log-tabs-scroll::-webkit-scrollbar {
-    height: 6px;
+    height: calc(6px * var(--ui-scale));
 }
 
 .log-tabs-scroll::-webkit-scrollbar-thumb {
     background-color: rgba(148, 163, 184, 0.7);
-    border-radius: 999px;
+    border-radius: calc(999px * var(--ui-scale));
 }
 
 .spreadsheet-grid {
     position: relative;
     flex: 1 1 auto;
-    min-height: 420px;
-    border: 1px solid #e2e6ea;
+    min-height: calc(420px * var(--ui-scale));
+    border: calc(1px * var(--ui-scale)) solid #e2e6ea;
     border-radius: 0.75rem;
     font-size: var(--logs-grid-font-size, 1rem);
     overflow: auto;
@@ -356,12 +356,12 @@
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    min-width: 640px;
+    min-width: calc(640px * var(--ui-scale));
 }
 
 .logs-grid-table th,
 .logs-grid-table td {
-    border: 1px solid #e5e7eb;
+    border: calc(1px * var(--ui-scale)) solid #e5e7eb;
 }
 
 .logs-grid-table__corner {
@@ -396,7 +396,7 @@
 }
 
 .logs-grid-cell {
-    min-height: 44px;
+    min-height: calc(44px * var(--ui-scale));
     padding: 0.5rem;
     font-size: 0.95em;
     line-height: 1.3;
@@ -406,8 +406,8 @@
 }
 
 .logs-grid-cell:focus {
-    outline: 2px solid rgba(13, 110, 253, 0.45);
-    outline-offset: -2px;
+    outline: calc(2px * var(--ui-scale)) solid rgba(13, 110, 253, 0.45);
+    outline-offset: calc(-2px * var(--ui-scale));
 }
 
 .logs-grid-cell.is-selected {
@@ -432,17 +432,17 @@
 }
 
 .mail-log-table .notes-cell {
-    min-width: 200px;
+    min-width: calc(200px * var(--ui-scale));
     white-space: pre-wrap;
     word-break: break-word;
 }
 
 .mail-log-table .delivered-cell {
-    width: 90px;
+    width: calc(90px * var(--ui-scale));
 }
 
 .mail-log-table .actions-cell {
-    width: 110px;
+    width: calc(110px * var(--ui-scale));
     white-space: nowrap;
 }
 
@@ -480,7 +480,7 @@
     }
 
     .spreadsheet-grid {
-        min-height: 320px;
+        min-height: calc(320px * var(--ui-scale));
     }
 
     #logTabsBar {
