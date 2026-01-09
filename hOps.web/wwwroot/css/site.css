@@ -741,6 +741,11 @@ body.sidebar-collapsed .sidebar-inner {
     margin-inline: auto;
 }
 
+.main-inner--wide-stretched {
+    max-width: none;
+    width: 100%;
+}
+
 @media (max-width: 991.98px) {
     .main-inner,
     .main-inner--wide {
