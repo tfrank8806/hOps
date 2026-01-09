@@ -33,7 +33,7 @@ body {
 
 
 :root {
-    --ui-scale: 0.8;
+    --ui-scale: 0.9;
     --sidebar-width: calc(260px * var(--ui-scale));
     --todo-sidebar-width: calc(320px * var(--ui-scale));
     --rail-toggle-width: calc(18px * var(--ui-scale));
