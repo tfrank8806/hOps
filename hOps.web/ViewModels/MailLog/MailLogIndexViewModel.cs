@@ -25,6 +25,7 @@ namespace hOps.web.ViewModels.MailLog
         public string? StorageLocation { get; set; }
         public DateTime? ArrivalDate { get; set; }
         public DateTime? DepartureDate { get; set; }
+        public DateTime? PackageReceivedDate { get; set; }
         public string? Notes { get; set; }
         public DateTime LoggedAt { get; set; }
         public string LoggedByName { get; set; } = string.Empty;
@@ -61,6 +62,10 @@ namespace hOps.web.ViewModels.MailLog
         [DataType(DataType.Date)]
         [Display(Name = "Departure Date")]
         public DateTime? DepartureDate { get; set; }
+
+        [DataType(DataType.Date)]
+        [Display(Name = "Package Received Date")]
+        public DateTime? PackageReceivedDate { get; set; }
 
         [MaxLength(512)]
         public string? Notes { get; set; }

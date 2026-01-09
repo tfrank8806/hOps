@@ -1244,6 +1244,7 @@ namespace hOps.web.Controllers
                     StorageLocation = entry.StorageLocation,
                     Delivered = entry.Delivered,
                     DeliveredAt = entry.DeliveredAt,
+                    PackageReceivedDate = entry.PackageReceivedDate,
                     LoggedAt = entry.LoggedAt,
                     DetailUrl = Url.Action("Details", "MailLog", new { id = entry.Id }) ?? string.Empty
                 })

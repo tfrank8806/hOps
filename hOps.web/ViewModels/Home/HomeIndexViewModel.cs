@@ -135,6 +135,7 @@ namespace hOps.web.ViewModels.Home
         public string? StorageLocation { get; set; }
         public bool Delivered { get; set; }
         public DateTime? DeliveredAt { get; set; }
+        public DateTime? PackageReceivedDate { get; set; }
         public DateTime LoggedAt { get; set; }
         public string DetailUrl { get; set; } = string.Empty;
     }

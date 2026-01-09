@@ -91,6 +91,11 @@
                             <input asp-for="Form.DepartureDate" class="form-control" />
                             <span asp-validation-for="Form.DepartureDate" class="text-danger"></span>
                         </div>
+                        <div class="col-md-3">
+                            <label asp-for="Form.PackageReceivedDate" class="form-label"></label>
+                            <input asp-for="Form.PackageReceivedDate" class="form-control" type="date" />
+                            <span asp-validation-for="Form.PackageReceivedDate" class="text-danger"></span>
+                        </div>
                         <div class="col-12">
                             <label asp-for="Form.Notes" class="form-label"></label>
                             <textarea asp-for="Form.Notes" class="form-control" rows="2" data-enable-mentions="true"></textarea>
@@ -123,6 +128,7 @@
                                         <th scope="col">Room #</th>
                                         <th scope="col">Storage</th>
                                         <th scope="col">Arrival</th>
+                                        <th scope="col">Package Received</th>
                                         <th scope="col">Departure</th>
                                         <th scope="col">Notes</th>
                                         <th scope="col">Logged By</th>
@@ -144,6 +150,7 @@
                                             <td>@(string.IsNullOrWhiteSpace(entry.RoomNumber) ? "-" : entry.RoomNumber)</td>
                                             <td>@(string.IsNullOrWhiteSpace(entry.StorageLocation) ? "-" : entry.StorageLocation)</td>
                                             <td>@(entry.ArrivalDate.HasValue ? entry.ArrivalDate.Value.ToString("MMM d, yyyy") : "-")</td>
+                                            <td>@(entry.PackageReceivedDate.HasValue ? entry.PackageReceivedDate.Value.ToString("MMM d, yyyy") : "-")</td>
                                             <td>@(entry.DepartureDate.HasValue ? entry.DepartureDate.Value.ToString("MMM d, yyyy") : "-")</td>
                                             <td class="notes-cell">
                                                 @if (!string.IsNullOrWhiteSpace(entry.Notes))

@@ -183,6 +183,10 @@
                             {
                                 metaParts.Add(package.StorageLocation);
                             }
+                            if (package.PackageReceivedDate.HasValue)
+                            {
+                                metaParts.Add($"Received {package.PackageReceivedDate.Value.ToString("MMM d")}");
+                            }
                         }
                         @if (metaParts.Any())
                         {

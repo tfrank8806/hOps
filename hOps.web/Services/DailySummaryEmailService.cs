@@ -765,6 +765,7 @@ namespace hOps.web.Services
                 Carrier = p.Carrier,
                 TrackingNumber = p.TrackingNumber,
                 StorageLocation = p.StorageLocation,
+                PackageReceivedDate = p.PackageReceivedDate,
                 LoggedAt = p.LoggedAt,
                 DetailPath = $"/MailLog/Details/{p.Id}"
             }).ToList();
@@ -919,6 +920,7 @@ namespace hOps.web.Services
             public string? Carrier { get; set; }
             public string? TrackingNumber { get; set; }
             public string? StorageLocation { get; set; }
+            public DateTime? PackageReceivedDate { get; set; }
             public DateTime LoggedAt { get; set; }
             public string DetailPath { get; set; } = string.Empty;
         }

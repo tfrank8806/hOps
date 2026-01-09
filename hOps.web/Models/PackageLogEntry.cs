@@ -40,6 +40,8 @@ namespace hOps.web.Models
 
         public DateTime? DeliveredAt { get; set; }
 
+        public DateTime? PackageReceivedDate { get; set; }
+
         [Required]
         public string LoggedById { get; set; } = string.Empty;
         public ApplicationUser? LoggedBy { get; set; }
