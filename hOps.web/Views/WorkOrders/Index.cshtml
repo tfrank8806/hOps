@@ -265,13 +265,13 @@
         }
 
         .workorders-table .col-status {
-            width: 10%;
-            min-width: 110px;
+            width: 8%;
+            min-width: 90px;
         }
 
         .workorders-table .col-location {
-            width: 22%;
-            min-width: 160px;
+            width: 18%;
+            min-width: 140px;
         }
 
         .workorders-table .col-department {
@@ -285,8 +285,8 @@
         }
 
         .workorders-table .col-issue {
-            width: 27%;
-            min-width: 180px;
+            width: 22%;
+            min-width: 150px;
         }
 
         .workorders-table .col-details {
@@ -375,11 +375,22 @@
             font-size: 0.75rem;
             opacity: 0.8;
         }
+
+        .workorders-form-wrapper {
+            position: static;
+        }
+
+        @@media (min-width: 1200px) {
+            .workorders-form-wrapper {
+                position: sticky;
+                top: calc(var(--main-header-height) + 1.5rem);
+            }
+        }
     </style>
 }
 
 <div class="row g-4 align-items-start">
-    <div class="col-12">
+    <div class="col-12 col-xl-8 col-xxl-9">
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-light d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Filters</h5>
@@ -753,130 +764,132 @@
             </div>
         </div>
     </div>
-    <div class="col-12 col-xl-10 col-xxl-8 mx-auto">
-        <div class="card shadow-sm workorders-form-card" id="workOrdersForm">
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">@formTitle</h5>
-                @if (Model.IsEditing)
-                {
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <a class="btn btn-sm btn-light" href="@indexUrlWithFilters">Cancel</a>
-                        @if (Model.CanManageWorkOrders && Model.Form != null && Model.Form.Id.HasValue)
-                        {
-                            var deleteId = Model.Form!.Id!.Value;
-                            var deleteUrl = $"{Url.Action("Delete", new { id = deleteId })}{filterQueryString}";
-                            <form method="post" action="@deleteUrl" onsubmit="return confirm('Are you sure you want to delete this work order?');">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                            </form>
-                        }
-                    </div>
-                }
-            </div>
-            <div class="card-body">
-                <form asp-action="@formAction" asp-route-id="@formRouteId" method="post" enctype="multipart/form-data">
-                    @Html.AntiForgeryToken()
-                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-                    <input type="hidden" asp-for="Form.Id" />
-                    <div class="mb-3">
-                        <label asp-for="Form.Status" class="form-label"></label>
-                        <select asp-for="Form.Status" class="form-select">
-                            @foreach (var status in Model.StatusOptions)
+    <div class="col-12 col-xl-4 col-xxl-3">
+        <div class="workorders-form-wrapper">
+            <div class="card shadow-sm workorders-form-card" id="workOrdersForm">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">@formTitle</h5>
+                    @if (Model.IsEditing)
+                    {
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <a class="btn btn-sm btn-light" href="@indexUrlWithFilters">Cancel</a>
+                            @if (Model.CanManageWorkOrders && Model.Form != null && Model.Form.Id.HasValue)
                             {
-                                <option value="@status.Key" selected="@(string.Equals(Model.Form?.Status, status.Key, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@status.Label</option>
+                                var deleteId = Model.Form!.Id!.Value;
+                                var deleteUrl = $"{Url.Action("Delete", new { id = deleteId })}{filterQueryString}";
+                                <form method="post" action="@deleteUrl" onsubmit="return confirm('Are you sure you want to delete this work order?');">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
                             }
-                        </select>
-                        <span asp-validation-for="Form.Status" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Form.Location" class="form-label"></label>
-                        <input asp-for="Form.Location" class="form-control" list="locationSuggestions" placeholder="Room number or location" />
-                        <datalist id="locationSuggestions">
-                            @foreach (var suggestion in Model.LocationSuggestions)
-                            {
-                                <option value="@suggestion"></option>
-                            }
-                        </datalist>
-                        <span asp-validation-for="Form.Location" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Form.WorkOrderTypeId" class="form-label"></label>
-                        <select asp-for="Form.WorkOrderTypeId" class="form-select">
-                            <option value="">-- Select Type --</option>
-                            @foreach (var type in Model.WorkOrderTypes)
-                            {
-                                <option value="@type.Id" selected="@(Model.Form?.WorkOrderTypeId == type.Id ? "selected" : null)">@type.Name</option>
-                            }
-                        </select>
-                        <span asp-validation-for="Form.WorkOrderTypeId" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Form.Issue" class="form-label"></label>
-                        <input asp-for="Form.Issue" class="form-control" placeholder="Short description" />
-                        <span asp-validation-for="Form.Issue" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Form.Details" class="form-label"></label>
-                        <textarea asp-for="Form.Details" class="form-control" rows="3" placeholder="Additional details" data-enable-mentions="true"></textarea>
-                        <span asp-validation-for="Form.Details" class="text-danger"></span>
-                    </div>
-                    <div class="row g-3">
-                        <div class="col-sm-6">
-                            <label asp-for="Form.DueDate" class="form-label"></label>
-                            <input asp-for="Form.DueDate" class="form-control" type="date" />
-                            <span asp-validation-for="Form.DueDate" class="text-danger"></span>
                         </div>
-                        <div class="col-sm-6">
-                            <label asp-for="Form.DepartmentId" class="form-label"></label>
-                            <select asp-for="Form.DepartmentId" class="form-select">
-                                <option value="">-- Unassigned --</option>
-                                @foreach (var dept in Model.Departments)
+                    }
+                </div>
+                <div class="card-body">
+                    <form asp-action="@formAction" asp-route-id="@formRouteId" method="post" enctype="multipart/form-data">
+                        @Html.AntiForgeryToken()
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                        <input type="hidden" asp-for="Form.Id" />
+                        <div class="mb-3">
+                            <label asp-for="Form.Status" class="form-label"></label>
+                            <select asp-for="Form.Status" class="form-select">
+                                @foreach (var status in Model.StatusOptions)
                                 {
-                                    <option value="@dept.Id" selected="@(Model.Form?.DepartmentId == dept.Id ? "selected" : null)">@dept.Name</option>
+                                    <option value="@status.Key" selected="@(string.Equals(Model.Form?.Status, status.Key, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@status.Label</option>
                                 }
                             </select>
-                            <span asp-validation-for="Form.DepartmentId" class="text-danger"></span>
+                            <span asp-validation-for="Form.Status" class="text-danger"></span>
                         </div>
-                    </div>
-                    <div class="mb-3 mt-3">
-                        <label asp-for="Form.Photos" class="form-label"></label>
-                        <input asp-for="Form.Photos" class="form-control" type="file" accept="image/*" multiple />
-                        <span class="form-text">
-                            @if (Model.IsEditing)
-                            {
-                                @:Upload photos to add new attachments (existing files remain available).
-                            }
-                            else
-                            {
-                                @:Upload supporting photos (optional).
-                            }
-                        </span>
-                        <span asp-validation-for="Form.Photos" class="text-danger"></span>
-                    </div>
-                    @if (showPropertySelector)
-                    {
-                        <fieldset class="mb-3">
-                            <legend class="fs-6">Properties</legend>
-                            <span asp-validation-for="Form.SelectedPropertyIds" class="text-danger"></span>
-                            @foreach (var property in Model.PropertyOptions)
-                            {
-                                <div class="form-check d-flex align-items-center gap-2 mb-2">
-                                    <input class="form-check-input" type="checkbox" value="@property.Id" name="Form.SelectedPropertyIds" id="property_@property.Id" @(property.IsSelected ? "checked" : string.Empty) />
-                                    <label class="form-check-label mb-0" for="property_@property.Id">@property.Name (@property.Code)</label>
-                                </div>
-                            }
-                        </fieldset>
-                    }
-                    else if (Model.PropertyOptions != null && Model.PropertyOptions.Count == 1)
-                    {
-                        var soleProperty = Model.PropertyOptions[0];
-                        <input type="hidden" name="Form.SelectedPropertyIds" value="@soleProperty.Id" />
-                        <div class="alert alert-info">
-                            Work order will be created for <strong>@soleProperty.Name (@soleProperty.Code)</strong>.
+                        <div class="mb-3">
+                            <label asp-for="Form.Location" class="form-label"></label>
+                            <input asp-for="Form.Location" class="form-control" list="locationSuggestions" placeholder="Room number or location" />
+                            <datalist id="locationSuggestions">
+                                @foreach (var suggestion in Model.LocationSuggestions)
+                                {
+                                    <option value="@suggestion"></option>
+                                }
+                            </datalist>
+                            <span asp-validation-for="Form.Location" class="text-danger"></span>
                         </div>
-                    }
-                    <button type="submit" class="btn btn-primary w-100">@submitLabel</button>
-                </form>
+                        <div class="mb-3">
+                            <label asp-for="Form.WorkOrderTypeId" class="form-label"></label>
+                            <select asp-for="Form.WorkOrderTypeId" class="form-select">
+                                <option value="">-- Select Type --</option>
+                                @foreach (var type in Model.WorkOrderTypes)
+                                {
+                                    <option value="@type.Id" selected="@(Model.Form?.WorkOrderTypeId == type.Id ? "selected" : null)">@type.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="Form.WorkOrderTypeId" class="text-danger"></span>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="Form.Issue" class="form-label"></label>
+                            <input asp-for="Form.Issue" class="form-control" placeholder="Short description" />
+                            <span asp-validation-for="Form.Issue" class="text-danger"></span>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="Form.Details" class="form-label"></label>
+                            <textarea asp-for="Form.Details" class="form-control" rows="3" placeholder="Additional details" data-enable-mentions="true"></textarea>
+                            <span asp-validation-for="Form.Details" class="text-danger"></span>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <label asp-for="Form.DueDate" class="form-label"></label>
+                                <input asp-for="Form.DueDate" class="form-control" type="date" />
+                                <span asp-validation-for="Form.DueDate" class="text-danger"></span>
+                            </div>
+                            <div class="col-sm-6">
+                                <label asp-for="Form.DepartmentId" class="form-label"></label>
+                                <select asp-for="Form.DepartmentId" class="form-select">
+                                    <option value="">-- Unassigned --</option>
+                                    @foreach (var dept in Model.Departments)
+                                    {
+                                        <option value="@dept.Id" selected="@(Model.Form?.DepartmentId == dept.Id ? "selected" : null)">@dept.Name</option>
+                                    }
+                                </select>
+                                <span asp-validation-for="Form.DepartmentId" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="mb-3 mt-3">
+                            <label asp-for="Form.Photos" class="form-label"></label>
+                            <input asp-for="Form.Photos" class="form-control" type="file" accept="image/*" multiple />
+                            <span class="form-text">
+                                @if (Model.IsEditing)
+                                {
+                                    @:Upload photos to add new attachments (existing files remain available).
+                                }
+                                else
+                                {
+                                    @:Upload supporting photos (optional).
+                                }
+                            </span>
+                            <span asp-validation-for="Form.Photos" class="text-danger"></span>
+                        </div>
+                        @if (showPropertySelector)
+                        {
+                            <fieldset class="mb-3">
+                                <legend class="fs-6">Properties</legend>
+                                <span asp-validation-for="Form.SelectedPropertyIds" class="text-danger"></span>
+                                @foreach (var property in Model.PropertyOptions)
+                                {
+                                    <div class="form-check d-flex align-items-center gap-2 mb-2">
+                                        <input class="form-check-input" type="checkbox" value="@property.Id" name="Form.SelectedPropertyIds" id="property_@property.Id" @(property.IsSelected ? "checked" : string.Empty) />
+                                        <label class="form-check-label mb-0" for="property_@property.Id">@property.Name (@property.Code)</label>
+                                    </div>
+                                }
+                            </fieldset>
+                        }
+                        else if (Model.PropertyOptions != null && Model.PropertyOptions.Count == 1)
+                        {
+                            var soleProperty = Model.PropertyOptions[0];
+                            <input type="hidden" name="Form.SelectedPropertyIds" value="@soleProperty.Id" />
+                            <div class="alert alert-info">
+                                Work order will be created for <strong>@soleProperty.Name (@soleProperty.Code)</strong>.
+                            </div>
+                        }
+                        <button type="submit" class="btn btn-primary w-100">@submitLabel</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
