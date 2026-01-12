@@ -90,32 +90,22 @@
         </form>
     }
     <header class="main-header">
-        <div class="container-fluid py-2 d-flex align-items-center justify-content-between">
-            <div class="d-flex align-items-center gap-3">
-                <a class="brand-lockup text-decoration-none" href="@Url.Action("Index", "Home")">
-                    <img src="~/favicon.png" alt="GuestQuest logo" class="brand-lockup__mark" asp-append-version="true" />
-                    <span class="brand-lockup__text">
-                        <span class="brand-lockup__title">GuestQuest</span>
-                        <span class="brand-lockup__subtitle">hOps</span>
-                    </span>
-                </a>
-                <button class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="true" data-sidebar-toggle="true">
-                    <span class="sidebar-toggle-icon" aria-hidden="true">
-                        <svg class="icon-collapse" viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="14 5 8 12 14 19" />
-                        </svg>
-                        <svg class="icon-expand" viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="10 5 16 12 10 19" />
-                        </svg>
-                    </span>
-                    <span class="sidebar-toggle-text d-none d-md-inline">Menu</span>
-                </button>
-                <div class="page-title">
-                    <span class="text-uppercase text-muted small">Hotel Operations</span>
-                    <h1 class="h5 mb-0 fw-semibold">@(ViewData["Title"] as string ?? "HotelOps")</h1>
+        <div class="container-fluid py-2">
+            <div class="main-header__top d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                <div class="main-header__identity d-flex align-items-center gap-3 flex-wrap">
+                    <a class="brand-lockup text-decoration-none" href="@Url.Action("Index", "Home")">
+                        <img src="~/favicon.png" alt="GuestQuest logo" class="brand-lockup__mark" asp-append-version="true" />
+                        <span class="brand-lockup__text">
+                            <span class="brand-lockup__title">GuestQuest</span>
+                            <span class="brand-lockup__subtitle">hOps</span>
+                        </span>
+                    </a>
+                    <div class="page-title">
+                        <span class="text-uppercase text-muted small">Hotel Operations</span>
+                        <h1 class="h5 mb-0 fw-semibold">@(ViewData["Title"] as string ?? "HotelOps")</h1>
+                    </div>
                 </div>
-            </div>
-            <ul class="nav align-items-center">
+                <ul class="nav align-items-center">
                 <li class="nav-item me-3 text-muted small d-none d-lg-block">
                     @todayDisplay
                 </li>
@@ -240,7 +230,21 @@
                         <a class="nav-link" asp-area="Identity" asp-page="/Account/Register">Register</a>
                     </li>
                 }
-            </ul>
+                </ul>
+            </div>
+            <div class="main-header__toggle text-end mt-2">
+                <button class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="true" data-sidebar-toggle="true">
+                    <span class="sidebar-toggle-icon" aria-hidden="true">
+                        <svg class="icon-collapse" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="14 5 8 12 14 19" />
+                        </svg>
+                        <svg class="icon-expand" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="10 5 16 12 10 19" />
+                        </svg>
+                    </span>
+                    <span class="sidebar-toggle-text d-none d-md-inline">Menu</span>
+                </button>
+            </div>
         </div>
     </header>
     <div class="hotel-layout-panel shadow-lg" id="hotelLayoutPanel" role="dialog" aria-modal="false">
