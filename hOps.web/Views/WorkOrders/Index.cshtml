@@ -378,9 +378,18 @@
 
         .workorders-form-wrapper {
             position: static;
+            width: 100%;
         }
 
-        @@media (min-width: 1200px) {
+        .workorders-form-column {
+            align-self: stretch;
+        }
+
+        @@media (min-width: 992px) {
+            .workorders-form-column {
+                align-self: flex-start;
+            }
+
             .workorders-form-wrapper {
                 position: sticky;
                 top: calc(var(--main-header-height) + 1.5rem);
@@ -764,7 +773,7 @@
             </div>
         </div>
     </div>
-    <div class="col-12 col-xl-4 col-xxl-3">
+    <div class="col-12 col-xl-4 col-xxl-3 workorders-form-column">
         <div class="workorders-form-wrapper">
             <div class="card shadow-sm workorders-form-card" id="workOrdersForm">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
