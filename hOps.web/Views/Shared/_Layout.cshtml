@@ -114,12 +114,6 @@
                     var userProps = ViewBag.UserProperties as List<Property>;
                     var currentProp = ViewBag.CurrentProperty as Property;
 
-                    <li class="nav-item me-2 d-none d-md-block">
-                        <a class="btn btn-outline-primary" asp-controller="Sales" asp-action="Index">Sales Lead</a>
-                    </li>
-                    <li class="nav-item me-2 d-md-none">
-                        <a class="nav-link @(currentController == "Sales" ? "active" : string.Empty)" asp-controller="Sales" asp-action="Index">Sales Lead</a>
-                    </li>
 
                     if (userProps != null && userProps.Count > 1)
                     {
@@ -144,18 +138,6 @@
                             </ul>
                         </li>
                     }
-
-                    <li class="nav-item me-2 d-none d-lg-block">
-                        <button type="button"
-                                class="btn btn-outline-secondary"
-                                data-hotel-layout-trigger
-                                aria-haspopup="dialog"
-                                aria-expanded="false"
-                                title="Hotel layout quick view">
-                            <span aria-hidden="true">🏨</span>
-                            <span class="d-none d-xl-inline ms-1">Layout</span>
-                        </button>
-                    </li>
 
                     <li class="nav-item dropdown me-2" id="bookmarkMenu">
                         <a class="nav-link position-relative bookmark-toggle" href="#" id="bookmarkMenuToggle" data-bookmark-toggle aria-expanded="false" aria-label="Quick bookmarks">
@@ -232,18 +214,35 @@
                 }
                 </ul>
             </div>
-            <div class="main-header__toggle text-end mt-2">
-                <button class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="true" data-sidebar-toggle="true">
-                    <span class="sidebar-toggle-icon" aria-hidden="true">
-                        <svg class="icon-collapse" viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="14 5 8 12 14 19" />
-                        </svg>
-                        <svg class="icon-expand" viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="10 5 16 12 10 19" />
-                        </svg>
-                    </span>
-                    <span class="sidebar-toggle-text d-none d-md-inline">Menu</span>
-                </button>
+            <div class="main-header__actions d-flex justify-content-between align-items-center gap-2 flex-wrap mt-2">
+                <div>
+                    <button class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="true" data-sidebar-toggle="true">
+                        <span class="sidebar-toggle-icon" aria-hidden="true">
+                            <svg class="icon-collapse" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="14 5 8 12 14 19" />
+                            </svg>
+                            <svg class="icon-expand" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="10 5 16 12 10 19" />
+                            </svg>
+                        </span>
+                        <span class="sidebar-toggle-text d-none d-md-inline">Menu</span>
+                    </button>
+                </div>
+                @if (SignInManager.IsSignedIn(User))
+                {
+                    <div class="d-flex align-items-center gap-2 flex-wrap w-100 w-md-auto justify-content-md-end">
+                        <a class="btn btn-outline-primary w-100 w-md-auto" asp-controller="Sales" asp-action="Index">Sales Lead</a>
+                        <button type="button"
+                                class="btn btn-outline-secondary w-100 w-md-auto"
+                                data-hotel-layout-trigger
+                                aria-haspopup="dialog"
+                                aria-expanded="false"
+                                title="Hotel layout quick view">
+                            <span aria-hidden="true">dY?"</span>
+                            <span class="ms-1">Layout</span>
+                        </button>
+                    </div>
+                }
             </div>
         </div>
     </header>
@@ -2312,6 +2311,7 @@
 </div>
 </body>
 </html>
+
 
 
 
