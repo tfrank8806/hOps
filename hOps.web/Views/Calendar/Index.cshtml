@@ -2,7 +2,7 @@
 @using System.Text.Json
 @{
     ViewData["Title"] = "Calendar";
-    ViewData["MainContainerClass"] = "main-inner--wide";
+    ViewData["MainContainerClass"] = "main-inner--wide main-inner--wide-stretched";
     var dayHeaders = new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
     var disableForm = !Model.AccessibleProperties.Any();
     var today = DateTime.Today;
@@ -51,7 +51,7 @@
 }
 
     <div class="calendar-page__layout row g-4 align-items-start">
-        <div class="col-12 col-xl-8 calendar-page__main">
+        <div class="col-12 col-xxl-9 calendar-page__main">
         <section class="calendar-page__calendar">
             <div class="calendar-page__calendar-surface shadow-sm border rounded overflow-hidden">
                 <div class="table-responsive">
@@ -181,9 +181,9 @@
                 </div>
                 <div class="card-body">
                     <form asp-action="Create" method="post" enctype="multipart/form-data" id="calendarCreateForm">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="month" value="@Model.CurrentMonth.Month" />
-                        <input type="hidden" name="year" value="@Model.CurrentMonth.Year" />
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="month" value="@Model.CurrentMonth.Month" />
+        <input type="hidden" name="year" value="@Model.CurrentMonth.Year" />
 
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
@@ -298,7 +298,7 @@
             </div>
         </div>
 
-        <aside class="col-12 col-xl-4 calendar-page__sidebar">
+        <aside class="col-12 col-xxl-3 calendar-page__sidebar">
             <div class="calendar-upcoming-sticky">
             <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
