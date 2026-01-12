@@ -50,7 +50,8 @@
     </div>
 }
 
-    <div class="calendar-page__layout">
+    <div class="calendar-page__layout row g-4 align-items-start">
+        <div class="col-12 col-xl-8 calendar-page__main">
         <section class="calendar-page__calendar">
             <div class="calendar-page__calendar-surface shadow-sm border rounded overflow-hidden">
                 <div class="table-responsive">
@@ -174,55 +175,7 @@
             </div>
         </section>
 
-        <aside class="calendar-page__sidebar">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>Upcoming Events</span>
-                    <span class="badge bg-secondary">Next 10</span>
-                </div>
-                <div class="list-group list-group-flush">
-                    @if (Model.UpcomingEvents.Any())
-                    {
-                        foreach (var upcoming in Model.UpcomingEvents)
-                        {
-                            <button type="button"
-                                    class="list-group-item list-group-item-action calendar-upcoming-event"
-                                    style="border-left: 4px solid @upcoming.CategoryColor;"
-                                    data-calendar-event="true"
-                                    data-event-id="@upcoming.Id"
-                                    data-event-title="@upcoming.Title"
-                                    data-event-category="@upcoming.CategoryName"
-                                    data-event-color="@upcoming.CategoryColor"
-                                    data-event-text-color="@upcoming.CategoryTextColor"
-                                    data-event-date="@upcoming.DateDisplay"
-                                    data-event-time="@(upcoming.TimeDisplay ?? string.Empty)"
-                                    data-event-recurrence="@upcoming.RecurrenceDisplay"
-                                    data-event-details="@(upcoming.Details ?? string.Empty)"
-                                    data-event-properties="@upcoming.PropertiesDisplay"
-                                    data-event-created-by="@upcoming.CreatedByDisplay"
-                                    data-event-created-at="@TimeZoneService.ConvertToUserTime(upcoming.CreatedAtUtc).ToString("f")"
-                                    data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = upcoming.Id })"
-                                    data-event-attachments='@JsonSerializer.Serialize(upcoming.Attachments)'>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="fw-semibold">@upcoming.Title</span>
-                                    <span class="badge" style="background-color: @upcoming.CategoryColor; color: @upcoming.CategoryTextColor">@upcoming.CategoryName</span>
-                                </div>
-                                <small class="text-muted">@upcoming.DateDisplay</small>
-                                @if (!string.IsNullOrWhiteSpace(upcoming.TimeDisplay))
-                                {
-                                    <small class="text-muted">@upcoming.TimeDisplay</small>
-                                }
-                            </button>
-                        }
-                    }
-                    else
-                    {
-                        <div class="list-group-item text-muted">No upcoming events.</div>
-                    }
-                </div>
-            </div>
-
-            <div class="card shadow-sm calendar-page__form">
+            <div class="card shadow-sm calendar-page__form mt-4">
                 <div class="card-header">
                     <span>Create Event</span>
                 </div>
@@ -343,6 +296,57 @@
                     </form>
                 </div>
             </div>
+        </div>
+
+        <aside class="col-12 col-xl-4 calendar-page__sidebar">
+            <div class="calendar-upcoming-sticky">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Upcoming Events</span>
+                    <span class="badge bg-secondary">Next 10</span>
+                </div>
+                <div class="list-group list-group-flush">
+                    @if (Model.UpcomingEvents.Any())
+                    {
+                        foreach (var upcoming in Model.UpcomingEvents)
+                        {
+                            <button type="button"
+                                    class="list-group-item list-group-item-action calendar-upcoming-event"
+                                    style="border-left: 4px solid @upcoming.CategoryColor;"
+                                    data-calendar-event="true"
+                                    data-event-id="@upcoming.Id"
+                                    data-event-title="@upcoming.Title"
+                                    data-event-category="@upcoming.CategoryName"
+                                    data-event-color="@upcoming.CategoryColor"
+                                    data-event-text-color="@upcoming.CategoryTextColor"
+                                    data-event-date="@upcoming.DateDisplay"
+                                    data-event-time="@(upcoming.TimeDisplay ?? string.Empty)"
+                                    data-event-recurrence="@upcoming.RecurrenceDisplay"
+                                    data-event-details="@(upcoming.Details ?? string.Empty)"
+                                    data-event-properties="@upcoming.PropertiesDisplay"
+                                    data-event-created-by="@upcoming.CreatedByDisplay"
+                                    data-event-created-at="@TimeZoneService.ConvertToUserTime(upcoming.CreatedAtUtc).ToString("f")"
+                                    data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = upcoming.Id })"
+                                    data-event-attachments='@JsonSerializer.Serialize(upcoming.Attachments)'>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-semibold">@upcoming.Title</span>
+                                    <span class="badge" style="background-color: @upcoming.CategoryColor; color: @upcoming.CategoryTextColor">@upcoming.CategoryName</span>
+                                </div>
+                                <small class="text-muted">@upcoming.DateDisplay</small>
+                                @if (!string.IsNullOrWhiteSpace(upcoming.TimeDisplay))
+                                {
+                                    <small class="text-muted">@upcoming.TimeDisplay</small>
+                                }
+                            </button>
+                        }
+                    }
+                    else
+                    {
+                        <div class="list-group-item text-muted">No upcoming events.</div>
+                    }
+                </div>
+            </div>
+            </div>
         </aside>
     </div>
 
@@ -395,6 +399,28 @@
 
 @section Styles {
     <style>
+        .calendar-page__layout {
+            margin-top: 1rem;
+        }
+
+        .calendar-page__main,
+        .calendar-page__sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .calendar-upcoming-sticky {
+            position: static;
+        }
+
+        @@media (min-width: 1200px) {
+            .calendar-upcoming-sticky {
+                position: sticky;
+                top: calc(var(--main-header-height) + 1.5rem);
+            }
+        }
+
         .calendar-table {
             width: 100%;
             table-layout: fixed;
