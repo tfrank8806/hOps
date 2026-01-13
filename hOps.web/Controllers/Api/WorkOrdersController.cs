@@ -150,7 +150,7 @@ namespace hOps.web.Controllers.Api
                     : request.Status,
                 CreatedAt = DateTime.UtcNow,
                 CreatedById = currentUser.Id,
-                DueDate = (request.DueDateUtc ?? DateTime.UtcNow.Date).Date
+                DueDate = (request.DueDateUtc ?? DateTime.UtcNow.Date.AddDays(1)).Date
             };
 
             foreach (var propertyId in propertySelection)

@@ -322,7 +322,7 @@ namespace hOps.web.Controllers
                 WorkOrderTypeId = request.WorkOrderTypeId,
                 Issue = issue,
                 Details = string.IsNullOrWhiteSpace(request.Details) ? null : request.Details.Trim(),
-                DueDate = NormalizeUtcDate((request.DueDate ?? DateTime.UtcNow.Date).Date),
+                DueDate = NormalizeUtcDate((request.DueDate ?? DateTime.UtcNow.Date.AddDays(1)).Date),
                 DepartmentId = request.DepartmentId,
                 SelectedPropertyIds = new List<int> { request.PropertyId }
             };
@@ -1211,7 +1211,7 @@ namespace hOps.web.Controllers
             var effectiveForm = form ?? new WorkOrderFormViewModel
             {
                 Status = defaultStatus,
-                DueDate = DateTime.UtcNow.Date
+                DueDate = DateTime.UtcNow.Date.AddDays(1)
             };
 
             if (string.IsNullOrWhiteSpace(effectiveForm.Status))
