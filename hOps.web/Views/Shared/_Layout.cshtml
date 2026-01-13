@@ -214,8 +214,8 @@
                 }
                 </ul>
             </div>
-            <div class="main-header__actions d-flex justify-content-between align-items-center gap-2 flex-wrap mt-2">
-                <div class="d-flex gap-2">
+            <div class="main-header__actions d-flex justify-content-end align-items-center gap-2 flex-wrap mt-2">
+                <div class="d-flex gap-2 flex-wrap align-items-center justify-content-end w-100">
                     <button class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="true" data-sidebar-toggle="true">
                         <span class="sidebar-toggle-icon" aria-hidden="true">
                             <svg class="icon-collapse" viewBox="0 0 24 24" fill="currentColor">
@@ -227,10 +227,23 @@
                         </span>
                         <span class="sidebar-toggle-text d-none d-md-inline">Menu</span>
                     </button>
+                    @if (SignInManager.IsSignedIn(User))
+                    {
+                        <a class="btn btn-outline-primary w-100 w-md-auto" asp-controller="Sales" asp-action="Index">Sales Lead</a>
+                        <button type="button"
+                                class="btn btn-outline-secondary w-100 w-md-auto"
+                                data-hotel-layout-trigger
+                                aria-haspopup="dialog"
+                                aria-expanded="false"
+                                title="Hotel layout quick view">
+                            <span aria-hidden="true">dY?"</span>
+                            <span class="ms-1">Layout</span>
+                        </button>
+                    }
                     @if (SignInManager.IsSignedIn(User) && showTodoSidebar)
                     {
                         <button type="button"
-                                class="sidebar-toggle sidebar-toggle--todo"
+                                class="sidebar-toggle sidebar-toggle--todo ms-md-2"
                                 data-todo-toggle="toggle"
                                 aria-controls="todoSidebar"
                                 aria-expanded="true"
@@ -247,21 +260,6 @@
                         </button>
                     }
                 </div>
-                @if (SignInManager.IsSignedIn(User))
-                {
-                    <div class="d-flex align-items-center gap-2 flex-wrap w-100 w-md-auto justify-content-md-end mt-2 mt-md-0">
-                        <a class="btn btn-outline-primary w-100 w-md-auto" asp-controller="Sales" asp-action="Index">Sales Lead</a>
-                        <button type="button"
-                                class="btn btn-outline-secondary w-100 w-md-auto"
-                                data-hotel-layout-trigger
-                                aria-haspopup="dialog"
-                                aria-expanded="false"
-                                title="Hotel layout quick view">
-                            <span aria-hidden="true">dY?"</span>
-                            <span class="ms-1">Layout</span>
-                        </button>
-                    </div>
-                }
             </div>
         </div>
     </header>
