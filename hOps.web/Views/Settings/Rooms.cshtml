@@ -67,11 +67,31 @@
     <table class="table table-bordered table-striped" id="roomsTable">
         <thead class="table-light">
             <tr>
-                <th>Room Number</th>
-                <th>Abbreviation</th>
-                <th>Room Type</th>
-                <th>Floor</th>
-                <th>Description</th>
+                <th>
+                    <button type="button" class="btn btn-link p-0 text-decoration-none table-sort" data-sort-key="RoomNumber" data-sort-type="text">
+                        Room Number <span class="sort-indicator ms-1 small text-muted"></span>
+                    </button>
+                </th>
+                <th>
+                    <button type="button" class="btn btn-link p-0 text-decoration-none table-sort" data-sort-key="Abbreviation" data-sort-type="text">
+                        Abbreviation <span class="sort-indicator ms-1 small text-muted"></span>
+                    </button>
+                </th>
+                <th>
+                    <button type="button" class="btn btn-link p-0 text-decoration-none table-sort" data-sort-key="RoomType" data-sort-type="text">
+                        Room Type <span class="sort-indicator ms-1 small text-muted"></span>
+                    </button>
+                </th>
+                <th>
+                    <button type="button" class="btn btn-link p-0 text-decoration-none table-sort" data-sort-key="Floor" data-sort-type="number">
+                        Floor <span class="sort-indicator ms-1 small text-muted"></span>
+                    </button>
+                </th>
+                <th>
+                    <button type="button" class="btn btn-link p-0 text-decoration-none table-sort" data-sort-key="Description" data-sort-type="text">
+                        Description <span class="sort-indicator ms-1 small text-muted"></span>
+                    </button>
+                </th>
                 <th>Action</th>
             </tr>
         </thead>
@@ -129,6 +149,16 @@
     const roomsTable = document.getElementById("roomsTable");
     const roomsTableBody = roomsTable ? roomsTable.querySelector("tbody") : null;
     const newRowTemplate = document.getElementById("newRowTemplate");
+    const sortButtons = document.querySelectorAll(".table-sort");
+    const sortSelectors = {
+        RoomNumber: 'input[name$=".RoomNumber"]',
+        Abbreviation: 'input[name$=".Abbreviation"]',
+        RoomType: 'input[name$=".RoomType"]',
+        Floor: 'input[name$=".Floor"]',
+        Description: 'input[name$=".Description"]'
+    };
+    let currentSortKey = null;
+    let currentSortDirection = "asc";
 
     function addRoomRow(position) {
         if (!roomsTableBody || !newRowTemplate) {
@@ -148,6 +178,93 @@
         }
     }
 
+    function sortRoomsTable(key, sortType, direction) {
+        if (!roomsTableBody) {
+            return;
+        }
+
+        const rows = Array.from(roomsTableBody.querySelectorAll("tr"))
+            .filter(row => row.id !== "newRowTemplate");
+
+        if (!rows.length) {
+            return;
+        }
+
+        rows.sort((a, b) => {
+            const aValue = getSortValue(a, key);
+            const bValue = getSortValue(b, key);
+
+            if (sortType === "number") {
+                const aNumber = parseInt(aValue, 10);
+                const bNumber = parseInt(bValue, 10);
+                const aMissing = Number.isNaN(aNumber);
+                const bMissing = Number.isNaN(bNumber);
+
+                if (aMissing && bMissing) {
+                    return 0;
+                }
+                if (aMissing) {
+                    return 1;
+                }
+                if (bMissing) {
+                    return -1;
+                }
+
+                return direction === "asc" ? aNumber - bNumber : bNumber - aNumber;
+            }
+
+            const normalizedA = (aValue || "").toLowerCase();
+            const normalizedB = (bValue || "").toLowerCase();
+
+            if (!normalizedA && !normalizedB) {
+                return 0;
+            }
+            if (!normalizedA) {
+                return 1;
+            }
+            if (!normalizedB) {
+                return -1;
+            }
+
+            return direction === "asc"
+                ? normalizedA.localeCompare(normalizedB)
+                : normalizedB.localeCompare(normalizedA);
+        });
+
+        rows.forEach(row => roomsTableBody.appendChild(row));
+    }
+
+    function getSortValue(row, key) {
+        const selector = sortSelectors[key];
+        if (!selector) {
+            return "";
+        }
+
+        const input = row.querySelector(selector);
+        if (!input) {
+            return "";
+        }
+
+        return (input.value || "").toString().trim();
+    }
+
+    function updateSortIndicators(activeButton, direction) {
+        sortButtons.forEach(button => {
+            const indicator = button.querySelector(".sort-indicator");
+            if (!indicator) {
+                return;
+            }
+
+            if (button === activeButton) {
+                indicator.textContent = direction === "asc" ? "^" : "v";
+                indicator.classList.remove("invisible");
+            } else {
+                indicator.textContent = "";
+                indicator.classList.add("invisible");
+            }
+        });
+    }
+
     addRowButtons.forEach(function (btn) {
         btn.addEventListener("click", function () {
             const position = btn.getAttribute("data-insert-position") || "bottom";
@@ -163,6 +280,26 @@
             }
         });
     }
+
+    sortButtons.forEach(function (button) {
+        button.addEventListener("click", function () {
+            const key = button.getAttribute("data-sort-key");
+            const sortType = button.getAttribute("data-sort-type") || "text";
+            if (!key) {
+                return;
+            }
+
+            var nextDirection = "asc";
+            if (currentSortKey === key && currentSortDirection === "asc") {
+                nextDirection = "desc";
+            }
+
+            sortRoomsTable(key, sortType, nextDirection);
+            currentSortKey = key;
+            currentSortDirection = nextDirection;
+            updateSortIndicators(button, nextDirection);
+        });
+    });
 
     var select = document.getElementById("propertySelect");
     if (select) {
