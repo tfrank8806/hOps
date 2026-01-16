@@ -21,7 +21,7 @@
             <div class="flex-fill position-relative w-100" style="max-width: 480px;">
                 <label for="faqSearch" class="form-label fw-semibold mb-1">Search FAQs</label>
                 <div class="position-relative">
-                    <input id="faqSearch" type="search" class="form-control form-control-lg" placeholder="Try “import rooms” or “reset password”" autocomplete="off" />
+                    <input id="faqSearch" type="search" class="form-control form-control-lg" placeholder="Try &quot;import rooms&quot; or &quot;reset password&quot;" autocomplete="off" />
                     <div id="faqSearchResults" class="list-group shadow-sm position-absolute start-0 top-100 w-100 d-none" style="z-index: 5;"></div>
                 </div>
                 <div id="faqSearchMeta" class="small text-muted mt-2">Showing all answers</div>
@@ -38,9 +38,9 @@
                     <h2 class="h6 mb-0 text-uppercase text-muted">Browse by topic</h2>
                 </div>
                 <div class="list-group list-group-flush">
-                    @foreach (var section in faqSections)
+                    @foreach (var topic in faqSections)
                     {
-                        <a class="list-group-item list-group-item-action faq-nav-link" href="#@section.Id" data-section="@section.Id">@section.Title</a>
+                        <a class="list-group-item list-group-item-action faq-nav-link" href="#@topic.Id" data-section="@topic.Id">@topic.Title</a>
                     }
                 </div>
             </div>
@@ -191,8 +191,8 @@
                         <div class="faq-answer mt-3">
                             <p>Create a log template per focus area (Front Desk, Engineering, Housekeeping). Use row colors or the flag column to highlight items awaiting follow-up.</p>
                             <ul>
-                                <li>Duplicate yesterday’s log with <strong>Actions &gt; Copy</strong> to keep formatting.</li>
-                                <li>Use <code>@mentions</code> to notify teammates directly from the log.</li>
+                                <li>Duplicate yesterday's log with <strong>Actions &gt; Copy</strong> to keep formatting.</li>
+                                <li>Use <code>&#64;mentions</code> to notify teammates directly from the log.</li>
                                 <li>Export to Excel from the toolbar for offline archiving.</li>
                             </ul>
                             <a asp-controller="PassOnLogs" asp-action="Index" class="btn btn-outline-primary btn-sm">Open Pass On Logs</a>
@@ -234,7 +234,7 @@
                     <details id="faq-communication-mentions" class="faq-item" data-faq-question data-faq-section="communication" data-question-title="How do mentions and alerts work?" data-search="mentions alerts notifications message center all">
                         <summary>How do mentions and alerts work?</summary>
                         <div class="faq-answer mt-3">
-                            <p>Type <code>@</code> inside logs, comments, or messages to mention someone. They receive an in-app notification plus an email (if enabled). Use <code>@all</code> for everyone who has access to that record.</p>
+                            <p>Type <code>&#64;</code> inside logs, comments, or messages to mention someone. They receive an in-app notification plus an email (if enabled). Use <code>&#64;all</code> for everyone who has access to that record.</p>
                             <p class="mb-2">The Message Center (bell icon) shows unread alerts and DMs in one place. Dismiss items you no longer need.</p>
                         </div>
                     </details>
@@ -250,7 +250,7 @@
                     <details id="faq-communication-noisy" class="faq-item" data-faq-question data-faq-section="communication" data-question-title="What if messages feel noisy?" data-search="mute channel pause notifications filters message center">
                         <summary>What if messages feel noisy?</summary>
                         <div class="faq-answer mt-3">
-                            <p>Filter the Message Center by Direct Messages vs. Alerts, and archive items you no longer need. Encourage teams to mention individuals or roles instead of @all when something is not urgent.</p>
+                            <p>Filter the Message Center by Direct Messages vs. Alerts, and archive items you no longer need. Encourage teams to mention individuals or roles instead of &#64;all when something is not urgent.</p>
                             <p class="mb-0">For urgent broadcast needs, create a pinned Pass On log entry or schedule announcement so everyone sees the same message.</p>
                         </div>
                     </details>
@@ -464,10 +464,12 @@
             animation: faqPulse 1.5s ease;
         }
 
-        @keyframes faqPulse {
+        @@keyframes faqPulse {
             0% { box-shadow: 0 0 0 rgba(13, 110, 253, 0.2); }
             50% { box-shadow: 0 0 12px rgba(13, 110, 253, 0.5); }
             100% { box-shadow: 0 0 0 rgba(13, 110, 253, 0); }
         }
     </style>
 }
+
+
