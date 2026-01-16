@@ -49,6 +49,7 @@
             </div>
             <div class="col-md-6 d-flex flex-wrap align-items-center gap-2">
                 <button type="submit" class="btn btn-primary">Import CSV</button>
+                <a asp-action="DownloadRoomsCsv" asp-route-propertyId="@propertyId" class="btn btn-outline-primary">Download Current Rooms</a>
                 <a asp-action="DownloadRoomsTemplate" class="btn btn-outline-secondary">Download Template</a>
             </div>
         </form>

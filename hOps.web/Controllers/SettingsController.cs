@@ -1221,6 +1221,44 @@ namespace hOps.web.Controllers
             return File(bytes, "text/csv", "rooms-template.csv");
         }
 
+        [HttpGet]
+        public async Task<IActionResult> DownloadRoomsCsv(int propertyId)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            var property = properties.FirstOrDefault(p => p.Id == propertyId);
+            if (property == null)
+            {
+                return Forbid();
+            }
+
+            var rooms = await _db.Rooms
+                .Where(r => r.PropertyId == propertyId)
+                .OrderBy(r => r.Floor)
+                .ThenBy(r => r.RoomNumber)
+                .ToListAsync();
+
+            var builder = new StringBuilder();
+            builder.AppendLine("RoomNumber,Abbreviation,RoomType,Floor,Description");
+
+            foreach (var room in rooms)
+            {
+                var csvLine = string.Join(",", new[]
+                {
+                    EscapeCsv(room.RoomNumber),
+                    EscapeCsv(room.Abbreviation),
+                    EscapeCsv(room.RoomType),
+                    EscapeCsv(room.Floor.ToString()),
+                    EscapeCsv(room.Description)
+                });
+
+                builder.AppendLine(csvLine);
+            }
+
+            var fileName = $"rooms-property-{propertyId}.csv";
+            var bytes = Encoding.UTF8.GetBytes(builder.ToString());
+            return File(bytes, "text/csv", fileName);
+        }
+
         private static string? NormalizeRoomAbbreviation(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -1235,6 +1273,18 @@ namespace hOps.web.Controllers
             }
 
             return trimmed.ToUpperInvariant();
+        }
+
+        private static string EscapeCsv(string? value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return string.Empty;
+            }
+
+            var needsQuotes = value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r');
+            var sanitized = value.Replace("\"", "\"\"");
+            return needsQuotes ? $"\"{sanitized}\"" : sanitized;
         }
 
         // - Layout Editor & Save -
