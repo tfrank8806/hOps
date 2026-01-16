@@ -1,109 +1,473 @@
 @{
-    ViewData["Title"] ??= "Tips & Tricks";
+    ViewData["Title"] = "FAQs & Guides";
+    var faqSections = new[]
+    {
+        new { Id = "accounts", Title = "Account & Access" },
+        new { Id = "rooms", Title = "Rooms & Layouts" },
+        new { Id = "operations", Title = "Logs & Work Orders" },
+        new { Id = "communication", Title = "Messaging & Notifications" },
+        new { Id = "mobile", Title = "Mobile & Offline" }
+    };
 }
 
-<div class="d-flex flex-column gap-4">
-    <div class="card shadow-sm">
-        <div class="card-header">
-            <h2 class="h5 mb-0">Quick wins in hOps</h2>
-            <small class="text-muted">Sharpen your workflow with these built-in helpers.</small>
-        </div>
-        <div class="card-body">
-            <div class="row g-4 row-cols-1 row-cols-md-2">
-                <div class="col">
-                    <div class="p-3 border rounded h-100 bg-light-subtle">
-                        <h3 class="h6 text-uppercase text-muted">Mention teammates</h3>
-                        <p class="mb-2">Type <code>&#64;</code> followed by a name anywhere you can write rich text (logs, comments, messages). hOps suggests people as you type and sends them a notification.</p>
-                        <ul class="small ps-3 mb-0">
-                            <li>Use <code>&#64;all</code> to reach everyone with access to the item.</li>
-                            <li>Mentions work in Pass On Logs, Package Logs, Work Orders, and Direct Messages.</li>
-                        </ul>
-                    </div>
+<div class="mb-4">
+    <div class="bg-body-tertiary border rounded p-4 shadow-sm">
+        <div class="d-flex flex-column flex-lg-row align-items-lg-center gap-3">
+            <div class="flex-fill">
+                <p class="text-uppercase text-muted small mb-1 fw-semibold">Knowledge base 2.0</p>
+                <h1 class="h3 mb-2">Find answers faster</h1>
+                <p class="mb-0 text-muted">Browse outcome-based sections, search across everything, or jump straight into the tool you need.</p>
+            </div>
+            <div class="flex-fill position-relative w-100" style="max-width: 480px;">
+                <label for="faqSearch" class="form-label fw-semibold mb-1">Search FAQs</label>
+                <div class="position-relative">
+                    <input id="faqSearch" type="search" class="form-control form-control-lg" placeholder="Try “import rooms” or “reset password”" autocomplete="off" />
+                    <div id="faqSearchResults" class="list-group shadow-sm position-absolute start-0 top-100 w-100 d-none" style="z-index: 5;"></div>
                 </div>
-                <div class="col">
-                    <div class="p-3 border rounded h-100 bg-light-subtle">
-                        <h3 class="h6 text-uppercase text-muted">Stay on top of logs</h3>
-                        <p class="mb-2">Click any log cell and use the toolbar to format text, change colors, or merge cells. Arrow keys move between entries—press <kbd>Enter</kbd> to edit and <kbd>Esc</kbd> to cancel.</p>
-                        <ul class="small ps-3 mb-0">
-                            <li>Use the sidebar to switch logs or duplicate templates.</li>
-                            <li>Export to Excel anytime for offline tracking.</li>
-                        </ul>
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="p-3 border rounded h-100 bg-light-subtle">
-                        <h3 class="h6 text-uppercase text-muted">Work order shortcuts</h3>
-                        <p class="mb-2">Assign a department, add photos, and &#64;mention teammates in updates so everyone stays aligned.</p>
-                        <ul class="small ps-3 mb-0">
-                            <li>Filter the list to show only your departments or open items.</li>
-                            <li>Use the timeline to track every status change.</li>
-                        </ul>
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="p-3 border rounded h-100 bg-light-subtle">
-                        <h3 class="h6 text-uppercase text-muted">Calendar & reminders</h3>
-                        <p class="mb-2">Create calendar events for inspections, VIP arrivals, and recurring tasks. Attach properties so the right teams see them.</p>
-                        <ul class="small ps-3 mb-0">
-                            <li>Switch between property calendars with the selector in the header.</li>
-                            <li>Add subscribers to send reminders automatically.</li>
-                        </ul>
-                    </div>
-                </div>
+                <div id="faqSearchMeta" class="small text-muted mt-2">Showing all answers</div>
             </div>
         </div>
     </div>
+</div>
 
-    <div class="card shadow-sm">
-        <div class="card-header">
-            <h2 class="h5 mb-0">Communication best practices</h2>
-        </div>
-        <div class="card-body">
-            <ul class="list-unstyled d-flex flex-column gap-3 mb-0">
-                <li>
-                    <h3 class="h6 mb-1 text-uppercase text-muted">Use Pass On Logs for shift notes</h3>
-                    <p class="mb-0">Create one log per focus area (Front Desk, Engineering, Housekeeping). Color-code rows to highlight follow-up items.</p>
-                </li>
-                <li>
-                    <h3 class="h6 mb-1 text-uppercase text-muted">Keep the inbox tidy</h3>
-                    <p class="mb-0">Direct Messages are great for quick clarifications. Use the "View History" button in logs if you need to review who changed what.</p>
-                </li>
-                <li>
-                    <h3 class="h6 mb-1 text-uppercase text-muted">Bookmark recurring resources</h3>
-                    <p class="mb-0">Save key SOPs or vendor info with bookmarks. They surface on the Home dashboard for fast access.</p>
-                </li>
-            </ul>
-        </div>
-    </div>
-
-    <div class="card shadow-sm">
-        <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <div>
-                <h2 class="h5 mb-0">Need a deeper dive?</h2>
-                <small class="text-muted">We are building a richer knowledge base—tell us what to cover next.</small>
-            </div>
-            <a asp-action="Index" class="btn btn-outline-primary btn-sm">Submit a Support Ticket</a>
-        </div>
-        <div class="card-body">
-            <div class="row g-4 row-cols-1 row-cols-md-2">
-                <div class="col">
-                    <div class="border rounded p-3 h-100">
-                        <h3 class="h6 text-uppercase text-muted">Training ideas</h3>
-                        <ul class="small ps-3 mb-0">
-                            <li>How to build reusable log templates</li>
-                            <li>Setting up departments &amp; staffing notifications</li>
-                            <li>Automating daily summary emails</li>
-                        </ul>
-                    </div>
+<div class="row g-4">
+    <aside class="col-12 col-lg-3">
+        <div class="position-sticky" style="top: 88px;">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header">
+                    <h2 class="h6 mb-0 text-uppercase text-muted">Browse by topic</h2>
                 </div>
-                <div class="col">
-                    <div class="border rounded p-3 h-100">
-                        <h3 class="h6 text-uppercase text-muted">Share your tips</h3>
-                        <p class="small mb-2">Have a workflow hack or template that helps your team? Send it via Support so we can add it here.</p>
-                        <p class="small mb-0 text-muted">Together we keep operations running smoothly.</p>
-                    </div>
+                <div class="list-group list-group-flush">
+                    @foreach (var section in faqSections)
+                    {
+                        <a class="list-group-item list-group-item-action faq-nav-link" href="#@section.Id" data-section="@section.Id">@section.Title</a>
+                    }
+                </div>
+            </div>
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h3 class="h6 text-uppercase text-muted">Need a human?</h3>
+                    <p class="small mb-2">If an answer is missing, send the context to our team and we will follow up.</p>
+                    <a asp-controller="Support" asp-action="Index" class="btn btn-primary btn-sm w-100">Open Support Ticket</a>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="col-12 col-lg-9">
+        <div id="faqNoResults" class="alert alert-warning d-none">
+            Nothing matched your search. Try different keywords or <a asp-controller="Support" asp-action="Index" class="alert-link">contact Support</a>.
+        </div>
+
+        <section id="accounts" class="faq-section mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h2 class="h4 mb-1">Account &amp; Access</h2>
+                    <p class="text-muted mb-0">Requests, passwords, and property visibility.</p>
+                </div>
+                <div class="card-body d-flex flex-column gap-3">
+                    <details id="faq-account-request" class="faq-item" data-faq-question data-faq-section="accounts" data-question-title="How do I request access for a teammate?" data-search="request access account invite new teammate">
+                        <summary>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <span>How do I request access for a teammate?</span>
+                                <span class="badge text-bg-info">Updated</span>
+                            </div>
+                        </summary>
+                        <div class="faq-answer mt-3">
+                            <p>Point the teammate to the access request form. They will complete the short questionnaire and our admins approve once a manager confirms.</p>
+                            <ol class="mb-3">
+                                <li>Send them the secure link below.</li>
+                                <li>Have them complete all required fields &amp; the CAPTCHA.</li>
+                                <li>Managers receive a notification to approve or reject the request.</li>
+                            </ol>
+                            <a asp-area="Identity" asp-page="/Account/Register" class="btn btn-outline-primary btn-sm me-2">Open Access Request</a>
+                            <a asp-controller="Admin" asp-action="AccessRequests" class="btn btn-link btn-sm">Review pending approvals</a>
+                            <div class="faq-feedback-wrapper mt-3">
+                                <span class="text-muted small me-2">Was this helpful?</span>
+                                <button type="button" class="btn btn-sm btn-outline-success faq-feedback" data-feedback="yes">Yes</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary faq-feedback" data-feedback="no">Not really</button>
+                                <span class="faq-feedback-response small text-muted ms-2 d-none"></span>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details id="faq-account-password" class="faq-item" data-faq-question data-faq-section="accounts" data-question-title="I forgot my password—what should I do?" data-search="forgot password reset email link sign in">
+                        <summary>I forgot my password—what should I do?</summary>
+                        <div class="faq-answer mt-3">
+                            <p>Use the password reset flow. Enter your sign-in email and we will email a secure link that lasts 30 minutes.</p>
+                            <ul>
+                                <li>Check spam/junk folders for the message titled <em>Reset your hOps password</em>.</li>
+                                <li>If you use SSO at your property, reset your password with the identity provider instead.</li>
+                                <li>Still locked out? Ask another admin to trigger a manual reset from the Users page.</li>
+                            </ul>
+                            <a asp-area="Identity" asp-page="/Account/ForgotPassword" class="btn btn-outline-primary btn-sm">Send reset link</a>
+                            <div class="faq-feedback-wrapper mt-3">
+                                <span class="text-muted small me-2">Was this helpful?</span>
+                                <button type="button" class="btn btn-sm btn-outline-success faq-feedback" data-feedback="yes">Yes</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary faq-feedback" data-feedback="no">Not really</button>
+                                <span class="faq-feedback-response small text-muted ms-2 d-none"></span>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details id="faq-account-property-visibility" class="faq-item" data-faq-question data-faq-section="accounts" data-question-title="Why can’t I see my property or departments?" data-search="missing property departments access switcher visibility roles">
+                        <summary>Why can’t I see my property or departments?</summary>
+                        <div class="faq-answer mt-3">
+                            <p>Use the property switcher in the global header to confirm you are looking at the right location. If the property is missing entirely, you likely do not have access yet.</p>
+                            <p>Ask an Admin or Manager to open <strong>Admin &gt; Users &gt; Property Access</strong> and grant you access. Once saved, refresh the page and the property will appear in the selector.</p>
+                            <div class="alert alert-info mb-2 small">
+                                Tip: if you work across properties, bookmark each dashboard; hOps remembers your last selection.
+                            </div>
+                            <a asp-controller="Admin" asp-action="Users" class="btn btn-outline-primary btn-sm me-2">Manage user access</a>
+                            <a asp-controller="Support" asp-action="Index" class="btn btn-link btn-sm">Contact Support</a>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <section id="rooms" class="faq-section mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h2 class="h4 mb-1">Rooms &amp; Layouts</h2>
+                    <p class="text-muted mb-0">Keep the source of truth current for housekeeping, layouts, and packages.</p>
+                </div>
+                <div class="card-body d-flex flex-column gap-3">
+                    <details id="faq-rooms-download" class="faq-item" data-faq-question data-faq-section="rooms" data-question-title="How do I download the current rooms list?" data-search="download rooms csv template export floor abbreviation description">
+                        <summary>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <span>How do I download the current rooms list?</span>
+                                <span class="badge text-bg-success">New</span>
+                            </div>
+                        </summary>
+                        <div class="faq-answer mt-3">
+                            <p>On <strong>Settings &gt; Rooms Editor</strong>, use the <em>Download Current Rooms</em> button in the Import/Export panel. The CSV includes room number, abbreviation, type, floor, and description so you can edit offline.</p>
+                            <ol>
+                                <li>Pick the property in the selector at the top of the page.</li>
+                                <li>Click <strong>Download Current Rooms</strong>.</li>
+                                <li>Make edits in Excel/Sheets, then upload via <em>Import CSV</em>.</li>
+                            </ol>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a asp-controller="Settings" asp-action="Rooms" class="btn btn-outline-primary btn-sm">Open Rooms Editor</a>
+                                <a asp-controller="Settings" asp-action="DownloadRoomsTemplate" class="btn btn-outline-secondary btn-sm">Download blank template</a>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details id="faq-rooms-import" class="faq-item" data-faq-question data-faq-section="rooms" data-question-title="CSV import keeps failing. What format is required?" data-search="csv import rooms template format headers abbreviation floor room type description">
+                        <summary>CSV import keeps failing. What format is required?</summary>
+                        <div class="faq-answer mt-3">
+                            <p>Ensure your CSV headers are exactly <code>RoomNumber,Abbreviation,RoomType,Floor,Description</code>. Floor must be a whole number and abbreviations are optional (max three characters).</p>
+                            <ul>
+                                <li>Remove blank rows or rows without a room number.</li>
+                                <li>Save as UTF-8 CSV (default in Excel/Sheets).</li>
+                                <li>Only include rooms for the property you selected.</li>
+                            </ul>
+                            <p>If import still fails, download the current list, make a single change, and upload it to confirm formatting. Then paste or merge your dataset.</p>
+                        </div>
+                    </details>
+
+                    <details id="faq-rooms-layout" class="faq-item" data-faq-question data-faq-section="rooms" data-question-title="Can I sync Rooms with the Layout Editor?" data-search="layout editor sync rooms floors palette labels map">
+                        <summary>Can I sync Rooms with the Layout Editor?</summary>
+                        <div class="faq-answer mt-3">
+                            <p>Yes. After updating rooms, visit the <strong>Layout Editor</strong> for the same property. Use <em>Refresh Palette</em> to pull the newest labels and floors into the map.</p>
+                            <p class="mb-2">Need to bulk update floors? Update in the Rooms Editor first, save, then revisit Layout Editor—tiles inherit the updated metadata.</p>
+                            <a asp-controller="Settings" asp-action="LayoutEditor" asp-route-propertyId="@(ViewBag.CurrentProperty?.Id ?? 0)" class="btn btn-outline-primary btn-sm">Edit layout</a>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <section id="operations" class="faq-section mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h2 class="h4 mb-1">Logs &amp; Work Orders</h2>
+                    <p class="text-muted mb-0">Keep teams aligned across shifts.</p>
+                </div>
+                <div class="card-body d-flex flex-column gap-3">
+                    <details id="faq-logs-organization" class="faq-item" data-faq-question data-faq-section="operations" data-question-title="How do I keep Pass On Logs organized?" data-search="pass on logs organize template color sidebar export shift notes">
+                        <summary>How do I keep Pass On Logs organized?</summary>
+                        <div class="faq-answer mt-3">
+                            <p>Create a log template per focus area (Front Desk, Engineering, Housekeeping). Use row colors or the flag column to highlight items awaiting follow-up.</p>
+                            <ul>
+                                <li>Duplicate yesterday’s log with <strong>Actions &gt; Copy</strong> to keep formatting.</li>
+                                <li>Use <code>@mentions</code> to notify teammates directly from the log.</li>
+                                <li>Export to Excel from the toolbar for offline archiving.</li>
+                            </ul>
+                            <a asp-controller="PassOnLogs" asp-action="Index" class="btn btn-outline-primary btn-sm">Open Pass On Logs</a>
+                        </div>
+                    </details>
+
+                    <details id="faq-workorders-escalate" class="faq-item" data-faq-question data-faq-section="operations" data-question-title="How do I escalate a work order?" data-search="work order escalate status notify department attachments timeline">
+                        <summary>How do I escalate a work order?</summary>
+                        <div class="faq-answer mt-3">
+                            <p>Open the work order, switch the status to <strong>Escalated</strong> or assign an urgent department, then add an update with context. Mention the person or group responsible so they receive an alert.</p>
+                            <p class="mb-2">Attach photos or documents before escalating so Engineering has everything needed.</p>
+                            <a asp-controller="WorkOrders" asp-action="Index" class="btn btn-outline-primary btn-sm">Go to Work Orders</a>
+                        </div>
+                    </details>
+
+                    <details id="faq-logs-export" class="faq-item" data-faq-question data-faq-section="operations" data-question-title="Can I export logs or work orders for offline sharing?" data-search="export logs work orders excel pdf share offline printing history timeline">
+                        <summary>Can I export logs or work orders for offline sharing?</summary>
+                        <div class="faq-answer mt-3">
+                            <p>Yes. Every log view and work order list has an <strong>Export</strong> or <strong>Download</strong> option.</p>
+                            <ul>
+                                <li>Pass On &amp; Package Logs: use the download icon in the toolbar to export XLSX.</li>
+                                <li>Work Orders: filter what you need, then click <em>Export</em> for CSV.</li>
+                                <li>Reports: visit <strong>Reports &gt; Room Inventory</strong> or other modules for clean summaries.</li>
+                            </ul>
+                            <a asp-controller="Reports" asp-action="Index" class="btn btn-outline-secondary btn-sm">Browse Reports</a>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <section id="communication" class="faq-section mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h2 class="h4 mb-1">Messaging &amp; Notifications</h2>
+                    <p class="text-muted mb-0">Keep the signal high without drowning in noise.</p>
+                </div>
+                <div class="card-body d-flex flex-column gap-3">
+                    <details id="faq-communication-mentions" class="faq-item" data-faq-question data-faq-section="communication" data-question-title="How do mentions and alerts work?" data-search="mentions alerts notifications message center all">
+                        <summary>How do mentions and alerts work?</summary>
+                        <div class="faq-answer mt-3">
+                            <p>Type <code>@</code> inside logs, comments, or messages to mention someone. They receive an in-app notification plus an email (if enabled). Use <code>@all</code> for everyone who has access to that record.</p>
+                            <p class="mb-2">The Message Center (bell icon) shows unread alerts and DMs in one place. Dismiss items you no longer need.</p>
+                        </div>
+                    </details>
+
+                    <details id="faq-communication-notifications" class="faq-item" data-faq-question data-faq-section="communication" data-question-title="How do I change email notifications?" data-search="email notifications digest frequency profile settings digest">
+                        <summary>How do I change email notifications?</summary>
+                        <div class="faq-answer mt-3">
+                            <p>Open <strong>Profile &gt; Notifications</strong>. Choose which events send emails (mentions, work order updates, reports). You can also switch to a daily digest if you prefer fewer emails.</p>
+                            <a asp-controller="Profile" asp-action="Index" class="btn btn-outline-primary btn-sm">Update notification settings</a>
+                        </div>
+                    </details>
+
+                    <details id="faq-communication-noisy" class="faq-item" data-faq-question data-faq-section="communication" data-question-title="What if messages feel noisy?" data-search="mute channel pause notifications filters message center">
+                        <summary>What if messages feel noisy?</summary>
+                        <div class="faq-answer mt-3">
+                            <p>Filter the Message Center by Direct Messages vs. Alerts, and archive items you no longer need. Encourage teams to mention individuals or roles instead of @all when something is not urgent.</p>
+                            <p class="mb-0">For urgent broadcast needs, create a pinned Pass On log entry or schedule announcement so everyone sees the same message.</p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <section id="mobile" class="faq-section mb-5">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h2 class="h4 mb-1">Mobile &amp; Offline</h2>
+                    <p class="text-muted mb-0">Stay productive away from the desk.</p>
+                </div>
+                <div class="card-body d-flex flex-column gap-3">
+                    <details id="faq-mobile-install" class="faq-item" data-faq-question data-faq-section="mobile" data-question-title="Can I use hOps on my phone?" data-search="mobile iphone android install app add to home progressive web app">
+                        <summary>Can I use hOps on my phone?</summary>
+                        <div class="faq-answer mt-3">
+                            <p>Yes. hOps is mobile-friendly. For the best experience, install it as a Progressive Web App:</p>
+                            <ol>
+                                <li>Open hOps in Safari (iOS) or Chrome (Android).</li>
+                                <li>Use <strong>Share &gt; Add to Home Screen</strong> (iOS) or menu &gt; <strong>Add to Home Screen</strong> (Android).</li>
+                                <li>Launch hOps from your home screen like any other app.</li>
+                            </ol>
+                        </div>
+                    </details>
+
+                    <details id="faq-mobile-offline" class="faq-item" data-faq-question data-faq-section="mobile" data-question-title="What happens if our network drops?" data-search="offline mode network drops autosave reconnect data loss">
+                        <summary>What happens if our network drops?</summary>
+                        <div class="faq-answer mt-3">
+                            <p>hOps needs an internet connection to sync data, but forms auto-save while you are typing. If the connection fails, we surface a warning banner and prevent sending until you are back online.</p>
+                            <p class="mb-0">If outages are frequent, consider exporting logs at the end of each shift so you have a backup. Let us know via Support if you need a bulk export.</p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <div class="card shadow-sm">
+            <div class="card-body d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+                <div>
+                    <h2 class="h5 mb-1">See something missing?</h2>
+                    <p class="mb-0 text-muted">Vote on the next guide or attach screenshots so we can document the workflow.</p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a asp-controller="Support" asp-action="Index" class="btn btn-primary">Share feedback</a>
+                    <a asp-controller="Support" asp-action="Index" class="btn btn-outline-secondary">Contact Support</a>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const searchInput = document.getElementById("faqSearch");
+            const searchResults = document.getElementById("faqSearchResults");
+            const searchMeta = document.getElementById("faqSearchMeta");
+            const noResultsAlert = document.getElementById("faqNoResults");
+            const faqItems = Array.from(document.querySelectorAll("[data-faq-question]"));
+            const navLinks = document.querySelectorAll(".faq-nav-link");
+
+            function normalizeText(text) {
+                return (text || "").toLowerCase();
+            }
+
+            function clearResults() {
+                searchResults.classList.add("d-none");
+                searchResults.innerHTML = "";
+            }
+
+            function showAllItems() {
+                faqItems.forEach(item => item.classList.remove("d-none"));
+                navLinks.forEach(link => link.classList.remove("text-muted"));
+                noResultsAlert?.classList.add("d-none");
+                searchMeta.textContent = "Showing all answers";
+            }
+
+            function scrollToFaq(id) {
+                const el = document.getElementById(id);
+                if (!el) {
+                    return;
+                }
+
+                el.open = true;
+                el.scrollIntoView({ behavior: "smooth", block: "start" });
+                el.classList.add("faq-highlight");
+                setTimeout(() => el.classList.remove("faq-highlight"), 1500);
+            }
+
+            function renderSearchResults(matches) {
+                clearResults();
+                if (!matches.length) {
+                    return;
+                }
+
+                const fragment = document.createDocumentFragment();
+                matches.slice(0, 5).forEach(match => {
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.className = "list-group-item list-group-item-action";
+                    button.dataset.targetId = match.id;
+                    button.textContent = match.dataset.questionTitle || match.querySelector("summary")?.textContent?.trim() || "View answer";
+                    fragment.appendChild(button);
+                });
+                searchResults.appendChild(fragment);
+                searchResults.classList.remove("d-none");
+            }
+
+            searchResults.addEventListener("click", function (event) {
+                if (!(event.target instanceof HTMLElement)) {
+                    return;
+                }
+                const button = event.target.closest("button[data-target-id]");
+                if (!button) {
+                    return;
+                }
+                scrollToFaq(button.dataset.targetId);
+                clearResults();
+            });
+
+            searchInput.addEventListener("input", function () {
+                const query = normalizeText(this.value);
+                if (query.length < 2) {
+                    clearResults();
+                    showAllItems();
+                    return;
+                }
+
+                const matches = [];
+                faqItems.forEach(item => {
+                    const haystack = normalizeText(item.getAttribute("data-search") || item.textContent);
+                    const isMatch = haystack.includes(query);
+                    item.classList.toggle("d-none", !isMatch);
+                    if (isMatch) {
+                        matches.push(item);
+                    }
+                });
+
+                if (!matches.length) {
+                    noResultsAlert?.classList.remove("d-none");
+                    searchMeta.textContent = "No answers found";
+                } else {
+                    noResultsAlert?.classList.add("d-none");
+                    searchMeta.textContent = $"Showing {matches.length} answer" + (matches.length === 1 ? "" : "s");
+                }
+
+                renderSearchResults(matches);
+            });
+
+            navLinks.forEach(link => {
+                link.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    const target = this.getAttribute("href");
+                    if (!target) {
+                        return;
+                    }
+                    const el = document.querySelector(target);
+                    if (el) {
+                        el.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                });
+            });
+
+            document.querySelectorAll(".faq-feedback").forEach(button => {
+                button.addEventListener("click", function () {
+                    const wrapper = this.closest(".faq-feedback-wrapper");
+                    if (!wrapper) {
+                        return;
+                    }
+                    wrapper.querySelectorAll("button").forEach(btn => btn.disabled = true);
+                    const response = wrapper.querySelector(".faq-feedback-response");
+                    if (response) {
+                        response.classList.remove("d-none");
+                        response.textContent = this.dataset.feedback === "yes"
+                            ? "Thanks for the feedback!"
+                            : "Thanks! Please use Support if you need more help.";
+                    }
+                });
+            });
+        })();
+    </script>
+    <style>
+        .faq-item summary {
+            cursor: pointer;
+            font-weight: 600;
+            list-style: none;
+        }
+
+        .faq-item summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .faq-item summary::after {
+            content: "›";
+            float: right;
+            transform: rotate(90deg);
+            transition: transform 0.2s ease;
+        }
+
+        .faq-item[open] summary::after {
+            transform: rotate(-90deg);
+        }
+
+        .faq-answer {
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            padding-top: 1rem;
+        }
+
+        .faq-highlight {
+            animation: faqPulse 1.5s ease;
+        }
+
+        @keyframes faqPulse {
+            0% { box-shadow: 0 0 0 rgba(13, 110, 253, 0.2); }
+            50% { box-shadow: 0 0 12px rgba(13, 110, 253, 0.5); }
+            100% { box-shadow: 0 0 0 rgba(13, 110, 253, 0); }
+        }
+    </style>
+}
