@@ -1914,6 +1914,7 @@
             const TODO_SECTION_STATE_STORAGE_KEY = 'todoSidebarSectionState';
             const todoToggleButtons = Array.from(document.querySelectorAll('[data-todo-toggle="toggle"]'));
             const todoSectionState = loadTodoSectionState();
+            let todoRailDeferredSync = null;
 
             function updateTodoAria() {
                 if (!todoSidebar) {
@@ -1979,6 +1980,15 @@
                 updateTodoAria();
                 syncTodoBackdrop();
                 syncTodoRailPosition();
+                if (!collapsed) {
+                    if (todoRailDeferredSync) {
+                        clearTimeout(todoRailDeferredSync);
+                    }
+                    todoRailDeferredSync = window.setTimeout(() => {
+                        todoRailDeferredSync = null;
+                        syncTodoRailPosition();
+                    }, 350);
+                }
             }
 
             function initialiseTodoSidebar() {
@@ -2093,6 +2103,18 @@
                 }
 
                 initTodoSectionPersistence();
+
+                todoSidebar.addEventListener('transitionend', (event) => {
+                    if (body.classList.contains('todo-sidebar-collapsed')) {
+                        return;
+                    }
+                    if (event.propertyName === 'width' ||
+                        event.propertyName === 'padding' ||
+                        event.propertyName === 'padding-left' ||
+                        event.propertyName === 'padding-right') {
+                        syncTodoRailPosition();
+                    }
+                });
 
                 window.addEventListener('resize', syncTodoRailPosition);
                 window.addEventListener('scroll', () => {
