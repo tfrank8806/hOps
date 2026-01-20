@@ -10,6 +10,8 @@ body {
     color: var(--brand-text, #1f2739);
     font-size: var(--font-body-size);
     line-height: var(--font-body-line);
+    --bs-modal-zindex: 1400;
+    --bs-backdrop-zindex: 1390;
 }
 
 .skip-link {
