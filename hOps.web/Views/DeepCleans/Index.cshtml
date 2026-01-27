@@ -1,0 +1,645 @@
+@using System.Text.Json
+@model hOps.web.ViewModels.DeepCleans.DeepCleanIndexViewModel
+@{
+    ViewData["Title"] = "Deep Cleans";
+    var localNow = ViewBag.LocalNow is DateTime dt ? dt : TimeZoneService.ConvertToUserTime(DateTime.UtcNow);
+    var initialSessionJson = Model.ActiveSession != null
+        ? JsonSerializer.Serialize(Model.ActiveSession, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
+        : "null";
+}
+
+<div id="deepCleanApp"
+     data-start-url="@Url.Action("StartSession", "DeepCleans")"
+     data-update-url="@Url.Action("UpdateTask", "DeepCleans")"
+     data-pause-url="@Url.Action("PauseSession", "DeepCleans")"
+     data-resume-url="@Url.Action("ResumeSession", "DeepCleans")"
+     data-finish-url="@Url.Action("FinishSession", "DeepCleans")"
+     data-has-checklist="@Model.HasChecklist.ToString().ToLowerInvariant()">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+        <div>
+            <h2 class="mb-0">Deep Cleans</h2>
+            <p class="text-muted mb-0 small">Log detailed room deep cleans, capture notes, and track overdue rooms.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-controller="Settings" asp-action="DeepCleanSetup" asp-route-propertyId="@Model.PropertyId" class="btn btn-outline-secondary btn-sm">Edit Checklist</a>
+            <button type="button" class="btn btn-primary" id="deepCleanStartToggle">Start new Deep Clean</button>
+        </div>
+    </div>
+
+    @if (ViewBag.DeepCleanError is string dcError && !string.IsNullOrWhiteSpace(dcError))
+    {
+        <div class="alert alert-warning">@dcError</div>
+    }
+
+    @if (ViewBag.DeepCleanMessage is string dcMessage && !string.IsNullOrWhiteSpace(dcMessage))
+    {
+        <div class="alert alert-success">@dcMessage</div>
+    }
+
+    @if (Model.FrequencyPerYear > 0)
+    {
+        <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>
+                Deep Clean frequency: <strong>@Model.FrequencyPerYear</strong> per year
+            </span>
+            <span class="text-muted small">Current time: @localNow.ToString("f")</span>
+        </div>
+    }
+
+    <div id="deepCleanAlert"></div>
+
+    <div id="deepCleanStartPanel" class="card mb-4" hidden>
+        <div class="card-body">
+            <form id="deepCleanStartForm" class="row g-3">
+                @Html.AntiForgeryToken()
+                <div class="col-md-4">
+                    <label for="deepCleanRoomSelect" class="form-label">Select a room</label>
+                    <select id="deepCleanRoomSelect" class="form-select">
+                        <option value="">-- Select room --</option>
+                        @foreach (var option in Model.RoomOptions)
+                        {
+                            <option value="@option.Value">@option.Text</option>
+                        }
+                    </select>
+                    <div class="form-text">Optional shortcut to auto-fill the room number.</div>
+                </div>
+                <div class="col-md-4">
+                    <label for="deepCleanRoomNumber" class="form-label">Room number *</label>
+                    <input type="text" class="form-control" id="deepCleanRoomNumber" required maxlength="32" />
+                </div>
+                <div class="col-md-4">
+                    <label for="deepCleanStartTime" class="form-label">Start date &amp; time</label>
+                    <input type="datetime-local" class="form-control" id="deepCleanStartTime" />
+                    <div class="form-text">Defaults to the current time. Adjust if you began earlier.</div>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" id="deepCleanStartButton">Start Deep Clean</button>
+                    <button type="button" class="btn btn-outline-secondary" id="deepCleanStartCancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="deepCleanSessionContainer" class="mb-4">
+        <div class="card">
+            <div class="card-body text-muted">
+                <p class="mb-0">Start a Deep Clean to load the checklist.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <strong class="mb-0">Room Deep Clean Log</strong>
+                <span class="text-muted small">Due status is based on the property frequency.</span>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Room</th>
+                        <th>Last Deep Clean</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                        <th>Next due</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.RoomLogs.Any())
+                    {
+                        foreach (var log in Model.RoomLogs)
+                        {
+                            <tr>
+                                <td>@log.RoomNumber</td>
+                                <td>
+                                    @if (log.LastCompletedAtUtc.HasValue)
+                                    {
+                                        <span>@TimeZoneService.ConvertToUserTime(log.LastCompletedAtUtc.Value).ToString("g")</span>
+                                        if (!string.IsNullOrWhiteSpace(log.CompletedByName))
+                                        {
+                                            <div class="small text-muted">by @log.CompletedByName</div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">No history</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (log.LastDurationSeconds.HasValue)
+                                    {
+                                        <span>@TimeSpan.FromSeconds(Math.Max(0, log.LastDurationSeconds.Value)).ToString(@"hh\:mm\:ss")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (log.IsOverdue)
+                                    {
+                                        <span class="badge bg-danger">Overdue</span>
+                                    }
+                                    else if (log.IsDue)
+                                    {
+                                        <span class="badge bg-warning text-dark">Due soon</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success">On track</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (log.NextDueAtUtc.HasValue)
+                                    {
+                                        <span>@TimeZoneService.ConvertToUserTime(log.NextDueAtUtc.Value).ToString("d")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">No deep clean activity logged yet.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script id="deepCleanInitialSession" type="application/json">@Html.Raw(initialSessionJson)</script>
+    <script>
+        (function () {
+            const appEl = document.getElementById('deepCleanApp');
+            if (!appEl) {
+                return;
+            }
+
+            const startPanel = document.getElementById('deepCleanStartPanel');
+            const startToggle = document.getElementById('deepCleanStartToggle');
+            const startForm = document.getElementById('deepCleanStartForm');
+            const roomSelect = document.getElementById('deepCleanRoomSelect');
+            const roomNumberInput = document.getElementById('deepCleanRoomNumber');
+            const startTimeInput = document.getElementById('deepCleanStartTime');
+            const startCancel = document.getElementById('deepCleanStartCancel');
+            const alertContainer = document.getElementById('deepCleanAlert');
+            const sessionContainer = document.getElementById('deepCleanSessionContainer');
+            const hasChecklist = appEl.dataset.hasChecklist === 'true';
+            const urls = {
+                start: appEl.dataset.startUrl,
+                update: appEl.dataset.updateUrl,
+                pause: appEl.dataset.pauseUrl,
+                resume: appEl.dataset.resumeUrl,
+                finish: appEl.dataset.finishUrl
+            };
+
+            const initialSession = (() => {
+                try {
+                    const script = document.getElementById('deepCleanInitialSession');
+                    return script ? JSON.parse(script.textContent || 'null') : null;
+                } catch {
+                    return null;
+                }
+            })();
+
+            let sessionState = null;
+            let timerInterval = null;
+
+            function syncSession(session, shouldRender = true) {
+                if (session) {
+                    sessionState = {
+                        ...session,
+                        tasks: Array.isArray(session.tasks) ? session.tasks.map(t => ({ ...t })) : [],
+                        syncedAt: Date.now()
+                    };
+                } else {
+                    sessionState = null;
+                    stopTimer();
+                }
+
+                if (shouldRender) {
+                    renderSession();
+                } else {
+                    if (sessionState && sessionState.status === 'InProgress') {
+                        startTimer();
+                    } else {
+                        stopTimer();
+                        updateTimerDisplay();
+                    }
+                    updateActionButtons();
+                }
+            }
+
+            function formatLocalInput(date) {
+                const pad = (value) => value.toString().padStart(2, '0');
+                return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+            }
+
+            function setStartDefaults() {
+                const now = new Date();
+                if (startTimeInput) {
+                    startTimeInput.value = formatLocalInput(now);
+                }
+                if (roomSelect) {
+                    roomSelect.value = '';
+                }
+                roomNumberInput.value = '';
+                delete roomNumberInput.dataset.selectedRoomId;
+                delete roomNumberInput.dataset.selectedRoomLabel;
+            }
+
+            function toggleStartPanel(show) {
+                if (!startPanel) {
+                    return;
+                }
+                const shouldShow = typeof show === 'boolean' ? show : startPanel.hasAttribute('hidden');
+                if (shouldShow) {
+                    startPanel.removeAttribute('hidden');
+                    setStartDefaults();
+                } else {
+                    startPanel.setAttribute('hidden', 'hidden');
+                }
+            }
+
+            if (startToggle && !hasChecklist) {
+                startToggle.classList.add('disabled');
+                startToggle.setAttribute('title', 'Add tasks on the Deep Clean Setup page before starting.');
+            }
+
+            if (startToggle) {
+                startToggle.addEventListener('click', () => {
+                    if (!hasChecklist) {
+                        showAlert('warning', 'Add tasks on the Deep Clean Setup page before starting.');
+                        return;
+                    }
+
+                    if (sessionState) {
+                        showAlert('info', 'Finish or pause your current Deep Clean before starting another.');
+                        return;
+                    }
+
+                    toggleStartPanel(true);
+                });
+            }
+
+            if (startCancel) {
+                startCancel.addEventListener('click', () => toggleStartPanel(false));
+            }
+
+            if (roomSelect && roomNumberInput) {
+                roomSelect.addEventListener('change', () => {
+                    const option = roomSelect.selectedOptions[0];
+                    if (option && option.value) {
+                        roomNumberInput.value = option.textContent || option.value;
+                        roomNumberInput.dataset.selectedRoomId = option.value;
+                        roomNumberInput.dataset.selectedRoomLabel = (option.textContent || option.value).trim();
+                    } else {
+                        roomNumberInput.value = '';
+                        delete roomNumberInput.dataset.selectedRoomId;
+                        delete roomNumberInput.dataset.selectedRoomLabel;
+                    }
+                });
+            }
+
+            if (startForm) {
+                startForm.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    if (sessionState) {
+                        showAlert('info', 'Finish or pause your current Deep Clean first.');
+                        return;
+                    }
+
+                    const payload = {
+                        roomNumber: roomNumberInput.value.trim(),
+                        roomId: parseInt(roomNumberInput.dataset.selectedRoomId || '0', 10) || null,
+                        startedAtUtc: new Date((startTimeInput && startTimeInput.value) ? startTimeInput.value : new Date()).toISOString()
+                    };
+
+                    try {
+                        const data = await postJson(urls.start, payload);
+                        syncSession(data.session);
+                        toggleStartPanel(false);
+                        showAlert('success', 'Deep Clean started.');
+                    } catch (error) {
+                        showAlert('danger', error.message || 'Unable to start the Deep Clean.');
+                    }
+                });
+            }
+
+            function renderSession() {
+                if (!sessionContainer) {
+                    return;
+                }
+
+                if (!sessionState) {
+                    sessionContainer.innerHTML = `
+                        <div class="card">
+                            <div class="card-body text-muted">
+                                <p class="mb-0">Start a Deep Clean to load the checklist.</p>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const header = `
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between flex-wrap gap-3">
+                                <div>
+                                    <h5 class="mb-1">Room ${escapeHtml(sessionState.roomLabel || sessionState.roomNumber)}</h5>
+                                    <div class="text-muted small">
+                                        Started: ${formatLocal(sessionState.startedAtUtc)} ·
+                                        <span id="deepCleanTimer">${formatDuration(sessionState.durationSeconds)}</span>
+                                        <span class="ms-2 badge ${sessionState.status === 'Paused' ? 'bg-warning text-dark' : 'bg-success'}" id="deepCleanStatusLabel">
+                                            ${sessionState.status === 'Paused' ? 'Paused' : 'In progress'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="button" class="btn btn-outline-secondary" id="deepCleanPauseButton">${sessionState.status === 'Paused' ? 'Resume' : 'Pause'}</button>
+                                    <button type="button" class="btn btn-success" id="deepCleanFinishButton">Finish</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                const rows = (sessionState.tasks || []).map(task => `
+                    <tr data-task-id="${task.id}">
+                        <td>
+                            <div class="fw-semibold">${escapeHtml(task.title)}</div>
+                            <div class="text-muted small">${escapeHtml(task.description) || ''}</div>
+                        </td>
+                        <td class="align-middle" style="width:180px;">
+                            <select class="form-select form-select-sm deep-clean-task-status" data-task-id="${task.id}">
+                                ${buildStatusOptions(task.status)}
+                            </select>
+                        </td>
+                        <td class="align-middle" style="width:280px;">
+                            <textarea class="form-control form-control-sm deep-clean-task-notes" data-task-id="${task.id}" rows="2" placeholder="Notes">${task.notes || ''}</textarea>
+                        </td>
+                        <td class="align-middle text-end" style="width:120px;">
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-dc-action="save-task" data-task-id="${task.id}">Save</button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                sessionContainer.innerHTML = `
+                    ${header}
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="table mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Task</th>
+                                        <th style="width:180px;">Status</th>
+                                        <th style="width:280px;">Notes</th>
+                                        <th class="text-end" style="width:120px;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+
+                sessionContainer.querySelectorAll('[data-dc-action="save-task"]').forEach(button => {
+                    button.addEventListener('click', async () => {
+                        const taskId = parseInt(button.dataset.taskId, 10);
+                        await saveTask(taskId);
+                    });
+                });
+
+                sessionContainer.querySelectorAll('.deep-clean-task-status').forEach(select => {
+                    select.addEventListener('change', async () => {
+                        const taskId = parseInt(select.dataset.taskId, 10);
+                        await saveTask(taskId, true);
+                    });
+                });
+
+                sessionContainer.querySelectorAll('.deep-clean-task-notes').forEach(textarea => {
+                    textarea.addEventListener('blur', async () => {
+                        const taskId = parseInt(textarea.dataset.taskId, 10);
+                        if (!Number.isNaN(taskId)) {
+                            await saveTask(taskId, true);
+                        }
+                    });
+                });
+
+                startTimer();
+                updateActionButtons();
+            }
+
+            function startTimer() {
+                stopTimer();
+                timerInterval = setInterval(updateTimerDisplay, 1000);
+                updateTimerDisplay();
+            }
+
+            function stopTimer() {
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+            }
+
+            function updateTimerDisplay() {
+                const timerLabel = document.getElementById('deepCleanTimer');
+                if (!sessionState || !timerLabel) {
+                    return;
+                }
+                const base = sessionState.durationSeconds || 0;
+                if (sessionState.status === 'InProgress') {
+                    const elapsed = (Date.now() - (sessionState.syncedAt || Date.now())) / 1000;
+                    timerLabel.textContent = formatDuration(base + elapsed);
+                } else {
+                    timerLabel.textContent = formatDuration(base);
+                }
+            }
+
+            async function saveTask(taskId, silent = false) {
+                if (!sessionState) {
+                    return;
+                }
+
+                const payload = {
+                    sessionId: sessionState.id,
+                    taskId,
+                    status: getTaskStatus(taskId),
+                    notes: getTaskNotes(taskId)
+                };
+
+                try {
+                    const data = await postJson(urls.update, payload);
+                    syncSession(data.session, true);
+                    if (!silent) {
+                        showAlert('success', 'Checklist updated.');
+                    }
+                } catch (error) {
+                    showAlert('danger', error.message || 'Unable to save the task update.');
+                }
+            }
+
+            function getTaskStatus(taskId) {
+                const select = document.querySelector(`.deep-clean-task-status[data-task-id="${taskId}"]`);
+                return select ? select.value : 'NotStarted';
+            }
+
+            function getTaskNotes(taskId) {
+                const textarea = document.querySelector(`.deep-clean-task-notes[data-task-id="${taskId}"]`);
+                return textarea ? textarea.value : '';
+            }
+
+            function updateActionButtons() {
+                const finishButton = document.getElementById('deepCleanFinishButton');
+                const pauseButton = document.getElementById('deepCleanPauseButton');
+                const statusLabel = document.getElementById('deepCleanStatusLabel');
+
+                if (!sessionState) {
+                    if (finishButton) finishButton.setAttribute('disabled', 'disabled');
+                    if (pauseButton) pauseButton.setAttribute('disabled', 'disabled');
+                    return;
+                }
+
+                if (statusLabel) {
+                    statusLabel.textContent = sessionState.status === 'Paused' ? 'Paused' : 'In progress';
+                    statusLabel.className = `badge ${sessionState.status === 'Paused' ? 'bg-warning text-dark' : 'bg-success'}`;
+                }
+
+                if (pauseButton) {
+                    pauseButton.textContent = sessionState.status === 'Paused' ? 'Resume' : 'Pause';
+                    pauseButton.disabled = false;
+                    pauseButton.onclick = async () => {
+                        try {
+                            const wasPaused = sessionState.status === 'Paused';
+                            const targetUrl = wasPaused ? urls.resume : urls.pause;
+                            const data = await postJson(targetUrl, { sessionId: sessionState.id });
+                            syncSession(data.session);
+                            showAlert('info', wasPaused
+                                ? 'Deep Clean resumed.'
+                                : 'Deep Clean paused. Timer stopped until you resume.');
+                        } catch (error) {
+                            showAlert('danger', error.message || 'Unable to update the Deep Clean status.');
+                        }
+                    };
+                }
+
+                const canFinish = (sessionState.tasks || []).every(task => task.status === 'Complete' || task.status === 'ReportIssue');
+                if (finishButton) {
+                    finishButton.disabled = !canFinish;
+                    finishButton.title = canFinish ? 'Finish Deep Clean' : 'Update every task before finishing.';
+                    finishButton.onclick = async () => {
+                        if (!canFinish) {
+                            showAlert('warning', 'All tasks must be marked Complete or Report an Issue before finishing.');
+                            return;
+                        }
+
+                        try {
+                            const data = await postJson(urls.finish, { sessionId: sessionState.id });
+                            syncSession(null);
+                            showAlert('success', data.issuesLogged > 0
+                                ? `Deep Clean completed. Created ${data.issuesLogged} work order(s) for reported issues.`
+                                : 'Deep Clean completed.');
+                        } catch (error) {
+                            showAlert('danger', error.message || 'Unable to finish the Deep Clean.');
+                        }
+                    };
+                }
+            }
+
+            function buildStatusOptions(selectedValue) {
+                const options = [
+                    { value: 'NotStarted', label: 'Not Started' },
+                    { value: 'Complete', label: 'Complete' },
+                    { value: 'ReportIssue', label: 'Report an Issue' },
+                    { value: 'Incomplete', label: 'Incomplete' }
+                ];
+
+                return options.map(opt => `<option value="${opt.value}" ${opt.value === selectedValue ? 'selected' : ''}>${opt.label}</option>`).join('');
+            }
+
+            function formatLocal(iso) {
+                const date = new Date(iso);
+                return date.toLocaleString();
+            }
+
+            function escapeHtml(text) {
+                if (!text) {
+                    return '';
+                }
+
+                return text
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            }
+
+            function formatDuration(seconds) {
+                const totalSeconds = Math.max(0, Math.floor(seconds || 0));
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const secs = totalSeconds % 60;
+                if (hours > 0) {
+                    return `${hours}h ${minutes}m`;
+                }
+                if (minutes > 0) {
+                    return `${minutes}m ${secs}s`;
+                }
+                return `${secs}s`;
+            }
+
+            function showAlert(type, message) {
+                if (!alertContainer) {
+                    return;
+                }
+
+                const wrapper = document.createElement('div');
+                wrapper.className = `alert alert-${type}`;
+                wrapper.textContent = message;
+                alertContainer.innerHTML = '';
+                alertContainer.appendChild(wrapper);
+                setTimeout(() => {
+                    if (alertContainer.contains(wrapper)) {
+                        wrapper.remove();
+                    }
+                }, 8000);
+            }
+
+            async function postJson(url, payload) {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]');
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                if (token) {
+                    headers['RequestVerificationToken'] = token.value;
+                }
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(payload ?? {})
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(text || 'Request failed.');
+                }
+
+                return response.json();
+            }
+
+            syncSession(initialSession);
+        })();
+    </script>
+}

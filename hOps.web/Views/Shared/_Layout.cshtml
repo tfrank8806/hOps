@@ -315,6 +315,11 @@
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link @(currentController == "DeepCleans" ? "active" : string.Empty)" asp-controller="DeepCleans" asp-action="Index">
+                                    <span class="sidebar-text">Deep Cleans</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link @(currentController == "PreventiveMaintenance" ? "active" : string.Empty)" asp-controller="PreventiveMaintenance" asp-action="Index">
                                     <span class="sidebar-text">PMs</span>
                                 </a>
@@ -401,6 +406,7 @@
                                         <li><a class="dropdown-item" asp-controller="Settings" asp-action="WorkOrderTypes">Work Order Types</a></li>
                                         <li><a class="dropdown-item" asp-controller="Settings" asp-action="Rooms" asp-route-propertyId="@(ViewBag.CurrentProperty?.Id ?? 0)">Rooms Editor</a></li>
                                         <li><a class="dropdown-item" asp-controller="Settings" asp-action="PmSetup" asp-route-propertyId="@(ViewBag.CurrentProperty?.Id ?? 0)">PM Setup</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Settings" asp-action="DeepCleanSetup" asp-route-propertyId="@(ViewBag.CurrentProperty?.Id ?? 0)">Deep Clean Setup</a></li>
                                         <li><a class="dropdown-item" asp-controller="Settings" asp-action="PhonebookTypes">Phonebook Types</a></li>
                                         <li><a class="dropdown-item" asp-controller="Settings" asp-action="CalendarCategories">Calendar Categories</a></li>
                                         <li>

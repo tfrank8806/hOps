@@ -3,6 +3,7 @@ using hOps.web.Models;
 using hOps.web.ViewModels;
 using hOps.web.ViewModels.Settings;
 using hOps.web.ViewModels.PreventiveMaintenance;
+using hOps.web.ViewModels.DeepCleans;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -1526,6 +1527,274 @@ namespace hOps.web.Controllers
             const string content = "Task,Description\r\nInspect HVAC filters,Replace or clean filters as needed\r\nTest smoke detector,Confirm alarm is functional and note battery status\r\n";
             var bytes = Encoding.UTF8.GetBytes(content);
             return File(bytes, "text/csv", "pm-checklist-template.csv");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DeepCleanSetup(int? propertyId = null)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            if (!properties.Any())
+            {
+                return Forbid();
+            }
+
+            var selectedId = propertyId.HasValue && properties.Any(p => p.Id == propertyId.Value)
+                ? propertyId.Value
+                : properties.First().Id;
+
+            var selectedProperty = properties.First(p => p.Id == selectedId);
+
+            var setting = await _db.DeepCleanSettings
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.PropertyId == selectedProperty.Id);
+
+            var tasks = await _db.DeepCleanChecklistItems
+                .AsNoTracking()
+                .Where(t => t.PropertyId == selectedProperty.Id)
+                .OrderBy(t => t.SortOrder)
+                .ThenBy(t => t.Id)
+                .ToListAsync();
+
+            var viewModel = new DeepCleanSetupViewModel
+            {
+                PropertyId = selectedProperty.Id,
+                PropertyName = selectedProperty.Name,
+                FrequencyPerYear = setting?.FrequencyPerYear ?? 2,
+                AccessibleProperties = properties,
+                Tasks = tasks
+                    .Select(t => new DeepCleanSetupTaskRow
+                    {
+                        Id = t.Id,
+                        Task = t.Task,
+                        Description = t.Description,
+                        SortOrder = t.SortOrder
+                    })
+                    .ToList()
+            };
+
+            return View("DeepCleanSetup", viewModel);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveDeepCleanChecklist(int propertyId, int frequencyPerYear, List<DeepCleanSetupTaskRow> tasks)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            var selectedProperty = properties.FirstOrDefault(p => p.Id == propertyId);
+            if (selectedProperty == null)
+            {
+                return Forbid();
+            }
+
+            var normalizedFrequency = Math.Clamp(frequencyPerYear, 1, 52);
+            tasks ??= new List<DeepCleanSetupTaskRow>();
+
+            var sanitizedTasks = tasks
+                .Where(t => !string.IsNullOrWhiteSpace(t.Task))
+                .Select((t, index) => new
+                {
+                    Id = t.Id,
+                    Task = t.Task.Trim(),
+                    Description = string.IsNullOrWhiteSpace(t.Description) ? null : t.Description!.Trim(),
+                    SortOrder = index
+                })
+                .ToList();
+
+            var user = await _userManager.GetUserAsync(User);
+            var now = DateTime.UtcNow;
+
+            var setting = await _db.DeepCleanSettings.FirstOrDefaultAsync(s => s.PropertyId == propertyId);
+            if (setting == null)
+            {
+                setting = new DeepCleanSetting
+                {
+                    PropertyId = propertyId
+                };
+                _db.DeepCleanSettings.Add(setting);
+            }
+
+            setting.FrequencyPerYear = normalizedFrequency;
+            setting.UpdatedAtUtc = now;
+            setting.UpdatedByUserId = user?.Id;
+
+            var existingTasks = await _db.DeepCleanChecklistItems
+                .Where(t => t.PropertyId == propertyId)
+                .ToListAsync();
+
+            var retainedIds = new HashSet<int>();
+            foreach (var row in sanitizedTasks)
+            {
+                if (row.Id > 0)
+                {
+                    var match = existingTasks.FirstOrDefault(t => t.Id == row.Id);
+                    if (match != null)
+                    {
+                        retainedIds.Add(match.Id);
+                        match.Task = row.Task;
+                        match.Description = row.Description;
+                        match.SortOrder = row.SortOrder;
+                        match.UpdatedAtUtc = now;
+                        continue;
+                    }
+                }
+
+                var newTask = new DeepCleanChecklistItem
+                {
+                    PropertyId = propertyId,
+                    Task = row.Task,
+                    Description = row.Description,
+                    SortOrder = row.SortOrder,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                };
+                _db.DeepCleanChecklistItems.Add(newTask);
+            }
+
+            var obsoleteTasks = existingTasks
+                .Where(t => !retainedIds.Contains(t.Id))
+                .ToList();
+
+            if (obsoleteTasks.Any())
+            {
+                _db.DeepCleanChecklistItems.RemoveRange(obsoleteTasks);
+            }
+
+            await _db.SaveChangesAsync();
+
+            TempData["DeepCleanSetupMessage"] = "Deep Clean checklist saved.";
+            return RedirectToAction(nameof(DeepCleanSetup), new { propertyId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ImportDeepCleanChecklist(int propertyId, IFormFile? csvFile)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            var selectedProperty = properties.FirstOrDefault(p => p.Id == propertyId);
+            if (selectedProperty == null)
+            {
+                return Forbid();
+            }
+
+            if (csvFile == null || csvFile.Length == 0)
+            {
+                TempData["DeepCleanSetupError"] = "Select a CSV file to import your checklist.";
+                return RedirectToAction(nameof(DeepCleanSetup), new { propertyId });
+            }
+
+            var importedTasks = new List<DeepCleanChecklistItem>();
+            try
+            {
+                using var stream = csvFile.OpenReadStream();
+                using var reader = new StreamReader(stream);
+                string? line;
+                var lineIndex = 0;
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    if (lineIndex == 0 && line.StartsWith("Task", StringComparison.OrdinalIgnoreCase))
+                    {
+                        lineIndex++;
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(line))
+                    {
+                        continue;
+                    }
+
+                    var columns = line.Split(',');
+                    var task = columns.ElementAtOrDefault(0)?.Trim();
+                    var description = columns.ElementAtOrDefault(1)?.Trim();
+
+                    if (string.IsNullOrWhiteSpace(task))
+                    {
+                        continue;
+                    }
+
+                    importedTasks.Add(new DeepCleanChecklistItem
+                    {
+                        PropertyId = propertyId,
+                        Task = task,
+                        Description = string.IsNullOrWhiteSpace(description) ? null : description,
+                        SortOrder = importedTasks.Count
+                    });
+                    lineIndex++;
+                }
+            }
+            catch
+            {
+                TempData["DeepCleanSetupError"] = "Unable to read the uploaded file.";
+                return RedirectToAction(nameof(DeepCleanSetup), new { propertyId });
+            }
+
+            if (!importedTasks.Any())
+            {
+                TempData["DeepCleanSetupError"] = "No checklist tasks were found in the uploaded file.";
+                return RedirectToAction(nameof(DeepCleanSetup), new { propertyId });
+            }
+
+            var existingTasks = await _db.DeepCleanChecklistItems
+                .Where(t => t.PropertyId == propertyId)
+                .ToListAsync();
+
+            if (existingTasks.Any())
+            {
+                _db.DeepCleanChecklistItems.RemoveRange(existingTasks);
+                await _db.SaveChangesAsync();
+            }
+
+            var now = DateTime.UtcNow;
+            foreach (var task in importedTasks)
+            {
+                task.CreatedAtUtc = now;
+                task.UpdatedAtUtc = now;
+            }
+
+            _db.DeepCleanChecklistItems.AddRange(importedTasks);
+            await _db.SaveChangesAsync();
+
+            TempData["DeepCleanSetupMessage"] = $"Imported {importedTasks.Count} checklist item{(importedTasks.Count == 1 ? string.Empty : "s")}.";
+            return RedirectToAction(nameof(DeepCleanSetup), new { propertyId });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadDeepCleanChecklist(int propertyId)
+        {
+            var properties = await GetEditablePropertiesAsync();
+            var selectedProperty = properties.FirstOrDefault(p => p.Id == propertyId);
+            if (selectedProperty == null)
+            {
+                return Forbid();
+            }
+
+            var tasks = await _db.DeepCleanChecklistItems
+                .Where(t => t.PropertyId == propertyId)
+                .OrderBy(t => t.SortOrder)
+                .ThenBy(t => t.Id)
+                .ToListAsync();
+
+            var builder = new StringBuilder();
+            builder.AppendLine("Task,Description");
+
+            foreach (var task in tasks)
+            {
+                builder.AppendLine(string.Join(",", new[]
+                {
+                    EscapeCsv(task.Task),
+                    EscapeCsv(task.Description)
+                }));
+            }
+
+            var fileName = $"deep-clean-checklist-property-{propertyId}.csv";
+            return File(Encoding.UTF8.GetBytes(builder.ToString()), "text/csv", fileName);
+        }
+
+        [HttpGet]
+        public IActionResult DownloadDeepCleanTemplate()
+        {
+            const string content = "Task,Description\r\nDetail shower grout,Inspect and scrub all grout lines\r\nDust vents,Remove vent covers and dust thoroughly\r\n";
+            var bytes = Encoding.UTF8.GetBytes(content);
+            return File(bytes, "text/csv", "deep-clean-checklist-template.csv");
         }
 
         private static string? NormalizeRoomAbbreviation(string? value)

@@ -168,6 +168,7 @@ namespace hOps.web.Services
                 var lostFoundEntries = await LoadOpenLostFoundEntriesAsync(context, propertyIds, cancellationToken);
                 var scheduleSummaries = await LoadScheduleSummariesAsync(context, propertyIds, cancellationToken);
                 var pmSummary = await LoadPreventiveMaintenanceSummaryAsync(context, propertyIds, dayStartUtc, dayEndUtc, cancellationToken);
+                var deepCleanSummary = await LoadDeepCleanSummaryAsync(context, propertyIds, dayStartUtc, dayEndUtc, cancellationToken);
 
                 var body = BuildSummaryBody(
                     user,
@@ -187,7 +188,11 @@ namespace hOps.web.Services
                     pmSummary.Frequencies,
                     pmSummary.Completed,
                     pmSummary.DueSoon,
-                    pmSummary.Overdue);
+                    pmSummary.Overdue,
+                    deepCleanSummary.Frequencies,
+                    deepCleanSummary.Completed,
+                    deepCleanSummary.DueSoon,
+                    deepCleanSummary.Overdue);
                 var subject = $"Daily summary for {summaryDate:MMM d, yyyy}";
 
                 try
@@ -222,7 +227,11 @@ namespace hOps.web.Services
             IReadOnlyDictionary<int, int> pmFrequencies,
             IReadOnlyList<DailySummaryPmSession> completedPms,
             IReadOnlyList<DailySummaryPmDue> duePms,
-            IReadOnlyList<DailySummaryPmDue> overduePms)
+            IReadOnlyList<DailySummaryPmDue> overduePms,
+            IReadOnlyDictionary<int, int> deepCleanFrequencies,
+            IReadOnlyList<DailySummaryDeepCleanSession> completedDeepCleans,
+            IReadOnlyList<DailySummaryDeepCleanDue> dueDeepCleans,
+            IReadOnlyList<DailySummaryDeepCleanDue> overdueDeepCleans)
         {
             var builder = new StringBuilder();
             var userName = BuildUserDisplayName(user);
@@ -244,7 +253,11 @@ namespace hOps.web.Services
                 pmFrequencies,
                 completedPms,
                 duePms,
-                overduePms);
+                overduePms,
+                deepCleanFrequencies,
+                completedDeepCleans,
+                dueDeepCleans,
+                overdueDeepCleans);
             var summaryLabel = summaryDate.ToString("dddd, MMM d", CultureInfo.CurrentCulture);
             var sentLabel = FormatUserLocal(DateTime.UtcNow, userTimeZone, "MMM d, yyyy h:mm tt");
             var heroKpis = BuildHeroKpis();
@@ -330,6 +343,7 @@ namespace hOps.web.Services
                 AppendAnnouncements(recap);
                 AppendWorkOrders(recap);
                 AppendPreventiveMaintenance(recap);
+                AppendDeepCleans(recap);
                 AppendPassOnLogs(recap);
                 AppendBulletins(recap);
                 AppendPackages(recap);
@@ -349,6 +363,8 @@ namespace hOps.web.Services
                 yield return ("Sales Leads", recap.SalesLeads.Count.ToString("N0", CultureInfo.CurrentCulture));
                 yield return ("PMs Done", recap.CompletedPms.Count.ToString("N0", CultureInfo.CurrentCulture));
                 yield return ("PMs Due", (recap.DuePms.Count + recap.OverduePms.Count).ToString("N0", CultureInfo.CurrentCulture));
+                yield return ("Deep Cleans Done", recap.CompletedDeepCleans.Count.ToString("N0", CultureInfo.CurrentCulture));
+                yield return ("Deep Cleans Due", (recap.DueDeepCleans.Count + recap.OverdueDeepCleans.Count).ToString("N0", CultureInfo.CurrentCulture));
             }
 
             void AppendAnnouncements(PropertyRecap recap)
@@ -470,6 +486,85 @@ namespace hOps.web.Services
                 builder.AppendLine(@"</div>");
 
                 static string FormatPmDuration(double seconds)
+                {
+                    var span = TimeSpan.FromSeconds(Math.Max(0, seconds));
+                    if (span.TotalHours >= 1)
+                    {
+                        return $"{(int)span.TotalHours}h {span.Minutes}m";
+                    }
+
+                    if (span.TotalMinutes >= 1)
+                    {
+                        return $"{(int)span.TotalMinutes}m {span.Seconds}s";
+                    }
+
+                    return $"{span.Seconds}s";
+                }
+            }
+
+            void AppendDeepCleans(PropertyRecap recap)
+            {
+                if (!recap.CompletedDeepCleans.Any() && !recap.DueDeepCleans.Any() && !recap.OverdueDeepCleans.Any())
+                {
+                    return;
+                }
+
+                builder.AppendLine($@"<div style=""margin-top:1.5rem;"">");
+                builder.AppendLine($@"<h3 style=""margin:0 0 0.3rem;color:{palette.AccentAlt};font-size:1.05rem;"">Deep Cleans</h3>");
+
+                if (recap.DeepCleanFrequencyPerYear > 0)
+                {
+                    builder.AppendLine($@"<p style=""margin:0 0 0.5rem;color:{palette.Muted};"">Target frequency: {recap.DeepCleanFrequencyPerYear} per year.</p>");
+                }
+
+                if (recap.CompletedDeepCleans.Any())
+                {
+                    var latest = recap.CompletedDeepCleans
+                        .OrderByDescending(c => c.CompletedAtUtc)
+                        .Take(5)
+                        .ToList();
+
+                    builder.AppendLine($@"<p style=""margin:0 0 0.3rem;color:{palette.Muted};"">Completed yesterday:</p>");
+                    builder.AppendLine(@"<ul style=""margin:0 0 0.5rem;padding-left:1.2rem;"">");
+                    foreach (var session in latest)
+                    {
+                        var completed = WebUtility.HtmlEncode(FormatUserLocal(session.CompletedAtUtc, userTimeZone, "MMM d h:mm tt"));
+                        var roomLabel = string.IsNullOrWhiteSpace(session.RoomNumber) ? "Room" : session.RoomNumber!;
+                        builder.AppendLine($@"<li><strong>{WebUtility.HtmlEncode(roomLabel)}</strong> &middot; {completed} &middot; {FormatDurationLabel(session.DurationSeconds)}</li>");
+                    }
+                    builder.AppendLine(@"</ul>");
+                }
+                else
+                {
+                    builder.AppendLine($@"<p style=""margin:0;color:{palette.Muted};"">No Deep Cleans were logged yesterday.</p>");
+                }
+
+                var dueEntries = recap.OverdueDeepCleans
+                    .Concat(recap.DueDeepCleans)
+                    .OrderBy(entry => entry.DueAtUtc)
+                    .Take(5)
+                    .ToList();
+
+                if (dueEntries.Any())
+                {
+                    builder.AppendLine($@"<p style=""margin:0.6rem 0 0.3rem;color:{palette.Muted};"">Due soon or overdue:</p>");
+                    builder.AppendLine(@"<ul style=""margin:0;padding-left:1.2rem;"">");
+                    foreach (var entry in dueEntries)
+                    {
+                        var dueLabel = WebUtility.HtmlEncode(FormatUserLocal(entry.DueAtUtc, userTimeZone, "MMM d"));
+                        var roomLabel = string.IsNullOrWhiteSpace(entry.RoomNumber) ? "Room" : entry.RoomNumber!;
+                        builder.AppendLine($@"<li><strong>{WebUtility.HtmlEncode(roomLabel)}</strong> &middot; due {dueLabel}</li>");
+                    }
+                    builder.AppendLine(@"</ul>");
+                }
+                else
+                {
+                    builder.AppendLine($@"<p style=""margin:0;color:{palette.Muted};"">All rooms are on schedule.</p>");
+                }
+
+                builder.AppendLine(@"</div>");
+
+                static string FormatDurationLabel(double seconds)
                 {
                     var span = TimeSpan.FromSeconds(Math.Max(0, seconds));
                     if (span.TotalHours >= 1)
@@ -1115,6 +1210,135 @@ namespace hOps.web.Services
             };
         }
 
+        private static async Task<DeepCleanSummaryData> LoadDeepCleanSummaryAsync(
+            ApplicationDbContext context,
+            List<int> propertyIds,
+            DateTime dayStartUtc,
+            DateTime dayEndUtc,
+            CancellationToken cancellationToken)
+        {
+            if (propertyIds == null || propertyIds.Count == 0)
+            {
+                return new DeepCleanSummaryData();
+            }
+
+            var propertySet = new HashSet<int>(propertyIds);
+
+            var completed = await context.DeepCleanSessions
+                .AsNoTracking()
+                .Where(s => propertySet.Contains(s.PropertyId) && s.Status == DeepCleanSessionStatus.Completed)
+                .Where(s => s.CompletedAtUtc >= dayStartUtc && s.CompletedAtUtc < dayEndUtc)
+                .Select(s => new DailySummaryDeepCleanSession
+                {
+                    PropertyId = s.PropertyId,
+                    RoomNumber = s.RoomNumber,
+                    CompletedAtUtc = s.CompletedAtUtc ?? s.StartedAtUtc,
+                    DurationSeconds = s.TotalDurationSeconds
+                })
+                .ToListAsync(cancellationToken);
+
+            var frequencies = await context.DeepCleanSettings
+                .AsNoTracking()
+                .Where(s => propertySet.Contains(s.PropertyId))
+                .ToDictionaryAsync(s => s.PropertyId, s => s.FrequencyPerYear, cancellationToken);
+
+            if (frequencies.Count == 0)
+            {
+                return new DeepCleanSummaryData
+                {
+                    Completed = completed,
+                    Frequencies = new Dictionary<int, int>()
+                };
+            }
+
+            var rooms = await context.Rooms
+                .AsNoTracking()
+                .Where(r => propertySet.Contains(r.PropertyId))
+                .Select(r => new { r.Id, r.PropertyId, r.RoomNumber })
+                .ToListAsync(cancellationToken);
+
+            var lookbackStart = dayEndUtc.AddMonths(-18);
+            var recentSessions = await context.DeepCleanSessions
+                .AsNoTracking()
+                .Where(s => propertySet.Contains(s.PropertyId) && s.Status == DeepCleanSessionStatus.Completed)
+                .Where(s => s.CompletedAtUtc >= lookbackStart)
+                .OrderByDescending(s => s.CompletedAtUtc)
+                .Select(s => new
+                {
+                    s.PropertyId,
+                    s.RoomId,
+                    s.RoomNumber,
+                    CompletedAtUtc = s.CompletedAtUtc ?? s.StartedAtUtc
+                })
+                .ToListAsync(cancellationToken);
+
+            var latestByRoom = new Dictionary<(int PropertyId, int RoomId), DateTime>();
+            foreach (var session in recentSessions)
+            {
+                if (!session.RoomId.HasValue)
+                {
+                    continue;
+                }
+
+                var key = (session.PropertyId, session.RoomId.Value);
+                if (!latestByRoom.ContainsKey(key))
+                {
+                    latestByRoom[key] = session.CompletedAtUtc;
+                }
+            }
+
+            var dueSoon = new List<DailySummaryDeepCleanDue>();
+            var overdue = new List<DailySummaryDeepCleanDue>();
+            var dueCutoff = dayEndUtc.AddDays(7);
+
+            foreach (var kvp in frequencies)
+            {
+                var propertyId = kvp.Key;
+                var frequency = kvp.Value;
+                if (frequency <= 0)
+                {
+                    continue;
+                }
+
+                var intervalDays = Math.Max(1, 365.0 / frequency);
+                var propertyRooms = rooms.Where(r => r.PropertyId == propertyId).ToList();
+                foreach (var room in propertyRooms)
+                {
+                    var key = (propertyId, room.Id);
+                    var hasLast = latestByRoom.TryGetValue(key, out var lastCompleted);
+                    var dueAt = hasLast ? lastCompleted.AddDays(intervalDays) : dayStartUtc;
+                    var label = string.IsNullOrWhiteSpace(room.RoomNumber) ? $"Room {room.Id}" : room.RoomNumber!;
+
+                    if (!hasLast || dueAt < dayStartUtc)
+                    {
+                        overdue.Add(new DailySummaryDeepCleanDue
+                        {
+                            PropertyId = propertyId,
+                            RoomNumber = label,
+                            DueAtUtc = dueAt
+                        });
+                    }
+                    else if (dueAt <= dueCutoff)
+                    {
+                        dueSoon.Add(new DailySummaryDeepCleanDue
+                        {
+                            PropertyId = propertyId,
+                            RoomNumber = label,
+                            DueAtUtc = dueAt
+                        });
+                    }
+                }
+            }
+
+            return new DeepCleanSummaryData
+            {
+                Completed = completed,
+                DueSoon = dueSoon,
+                Overdue = overdue,
+                Frequencies = frequencies
+            };
+        }
+
         private static string BuildEventDateLabel(DailySummaryEvent calendarEvent)
         {
             return calendarEvent.StartDate.Date == calendarEvent.EndDate.Date
@@ -1169,7 +1393,11 @@ namespace hOps.web.Services
             IReadOnlyDictionary<int, int> pmFrequencies,
             IReadOnlyList<DailySummaryPmSession> completedPms,
             IReadOnlyList<DailySummaryPmDue> duePms,
-            IReadOnlyList<DailySummaryPmDue> overduePms)
+            IReadOnlyList<DailySummaryPmDue> overduePms,
+            IReadOnlyDictionary<int, int> deepCleanFrequencies,
+            IReadOnlyList<DailySummaryDeepCleanSession> completedDeepCleans,
+            IReadOnlyList<DailySummaryDeepCleanDue> dueDeepCleans,
+            IReadOnlyList<DailySummaryDeepCleanDue> overdueDeepCleans)
         {
             var contexts = new Dictionary<int, PropertyRecap>();
             var propertyIdSet = propertyIds != null ? new HashSet<int>(propertyIds) : new HashSet<int>();
@@ -1408,6 +1636,44 @@ namespace hOps.web.Services
                 }
             }
 
+            if (completedDeepCleans != null)
+            {
+                foreach (var session in completedDeepCleans)
+                {
+                    var context = GetContext(session.PropertyId);
+                    context.CompletedDeepCleans.Add(session);
+                }
+            }
+
+            if (dueDeepCleans != null)
+            {
+                foreach (var entry in dueDeepCleans)
+                {
+                    var context = GetContext(entry.PropertyId);
+                    context.DueDeepCleans.Add(entry);
+                }
+            }
+
+            if (overdueDeepCleans != null)
+            {
+                foreach (var entry in overdueDeepCleans)
+                {
+                    var context = GetContext(entry.PropertyId);
+                    context.OverdueDeepCleans.Add(entry);
+                }
+            }
+
+            if (deepCleanFrequencies != null && deepCleanFrequencies.Count > 0)
+            {
+                foreach (var context in contexts.Values)
+                {
+                    if (deepCleanFrequencies.TryGetValue(context.PropertyId, out var frequency))
+                    {
+                        context.DeepCleanFrequencyPerYear = frequency;
+                    }
+                }
+            }
+
             if (contexts.Count == 0)
             {
                 return Array.Empty<PropertyRecap>();
@@ -1442,6 +1708,10 @@ namespace hOps.web.Services
             public List<DailySummaryPmSession> CompletedPms { get; } = new();
             public List<DailySummaryPmDue> DuePms { get; } = new();
             public List<DailySummaryPmDue> OverduePms { get; } = new();
+            public int DeepCleanFrequencyPerYear { get; set; }
+            public List<DailySummaryDeepCleanSession> CompletedDeepCleans { get; } = new();
+            public List<DailySummaryDeepCleanDue> DueDeepCleans { get; } = new();
+            public List<DailySummaryDeepCleanDue> OverdueDeepCleans { get; } = new();
         }
 
         private sealed class EmailPalette
@@ -1562,6 +1832,29 @@ namespace hOps.web.Services
             public IReadOnlyList<DailySummaryPmSession> Completed { get; init; } = Array.Empty<DailySummaryPmSession>();
             public IReadOnlyList<DailySummaryPmDue> DueSoon { get; init; } = Array.Empty<DailySummaryPmDue>();
             public IReadOnlyList<DailySummaryPmDue> Overdue { get; init; } = Array.Empty<DailySummaryPmDue>();
+        }
+
+        private sealed class DailySummaryDeepCleanSession
+        {
+            public int PropertyId { get; set; }
+            public string RoomNumber { get; set; } = string.Empty;
+            public DateTime CompletedAtUtc { get; set; }
+            public double DurationSeconds { get; set; }
+        }
+
+        private sealed class DailySummaryDeepCleanDue
+        {
+            public int PropertyId { get; set; }
+            public string RoomNumber { get; set; } = string.Empty;
+            public DateTime DueAtUtc { get; set; }
+        }
+
+        private sealed class DeepCleanSummaryData
+        {
+            public IReadOnlyDictionary<int, int> Frequencies { get; init; } = new Dictionary<int, int>();
+            public IReadOnlyList<DailySummaryDeepCleanSession> Completed { get; init; } = Array.Empty<DailySummaryDeepCleanSession>();
+            public IReadOnlyList<DailySummaryDeepCleanDue> DueSoon { get; init; } = Array.Empty<DailySummaryDeepCleanDue>();
+            public IReadOnlyList<DailySummaryDeepCleanDue> Overdue { get; init; } = Array.Empty<DailySummaryDeepCleanDue>();
         }
 
         private static string BuildUserDisplayName(ApplicationUser? user)

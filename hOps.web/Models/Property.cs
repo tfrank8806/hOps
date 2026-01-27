@@ -61,5 +61,9 @@ namespace hOps.web.Models
         public PreventiveMaintenanceSetting? PreventiveMaintenanceSetting { get; set; }
         public ICollection<PreventiveMaintenanceTask> PreventiveMaintenanceTasks { get; set; } = new List<PreventiveMaintenanceTask>();
         public ICollection<PreventiveMaintenanceSession> PreventiveMaintenanceSessions { get; set; } = new List<PreventiveMaintenanceSession>();
+
+        public DeepCleanSetting? DeepCleanSetting { get; set; }
+        public ICollection<DeepCleanChecklistItem> DeepCleanChecklistItems { get; set; } = new List<DeepCleanChecklistItem>();
+        public ICollection<DeepCleanSession> DeepCleanSessions { get; set; } = new List<DeepCleanSession>();
     }
 }

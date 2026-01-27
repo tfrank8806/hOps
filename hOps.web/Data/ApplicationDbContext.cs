@@ -74,6 +74,11 @@ namespace hOps.web.Data
         public DbSet<PreventiveMaintenanceSession> PreventiveMaintenanceSessions { get; set; }
         public DbSet<PreventiveMaintenanceSessionTask> PreventiveMaintenanceSessionTasks { get; set; }
 
+        public DbSet<DeepCleanSetting> DeepCleanSettings { get; set; }
+        public DbSet<DeepCleanChecklistItem> DeepCleanChecklistItems { get; set; }
+        public DbSet<DeepCleanSession> DeepCleanSessions { get; set; }
+        public DbSet<DeepCleanSessionTask> DeepCleanSessionTasks { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -759,6 +764,73 @@ namespace hOps.web.Data
                 .OnDelete(DeleteBehavior.SetNull);
 
             builder.Entity<PreventiveMaintenanceSessionTask>()
+                .HasIndex(t => new { t.SessionId, t.SortOrder });
+
+            builder.Entity<DeepCleanSetting>()
+                .HasOne(s => s.Property)
+                .WithOne(p => p.DeepCleanSetting)
+                .HasForeignKey<DeepCleanSetting>(s => s.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<DeepCleanSetting>()
+                .HasOne(s => s.UpdatedByUser)
+                .WithMany()
+                .HasForeignKey(s => s.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<DeepCleanSetting>()
+                .HasIndex(s => s.PropertyId)
+                .IsUnique();
+
+            builder.Entity<DeepCleanChecklistItem>()
+                .HasOne(t => t.Property)
+                .WithMany(p => p.DeepCleanChecklistItems)
+                .HasForeignKey(t => t.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<DeepCleanChecklistItem>()
+                .HasIndex(t => new { t.PropertyId, t.SortOrder });
+
+            builder.Entity<DeepCleanSession>()
+                .HasOne(s => s.Property)
+                .WithMany(p => p.DeepCleanSessions)
+                .HasForeignKey(s => s.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<DeepCleanSession>()
+                .HasOne(s => s.Room)
+                .WithMany()
+                .HasForeignKey(s => s.RoomId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<DeepCleanSession>()
+                .HasOne(s => s.CreatedBy)
+                .WithMany()
+                .HasForeignKey(s => s.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<DeepCleanSession>()
+                .HasOne(s => s.CompletedBy)
+                .WithMany()
+                .HasForeignKey(s => s.CompletedById)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<DeepCleanSession>()
+                .HasIndex(s => new { s.PropertyId, s.Status });
+
+            builder.Entity<DeepCleanSessionTask>()
+                .HasOne(t => t.Session)
+                .WithMany(s => s.Tasks)
+                .HasForeignKey(t => t.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<DeepCleanSessionTask>()
+                .HasOne(t => t.TemplateTask)
+                .WithMany()
+                .HasForeignKey(t => t.TemplateTaskId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<DeepCleanSessionTask>()
                 .HasIndex(t => new { t.SessionId, t.SortOrder });
         }
     }
