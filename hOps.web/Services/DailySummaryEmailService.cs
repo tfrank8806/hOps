@@ -21,7 +21,8 @@ namespace hOps.web.Services
 {
     public class DailySummaryEmailService : BackgroundService
     {
-        private const int PreviewCharacterLimit = 350;
+        private const int PassOnLogPreviewLimit = 260;
+        private const int BulletinPreviewLimit = 400;
 
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DailySummaryEmailService> _logger;
@@ -130,6 +131,8 @@ namespace hOps.web.Services
                     continue;
                 }
 
+                var propertyNameLookup = await LoadPropertyNameLookupAsync(context, propertyIds, cancellationToken);
+
                 var logs = await context.PassOnLogs
                     .AsNoTracking()
                     .Include(l => l.Properties).ThenInclude(lp => lp.Property)
@@ -177,6 +180,8 @@ namespace hOps.web.Services
                     upcomingEvents,
                     announcements,
                     scheduleSummaries,
+                    propertyIds,
+                    propertyNameLookup,
                     _appBaseUrl);
                 var subject = $"Daily summary for {summaryDate:MMM d, yyyy}";
 
@@ -194,7 +199,7 @@ namespace hOps.web.Services
             await context.SaveChangesAsync(cancellationToken);
         }
 
-        private static string BuildSummaryBody(
+                private static string BuildSummaryBody(
             ApplicationUser user,
             DateOnly summaryDate,
             List<PassOnLog> logs,
@@ -206,165 +211,141 @@ namespace hOps.web.Services
             IReadOnlyList<DailySummaryEvent> upcomingEvents,
             IReadOnlyList<DailySummaryAnnouncement> announcements,
             IReadOnlyList<DailySummarySchedule> schedules,
+            IReadOnlyList<int> propertyIds,
+            IReadOnlyDictionary<int, string> propertyNames,
             string? baseUrl)
         {
             var builder = new StringBuilder();
             var userName = BuildUserDisplayName(user);
             var safeName = WebUtility.HtmlEncode(userName);
             var userTimeZone = ResolveUserTimeZone(user);
+            var palette = EmailPalette.Default;
+            var propertyRecaps = BuildPropertyRecaps(
+                propertyIds,
+                propertyNames,
+                logs,
+                posts,
+                salesLeads,
+                workOrders,
+                packageEntries,
+                lostFoundEntries,
+                upcomingEvents,
+                announcements,
+                schedules);
+            var summaryLabel = summaryDate.ToString("dddd, MMM d", CultureInfo.CurrentCulture);
+            var sentLabel = FormatUserLocal(DateTime.UtcNow, userTimeZone, "MMM d, yyyy h:mm tt");
+            var heroKpis = BuildHeroKpis();
 
-            builder.AppendLine($@"<p>Hello {safeName},</p>");
-            builder.AppendLine($@"<p>Here is your activity summary for {summaryDate:MMMM d, yyyy}.</p>");
+            builder.AppendLine($@"<div style=""background:{palette.Background};color:{palette.Text};padding:24px;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;"">");
 
-            AppendWorkOrders();
-            AppendPassOnLogs();
-            AppendUpcomingEvents();
-            AppendAnnouncements();
-            AppendBulletins();
-            AppendPackages();
-            AppendLostFound();
-            AppendSchedules();
-            AppendSalesLeads();
+            AppendHero();
 
-            builder.AppendLine(@"<p style=""margin-top:1.5rem;"">You are receiving this email because daily summaries are enabled in your profile preferences.</p>");
+            if (propertyRecaps.Count == 0)
+            {
+                builder.AppendLine($@"<p style=""color:{palette.Muted};margin-top:1.5rem;"">No property activity matched your subscriptions for this time range.</p>");
+            }
+            else
+            {
+                foreach (var recap in propertyRecaps)
+                {
+                    AppendPropertyCard(recap);
+                }
+            }
+
+            AppendFooter();
+            builder.AppendLine(@"</div>");
 
             return builder.ToString();
 
-            void AppendSectionHeader(string title)
+            List<(string Label, string Value)> BuildHeroKpis()
             {
-                builder.AppendLine($@"<h3 style=""margin-top:1.5rem;"">{title}</h3>");
+                return new List<(string Label, string Value)>
+                {
+                    ("Open WOs", (workOrders?.Count ?? 0).ToString("N0", CultureInfo.CurrentCulture)),
+                    ("Packages waiting", (packageEntries?.Count ?? 0).ToString("N0", CultureInfo.CurrentCulture)),
+                    ("Lost & Found", (lostFoundEntries?.Count ?? 0).ToString("N0", CultureInfo.CurrentCulture)),
+                    ("New Sales Leads", (salesLeads?.Count ?? 0).ToString("N0", CultureInfo.CurrentCulture))
+                };
             }
 
-            void AppendWorkOrders()
+            void AppendHero()
             {
-                AppendSectionHeader("Open Work Orders");
-                if (workOrders == null || workOrders.Count == 0)
+                builder.AppendLine($@"<div style=""background:{palette.HeroBackground};border-radius:24px;border:1px solid {palette.Border};padding:24px;margin-bottom:24px;"">");
+                builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;margin:0 0 0.2rem;"">Sent {sentLabel}</div>");
+                builder.AppendLine($@"<h1 style=""margin:0;color:{palette.Text};font-size:1.6rem;"">Hello {safeName}, here's your recap for {summaryLabel}.</h1>");
+                builder.AppendLine($@"<p style=""margin:0.5rem 0 1rem;color:{palette.Muted};"">The cards below summarize everything logged on your properties during the previous day.</p>");
+
+                var propertyBadges = propertyRecaps
+                    .Select(r => WebUtility.HtmlEncode(r.PropertyName))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (propertyBadges.Any())
                 {
-                    builder.AppendLine(@"<p style=""color:#6c757d;margin:0;"">No open work orders for your selected properties.</p>");
-                    return;
+                    builder.AppendLine(@"<div style=""margin-bottom:1rem;"">");
+                    foreach (var badge in propertyBadges)
+                    {
+                        builder.AppendLine($@"<span style=""display:inline-block;background:{palette.BadgeBackground};color:{palette.AccentAlt};padding:6px 12px;border-radius:999px;margin:0 8px 8px 0;font-size:0.9rem;"">{badge}</span>");
+                    }
+                    builder.AppendLine(@"</div>");
                 }
 
-                builder.AppendLine(@"<ul style=""padding-left:1.25rem;margin:0;list-style-type:disc;"">");
-                foreach (var order in workOrders.OrderBy(o => o.DueDate))
+                builder.AppendLine(@"<table role=""presentation"" width=""100%"" style=""border-collapse:collapse;""><tr>");
+                foreach (var kpi in heroKpis)
                 {
-                    var issue = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(order.Issue) ? "Work Order" : order.Issue);
-                    var statusLabel = WebUtility.HtmlEncode(WorkOrderStatusOptions.GetLabel(order.Status));
-                    var properties = order.PropertyNames.Any()
-                        ? string.Join(", ", order.PropertyNames.Select(WebUtility.HtmlEncode))
-                        : "Property";
-                    var location = string.IsNullOrWhiteSpace(order.Location) ? null : WebUtility.HtmlEncode(order.Location);
-                    var department = string.IsNullOrWhiteSpace(order.DepartmentName) ? null : WebUtility.HtmlEncode(order.DepartmentName);
-                    var openedAt = WebUtility.HtmlEncode(FormatUserLocal(order.CreatedAt, userTimeZone, "MMM d, yyyy h:mm tt"));
-                    var dueAt = WebUtility.HtmlEncode(FormatUserLocal(order.DueDate, userTimeZone, "MMM d, yyyy h:mm tt"));
-                    var orderLink = BuildAbsoluteUrl(order.DetailPath, baseUrl);
-
-                    builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{issue}</strong><br/><span style=""color:#555;"">{properties}</span>");
-                    builder.Append($@"<div style=""margin:0.4rem 0;""><strong>Status:</strong> {statusLabel}");
-                    if (location != null)
-                    {
-                        builder.Append($@"<br/><strong>Location:</strong> {location}");
-                    }
-                    if (department != null)
-                    {
-                        builder.Append($@"<br/><strong>Department:</strong> {department}");
-                    }
-                    builder.Append($@"<br/><strong>Opened:</strong> {openedAt}");
-                    builder.Append($@"<br/><strong>Due:</strong> {dueAt}</div>");
-                    builder.AppendLine($@"<a href=""{orderLink}"">View work order</a></li>");
+                    builder.AppendLine($@"<td style=""border:1px solid {palette.Border};border-radius:18px;background:{palette.Panel};padding:14px;text-align:center;font-size:0.9rem;color:{palette.Muted};""><div style=""font-size:1.8rem;font-weight:600;color:{palette.AccentAlt};"">{kpi.Value}</div><div style=""letter-spacing:0.08em;text-transform:uppercase;"">{kpi.Label}</div></td>");
                 }
-                builder.AppendLine("</ul>");
+                builder.AppendLine(@"</tr></table>");
+                builder.AppendLine(@"</div>");
             }
 
-            void AppendPassOnLogs()
+            void AppendPropertyCard(PropertyRecap recap)
             {
-                AppendSectionHeader("Pass On Logs (Last 24 Hours)");
-                if (!logs.Any())
+                builder.AppendLine($@"<div style=""background:{palette.Panel};border-radius:24px;border:1px solid {palette.Border};padding:20px;margin-bottom:24px;"">");
+                builder.AppendLine(@"<div style=""display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-bottom:12px;"">");
+                builder.AppendLine($@"<div><h2 style=""margin:0;color:{palette.Text};font-size:1.35rem;"">{WebUtility.HtmlEncode(recap.PropertyName)}</h2>");
+                var supportLink = BuildAbsoluteUrl($"/Phonebook?propertyId={recap.PropertyId}", baseUrl);
+                builder.AppendLine($@"<p style=""margin:0.2rem 0 0;color:{palette.Muted};font-size:0.9rem;"">Need help here? <a href=""{supportLink}"" style=""color:{palette.Accent};"">Open the team directory</a>.</p></div>");
+                builder.AppendLine(@"<div style=""display:flex;flex-wrap:wrap;gap:10px;"">");
+                foreach (var badge in BuildPropertyBadges(recap))
                 {
-                    builder.AppendLine(@"<p style=""color:#6c757d;margin:0;"">No pass on logs were posted in the last 24 hours.</p>");
-                    return;
+                    builder.AppendLine($@"<div style=""min-width:120px;background:{palette.BadgeBackground};padding:10px 12px;border-radius:14px;text-align:center;""><div style=""color:{palette.AccentAlt};font-weight:600;font-size:1.2rem;"">{badge.Value}</div><div style=""color:{palette.Muted};font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;"">{badge.Label}</div></div>");
                 }
+                builder.AppendLine(@"</div>");
+                builder.AppendLine(@"</div>");
 
-                builder.AppendLine(@"<ul style=""padding-left:1.25rem;margin:0;list-style-type:disc;"">");
-                foreach (var log in logs.OrderBy(l => l.CreatedAt))
-                {
-                    var logTitle = WebUtility.HtmlEncode(log.Title);
-                    var createdAtLocal = FormatUserLocal(log.CreatedAt, userTimeZone, "MMM d, yyyy h:mm tt");
-                    var safeCreated = WebUtility.HtmlEncode(createdAtLocal);
-                    var properties = log.Properties
-                        .Select(lp => lp.Property?.Name ?? $"Property #{lp.PropertyId}")
-                        .Distinct()
-                        .Select(WebUtility.HtmlEncode)
-                        .ToList();
-                    var propertiesText = properties.Any()
-                        ? $"<span style=\"color:#555;\">{string.Join(", ", properties)}</span><br/>"
-                        : string.Empty;
-                    var previewHtml = BuildRichTextPreview(log.Body, PreviewCharacterLimit);
-                    var link = BuildAbsoluteUrl($"/PassOnLogs/Details/{log.Id}", baseUrl);
-                    builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{logTitle}</strong><br/>{propertiesText}<span style=""color:#555;"">{safeCreated}</span>");
-                    if (!string.IsNullOrEmpty(previewHtml))
-                    {
-                        builder.Append($@"<div style=""margin:0.5rem 0;"">{previewHtml}</div>");
-                    }
-                    else
-                    {
-                        builder.Append("<br/>");
-                    }
-                    builder.AppendLine($@"<a href=""{link}"">View log</a></li>");
-                }
-                builder.AppendLine("</ul>");
+                AppendAnnouncements(recap);
+                AppendWorkOrders(recap);
+                AppendPassOnLogs(recap);
+                AppendBulletins(recap);
+                AppendPackages(recap);
+                AppendLostFound(recap);
+                AppendEvents(recap);
+                AppendSchedules(recap);
+                AppendSalesLeads(recap);
+
+                builder.AppendLine(@"</div>");
             }
 
-            void AppendUpcomingEvents()
+            IEnumerable<(string Label, string Value)> BuildPropertyBadges(PropertyRecap recap)
             {
-                AppendSectionHeader("Upcoming Events");
-                if (upcomingEvents == null || upcomingEvents.Count == 0)
-                {
-                    builder.AppendLine(@"<p style=""color:#6c757d;margin:0;"">No upcoming events found for your properties.</p>");
-                    return;
-                }
-
-                builder.AppendLine(@"<ul style=""padding-left:1.25rem;margin:0;list-style-type:disc;"">");
-                foreach (var calendarEvent in upcomingEvents.OrderBy(e => e.StartDate))
-                {
-                    var title = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(calendarEvent.Title) ? "Event" : calendarEvent.Title);
-                    var props = calendarEvent.PropertyNames.Any()
-                        ? string.Join(", ", calendarEvent.PropertyNames.Select(WebUtility.HtmlEncode))
-                        : "Property";
-                    var dateLabel = WebUtility.HtmlEncode(BuildEventDateLabel(calendarEvent));
-                    var timeLabel = BuildEventTimeLabel(calendarEvent);
-                    var link = BuildAbsoluteUrl(calendarEvent.DetailPath, baseUrl);
-
-                    builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{title}</strong><br/><span style=""color:#555;"">{props}</span><br/>{dateLabel}");
-                    if (!string.IsNullOrEmpty(timeLabel))
-                    {
-                        builder.Append($@"<br/>{WebUtility.HtmlEncode(timeLabel)}");
-                    }
-                    builder.AppendLine($@"<br/><a href=""{link}"">View calendar</a></li>");
-                }
-                builder.AppendLine("</ul>");
+                yield return ("Open WOs", recap.WorkOrders.Count.ToString("N0", CultureInfo.CurrentCulture));
+                yield return ("Packages", recap.Packages.Count.ToString("N0", CultureInfo.CurrentCulture));
+                yield return ("Events", recap.Events.Count.ToString("N0", CultureInfo.CurrentCulture));
+                yield return ("Sales Leads", recap.SalesLeads.Count.ToString("N0", CultureInfo.CurrentCulture));
             }
 
-            void AppendAnnouncements()
+            void AppendAnnouncements(PropertyRecap recap)
             {
-                AppendSectionHeader("Manager Notes &amp; Announcements");
-                if (announcements == null || announcements.Count == 0)
+                AppendSection("Manager Notes &amp; Announcements", recap.Announcements, "No manager notes posted.", announcement =>
                 {
-                    builder.AppendLine(@"<p style=""color:#6c757d;margin:0;"">No manager announcements are currently posted.</p>");
-                    return;
-                }
-
-                foreach (var announcement in announcements.OrderBy(a => a.PropertyName))
-                {
-                    var propertyName = WebUtility.HtmlEncode(announcement.PropertyName);
-                    builder.Append($@"<div style=""margin-bottom:1rem;""><strong>{propertyName}</strong>");
-
                     if (!string.IsNullOrWhiteSpace(announcement.Content))
                     {
-                        builder.Append($@"<div style=""margin:0.4rem 0;"">{RichTextRenderer.ToHtml(announcement.Content)}</div>");
+                        builder.AppendLine($@"<div style=""margin-bottom:0.6rem;"">{RichTextRenderer.ToHtml(announcement.Content)}</div>");
                     }
                     else
                     {
-                        builder.Append(@"<p style=""color:#6c757d;margin:0.3rem 0;"">No announcement content.</p>");
+                        builder.AppendLine($@"<p style=""margin:0 0 0.6rem;color:{palette.Muted};"">No announcement content.</p>");
                     }
 
                     if (announcement.UpdatedAt.HasValue)
@@ -372,250 +353,286 @@ namespace hOps.web.Services
                         var updated = WebUtility.HtmlEncode(FormatUserLocal(announcement.UpdatedAt.Value, userTimeZone, "MMM d, yyyy h:mm tt"));
                         var updatedBy = string.IsNullOrWhiteSpace(announcement.UpdatedByName)
                             ? string.Empty
-                            : $" by {WebUtility.HtmlEncode(announcement.UpdatedByName)}";
-                        builder.Append($@"<p style=""color:#555;font-size:0.9rem;margin:0;margin-bottom:0.4rem;"">Updated {updated}{updatedBy}</p>");
+                            : $" &middot; {WebUtility.HtmlEncode(announcement.UpdatedByName)}";
+                        builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.85rem;"">Updated {updated}{updatedBy}</div>");
                     }
 
                     if (announcement.Attachments.Any())
                     {
-                        builder.Append(@"<ul style=""padding-left:1.25rem;margin:0 0 0.5rem 0;list-style-type:circle;"">");
+                        builder.AppendLine(@"<ul style=""margin:0.4rem 0 0;padding-left:1.25rem;"">");
                         foreach (var attachment in announcement.Attachments)
                         {
-                            var fileName = WebUtility.HtmlEncode(attachment.FileName);
                             var link = BuildAbsoluteUrl(attachment.DownloadPath, baseUrl);
-                            builder.Append($@"<li><a href=""{link}"">{fileName}</a></li>");
+                            var fileName = WebUtility.HtmlEncode(attachment.FileName);
+                            builder.AppendLine($@"<li><a href=""{link}"" style=""color:{palette.Accent};"">{fileName}</a></li>");
                         }
-                        builder.Append("</ul>");
+                        builder.AppendLine(@"</ul>");
                     }
-
-                    builder.AppendLine("</div>");
-                }
+                });
             }
 
-            void AppendBulletins()
+            void AppendWorkOrders(PropertyRecap recap)
             {
-                AppendSectionHeader("Bulletin Board");
-                if (!posts.Any())
+                var ordered = recap.WorkOrders.OrderBy(o => o.DueDate).ToList();
+                AppendSection("Open Work Orders", ordered, "All work orders are complete.", order =>
                 {
-                    builder.AppendLine(@"<p style=""color:#6c757d;margin:0;"">No bulletin posts were added or updated in the last 24 hours.</p>");
-                    return;
-                }
+                    var issue = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(order.Issue) ? "Work Order" : order.Issue);
+                    var statusLabel = WebUtility.HtmlEncode(WorkOrderStatusOptions.GetLabel(order.Status));
+                    var openedAt = WebUtility.HtmlEncode(FormatUserLocal(order.CreatedAt, userTimeZone, "MMM d, yyyy h:mm tt"));
+                    var dueAt = WebUtility.HtmlEncode(FormatUserLocal(order.DueDate, userTimeZone, "MMM d, yyyy h:mm tt"));
+                    var orderLink = BuildAbsoluteUrl(order.DetailPath, baseUrl);
 
-                builder.AppendLine(@"<ul style=""padding-left:1.25rem;margin:0;list-style-type:disc;"">");
-                foreach (var post in posts.OrderBy(p => p.CreatedAt))
+                    builder.AppendLine($@"<div style=""font-weight:600;"">{issue}</div>");
+                    builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;margin:0.2rem 0;"">Status: <span style=""color:{palette.AccentAlt};"">{statusLabel}</span> &middot; Due {dueAt}</div>");
+
+                    if (!string.IsNullOrWhiteSpace(order.Location))
+                    {
+                        builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;"">Location: {WebUtility.HtmlEncode(order.Location)}</div>");
+                    }
+                    if (!string.IsNullOrWhiteSpace(order.DepartmentName))
+                    {
+                        builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;"">Department: {WebUtility.HtmlEncode(order.DepartmentName)}</div>");
+                    }
+
+                    var sharedWith = order.PropertyNames
+                        .Where(name => !string.Equals(name, recap.PropertyName, StringComparison.OrdinalIgnoreCase))
+                        .Select(WebUtility.HtmlEncode)
+                        .ToList();
+                    if (sharedWith.Any())
+                    {
+                        builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.85rem;margin-top:0.2rem;"">Shared with: {string.Join("", "", sharedWith)}</div>");
+                    }
+
+                    builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.85rem;margin-top:0.2rem;"">Opened {openedAt}</div>");
+                    builder.AppendLine($@"<a href=""{orderLink}"" style=""color:{palette.Accent};font-weight:600;text-decoration:none;"">View work order &rarr;</a>");
+                });
+            }
+
+            void AppendPassOnLogs(PropertyRecap recap)
+            {
+                var ordered = recap.PassOnLogs.OrderByDescending(l => l.CreatedAt).ToList();
+                AppendSection("Pass On Logs (24h)", ordered, "No pass on logs were posted.", log =>
                 {
-                    var propertyName = post.Property?.Name ?? "Property";
-                    var safeProperty = WebUtility.HtmlEncode(propertyName);
-                    var createdAtLocal = FormatUserLocal(post.CreatedAt, userTimeZone, "MMM d, yyyy h:mm tt");
-                    var safeCreated = WebUtility.HtmlEncode(createdAtLocal);
-                    var contentHtml = BuildRichTextPreview(post.Content, PreviewCharacterLimit);
-                    var link = BuildAbsoluteUrl("/Home", baseUrl);
-                    builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{safeProperty}</strong><br/><span style=""color:#555;"">{safeCreated}</span>");
+                    var logTitle = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(log.Title) ? "Pass On Log" : log.Title);
+                    var createdAt = WebUtility.HtmlEncode(FormatUserLocal(log.CreatedAt, userTimeZone, "MMM d, yyyy h:mm tt"));
+                    var previewHtml = BuildRichTextPreview(log.Body, PassOnLogPreviewLimit);
+                    var link = BuildAbsoluteUrl($"/PassOnLogs/Details/{log.Id}", baseUrl);
+
+                    builder.AppendLine($@"<div style=""font-weight:600;"">{logTitle}</div>");
+                    builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;margin-bottom:0.4rem;"">{createdAt}</div>");
+                    if (!string.IsNullOrEmpty(previewHtml))
+                    {
+                        builder.AppendLine($@"<div style=""margin-bottom:0.4rem;"">{previewHtml}</div>");
+                    }
+                    builder.AppendLine($@"<a href=""{link}"" style=""color:{palette.Accent};font-weight:600;text-decoration:none;"">Read full log &rarr;</a>");
+                });
+            }
+
+            void AppendBulletins(PropertyRecap recap)
+            {
+                var ordered = recap.Bulletins.OrderByDescending(b => b.CreatedAt).ToList();
+                AppendSection("Bulletin Board", ordered, "No bulletin posts were added yesterday.", post =>
+                {
+                    var propertyLink = BuildAbsoluteUrl($"/Home?propertyId={post.PropertyId}#bulletin-board", baseUrl);
+                    var createdAt = WebUtility.HtmlEncode(FormatUserLocal(post.CreatedAt, userTimeZone, "MMM d, yyyy h:mm tt"));
+                    var contentHtml = BuildRichTextPreview(post.Content, BulletinPreviewLimit);
+
+                    builder.AppendLine($@"<div style=""font-weight:600;"">{WebUtility.HtmlEncode(post.Property?.Name ?? recap.PropertyName)}</div>");
+                    builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;margin-bottom:0.4rem;"">{createdAt}</div>");
                     if (!string.IsNullOrEmpty(contentHtml))
                     {
-                        builder.Append($@"<div style=""margin:0.5rem 0;"">{contentHtml}</div>");
+                        builder.AppendLine($@"<div style=""margin-bottom:0.4rem;"">{contentHtml}</div>");
                     }
-                    else
-                    {
-                        builder.Append("<br/>");
-                    }
-                    builder.AppendLine($@"<a href=""{link}"">View post</a></li>");
-                }
-                builder.AppendLine("</ul>");
+                    builder.AppendLine($@"<a href=""{propertyLink}"" style=""color:{palette.Accent};font-weight:600;text-decoration:none;"">Open bulletin &rarr;</a>");
+                });
             }
 
-            void AppendPackages()
+            void AppendPackages(PropertyRecap recap)
             {
-                AppendSectionHeader("Open Package Log Entries");
-                if (packageEntries == null || packageEntries.Count == 0)
-                {
-                    builder.AppendLine(@"<p style=""color:#6c757d;margin:0;"">No open package log entries.</p>");
-                    return;
-                }
-
-                builder.AppendLine(@"<ul style=""padding-left:1.25rem;margin:0;list-style-type:disc;"">");
-                foreach (var entry in packageEntries.OrderByDescending(p => p.LoggedAt))
+                var ordered = recap.Packages.OrderByDescending(p => p.PackageReceivedDate ?? p.LoggedAt).ToList();
+                AppendSection("Open Package Log", ordered, "No open packages are waiting.", entry =>
                 {
                     var recipient = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(entry.RecipientName) ? "Package" : entry.RecipientName);
-                    var property = WebUtility.HtmlEncode(entry.PropertyName);
-                    var loggedAt = WebUtility.HtmlEncode(FormatUserLocal(entry.LoggedAt, userTimeZone, "MMM d, yyyy h:mm tt"));
+                    var receivedSource = entry.PackageReceivedDate ?? entry.LoggedAt;
+                    var received = WebUtility.HtmlEncode(FormatUserLocal(receivedSource, userTimeZone, "MMM d, yyyy h:mm tt"));
+                    var loggedLabel = WebUtility.HtmlEncode(FormatUserLocal(entry.LoggedAt, userTimeZone, "MMM d, yyyy h:mm tt"));
                     var room = string.IsNullOrWhiteSpace(entry.RoomNumber) ? null : WebUtility.HtmlEncode(entry.RoomNumber);
                     var carrier = string.IsNullOrWhiteSpace(entry.Carrier) ? null : WebUtility.HtmlEncode(entry.Carrier);
                     var tracking = string.IsNullOrWhiteSpace(entry.TrackingNumber) ? null : WebUtility.HtmlEncode(entry.TrackingNumber);
                     var storage = string.IsNullOrWhiteSpace(entry.StorageLocation) ? null : WebUtility.HtmlEncode(entry.StorageLocation);
                     var link = BuildAbsoluteUrl(entry.DetailPath, baseUrl);
+                    var waitingDays = Math.Max(0, (int)System.Math.Floor((DateTime.UtcNow - DateTime.SpecifyKind(receivedSource, DateTimeKind.Utc)).TotalDays));
+                    var agingChip = waitingDays >= 2
+                        ? $@"<span style=""display:inline-block;margin-left:0.4rem;padding:2px 8px;border-radius:999px;background:{palette.Accent};color:#03121f;font-size:0.75rem;font-weight:600;"">{waitingDays}+ days</span>"
+                        : string.Empty;
 
-                    builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{recipient}</strong><br/><span style=""color:#555;"">{property}</span>");
-                    builder.Append($@"<div style=""margin:0.4rem 0;""><strong>Logged:</strong> {loggedAt}");
+                    builder.AppendLine($@"<div style=""font-weight:600;"">{recipient}{agingChip}</div>");
+                    builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;margin:0.2rem 0;"">Received {received}<br/>Logged {loggedLabel}</div>");
+
                     if (room != null)
                     {
-                        builder.Append($@"<br/><strong>Room:</strong> {room}");
+                        builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;"">Room: {room}</div>");
                     }
                     if (carrier != null)
                     {
-                        builder.Append($@"<br/><strong>Carrier:</strong> {carrier}");
+                        builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;"">Carrier: {carrier}</div>");
                     }
                     if (tracking != null)
                     {
-                        builder.Append($@"<br/><strong>Tracking:</strong> {tracking}");
+                        builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;"">Tracking: {tracking}</div>");
                     }
                     if (storage != null)
                     {
-                        builder.Append($@"<br/><strong>Storage:</strong> {storage}");
+                        builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;"">Storage: {storage}</div>");
                     }
-                    builder.Append("</div>");
-                    builder.AppendLine($@"<a href=""{link}"">View package entry</a></li>");
-                }
-                builder.AppendLine("</ul>");
+
+                    builder.AppendLine($@"<a href=""{link}"" style=""color:{palette.Accent};font-weight:600;text-decoration:none;"">View package entry &rarr;</a>");
+                });
             }
 
-            void AppendLostFound()
+            void AppendLostFound(PropertyRecap recap)
             {
-                AppendSectionHeader("Open Lost &amp; Found Logs");
-                if (lostFoundEntries == null || lostFoundEntries.Count == 0)
-                {
-                    builder.AppendLine(@"<p style=""color:#6c757d;margin:0;"">No open lost &amp; found entries.</p>");
-                    return;
-                }
-
-                builder.AppendLine(@"<ul style=""padding-left:1.25rem;margin:0;list-style-type:disc;"">");
-                foreach (var entry in lostFoundEntries.OrderByDescending(l => l.CreatedAt))
+                var ordered = recap.LostFoundEntries.OrderByDescending(l => l.CreatedAt).ToList();
+                AppendSection("Open Lost &amp; Found", ordered, "No open lost &amp; found entries.", entry =>
                 {
                     var title = WebUtility.HtmlEncode(entry.Title);
-                    var property = WebUtility.HtmlEncode(entry.PropertyName);
                     var status = WebUtility.HtmlEncode(entry.Status);
                     var type = string.IsNullOrWhiteSpace(entry.Type) ? null : WebUtility.HtmlEncode(entry.Type);
                     var createdAt = WebUtility.HtmlEncode(FormatUserLocal(entry.CreatedAt, userTimeZone, "MMM d, yyyy h:mm tt"));
                     var link = BuildAbsoluteUrl(entry.DetailPath, baseUrl);
 
-                    builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{title}</strong><br/><span style=""color:#555;"">{property}</span>");
-                    builder.Append($@"<div style=""margin:0.4rem 0;""><strong>Status:</strong> {status}");
+                    builder.AppendLine($@"<div style=""font-weight:600;"">{title}</div>");
+                    builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;margin:0.2rem 0;"">Status: {status}</div>");
                     if (type != null)
                     {
-                        builder.Append($@"<br/><strong>Type:</strong> {type}");
+                        builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;"">Type: {type}</div>");
                     }
-                    builder.Append($@"<br/><strong>Logged:</strong> {createdAt}</div>");
-                    builder.AppendLine($@"<a href=""{link}"">View entry</a></li>");
-                }
-                builder.AppendLine("</ul>");
+                    builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.85rem;margin-bottom:0.2rem;"">Logged {createdAt}</div>");
+                    builder.AppendLine($@"<a href=""{link}"" style=""color:{palette.Accent};font-weight:600;text-decoration:none;"">View entry &rarr;</a>");
+                });
             }
 
-            void AppendSchedules()
+            void AppendEvents(PropertyRecap recap)
             {
-                var currentSchedules = schedules.Where(s => !s.IsUpcoming).OrderBy(s => s.PropertyName).ThenBy(s => s.WeekStart).ToList();
-                var nextSchedules = schedules.Where(s => s.IsUpcoming).OrderBy(s => s.PropertyName).ThenBy(s => s.WeekStart).ToList();
+                var ordered = recap.Events.OrderBy(e => e.StartDate).ToList();
+                AppendSection("Upcoming Events", ordered, "No upcoming events have been posted.", calendarEvent =>
+                {
+                    var title = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(calendarEvent.Title) ? "Event" : calendarEvent.Title);
+                    var dateLabel = WebUtility.HtmlEncode(BuildEventDateLabel(calendarEvent));
+                    var timeLabel = BuildEventTimeLabel(calendarEvent);
+                    var link = BuildAbsoluteUrl(calendarEvent.DetailPath, baseUrl);
 
-                AppendSectionHeader("Current Week Schedule");
-                if (!currentSchedules.Any())
-                {
-                    builder.AppendLine(@"<p style=""color:#6c757d;margin:0;"">No posted schedule for the current week.</p>");
-                }
-                else
-                {
-                    RenderScheduleList(currentSchedules);
-                }
-
-                AppendSectionHeader("Upcoming Week Schedule");
-                if (!nextSchedules.Any())
-                {
-                    builder.AppendLine(@"<p style=""color:#6c757d;margin:0;"">No posted schedule for the upcoming week.</p>");
-                }
-                else
-                {
-                    RenderScheduleList(nextSchedules);
-                }
+                    builder.AppendLine($@"<div style=""font-weight:600;"">{title}</div>");
+                    builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;"">{dateLabel}");
+                    if (!string.IsNullOrEmpty(timeLabel))
+                    {
+                        builder.AppendLine($@" &middot; {WebUtility.HtmlEncode(timeLabel)}");
+                    }
+                    builder.AppendLine(@"</div>");
+                    builder.AppendLine($@"<a href=""{link}"" style=""color:{palette.Accent};font-weight:600;text-decoration:none;"">View calendar &rarr;</a>");
+                });
             }
 
-            void RenderScheduleList(IEnumerable<DailySummarySchedule> scheduleList)
+            void AppendSchedules(PropertyRecap recap)
             {
-                builder.AppendLine(@"<ul style=""padding-left:1.25rem;margin:0;list-style-type:disc;"">");
-                foreach (var schedule in scheduleList)
+                if (!recap.CurrentSchedules.Any() && !recap.UpcomingSchedules.Any())
                 {
-                    var property = WebUtility.HtmlEncode(schedule.PropertyName);
-                    var title = WebUtility.HtmlEncode(schedule.Title);
-                    var weekRange = $"{FormatUserLocal(schedule.WeekStart, userTimeZone, "MMM d, yyyy")} - {FormatUserLocal(schedule.WeekEnd, userTimeZone, "MMM d, yyyy")}";
-                    var link = BuildAbsoluteUrl(schedule.DetailPath, baseUrl);
-                    builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{property}</strong><br/>{title}<div style=""margin:0.35rem 0;"">{WebUtility.HtmlEncode(weekRange)}</div><a href=""{link}"">View schedule</a></li>");
-                }
-                builder.AppendLine("</ul>");
-            }
-
-            void AppendSalesLeads()
-            {
-                AppendSectionHeader("Sales Leads (Past 24 Hours)");
-                if (!salesLeads.Any())
-                {
-                    builder.AppendLine(@"<p style=""color:#6c757d;margin:0;"">No new sales leads were submitted in the last 24 hours.</p>");
+                    AppendSection("Staff Schedules", Array.Empty<DailySummarySchedule>(), "No posted schedules for the current or upcoming week.", _ => { });
                     return;
                 }
 
-                builder.AppendLine(@"<ul style=""padding-left:1.25rem;margin:0;list-style-type:disc;"">");
-                var salesLink = BuildAbsoluteUrl("/Sales", baseUrl);
-                foreach (var lead in salesLeads.OrderBy(l => l.CreatedAtUtc))
+                builder.AppendLine($@"<div style=""margin-top:18px;""><h3 style=""margin:0 0 6px;color:{palette.Accent};font-size:1rem;text-transform:uppercase;letter-spacing:0.08em;"">Staff Schedules</h3>");
+
+                RenderScheduleGroup("Current Week", recap.CurrentSchedules.OrderBy(s => s.WeekStart));
+                RenderScheduleGroup("Upcoming Week", recap.UpcomingSchedules.OrderBy(s => s.WeekStart));
+
+                builder.AppendLine(@"</div>");
+            }
+
+            void RenderScheduleGroup(string title, IEnumerable<DailySummarySchedule> scheduleList)
+            {
+                var schedulesArray = scheduleList.ToList();
+                if (!schedulesArray.Any())
                 {
-                    var propertyName = lead.Property?.Name ?? "Property";
-                    var safeProperty = WebUtility.HtmlEncode(propertyName);
-                    var submittedAt = FormatUserLocal(lead.CreatedAtUtc, userTimeZone, "MMM d, yyyy h:mm tt");
-                    var safeSubmitted = WebUtility.HtmlEncode(submittedAt);
+                    builder.AppendLine($@"<p style=""color:{palette.Muted};margin:0 0 0.4rem;"">{title}: no posted schedule.</p>");
+                    return;
+                }
+
+                builder.AppendLine($@"<p style=""color:{palette.Muted};margin:0 0 0.4rem;font-weight:600;"">{title}</p>");
+                builder.AppendLine(@"<ul style=""list-style:none;padding:0;margin:0;"">");
+                foreach (var schedule in schedulesArray)
+                {
+                    var weekRange = $"{FormatUserLocal(schedule.WeekStart, userTimeZone, "MMM d")} - {FormatUserLocal(schedule.WeekEnd, userTimeZone, "MMM d")}";
+                    var link = BuildAbsoluteUrl(schedule.DetailPath, baseUrl);
+
+                    builder.AppendLine($@"<li style=""background:{palette.ListItemBackground};border-radius:12px;padding:10px 12px;border:1px solid {palette.Border};margin-bottom:10px;""><div style=""font-weight:600;"">{WebUtility.HtmlEncode(schedule.Title)}</div><div style=""color:{palette.Muted};font-size:0.9rem;margin:0.2rem 0;"">{weekRange}</div><a href=""{link}"" style=""color:{palette.Accent};font-weight:600;text-decoration:none;"">View schedule &rarr;</a></li>");
+                }
+                builder.AppendLine(@"</ul>");
+            }
+
+            void AppendSalesLeads(PropertyRecap recap)
+            {
+                var ordered = recap.SalesLeads.OrderByDescending(l => l.CreatedAtUtc).ToList();
+                AppendSection("Sales Leads (24h)", ordered, "No new sales leads were submitted.", lead =>
+                {
+                    var submittedAt = WebUtility.HtmlEncode(FormatUserLocal(lead.CreatedAtUtc, userTimeZone, "MMM d, yyyy h:mm tt"));
                     var submittedBy = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(lead.SubmittedByName) ? "Team Member" : lead.SubmittedByName);
                     var groupName = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(lead.GroupName) ? "N/A" : lead.GroupName);
                     var contactName = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(lead.ContactName) ? "Not provided" : lead.ContactName);
-                    var contactEmail = WebUtility.HtmlEncode(lead.ContactEmail);
+                    var contactEmail = string.IsNullOrWhiteSpace(lead.ContactEmail) ? "Not provided" : lead.ContactEmail!;
                     var contactPhone = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(lead.ContactPhone) ? "Not provided" : lead.ContactPhone!);
                     var inquiryHtml = BuildInquiryListHtml(lead);
                     var datesText = BuildDateRangeDescription(lead.EventStartDate, lead.EventEndDate, userTimeZone);
                     var budgetText = BuildBudgetDescription(lead.BudgetMinimum, lead.BudgetMaximum);
                     var detailsHtml = BuildPlainTextHtml(lead.AdditionalDetails);
+                    var salesLink = BuildAbsoluteUrl("/Sales", baseUrl);
 
-                    builder.Append($@"<li style=""margin-bottom:1rem;""><strong>{safeProperty}</strong><br/><span style=""color:#555;"">Submitted {safeSubmitted} by {submittedBy}</span>");
-                    builder.Append($@"<div style=""margin:0.4rem 0;""><strong>Group:</strong> {groupName}<br/><strong>Contact:</strong> {contactName} &lt;<a href=""mailto:{contactEmail}"">{contactEmail}</a>&gt;<br/><strong>Phone:</strong> {contactPhone}</div>");
+                    builder.AppendLine($@"<div style=""font-weight:600;"">{groupName}</div>");
+                    builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;margin-bottom:0.2rem;"">Submitted {submittedAt} by {submittedBy}</div>");
+                    builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.9rem;margin-bottom:0.3rem;"">Contact: {contactName} &middot; <a href=""mailto:{WebUtility.HtmlEncode(contactEmail)}"" style=""color:{palette.Accent};"">{WebUtility.HtmlEncode(contactEmail)}</a> &middot; {contactPhone}</div>");
 
                     if (!string.IsNullOrEmpty(inquiryHtml))
                     {
-                        builder.Append($@"<div style=""margin-bottom:0.3rem;""><strong>Inquiry:</strong><br/>{inquiryHtml}</div>");
+                        builder.AppendLine($@"<div style=""margin-bottom:0.3rem;""><strong>Inquiry:</strong><br/>{inquiryHtml}</div>");
                     }
 
-                    builder.Append($@"<div style=""margin-bottom:0.3rem;""><strong>Dates:</strong> {datesText}<br/><strong>Budget:</strong> {WebUtility.HtmlEncode(budgetText)}</div>");
+                    builder.AppendLine($@"<div style=""margin-bottom:0.3rem;""><strong>Dates:</strong> {WebUtility.HtmlEncode(datesText)}<br/><strong>Budget:</strong> {WebUtility.HtmlEncode(budgetText)}</div>");
 
                     if (!string.IsNullOrEmpty(detailsHtml))
                     {
-                        builder.Append($@"<div style=""margin-bottom:0.3rem;""><strong>Additional details:</strong><br/>{detailsHtml}</div>");
+                        builder.AppendLine($@"<div style=""margin-bottom:0.3rem;""><strong>Additional details:</strong><br/>{detailsHtml}</div>");
                     }
 
-                    builder.AppendLine($@"<a href=""{salesLink}"">View sales tool</a></li>");
-                }
-                builder.AppendLine("</ul>");
+                    builder.AppendLine($@"<a href=""{salesLink}"" style=""color:{palette.Accent};font-weight:600;text-decoration:none;"">Open sales workspace &rarr;</a>");
+                });
             }
 
-            static string BuildEventDateLabel(DailySummaryEvent calendarEvent)
+            void AppendSection<T>(string title, IReadOnlyCollection<T> items, string emptyMessage, Action<T> renderItem)
             {
-                return calendarEvent.StartDate.Date == calendarEvent.EndDate.Date
-                    ? calendarEvent.StartDate.ToString("MMM d, yyyy", CultureInfo.CurrentCulture)
-                    : $"{calendarEvent.StartDate:MMM d, yyyy} - {calendarEvent.EndDate:MMM d, yyyy}";
+                builder.AppendLine($@"<div style=""margin-top:18px;""><h3 style=""margin:0 0 6px;color:{palette.Accent};font-size:1rem;text-transform:uppercase;letter-spacing:0.08em;"">{title}</h3>");
+                if (items == null || items.Count == 0)
+                {
+                    builder.AppendLine($@"<p style=""color:{palette.Muted};margin:0;"">{emptyMessage}</p></div>");
+                    return;
+                }
+
+                foreach (var item in items)
+                {
+                    builder.AppendLine($@"<div style=""background:{palette.ListItemBackground};border-radius:14px;padding:12px 14px;border:1px solid {palette.Border};margin-bottom:10px;"">");
+                    renderItem(item);
+                    builder.AppendLine(@"</div>");
+                }
+
+                builder.AppendLine(@"</div>");
             }
 
-            static string? BuildEventTimeLabel(DailySummaryEvent calendarEvent)
+            void AppendFooter()
             {
-                if (!calendarEvent.StartTime.HasValue && !calendarEvent.EndTime.HasValue)
-                {
-                    return null;
-                }
-
-                string Format(TimeSpan value) => DateTime.Today.Add(value).ToString("t", CultureInfo.CurrentCulture);
-
-                if (calendarEvent.StartTime.HasValue && calendarEvent.EndTime.HasValue)
-                {
-                    return $"{Format(calendarEvent.StartTime.Value)} - {Format(calendarEvent.EndTime.Value)}";
-                }
-
-                if (calendarEvent.StartTime.HasValue)
-                {
-                    return Format(calendarEvent.StartTime.Value);
-                }
-
-                return $"Until {Format(calendarEvent.EndTime!.Value)}";
+                var manageLink = BuildAbsoluteUrl("/Identity/Account/Manage#notifications", baseUrl);
+                builder.AppendLine($@"<div style=""margin-top:28px;padding:18px;border-radius:18px;border:1px solid {palette.Border};background:{palette.HeroBackground};text-align:center;""><p style=""margin:0 0 0.6rem;color:{palette.Muted};"">You are receiving this recap because daily summaries are enabled in your profile preferences.</p><a href=""{manageLink}"" style=""display:inline-block;padding:10px 22px;border-radius:999px;background:{palette.Accent};color:#02111d;font-weight:600;text-decoration:none;"">Manage notification settings</a><p style=""margin:0.75rem 0 0;color:{palette.Muted};font-size:0.85rem;"">Need to escalate anything? Reply to this email or use the property directory links above to reach your leadership team.</p></div>");
             }
         }
+
 
         private static async Task<List<DailySummaryWorkOrder>> LoadOpenWorkOrdersAsync(
             ApplicationDbContext context,
@@ -651,10 +668,31 @@ namespace hOps.web.Services
                     .Select(p => string.IsNullOrWhiteSpace(p.Property?.Name) ? $"Property #{p.PropertyId}" : p.Property!.Name!)
                     .Distinct()
                     .ToList(),
+                PropertyIds = wo.Properties
+                    .Where(p => propertyIds.Contains(p.PropertyId))
+                    .Select(p => p.PropertyId)
+                    .Distinct()
+                    .ToList(),
                 CreatedAt = wo.CreatedAt,
                 DueDate = wo.DueDate,
                 DetailPath = $"/WorkOrders/Edit/{wo.Id}"
             }).ToList();
+        }
+
+        private static async Task<Dictionary<int, string>> LoadPropertyNameLookupAsync(
+            ApplicationDbContext context,
+            IReadOnlyCollection<int> propertyIds,
+            CancellationToken cancellationToken)
+        {
+            if (propertyIds == null || propertyIds.Count == 0)
+            {
+                return new Dictionary<int, string>();
+            }
+
+            return await context.Properties
+                .AsNoTracking()
+                .Where(p => propertyIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.Name, cancellationToken);
         }
 
         private static async Task<List<DailySummaryAnnouncement>> LoadAnnouncementsAsync(
@@ -682,6 +720,7 @@ namespace hOps.web.Services
                     .First())
                 .Select(announcement => new DailySummaryAnnouncement
                 {
+                    PropertyId = announcement.PropertyId,
                     PropertyName = string.IsNullOrWhiteSpace(announcement.Property?.Name)
                         ? $"Property #{announcement.PropertyId}"
                         : announcement.Property!.Name!,
@@ -735,6 +774,11 @@ namespace hOps.web.Services
                     .Select(ep => string.IsNullOrWhiteSpace(ep.Property?.Name) ? $"Property #{ep.PropertyId}" : ep.Property!.Name!)
                     .Distinct()
                     .ToList(),
+                PropertyIds = e.EventProperties
+                    .Where(ep => propertyIds.Contains(ep.PropertyId))
+                    .Select(ep => ep.PropertyId)
+                    .Distinct()
+                    .ToList(),
                 DetailPath = "/Calendar"
             }).ToList();
         }
@@ -759,6 +803,7 @@ namespace hOps.web.Services
             return packages.Select(p => new DailySummaryPackageLog
             {
                 Id = p.Id,
+                PropertyId = p.PropertyId,
                 PropertyName = string.IsNullOrWhiteSpace(p.Property?.Name) ? $"Property #{p.PropertyId}" : p.Property!.Name!,
                 RecipientName = p.RecipientName,
                 RoomNumber = p.RoomNumber,
@@ -794,6 +839,7 @@ namespace hOps.web.Services
             return lostFoundEntries.Select(lf => new DailySummaryLostFound
             {
                 Id = lf.Id,
+                PropertyId = lf.PropertyId,
                 Title = !string.IsNullOrWhiteSpace(lf.ItemFound)
                     ? lf.ItemFound!
                     : (!string.IsNullOrWhiteSpace(lf.ItemLost) ? lf.ItemLost! : "Lost & Found Entry"),
@@ -849,6 +895,7 @@ namespace hOps.web.Services
 
                 summaries.Add(new DailySummarySchedule
                 {
+                    PropertyId = schedule.PropertyId,
                     PropertyName = string.IsNullOrWhiteSpace(schedule.Property?.Name) ? $"Property #{schedule.PropertyId}" : schedule.Property!.Name!,
                     Title = string.IsNullOrWhiteSpace(schedule.Title) ? "Weekly Schedule" : schedule.Title!,
                     WeekStart = schedule.WeekStartDate,
@@ -861,6 +908,35 @@ namespace hOps.web.Services
             return summaries;
         }
 
+        private static string BuildEventDateLabel(DailySummaryEvent calendarEvent)
+        {
+            return calendarEvent.StartDate.Date == calendarEvent.EndDate.Date
+                ? calendarEvent.StartDate.ToString("MMM d, yyyy", CultureInfo.CurrentCulture)
+                : $"{calendarEvent.StartDate:MMM d, yyyy} - {calendarEvent.EndDate:MMM d, yyyy}";
+        }
+
+        private static string? BuildEventTimeLabel(DailySummaryEvent calendarEvent)
+        {
+            if (!calendarEvent.StartTime.HasValue && !calendarEvent.EndTime.HasValue)
+            {
+                return null;
+            }
+
+            static string FormatTime(TimeSpan value) => DateTime.Today.Add(value).ToString("t", CultureInfo.CurrentCulture);
+
+            if (calendarEvent.StartTime.HasValue && calendarEvent.EndTime.HasValue)
+            {
+                return $"{FormatTime(calendarEvent.StartTime.Value)} - {FormatTime(calendarEvent.EndTime.Value)}";
+            }
+
+            if (calendarEvent.StartTime.HasValue)
+            {
+                return $"Starts {FormatTime(calendarEvent.StartTime.Value)}";
+            }
+
+            return $"Ends {FormatTime(calendarEvent.EndTime!.Value)}";
+        }
+
         private static DateTime AlignToWeekStart(DateTime date, DayOfWeek startDay)
         {
             while (date.DayOfWeek != startDay)
@@ -871,6 +947,266 @@ namespace hOps.web.Services
             return date.Date;
         }
 
+        private static IReadOnlyList<PropertyRecap> BuildPropertyRecaps(
+            IReadOnlyList<int> propertyIds,
+            IReadOnlyDictionary<int, string> propertyNames,
+            List<PassOnLog> logs,
+            List<BulletinPost> posts,
+            List<SalesLeadSubmission> salesLeads,
+            IReadOnlyList<DailySummaryWorkOrder> workOrders,
+            IReadOnlyList<DailySummaryPackageLog> packages,
+            IReadOnlyList<DailySummaryLostFound> lostFoundEntries,
+            IReadOnlyList<DailySummaryEvent> events,
+            IReadOnlyList<DailySummaryAnnouncement> announcements,
+            IReadOnlyList<DailySummarySchedule> schedules)
+        {
+            var contexts = new Dictionary<int, PropertyRecap>();
+            var propertyIdSet = propertyIds != null ? new HashSet<int>(propertyIds) : new HashSet<int>();
+
+            PropertyRecap GetContext(int propertyId, string? fallbackName = null)
+            {
+                if (!contexts.TryGetValue(propertyId, out var recap))
+                {
+                    var displayName = ResolvePropertyDisplayName(propertyId, fallbackName);
+                    recap = new PropertyRecap(propertyId, displayName);
+                    contexts[propertyId] = recap;
+                }
+
+                return recap;
+            }
+
+            string ResolvePropertyDisplayName(int propertyId, string? fallback)
+            {
+                if (propertyNames != null && propertyNames.TryGetValue(propertyId, out var known) && !string.IsNullOrWhiteSpace(known))
+                {
+                    return known;
+                }
+
+                if (!string.IsNullOrWhiteSpace(fallback))
+                {
+                    return fallback;
+                }
+
+                return propertyId > 0 ? $"Property #{propertyId}" : "Your Properties";
+            }
+
+            IEnumerable<int> ResolveTargets(IReadOnlyCollection<int>? candidates)
+            {
+                if (candidates != null && candidates.Count > 0)
+                {
+                    var filtered = propertyIdSet.Count == 0
+                        ? candidates
+                        : candidates.Where(propertyIdSet.Contains).ToList();
+
+                    if (filtered.Any())
+                    {
+                        return filtered;
+                    }
+                }
+
+                if (propertyIdSet.Count > 0)
+                {
+                        return propertyIdSet;
+                }
+
+                return new[] { 0 };
+            }
+
+            if (propertyIds != null)
+            {
+                foreach (var id in propertyIds)
+                {
+                    GetContext(id);
+                }
+            }
+
+            if (announcements != null)
+            {
+                foreach (var announcement in announcements)
+                {
+                    var context = GetContext(announcement.PropertyId, announcement.PropertyName);
+                    if (!context.Announcements.Any())
+                    {
+                        context.Announcements.Add(announcement);
+                    }
+                }
+            }
+
+            if (workOrders != null)
+            {
+                foreach (var order in workOrders)
+                {
+                    var targetIds = ResolveTargets(order.PropertyIds).ToList();
+                    var fallbackName = order.PropertyNames.FirstOrDefault();
+                    if (!targetIds.Any())
+                    {
+                        targetIds.Add(0);
+                    }
+
+                    foreach (var propertyId in targetIds)
+                    {
+                        var context = GetContext(propertyId, fallbackName);
+                        if (!context.WorkOrders.Any(existing => existing.Id == order.Id))
+                        {
+                            context.WorkOrders.Add(order);
+                        }
+                    }
+                }
+            }
+
+            if (logs != null)
+            {
+                foreach (var log in logs)
+                {
+                    var ids = log.Properties?
+                        .Select(p => p.PropertyId)
+                        .Where(id => propertyIdSet.Count == 0 || propertyIdSet.Contains(id))
+                        .Distinct()
+                        .ToList() ?? new List<int>();
+
+                    if (!ids.Any())
+                    {
+                        ids = propertyIdSet.Count > 0 ? propertyIdSet.ToList() : new List<int> { 0 };
+                    }
+
+                    foreach (var propertyId in ids)
+                    {
+                        var context = GetContext(propertyId);
+                        if (!context.PassOnLogs.Any(existing => existing.Id == log.Id))
+                        {
+                            context.PassOnLogs.Add(log);
+                        }
+                    }
+                }
+            }
+
+            if (posts != null)
+            {
+                foreach (var post in posts)
+                {
+                    var context = GetContext(post.PropertyId, post.Property?.Name);
+                    if (!context.Bulletins.Any(existing => existing.Id == post.Id))
+                    {
+                        context.Bulletins.Add(post);
+                    }
+                }
+            }
+
+            if (packages != null)
+            {
+                foreach (var package in packages)
+                {
+                    var context = GetContext(package.PropertyId, package.PropertyName);
+                    if (!context.Packages.Any(existing => existing.Id == package.Id))
+                    {
+                        context.Packages.Add(package);
+                    }
+                }
+            }
+
+            if (lostFoundEntries != null)
+            {
+                foreach (var entry in lostFoundEntries)
+                {
+                    var context = GetContext(entry.PropertyId, entry.PropertyName);
+                    if (!context.LostFoundEntries.Any(existing => existing.Id == entry.Id))
+                    {
+                        context.LostFoundEntries.Add(entry);
+                    }
+                }
+            }
+
+            if (events != null)
+            {
+                foreach (var calendarEvent in events)
+                {
+                    var targetIds = ResolveTargets(calendarEvent.PropertyIds).ToList();
+                    if (!targetIds.Any())
+                    {
+                        targetIds.Add(0);
+                    }
+
+                    foreach (var propertyId in targetIds)
+                    {
+                        var context = GetContext(propertyId, calendarEvent.PropertyNames.FirstOrDefault());
+                        if (!context.Events.Any(existing => ReferenceEquals(existing, calendarEvent)))
+                        {
+                            context.Events.Add(calendarEvent);
+                        }
+                    }
+                }
+            }
+
+            if (schedules != null)
+            {
+                foreach (var schedule in schedules)
+                {
+                    var context = GetContext(schedule.PropertyId, schedule.PropertyName);
+                    var target = schedule.IsUpcoming ? context.UpcomingSchedules : context.CurrentSchedules;
+                    if (!target.Any(existing => existing.DetailPath == schedule.DetailPath))
+                    {
+                        target.Add(schedule);
+                    }
+                }
+            }
+
+            if (salesLeads != null)
+            {
+                foreach (var lead in salesLeads)
+                {
+                    var context = GetContext(lead.PropertyId, lead.Property?.Name);
+                    context.SalesLeads.Add(lead);
+                }
+            }
+
+            if (contexts.Count == 0)
+            {
+                return Array.Empty<PropertyRecap>();
+            }
+
+            return contexts.Values
+                .OrderBy(c => c.PropertyName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private sealed class PropertyRecap
+        {
+            public PropertyRecap(int propertyId, string propertyName)
+            {
+                PropertyId = propertyId;
+                PropertyName = propertyName;
+            }
+
+            public int PropertyId { get; }
+            public string PropertyName { get; }
+            public List<DailySummaryWorkOrder> WorkOrders { get; } = new();
+            public List<PassOnLog> PassOnLogs { get; } = new();
+            public List<BulletinPost> Bulletins { get; } = new();
+            public List<DailySummaryPackageLog> Packages { get; } = new();
+            public List<DailySummaryLostFound> LostFoundEntries { get; } = new();
+            public List<DailySummaryAnnouncement> Announcements { get; } = new();
+            public List<DailySummaryEvent> Events { get; } = new();
+            public List<DailySummarySchedule> CurrentSchedules { get; } = new();
+            public List<DailySummarySchedule> UpcomingSchedules { get; } = new();
+            public List<SalesLeadSubmission> SalesLeads { get; } = new();
+        }
+
+        private sealed class EmailPalette
+        {
+            public string Background { get; init; } = "#020714";
+            public string Panel { get; init; } = "#0b1930";
+            public string HeroBackground { get; init; } = "#102642";
+            public string Border { get; init; } = "#133152";
+            public string Text { get; init; } = "#f2f6ff";
+            public string Muted { get; init; } = "#90a4c2";
+            public string Accent { get; init; } = "#1cb5e0";
+            public string AccentAlt { get; init; } = "#66d8ff";
+            public string BadgeBackground { get; init; } = "#122947";
+            public string ListItemBackground { get; init; } = "#0d1c33";
+
+            public static EmailPalette Default { get; } = new EmailPalette();
+        }
+
         private sealed class DailySummaryWorkOrder
         {
             public int Id { get; set; }
@@ -879,6 +1215,7 @@ namespace hOps.web.Services
             public string? Location { get; set; }
             public string? DepartmentName { get; set; }
             public List<string> PropertyNames { get; set; } = new();
+            public List<int> PropertyIds { get; set; } = new();
             public DateTime CreatedAt { get; set; }
             public DateTime DueDate { get; set; }
             public string DetailPath { get; set; } = string.Empty;
@@ -886,6 +1223,7 @@ namespace hOps.web.Services
 
         private sealed class DailySummaryAnnouncement
         {
+            public int PropertyId { get; set; }
             public string PropertyName { get; set; } = string.Empty;
             public string Content { get; set; } = string.Empty;
             public DateTime? UpdatedAt { get; set; }
@@ -908,12 +1246,14 @@ namespace hOps.web.Services
             public TimeSpan? EndTime { get; set; }
             public string CategoryName { get; set; } = string.Empty;
             public List<string> PropertyNames { get; set; } = new();
+            public List<int> PropertyIds { get; set; } = new();
             public string DetailPath { get; set; } = string.Empty;
         }
 
         private sealed class DailySummaryPackageLog
         {
             public int Id { get; set; }
+            public int PropertyId { get; set; }
             public string PropertyName { get; set; } = string.Empty;
             public string? RecipientName { get; set; }
             public string? RoomNumber { get; set; }
@@ -928,6 +1268,7 @@ namespace hOps.web.Services
         private sealed class DailySummaryLostFound
         {
             public int Id { get; set; }
+            public int PropertyId { get; set; }
             public string Title { get; set; } = string.Empty;
             public string PropertyName { get; set; } = string.Empty;
             public string Status { get; set; } = string.Empty;
@@ -938,6 +1279,7 @@ namespace hOps.web.Services
 
         private sealed class DailySummarySchedule
         {
+            public int PropertyId { get; set; }
             public string PropertyName { get; set; } = string.Empty;
             public string Title { get; set; } = string.Empty;
             public DateTime WeekStart { get; set; }
