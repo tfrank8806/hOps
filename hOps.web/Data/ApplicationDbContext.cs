@@ -69,6 +69,10 @@ namespace hOps.web.Data
         public DbSet<Schedule> Schedules { get; set; }
         public DbSet<ScheduleAssignment> ScheduleAssignments { get; set; }
         public DbSet<ScheduleTimeOffRequest> ScheduleTimeOffRequests { get; set; }
+        public DbSet<PreventiveMaintenanceSetting> PreventiveMaintenanceSettings { get; set; }
+        public DbSet<PreventiveMaintenanceTask> PreventiveMaintenanceTasks { get; set; }
+        public DbSet<PreventiveMaintenanceSession> PreventiveMaintenanceSessions { get; set; }
+        public DbSet<PreventiveMaintenanceSessionTask> PreventiveMaintenanceSessionTasks { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -689,6 +693,73 @@ namespace hOps.web.Data
                 .WithMany()
                 .HasForeignKey(r => r.DecisionByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<PreventiveMaintenanceSetting>()
+                .HasOne(s => s.Property)
+                .WithOne(p => p.PreventiveMaintenanceSetting)
+                .HasForeignKey<PreventiveMaintenanceSetting>(s => s.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<PreventiveMaintenanceSetting>()
+                .HasOne(s => s.UpdatedByUser)
+                .WithMany()
+                .HasForeignKey(s => s.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<PreventiveMaintenanceSetting>()
+                .HasIndex(s => s.PropertyId)
+                .IsUnique();
+
+            builder.Entity<PreventiveMaintenanceTask>()
+                .HasOne(t => t.Property)
+                .WithMany(p => p.PreventiveMaintenanceTasks)
+                .HasForeignKey(t => t.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<PreventiveMaintenanceTask>()
+                .HasIndex(t => new { t.PropertyId, t.SortOrder });
+
+            builder.Entity<PreventiveMaintenanceSession>()
+                .HasOne(s => s.Property)
+                .WithMany(p => p.PreventiveMaintenanceSessions)
+                .HasForeignKey(s => s.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<PreventiveMaintenanceSession>()
+                .HasOne(s => s.Room)
+                .WithMany()
+                .HasForeignKey(s => s.RoomId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<PreventiveMaintenanceSession>()
+                .HasOne(s => s.CreatedBy)
+                .WithMany()
+                .HasForeignKey(s => s.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<PreventiveMaintenanceSession>()
+                .HasOne(s => s.CompletedBy)
+                .WithMany()
+                .HasForeignKey(s => s.CompletedById)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<PreventiveMaintenanceSession>()
+                .HasIndex(s => new { s.PropertyId, s.Status });
+
+            builder.Entity<PreventiveMaintenanceSessionTask>()
+                .HasOne(t => t.Session)
+                .WithMany(s => s.Tasks)
+                .HasForeignKey(t => t.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<PreventiveMaintenanceSessionTask>()
+                .HasOne(t => t.TemplateTask)
+                .WithMany()
+                .HasForeignKey(t => t.TemplateTaskId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<PreventiveMaintenanceSessionTask>()
+                .HasIndex(t => new { t.SessionId, t.SortOrder });
         }
     }
 }

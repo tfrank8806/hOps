@@ -167,6 +167,7 @@ namespace hOps.web.Services
                 var packageEntries = await LoadOpenPackagesAsync(context, propertyIds, cancellationToken);
                 var lostFoundEntries = await LoadOpenLostFoundEntriesAsync(context, propertyIds, cancellationToken);
                 var scheduleSummaries = await LoadScheduleSummariesAsync(context, propertyIds, cancellationToken);
+                var pmSummary = await LoadPreventiveMaintenanceSummaryAsync(context, propertyIds, dayStartUtc, dayEndUtc, cancellationToken);
 
                 var body = BuildSummaryBody(
                     user,
@@ -182,7 +183,11 @@ namespace hOps.web.Services
                     scheduleSummaries,
                     propertyIds,
                     propertyNameLookup,
-                    _appBaseUrl);
+                    _appBaseUrl,
+                    pmSummary.Frequencies,
+                    pmSummary.Completed,
+                    pmSummary.DueSoon,
+                    pmSummary.Overdue);
                 var subject = $"Daily summary for {summaryDate:MMM d, yyyy}";
 
                 try
@@ -199,7 +204,7 @@ namespace hOps.web.Services
             await context.SaveChangesAsync(cancellationToken);
         }
 
-                private static string BuildSummaryBody(
+        private static string BuildSummaryBody(
             ApplicationUser user,
             DateOnly summaryDate,
             List<PassOnLog> logs,
@@ -213,7 +218,11 @@ namespace hOps.web.Services
             IReadOnlyList<DailySummarySchedule> schedules,
             IReadOnlyList<int> propertyIds,
             IReadOnlyDictionary<int, string> propertyNames,
-            string? baseUrl)
+            string? baseUrl,
+            IReadOnlyDictionary<int, int> pmFrequencies,
+            IReadOnlyList<DailySummaryPmSession> completedPms,
+            IReadOnlyList<DailySummaryPmDue> duePms,
+            IReadOnlyList<DailySummaryPmDue> overduePms)
         {
             var builder = new StringBuilder();
             var userName = BuildUserDisplayName(user);
@@ -231,7 +240,11 @@ namespace hOps.web.Services
                 lostFoundEntries,
                 upcomingEvents,
                 announcements,
-                schedules);
+                schedules,
+                pmFrequencies,
+                completedPms,
+                duePms,
+                overduePms);
             var summaryLabel = summaryDate.ToString("dddd, MMM d", CultureInfo.CurrentCulture);
             var sentLabel = FormatUserLocal(DateTime.UtcNow, userTimeZone, "MMM d, yyyy h:mm tt");
             var heroKpis = BuildHeroKpis();
@@ -316,6 +329,7 @@ namespace hOps.web.Services
 
                 AppendAnnouncements(recap);
                 AppendWorkOrders(recap);
+                AppendPreventiveMaintenance(recap);
                 AppendPassOnLogs(recap);
                 AppendBulletins(recap);
                 AppendPackages(recap);
@@ -333,6 +347,8 @@ namespace hOps.web.Services
                 yield return ("Packages", recap.Packages.Count.ToString("N0", CultureInfo.CurrentCulture));
                 yield return ("Events", recap.Events.Count.ToString("N0", CultureInfo.CurrentCulture));
                 yield return ("Sales Leads", recap.SalesLeads.Count.ToString("N0", CultureInfo.CurrentCulture));
+                yield return ("PMs Done", recap.CompletedPms.Count.ToString("N0", CultureInfo.CurrentCulture));
+                yield return ("PMs Due", (recap.DuePms.Count + recap.OverduePms.Count).ToString("N0", CultureInfo.CurrentCulture));
             }
 
             void AppendAnnouncements(PropertyRecap recap)
@@ -406,6 +422,68 @@ namespace hOps.web.Services
                     builder.AppendLine($@"<div style=""color:{palette.Muted};font-size:0.85rem;margin-top:0.2rem;"">Opened {openedAt}</div>");
                     builder.AppendLine($@"<a href=""{orderLink}"" style=""color:{palette.Accent};font-weight:600;text-decoration:none;"">View work order &rarr;</a>");
                 });
+            }
+
+            void AppendPreventiveMaintenance(PropertyRecap recap)
+            {
+                if (!recap.CompletedPms.Any() && !recap.DuePms.Any() && !recap.OverduePms.Any())
+                {
+                    return;
+                }
+
+                builder.AppendLine($@"<div style=""margin-top:1.5rem;"">");
+                builder.AppendLine($@"<h3 style=""margin:0 0 0.3rem;color:{palette.AccentAlt};font-size:1.05rem;"">Preventative Maintenance</h3>");
+
+                if (recap.CompletedPms.Any())
+                {
+                    builder.AppendLine($@"<p style=""margin:0 0 0.3rem;color:{palette.Muted};"">Completed yesterday:</p>");
+                    builder.AppendLine(@"<ul style=""margin:0 0 1rem;padding-left:1.2rem;"">");
+                    foreach (var entry in recap.CompletedPms.OrderByDescending(p => p.CompletedAtUtc).Take(5))
+                    {
+                        var completedLabel = WebUtility.HtmlEncode(FormatUserLocal(entry.CompletedAtUtc, userTimeZone, "MMM d, h:mm tt"));
+                        builder.AppendLine($@"<li><strong>{WebUtility.HtmlEncode(entry.RoomNumber)}</strong> &middot; {completedLabel} ({FormatPmDuration(entry.DurationSeconds)})</li>");
+                    }
+                    builder.AppendLine(@"</ul>");
+                }
+                else
+                {
+                    builder.AppendLine($@"<p style=""margin:0 0 1rem;color:{palette.Muted};"">No PMs were completed yesterday.</p>");
+                }
+
+                var dueEntries = recap.OverduePms.Concat(recap.DuePms).OrderBy(d => d.DueAtUtc).ToList();
+                if (dueEntries.Any())
+                {
+                    builder.AppendLine($@"<p style=""margin:0 0 0.3rem;color:{palette.Muted};"">Due soon or overdue:</p>");
+                    builder.AppendLine(@"<ul style=""margin:0;padding-left:1.2rem;"">");
+                    foreach (var entry in dueEntries.Take(5))
+                    {
+                        var dueLabel = WebUtility.HtmlEncode(FormatUserLocal(entry.DueAtUtc, userTimeZone, "MMM d"));
+                        builder.AppendLine($@"<li><strong>{WebUtility.HtmlEncode(entry.RoomNumber)}</strong> &middot; due {dueLabel}</li>");
+                    }
+                    builder.AppendLine(@"</ul>");
+                }
+                else
+                {
+                    builder.AppendLine($@"<p style=""margin:0;color:{palette.Muted};"">All rooms are up to date.</p>");
+                }
+
+                builder.AppendLine(@"</div>");
+
+                static string FormatPmDuration(double seconds)
+                {
+                    var span = TimeSpan.FromSeconds(Math.Max(0, seconds));
+                    if (span.TotalHours >= 1)
+                    {
+                        return $"{(int)span.TotalHours}h {span.Minutes}m";
+                    }
+
+                    if (span.TotalMinutes >= 1)
+                    {
+                        return $"{(int)span.TotalMinutes}m {span.Seconds}s";
+                    }
+
+                    return $"{span.Seconds}s";
+                }
             }
 
             void AppendPassOnLogs(PropertyRecap recap)
@@ -908,6 +986,135 @@ namespace hOps.web.Services
             return summaries;
         }
 
+        private static async Task<PreventiveMaintenanceSummaryData> LoadPreventiveMaintenanceSummaryAsync(
+            ApplicationDbContext context,
+            List<int> propertyIds,
+            DateTime dayStartUtc,
+            DateTime dayEndUtc,
+            CancellationToken cancellationToken)
+        {
+            if (propertyIds == null || propertyIds.Count == 0)
+            {
+                return new PreventiveMaintenanceSummaryData();
+            }
+
+            var propertySet = new HashSet<int>(propertyIds);
+
+            var completed = await context.PreventiveMaintenanceSessions
+                .AsNoTracking()
+                .Where(s => propertySet.Contains(s.PropertyId) && s.Status == PreventiveMaintenanceSessionStatus.Completed)
+                .Where(s => s.CompletedAtUtc >= dayStartUtc && s.CompletedAtUtc < dayEndUtc)
+                .Select(s => new DailySummaryPmSession
+                {
+                    PropertyId = s.PropertyId,
+                    RoomNumber = s.RoomNumber,
+                    CompletedAtUtc = s.CompletedAtUtc ?? s.StartedAtUtc,
+                    DurationSeconds = s.TotalDurationSeconds
+                })
+                .ToListAsync(cancellationToken);
+
+            var frequencies = await context.PreventiveMaintenanceSettings
+                .AsNoTracking()
+                .Where(s => propertySet.Contains(s.PropertyId))
+                .ToDictionaryAsync(s => s.PropertyId, s => s.FrequencyPerYear, cancellationToken);
+
+            if (frequencies.Count == 0)
+            {
+                return new PreventiveMaintenanceSummaryData
+                {
+                    Completed = completed,
+                    Frequencies = new Dictionary<int, int>()
+                };
+            }
+
+            var rooms = await context.Rooms
+                .AsNoTracking()
+                .Where(r => propertySet.Contains(r.PropertyId))
+                .Select(r => new { r.Id, r.PropertyId, r.RoomNumber })
+                .ToListAsync(cancellationToken);
+
+            var lookbackStart = dayEndUtc.AddMonths(-18);
+            var recentSessions = await context.PreventiveMaintenanceSessions
+                .AsNoTracking()
+                .Where(s => propertySet.Contains(s.PropertyId) && s.Status == PreventiveMaintenanceSessionStatus.Completed)
+                .Where(s => s.CompletedAtUtc >= lookbackStart)
+                .OrderByDescending(s => s.CompletedAtUtc)
+                .Select(s => new
+                {
+                    s.PropertyId,
+                    s.RoomId,
+                    s.RoomNumber,
+                    CompletedAtUtc = s.CompletedAtUtc ?? s.StartedAtUtc
+                })
+                .ToListAsync(cancellationToken);
+
+            var latestByRoom = new Dictionary<(int PropertyId, int RoomId), DateTime>();
+            foreach (var session in recentSessions)
+            {
+                if (!session.RoomId.HasValue)
+                {
+                    continue;
+                }
+
+                var key = (session.PropertyId, session.RoomId.Value);
+                if (!latestByRoom.ContainsKey(key))
+                {
+                    latestByRoom[key] = session.CompletedAtUtc;
+                }
+            }
+
+            var dueSoon = new List<DailySummaryPmDue>();
+            var overdue = new List<DailySummaryPmDue>();
+            var dueCutoff = dayEndUtc.AddDays(7);
+
+            foreach (var kvp in frequencies)
+            {
+                var propertyId = kvp.Key;
+                var frequency = kvp.Value;
+                if (frequency <= 0)
+                {
+                    continue;
+                }
+
+                var intervalDays = Math.Max(1, 365.0 / frequency);
+                var propertyRooms = rooms.Where(r => r.PropertyId == propertyId).ToList();
+                foreach (var room in propertyRooms)
+                {
+                    var key = (propertyId, room.Id);
+                    var hasLast = latestByRoom.TryGetValue(key, out var lastCompleted);
+                    var dueAt = hasLast ? lastCompleted.AddDays(intervalDays) : dayStartUtc;
+                    var label = string.IsNullOrWhiteSpace(room.RoomNumber) ? $"Room {room.Id}" : room.RoomNumber!;
+
+                    if (!hasLast || dueAt < dayStartUtc)
+                    {
+                        overdue.Add(new DailySummaryPmDue
+                        {
+                            PropertyId = propertyId,
+                            RoomNumber = label,
+                            DueAtUtc = dueAt
+                        });
+                    }
+                    else if (dueAt <= dueCutoff)
+                    {
+                        dueSoon.Add(new DailySummaryPmDue
+                        {
+                            PropertyId = propertyId,
+                            RoomNumber = label,
+                            DueAtUtc = dueAt
+                        });
+                    }
+                }
+            }
+
+            return new PreventiveMaintenanceSummaryData
+            {
+                Completed = completed,
+                DueSoon = dueSoon,
+                Overdue = overdue,
+                Frequencies = frequencies
+            };
+        }
+
         private static string BuildEventDateLabel(DailySummaryEvent calendarEvent)
         {
             return calendarEvent.StartDate.Date == calendarEvent.EndDate.Date
@@ -958,7 +1165,11 @@ namespace hOps.web.Services
             IReadOnlyList<DailySummaryLostFound> lostFoundEntries,
             IReadOnlyList<DailySummaryEvent> events,
             IReadOnlyList<DailySummaryAnnouncement> announcements,
-            IReadOnlyList<DailySummarySchedule> schedules)
+            IReadOnlyList<DailySummarySchedule> schedules,
+            IReadOnlyDictionary<int, int> pmFrequencies,
+            IReadOnlyList<DailySummaryPmSession> completedPms,
+            IReadOnlyList<DailySummaryPmDue> duePms,
+            IReadOnlyList<DailySummaryPmDue> overduePms)
         {
             var contexts = new Dictionary<int, PropertyRecap>();
             var propertyIdSet = propertyIds != null ? new HashSet<int>(propertyIds) : new HashSet<int>();
@@ -1159,6 +1370,44 @@ namespace hOps.web.Services
                 }
             }
 
+            if (completedPms != null)
+            {
+                foreach (var pm in completedPms)
+                {
+                    var context = GetContext(pm.PropertyId);
+                    context.CompletedPms.Add(pm);
+                }
+            }
+
+            if (duePms != null)
+            {
+                foreach (var due in duePms)
+                {
+                    var context = GetContext(due.PropertyId);
+                    context.DuePms.Add(due);
+                }
+            }
+
+            if (overduePms != null)
+            {
+                foreach (var entry in overduePms)
+                {
+                    var context = GetContext(entry.PropertyId);
+                    context.OverduePms.Add(entry);
+                }
+            }
+
+            if (pmFrequencies != null && pmFrequencies.Count > 0)
+            {
+                foreach (var context in contexts.Values)
+                {
+                    if (pmFrequencies.TryGetValue(context.PropertyId, out var frequency))
+                    {
+                        context.FrequencyPerYear = frequency;
+                    }
+                }
+            }
+
             if (contexts.Count == 0)
             {
                 return Array.Empty<PropertyRecap>();
@@ -1189,6 +1438,10 @@ namespace hOps.web.Services
             public List<DailySummarySchedule> CurrentSchedules { get; } = new();
             public List<DailySummarySchedule> UpcomingSchedules { get; } = new();
             public List<SalesLeadSubmission> SalesLeads { get; } = new();
+            public int FrequencyPerYear { get; set; }
+            public List<DailySummaryPmSession> CompletedPms { get; } = new();
+            public List<DailySummaryPmDue> DuePms { get; } = new();
+            public List<DailySummaryPmDue> OverduePms { get; } = new();
         }
 
         private sealed class EmailPalette
@@ -1286,6 +1539,29 @@ namespace hOps.web.Services
             public DateTime WeekEnd { get; set; }
             public string DetailPath { get; set; } = string.Empty;
             public bool IsUpcoming { get; set; }
+        }
+
+        private sealed class DailySummaryPmSession
+        {
+            public int PropertyId { get; set; }
+            public string RoomNumber { get; set; } = string.Empty;
+            public DateTime CompletedAtUtc { get; set; }
+            public double DurationSeconds { get; set; }
+        }
+
+        private sealed class DailySummaryPmDue
+        {
+            public int PropertyId { get; set; }
+            public string RoomNumber { get; set; } = string.Empty;
+            public DateTime DueAtUtc { get; set; }
+        }
+
+        private sealed class PreventiveMaintenanceSummaryData
+        {
+            public IReadOnlyDictionary<int, int> Frequencies { get; init; } = new Dictionary<int, int>();
+            public IReadOnlyList<DailySummaryPmSession> Completed { get; init; } = Array.Empty<DailySummaryPmSession>();
+            public IReadOnlyList<DailySummaryPmDue> DueSoon { get; init; } = Array.Empty<DailySummaryPmDue>();
+            public IReadOnlyList<DailySummaryPmDue> Overdue { get; init; } = Array.Empty<DailySummaryPmDue>();
         }
 
         private static string BuildUserDisplayName(ApplicationUser? user)

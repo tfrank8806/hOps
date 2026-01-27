@@ -57,5 +57,9 @@ namespace hOps.web.Models
         public ICollection<ScheduleEmployee> ScheduleEmployees { get; set; } = new List<ScheduleEmployee>();
         public ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
         public ICollection<ScheduleTimeOffRequest> ScheduleTimeOffRequests { get; set; } = new List<ScheduleTimeOffRequest>();
+
+        public PreventiveMaintenanceSetting? PreventiveMaintenanceSetting { get; set; }
+        public ICollection<PreventiveMaintenanceTask> PreventiveMaintenanceTasks { get; set; } = new List<PreventiveMaintenanceTask>();
+        public ICollection<PreventiveMaintenanceSession> PreventiveMaintenanceSessions { get; set; } = new List<PreventiveMaintenanceSession>();
     }
 }

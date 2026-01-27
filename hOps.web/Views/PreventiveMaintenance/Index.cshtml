@@ -1,0 +1,647 @@
+@using System.Text.Json
+@model hOps.web.ViewModels.PreventiveMaintenance.PreventiveMaintenanceIndexViewModel
+@{
+    ViewData["Title"] = "PMs";
+    var localNow = ViewBag.LocalNow is DateTime dt ? dt : TimeZoneService.ConvertToUserTime(DateTime.UtcNow);
+    var initialSessionJson = Model.ActiveSession != null
+        ? JsonSerializer.Serialize(Model.ActiveSession, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
+        : "null";
+}
+
+<div id="pmApp"
+     data-start-url="@Url.Action("StartSession", "PreventiveMaintenance")"
+     data-update-url="@Url.Action("UpdateTask", "PreventiveMaintenance")"
+     data-pause-url="@Url.Action("PauseSession", "PreventiveMaintenance")"
+     data-resume-url="@Url.Action("ResumeSession", "PreventiveMaintenance")"
+     data-finish-url="@Url.Action("FinishSession", "PreventiveMaintenance")"
+     data-has-checklist="@Model.HasChecklist.ToString().ToLowerInvariant()">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+        <div>
+            <h2 class="mb-0">Preventative Maintenance (PMs)</h2>
+            <p class="text-muted mb-0 small">Log PM sessions, track durations, and stay ahead of upcoming rooms.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-controller="Settings" asp-action="PmSetup" asp-route-propertyId="@Model.PropertyId" class="btn btn-outline-secondary btn-sm">Edit Checklist</a>
+            <button type="button" class="btn btn-primary" id="pmStartToggle">Start new PM</button>
+        </div>
+    </div>
+
+    @if (ViewBag.PmError is string pmError && !string.IsNullOrWhiteSpace(pmError))
+    {
+        <div class="alert alert-warning">@pmError</div>
+    }
+
+    @if (ViewBag.PmMessage is string pmMessage && !string.IsNullOrWhiteSpace(pmMessage))
+    {
+        <div class="alert alert-success">@pmMessage</div>
+    }
+
+    @if (Model.FrequencyPerYear > 0)
+    {
+        <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>
+                PM frequency: <strong>@Model.FrequencyPerYear</strong> per year
+            </span>
+            <span class="text-muted small">Current time: @localNow.ToString("f")</span>
+        </div>
+    }
+
+    <div id="pmAlert"></div>
+
+    <div id="pmStartPanel" class="card mb-4" hidden>
+        <div class="card-body">
+            <form id="pmStartForm" class="row g-3">
+                @Html.AntiForgeryToken()
+                <div class="col-md-4">
+                    <label for="pmRoomSelect" class="form-label">Select a room</label>
+                    <select id="pmRoomSelect" class="form-select">
+                        <option value="">-- Select room --</option>
+                        @foreach (var option in Model.RoomOptions)
+                        {
+                            <option value="@option.Value">@option.Text</option>
+                        }
+                    </select>
+                    <div class="form-text">Optional shortcut to auto-fill the room number.</div>
+                </div>
+                <div class="col-md-4">
+                    <label for="pmRoomNumber" class="form-label">Room number *</label>
+                    <input type="text" class="form-control" id="pmRoomNumber" required maxlength="32" />
+                </div>
+                <div class="col-md-4">
+                    <label for="pmStartTime" class="form-label">Start date &amp; time</label>
+                    <input type="datetime-local" class="form-control" id="pmStartTime" />
+                    <div class="form-text">Defaults to the current time. Adjust if you began earlier.</div>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" id="pmStartButton">Start PM</button>
+                    <button type="button" class="btn btn-outline-secondary" id="pmStartCancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="pmSessionContainer" class="mb-4">
+        <div class="card">
+            <div class="card-body text-muted">
+                <p class="mb-0">Start a PM to load the checklist.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <strong class="mb-0">Room PM Log</strong>
+                <span class="text-muted small">Due status is based on the property frequency.</span>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Room</th>
+                        <th>Last PM completed</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                        <th>Next due</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.RoomLogs.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                No rooms found for this property. Add rooms first to begin logging PMs.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        foreach (var log in Model.RoomLogs)
+                        {
+                            var statusLabel = log.IsOverdue ? "Overdue" : log.IsDue ? "Due soon" : "Current";
+                            var statusClass = log.IsOverdue ? "bg-danger" : log.IsDue ? "bg-warning text-dark" : "bg-success";
+                            string FormatDuration(double? seconds)
+                            {
+                                if (!seconds.HasValue || seconds.Value <= 0)
+                                {
+                                    return "--";
+                                }
+
+                                var ts = TimeSpan.FromSeconds(seconds.Value);
+                                if (ts.TotalHours >= 1)
+                                {
+                                    return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+                                }
+                                if (ts.TotalMinutes >= 1)
+                                {
+                                    return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+                                }
+                                return $"{ts.Seconds}s";
+                            }
+
+                            <tr>
+                                <td>@log.RoomNumber</td>
+                                <td>
+                                    @if (log.LastCompletedAtUtc.HasValue)
+                                    {
+                                        var localCompleted = TimeZoneService.ConvertToUserTime(log.LastCompletedAtUtc.Value);
+                                        <div>@localCompleted.ToString("g")</div>
+                                        if (!string.IsNullOrWhiteSpace(log.CompletedByName))
+                                        {
+                                            <div class="text-muted small">by @log.CompletedByName</div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Never</span>
+                                    }
+                                </td>
+                                <td>@FormatDuration(log.LastDurationSeconds)</td>
+                                <td>
+                                    <span class="badge @statusClass">@statusLabel</span>
+                                </td>
+                                <td>
+                                    @if (log.NextDueAtUtc.HasValue)
+                                    {
+                                        var nextDueLocal = TimeZoneService.ConvertToUserTime(log.NextDueAtUtc.Value);
+                                        @nextDueLocal.ToString("g")
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">--</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script type="application/json" id="pmInitialSession">
+@Html.Raw(initialSessionJson)
+</script>
+
+@section Scripts {
+    <script>
+        (function () {
+            const appEl = document.getElementById('pmApp');
+            if (!appEl) {
+                return;
+            }
+
+            const startPanel = document.getElementById('pmStartPanel');
+            const startToggle = document.getElementById('pmStartToggle');
+            const startForm = document.getElementById('pmStartForm');
+            const roomSelect = document.getElementById('pmRoomSelect');
+            const roomNumberInput = document.getElementById('pmRoomNumber');
+            const startTimeInput = document.getElementById('pmStartTime');
+            const startCancel = document.getElementById('pmStartCancel');
+            const alertContainer = document.getElementById('pmAlert');
+            const sessionContainer = document.getElementById('pmSessionContainer');
+            const hasChecklist = appEl.dataset.hasChecklist === 'true';
+            const urls = {
+                start: appEl.dataset.startUrl,
+                update: appEl.dataset.updateUrl,
+                pause: appEl.dataset.pauseUrl,
+                resume: appEl.dataset.resumeUrl,
+                finish: appEl.dataset.finishUrl
+            };
+
+            const initialSession = (() => {
+                try {
+                    const script = document.getElementById('pmInitialSession');
+                    return script ? JSON.parse(script.textContent || 'null') : null;
+                } catch {
+                    return null;
+                }
+            })();
+
+            let sessionState = null;
+            let timerInterval = null;
+
+            function syncSession(session, shouldRender = true) {
+                if (session) {
+                    sessionState = {
+                        ...session,
+                        tasks: Array.isArray(session.tasks) ? session.tasks.map(t => ({ ...t })) : [],
+                        syncedAt: Date.now()
+                    };
+                } else {
+                    sessionState = null;
+                    stopTimer();
+                }
+
+                if (shouldRender) {
+                    renderSession();
+                } else {
+                    if (sessionState && sessionState.status === 'InProgress') {
+                        startTimer();
+                    } else {
+                        stopTimer();
+                        updateTimerDisplay();
+                    }
+                    updateActionButtons();
+                }
+            }
+
+            function formatLocalInput(date) {
+                const pad = (value) => value.toString().padStart(2, '0');
+                return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+            }
+
+            function setStartDefaults() {
+                const now = new Date();
+                startTimeInput.value = formatLocalInput(now);
+                roomSelect.value = '';
+                roomNumberInput.value = '';
+                delete roomNumberInput.dataset.selectedRoomId;
+                delete roomNumberInput.dataset.selectedRoomLabel;
+            }
+
+            function toggleStartPanel(show) {
+                if (!startPanel) {
+                    return;
+                }
+                const shouldShow = typeof show === 'boolean' ? show : startPanel.hasAttribute('hidden');
+                if (shouldShow) {
+                    startPanel.removeAttribute('hidden');
+                    setStartDefaults();
+                } else {
+                    startPanel.setAttribute('hidden', 'hidden');
+                }
+            }
+
+            if (startToggle && !hasChecklist) {
+                startToggle.classList.add('disabled');
+                startToggle.setAttribute('title', 'Add tasks on the PM Setup page before starting a PM.');
+            }
+
+            if (startToggle) {
+                startToggle.addEventListener('click', () => {
+                    if (!hasChecklist) {
+                        showAlert('warning', 'Add tasks on the PM Setup page before starting a PM.');
+                        return;
+                    }
+
+                    if (sessionState) {
+                        showAlert('info', 'Finish or pause your current PM before starting another.');
+                        return;
+                    }
+
+                    toggleStartPanel(true);
+                });
+            }
+
+            if (startCancel) {
+                startCancel.addEventListener('click', () => toggleStartPanel(false));
+            }
+
+            if (roomSelect && roomNumberInput) {
+                roomSelect.addEventListener('change', () => {
+                    const option = roomSelect.selectedOptions[0];
+                    if (option && option.value) {
+                        roomNumberInput.value = option.textContent || option.value;
+                        roomNumberInput.dataset.selectedRoomId = option.value;
+                        roomNumberInput.dataset.selectedRoomLabel = (option.textContent || option.value).trim();
+                    } else {
+                        delete roomNumberInput.dataset.selectedRoomId;
+                        delete roomNumberInput.dataset.selectedRoomLabel;
+                    }
+                });
+            }
+
+            if (roomNumberInput) {
+                roomNumberInput.addEventListener('input', () => {
+                    if (!roomNumberInput.dataset.selectedRoomLabel) {
+                        return;
+                    }
+
+                    if (roomNumberInput.value.trim() !== roomNumberInput.dataset.selectedRoomLabel) {
+                        delete roomNumberInput.dataset.selectedRoomId;
+                        delete roomNumberInput.dataset.selectedRoomLabel;
+                        if (roomSelect) {
+                            roomSelect.value = '';
+                        }
+                    }
+                });
+            }
+
+            function showAlert(type, message) {
+                if (!alertContainer) {
+                    return;
+                }
+                alertContainer.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`;
+            }
+
+            function getRequestVerificationToken() {
+                const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+                return tokenInput ? tokenInput.value : '';
+            }
+
+            async function postJson(url, payload) {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': getRequestVerificationToken()
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    let message = 'An unexpected error occurred.';
+                    try {
+                        const data = await response.json();
+                        if (data?.message) {
+                            message = data.message;
+                        }
+                    } catch {
+                        // ignore
+                    }
+                    throw new Error(message);
+                }
+
+                return response.json();
+            }
+
+            if (startForm) {
+                startForm.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    const roomNumber = roomNumberInput.value.trim();
+                    if (!roomNumber) {
+                        roomNumberInput.focus();
+                        return;
+                    }
+
+                    const payload = {
+                        roomNumber,
+                        startedAtUtc: new Date(startTimeInput.value || new Date().toISOString()).toISOString(),
+                        roomId: roomNumberInput.dataset.selectedRoomId ? Number(roomNumberInput.dataset.selectedRoomId) : null
+                    };
+
+                    try {
+                        const data = await postJson(urls.start, payload);
+                        syncSession(data.session);
+                        toggleStartPanel(false);
+                        showAlert('success', 'PM started.');
+                    } catch (error) {
+                        showAlert('danger', error.message || 'Unable to start the PM.');
+                    }
+                });
+            }
+
+            function renderSession() {
+                if (!sessionContainer) {
+                    return;
+                }
+
+                if (!sessionState) {
+                    sessionContainer.innerHTML = `<div class="card">
+                        <div class="card-body text-muted">
+                            <p class="mb-0">Start a PM to load the checklist.</p>
+                        </div>
+                    </div>`;
+                    stopTimer();
+                    return;
+                }
+
+                const taskRows = (sessionState.tasks || []).map(task => `
+                    <tr data-task-id="${task.id}">
+                        <td>
+                            <div class="fw-semibold">${escapeHtml(task.title)}</div>
+                            <div class="text-muted small">${escapeHtml(task.description || '')}</div>
+                        </td>
+                        <td class="w-25">
+                            <select class="form-select form-select-sm pm-task-status" data-task-id="${task.id}">
+                                ${buildStatusOptions(task.status)}
+                            </select>
+                        </td>
+                        <td class="w-25">
+                            <textarea class="form-control form-control-sm pm-task-notes" data-task-id="${task.id}" rows="2" placeholder="Notes about this task">${escapeHtml(task.notes || '')}</textarea>
+                        </td>
+                    </tr>`).join('');
+
+                sessionContainer.innerHTML = `
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <div class="fw-semibold mb-0">Room ${escapeHtml(sessionState.roomLabel || sessionState.roomNumber)}</div>
+                                <div class="text-muted small">Started ${formatRelativeTime(sessionState.startedAtUtc)}</div>
+                            </div>
+                            <div class="text-end">
+                                <div id="pmTimer" class="fs-4 fw-semibold">--:--</div>
+                                <div class="text-muted small" id="pmStatusLabel">${sessionState.status}</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex gap-2 mb-3 flex-wrap">
+                                <button type="button" class="btn btn-outline-secondary" id="pmPauseButton">${sessionState.status === 'Paused' ? 'Resume' : 'Pause'}</button>
+                                <button type="button" class="btn btn-success" id="pmFinishButton" disabled title="Update each task before finishing">Finish</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Task</th>
+                                            <th style="width:180px;">Status</th>
+                                            <th style="width:220px;">Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${taskRows}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>`;
+
+                bindTaskEvents();
+                updateActionButtons();
+                if (sessionState.status === 'InProgress') {
+                    startTimer();
+                } else {
+                    stopTimer();
+                    updateTimerDisplay();
+                }
+            }
+
+            function stopTimer() {
+                if (timerInterval) {
+                    window.clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+            }
+
+            function startTimer() {
+                stopTimer();
+                updateTimerDisplay();
+                timerInterval = window.setInterval(updateTimerDisplay, 1000);
+            }
+
+            function updateTimerDisplay() {
+                if (!sessionState) {
+                    return;
+                }
+
+                const timerEl = document.getElementById('pmTimer');
+                if (!timerEl) {
+                    return;
+                }
+
+                const status = sessionState.status;
+                let baseSeconds = sessionState.durationSeconds || 0;
+                if (status === 'InProgress') {
+                    const elapsedSinceSync = Date.now() - (sessionState.syncedAt || Date.now());
+                    baseSeconds += Math.max(0, elapsedSinceSync / 1000);
+                }
+
+                timerEl.textContent = formatDuration(baseSeconds);
+            }
+
+            function bindTaskEvents() {
+                document.querySelectorAll('.pm-task-status').forEach(select => {
+                    select.addEventListener('change', (event) => {
+                        handleTaskUpdate(event.currentTarget.dataset.taskId, event.currentTarget.value, null);
+                    });
+                });
+
+                document.querySelectorAll('.pm-task-notes').forEach(textarea => {
+                    textarea.addEventListener('change', (event) => {
+                        handleTaskUpdate(event.currentTarget.dataset.taskId, null, event.currentTarget.value);
+                    });
+                });
+            }
+
+            async function handleTaskUpdate(taskId, statusValue, notesValue) {
+                if (!sessionState) {
+                    return;
+                }
+
+                const payload = {
+                    sessionId: sessionState.id,
+                    taskId: Number(taskId),
+                    status: statusValue ? statusValue : getTaskStatus(taskId),
+                    notes: notesValue ?? getTaskNotes(taskId)
+                };
+
+                try {
+                    const data = await postJson(urls.update, payload);
+                    syncSession(data.session, false);
+                } catch (error) {
+                    showAlert('danger', error.message || 'Unable to save the task update.');
+                }
+            }
+
+            function getTaskStatus(taskId) {
+                const select = document.querySelector(`.pm-task-status[data-task-id="${taskId}"]`);
+                return select ? select.value : 'NotStarted';
+            }
+
+            function getTaskNotes(taskId) {
+                const textarea = document.querySelector(`.pm-task-notes[data-task-id="${taskId}"]`);
+                return textarea ? textarea.value : '';
+            }
+
+            function updateActionButtons() {
+                const finishButton = document.getElementById('pmFinishButton');
+                const pauseButton = document.getElementById('pmPauseButton');
+                const statusLabel = document.getElementById('pmStatusLabel');
+
+                if (!sessionState) {
+                    if (finishButton) finishButton.setAttribute('disabled', 'disabled');
+                    if (pauseButton) pauseButton.setAttribute('disabled', 'disabled');
+                    return;
+                }
+
+                if (statusLabel) {
+                    statusLabel.textContent = sessionState.status === 'Paused' ? 'Paused' : 'In progress';
+                }
+
+                if (pauseButton) {
+                    pauseButton.textContent = sessionState.status === 'Paused' ? 'Resume' : 'Pause';
+                    pauseButton.disabled = false;
+                    pauseButton.onclick = async () => {
+                        try {
+                            const targetUrl = sessionState.status === 'Paused' ? urls.resume : urls.pause;
+                            const data = await postJson(targetUrl, { sessionId: sessionState.id });
+                            syncSession(data.session);
+                            showAlert('info', sessionState.status === 'Paused' ? 'PM paused.' : 'PM resumed.');
+                        } catch (error) {
+                            showAlert('danger', error.message || 'Unable to update the PM status.');
+                        }
+                    };
+                }
+
+                const canFinish = (sessionState.tasks || []).every(task => task.status === 'Complete' || task.status === 'ReportIssue');
+                if (finishButton) {
+                    finishButton.disabled = !canFinish;
+                    finishButton.title = canFinish ? 'Finish PM' : 'Update all tasks before finishing';
+                    finishButton.onclick = async () => {
+                        if (!canFinish) {
+                            showAlert('warning', 'Update all tasks before finishing.');
+                            return;
+                        }
+
+                        try {
+                            const data = await postJson(urls.finish, { sessionId: sessionState.id });
+                            syncSession(null);
+                            showAlert('success', data.issuesLogged > 0
+                                ? `PM completed. Created ${data.issuesLogged} work order(s) for issues.`
+                                : 'PM completed.');
+                        } catch (error) {
+                            showAlert('danger', error.message || 'Unable to finish the PM.');
+                        }
+                    };
+                }
+            }
+
+            function buildStatusOptions(selectedValue) {
+                const options = [
+                    { value: 'NotStarted', label: 'Not Started' },
+                    { value: 'Complete', label: 'Complete' },
+                    { value: 'ReportIssue', label: 'Report an Issue' },
+                    { value: 'Incomplete', label: 'Incomplete' }
+                ];
+
+                return options.map(opt => `<option value="${opt.value}" ${opt.value === selectedValue ? 'selected' : ''}>${opt.label}</option>`).join('');
+            }
+
+            function formatRelativeTime(iso) {
+                const date = new Date(iso);
+                return date.toLocaleString();
+            }
+
+            function escapeHtml(text) {
+                if (!text) {
+                    return '';
+                }
+
+                return text
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            }
+
+            function formatDuration(seconds) {
+                const totalSeconds = Math.max(0, Math.floor(seconds || 0));
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const secs = totalSeconds % 60;
+                if (hours > 0) {
+                    return `${hours}h ${minutes}m`;
+                }
+                if (minutes > 0) {
+                    return `${minutes}m ${secs}s`;
+                }
+                return `${secs}s`;
+            }
+
+            syncSession(initialSession);
+        })();
+    </script>
+}

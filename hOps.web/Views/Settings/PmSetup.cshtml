@@ -1,0 +1,292 @@
+@model hOps.web.ViewModels.PreventiveMaintenance.PmSetupViewModel
+@{
+    ViewData["Title"] = "PM Setup";
+    var message = TempData["PmSetupMessage"] as string;
+    var error = TempData["PmSetupError"] as string;
+    var properties = Model.AccessibleProperties ?? new List<hOps.web.Models.Property>();
+}
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+        <h2 class="mb-0">Preventative Maintenance Setup</h2>
+        <p class="text-muted mb-0 small">Build the checklist that powers the PM workflow and recap reporting.</p>
+    </div>
+    <div>
+        <a asp-controller="PreventiveMaintenance" asp-action="Index" class="btn btn-outline-secondary btn-sm">Open PMs Page</a>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert alert-success">@message</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-warning">@error</div>
+}
+
+@if (properties.Count > 1)
+{
+    <div class="mb-3">
+        <label for="pmPropertySelect" class="form-label">Property</label>
+        <select id="pmPropertySelect" class="form-select" style="max-width:360px;">
+            @foreach (var property in properties)
+            {
+                if (property.Id == Model.PropertyId)
+                {
+                    <option selected value="@Url.Action("PmSetup", "Settings", new { propertyId = property.Id })">@property.Name (@property.Code)</option>
+                }
+                else
+                {
+                    <option value="@Url.Action("PmSetup", "Settings", new { propertyId = property.Id })">@property.Name (@property.Code)</option>
+                }
+            }
+        </select>
+    </div>
+}
+
+<form asp-action="SavePmChecklist" method="post" id="pmSetupForm" class="card mb-4">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="propertyId" value="@Model.PropertyId" />
+    <div class="card-body">
+        <div class="row g-4 align-items-end">
+            <div class="col-md-4">
+                <label for="pmFrequency" class="form-label">PM Frequency per year</label>
+                <input type="number"
+                       class="form-control"
+                       id="pmFrequency"
+                       name="frequencyPerYear"
+                       value="@Model.FrequencyPerYear"
+                       min="1"
+                       max="52"
+                       required />
+                <div class="form-text">How many times per year each room should complete a PM.</div>
+            </div>
+            <div class="col-md-8">
+                <div class="alert alert-info mb-0 small">
+                    Drag and drop rows to set checklist order. Click <strong>Save</strong> to keep your changes.
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center gap-2 mt-4 mb-2 flex-wrap">
+            <button type="button" class="btn btn-secondary" data-pm-action="add-row" data-position="top">+ Add Row</button>
+            <div class="d-flex align-items-center gap-2">
+                <button type="submit" class="btn btn-success">Save</button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table align-middle table-striped" id="pmTasksTable">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:40px;"></th>
+                        <th>Task</th>
+                        <th>Description</th>
+                        <th class="text-end" style="width:110px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="pmTasksBody">
+                    @if (Model.Tasks.Any())
+                    {
+                        for (var i = 0; i < Model.Tasks.Count; i++)
+                        {
+                            <tr draggable="true" class="pm-task-row">
+                                <td class="text-muted text-center cursor-move">
+                                    <span class="pm-drag-handle" title="Drag to reorder">&#x2630;</span>
+                                </td>
+                                <td>
+                                    <input type="hidden" name="tasks[@i].Id" value="@Model.Tasks[i].Id" />
+                                    <input type="hidden" name="tasks[@i].SortOrder" value="@Model.Tasks[i].SortOrder" />
+                                    <input type="text" class="form-control" name="tasks[@i].Title" value="@Model.Tasks[i].Title" placeholder="Task name" required />
+                                </td>
+                                <td>
+                                    <textarea class="form-control" name="tasks[@i].Description" rows="2" placeholder="Describe what needs to be done">@Model.Tasks[i].Description</textarea>
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-outline-danger btn-sm" data-pm-action="delete-row">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center gap-2 mt-3 flex-wrap">
+            <button type="button" class="btn btn-secondary" data-pm-action="add-row" data-position="bottom">+ Add Row</button>
+            <button type="submit" class="btn btn-success">Save</button>
+        </div>
+    </div>
+</form>
+
+<div class="card">
+    <div class="card-body">
+        <h4 class="h5 mb-3">Import / Export</h4>
+        <form asp-action="ImportPmChecklist" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="propertyId" value="@Model.PropertyId" />
+            <div class="col-md-6">
+                <label class="form-label" for="pmImportFile">Import checklist via CSV</label>
+                <input type="file" class="form-control" id="pmImportFile" name="csvFile" accept=".csv" />
+            </div>
+            <div class="col-md-6 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary">Import CSV</button>
+                <a asp-action="DownloadPmChecklist" asp-route-propertyId="@Model.PropertyId" class="btn btn-outline-primary">Download current checklist</a>
+                <a asp-action="DownloadPmTemplate" class="btn btn-outline-secondary">Download template</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<template id="pmTaskTemplate">
+    <tr draggable="true" class="pm-task-row">
+        <td class="text-muted text-center cursor-move">
+            <span class="pm-drag-handle" title="Drag to reorder">&#x2630;</span>
+        </td>
+        <td>
+            <input type="hidden" name="tasks[#].Id" value="0" />
+            <input type="hidden" name="tasks[#].SortOrder" value="0" />
+            <input type="text" class="form-control" name="tasks[#].Title" placeholder="Task name" required />
+        </td>
+        <td>
+            <textarea class="form-control" name="tasks[#].Description" rows="2" placeholder="Describe what needs to be done"></textarea>
+        </td>
+        <td class="text-end">
+            <button type="button" class="btn btn-outline-danger btn-sm" data-pm-action="delete-row">Delete</button>
+        </td>
+    </tr>
+</template>
+
+@section Scripts {
+    <script>
+        (function () {
+            const propertySelect = document.getElementById('pmPropertySelect');
+            if (propertySelect) {
+                propertySelect.addEventListener('change', (event) => {
+                    const value = event.target.value;
+                    if (value) {
+                        window.location.href = value;
+                    }
+                });
+            }
+
+            const tableBody = document.getElementById('pmTasksBody');
+            const rowTemplate = document.getElementById('pmTaskTemplate');
+            const form = document.getElementById('pmSetupForm');
+
+            function getRows() {
+                return Array.from(tableBody?.querySelectorAll('.pm-task-row') ?? []);
+            }
+
+            function addRow(position) {
+                if (!tableBody || !rowTemplate) {
+                    return;
+                }
+                const fragment = rowTemplate.content.cloneNode(true);
+                const placeholder = fragment.querySelectorAll('input, textarea');
+                const nextIndex = getRows().length;
+                placeholder.forEach(el => {
+                    if (el.name?.includes('tasks[#]')) {
+                        el.name = el.name.replace('tasks[#]', `tasks[${nextIndex}]`);
+                    }
+                });
+
+                if (position === 'top') {
+                    tableBody.prepend(fragment);
+                } else {
+                    tableBody.appendChild(fragment);
+                }
+                rebindRowEvents();
+                updateSortOrders();
+            }
+
+            function deleteRow(button) {
+                const row = button.closest('.pm-task-row');
+                if (!row) {
+                    return;
+                }
+                row.remove();
+                updateInputIndexes();
+            }
+
+            function updateInputIndexes() {
+                const rows = getRows();
+                rows.forEach((row, index) => {
+                    row.querySelectorAll('input[name^="tasks["], textarea[name^="tasks["]').forEach(input => {
+                        input.name = input.name.replace(/tasks\[\d+\]/, `tasks[${index}]`);
+                    });
+                });
+                updateSortOrders();
+            }
+
+            function updateSortOrders() {
+                const rows = getRows();
+                rows.forEach((row, index) => {
+                    const sortInput = row.querySelector('input[name$=".SortOrder"]');
+                    if (sortInput) {
+                        sortInput.value = index.toString();
+                    }
+                });
+            }
+
+            function rebindRowEvents() {
+                document.querySelectorAll('[data-pm-action="delete-row"]').forEach(button => {
+                    button.removeEventListener('click', handleDeleteClick);
+                    button.addEventListener('click', handleDeleteClick);
+                });
+
+                getRows().forEach(row => setupDragHandlers(row));
+            }
+
+            function handleDeleteClick(event) {
+                deleteRow(event.currentTarget);
+            }
+
+            document.querySelectorAll('[data-pm-action="add-row"]').forEach(button => {
+                button.addEventListener('click', () => addRow(button.dataset.position));
+            });
+
+            function setupDragHandlers(row) {
+                if (row.dataset.dragBound === '1') {
+                    return;
+                }
+                row.dataset.dragBound = '1';
+                row.addEventListener('dragstart', (event) => {
+                    event.dataTransfer.effectAllowed = 'move';
+                    row.classList.add('dragging');
+                });
+
+                row.addEventListener('dragend', () => {
+                    row.classList.remove('dragging');
+                    updateInputIndexes();
+                });
+            }
+
+            if (tableBody) {
+                tableBody.addEventListener('dragover', (event) => {
+                    event.preventDefault();
+                    const dragging = document.querySelector('.pm-task-row.dragging');
+                    const targetRow = event.target.closest('.pm-task-row');
+                    if (!dragging || !targetRow || dragging === targetRow) {
+                        return;
+                    }
+
+                    const bounding = targetRow.getBoundingClientRect();
+                    const offset = event.clientY - bounding.top;
+                    if (offset > bounding.height / 2) {
+                        targetRow.after(dragging);
+                    } else {
+                        targetRow.before(dragging);
+                    }
+                });
+            }
+
+            rebindRowEvents();
+            if (getRows().length === 0) {
+                addRow('bottom');
+            }
+        })();
+    </script>
+}
