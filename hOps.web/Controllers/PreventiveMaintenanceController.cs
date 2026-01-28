@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using hOps.web.Utilities;
 
 namespace hOps.web.Controllers
 {
@@ -495,15 +496,16 @@ namespace hOps.web.Controllers
             }
 
             var logs = new List<PreventiveMaintenanceRoomLogViewModel>();
-            foreach (var room in rooms)
+            for (var i = 0; i < rooms.Count; i++)
             {
+                var room = rooms[i];
                 latestLookup.TryGetValue($"room:{room.Id}", out var session);
-                logs.Add(BuildRoomLog(room.Id, room.RoomNumber ?? $"Room {room.Id}", session, frequencyPerYear));
+                logs.Add(BuildRoomLog(room.Id, room.RoomNumber ?? $"Room {room.Id}", session, frequencyPerYear, i));
             }
 
             var manualLogs = latestLookup
                 .Where(kvp => kvp.Key.StartsWith("manual:", StringComparison.OrdinalIgnoreCase))
-                .Select(kvp => BuildRoomLog(null, kvp.Value.RoomNumber, kvp.Value, frequencyPerYear))
+                .Select((kvp, index) => BuildRoomLog(null, kvp.Value.RoomNumber, kvp.Value, frequencyPerYear, rooms.Count + index))
                 .Take(20);
 
             logs.AddRange(manualLogs);
@@ -513,7 +515,7 @@ namespace hOps.web.Controllers
                 .ToList();
         }
 
-        private static PreventiveMaintenanceRoomLogViewModel BuildRoomLog(int? roomId, string? roomNumber, PreventiveMaintenanceSession? session, int frequencyPerYear)
+        private static PreventiveMaintenanceRoomLogViewModel BuildRoomLog(int? roomId, string? roomNumber, PreventiveMaintenanceSession? session, int frequencyPerYear, int roomIndex)
         {
             var log = new PreventiveMaintenanceRoomLogViewModel
             {
@@ -524,19 +526,18 @@ namespace hOps.web.Controllers
                 CompletedByName = BuildUserName(session?.CompletedBy)
             };
 
-            if (frequencyPerYear > 0)
+            var nextDue = MaintenanceScheduleHelper.CalculateNextDueDate(session?.CompletedAtUtc, frequencyPerYear, roomIndex);
+            log.NextDueAtUtc = nextDue;
+            if (nextDue.HasValue)
             {
-                var intervalDays = Math.Max(1, 365.0 / frequencyPerYear);
-                var baseline = session?.CompletedAtUtc ?? DateTime.MinValue;
-                var nextDue = baseline == DateTime.MinValue ? DateTime.UtcNow.AddDays(-1) : baseline.AddDays(intervalDays);
-                log.NextDueAtUtc = nextDue;
-                var now = DateTime.UtcNow;
-                if (baseline == DateTime.MinValue || nextDue <= now.Date)
+                var now = DateTime.UtcNow.Date;
+                var dueDate = nextDue.Value.Date;
+                if (dueDate <= now)
                 {
                     log.IsOverdue = true;
                     log.IsDue = true;
                 }
-                else if (nextDue <= now.AddDays(7))
+                else if (dueDate <= now.AddDays(7))
                 {
                     log.IsDue = true;
                     log.IsOverdue = false;
