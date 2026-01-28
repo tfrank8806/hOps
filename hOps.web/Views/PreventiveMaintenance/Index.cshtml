@@ -82,6 +82,48 @@
         </div>
     </div>
 
+    @if (ViewBag.CanRecordManualCompletion is bool canRecordManual && canRecordManual)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Record Manual Completion (Managers)</strong>
+            </div>
+            <div class="card-body">
+                <form asp-action="RecordManualCompletion" method="post" class="row g-3">
+                    @Html.AntiForgeryToken()
+                    <div class="col-md-4">
+                        <label for="pmManualRoomSelect" class="form-label">Select a room (optional)</label>
+                        <select id="pmManualRoomSelect" name="RoomId" class="form-select">
+                            <option value="">-- Select room --</option>
+                            @foreach (var option in Model.RoomOptions)
+                            {
+                                <option value="@option.Value">@option.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="pmManualRoomNumber" class="form-label">Room number *</label>
+                        <input type="text" class="form-control" id="pmManualRoomNumber" name="RoomNumber" required maxlength="64" />
+                    </div>
+                    <div class="col-md-4">
+                        <label for="pmManualCompletedAt" class="form-label">Completion date &amp; time *</label>
+                        <input type="datetime-local" class="form-control" id="pmManualCompletedAt" name="CompletedAtLocal" value="@localNow.ToString("yyyy-MM-ddTHH:mm")" required />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="pmManualDuration" class="form-label">Duration (minutes)</label>
+                        <input type="number" class="form-control" id="pmManualDuration" name="DurationMinutes" min="0" max="1440" value="60" />
+                    </div>
+                    <div class="col-12">
+                        <small class="text-muted">Use this when a PM was completed outside the checklist.</small>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-outline-primary">Record Manual PM</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+
     <div id="pmSessionContainer" class="mb-4">
         <div class="card">
             <div class="card-body text-muted">
@@ -231,6 +273,8 @@
             const roomNumberInput = document.getElementById('pmRoomNumber');
             const startTimeInput = document.getElementById('pmStartTime');
             const startCancel = document.getElementById('pmStartCancel');
+            const manualRoomSelect = document.getElementById('pmManualRoomSelect');
+            const manualRoomNumberInput = document.getElementById('pmManualRoomNumber');
             const alertContainer = document.getElementById('pmAlert');
             const sessionContainer = document.getElementById('pmSessionContainer');
             const hasChecklist = appEl.dataset.hasChecklist === 'true';
@@ -341,6 +385,15 @@
                     } else {
                         delete roomNumberInput.dataset.selectedRoomId;
                         delete roomNumberInput.dataset.selectedRoomLabel;
+                    }
+                });
+            }
+
+            if (manualRoomSelect && manualRoomNumberInput) {
+                manualRoomSelect.addEventListener('change', () => {
+                    const option = manualRoomSelect.selectedOptions[0];
+                    if (option && option.value) {
+                        manualRoomNumberInput.value = (option.textContent || option.value).trim();
                     }
                 });
             }

@@ -105,10 +105,94 @@ namespace hOps.web.Controllers
             };
 
             ViewBag.LocalNow = _timeZoneService.ConvertToUserTime(DateTime.UtcNow);
+            ViewBag.CanRecordManualCompletion = await UserCanRecordManualCompletionAsync(user);
             ViewBag.DeepCleanError = TempData["DeepCleanError"] ?? TempData["DeepCleanSetupError"];
             ViewBag.DeepCleanMessage = TempData["DeepCleanSetupMessage"];
 
             return View(viewModel);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RecordManualCompletion(DeepCleanManualCompletionRequest request)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["DeepCleanError"] = "Select a property before recording a manual Deep Clean.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            if (!await UserCanRecordManualCompletionAsync(user))
+            {
+                return Forbid();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                TempData["DeepCleanError"] = "Enter all required fields to record a manual Deep Clean.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            Room? selectedRoom = null;
+            string roomNumber = request.RoomNumber?.Trim() ?? string.Empty;
+            if (request.RoomId.HasValue)
+            {
+                selectedRoom = await _db.Rooms
+                    .FirstOrDefaultAsync(r => r.Id == request.RoomId.Value && r.PropertyId == property.Id && r.IncludeInDeepClean);
+                if (selectedRoom == null)
+                {
+                    TempData["DeepCleanError"] = "The selected room is not available for Deep Cleans at this property.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                roomNumber = selectedRoom.RoomNumber ?? roomNumber;
+            }
+
+            if (string.IsNullOrWhiteSpace(roomNumber))
+            {
+                TempData["DeepCleanError"] = "Enter a room number to record a manual Deep Clean.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var timeZone = _timeZoneService.GetTimeZone();
+            var completedLocal = request.CompletedAtLocal == default
+                ? _timeZoneService.ConvertToUserTime(DateTime.UtcNow)
+                : request.CompletedAtLocal;
+            var completedUtc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(completedLocal, DateTimeKind.Unspecified), timeZone);
+            var durationMinutes = Math.Clamp(request.DurationMinutes, 0, 1440);
+            var durationSeconds = durationMinutes * 60;
+            var startedUtc = completedUtc.AddSeconds(-durationSeconds);
+            if (startedUtc > completedUtc)
+            {
+                startedUtc = completedUtc;
+            }
+
+            var session = new DeepCleanSession
+            {
+                PropertyId = property.Id,
+                RoomId = selectedRoom?.Id,
+                RoomNumber = roomNumber,
+                CreatedById = user.Id,
+                StartedAtUtc = startedUtc,
+                Status = DeepCleanSessionStatus.Completed,
+                CompletedAtUtc = completedUtc,
+                CompletedById = user.Id,
+                LastSavedAtUtc = completedUtc,
+                TotalDurationSeconds = durationSeconds
+            };
+
+            _db.DeepCleanSessions.Add(session);
+            await _db.SaveChangesAsync();
+
+            TempData["DeepCleanMessage"] = $"Recorded a manual Deep Clean for {roomNumber}.";
+            return RedirectToAction(nameof(Index));
         }
 
         [HttpGet]
@@ -842,6 +926,13 @@ namespace hOps.web.Controllers
             }
 
             return value.Length <= maxLength ? value : value[..maxLength];
+        }
+
+        private async Task<bool> UserCanRecordManualCompletionAsync(ApplicationUser user)
+        {
+            var roles = await _userManager.GetRolesAsync(user);
+            return roles.Any(r => r.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
+                                  r.Equals("Admin", StringComparison.OrdinalIgnoreCase));
         }
     }
 }

@@ -82,6 +82,48 @@
         </div>
     </div>
 
+    @if (ViewBag.CanRecordManualCompletion is bool dcManual && dcManual)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Record Manual Completion (Managers)</strong>
+            </div>
+            <div class="card-body">
+                <form asp-action="RecordManualCompletion" method="post" class="row g-3">
+                    @Html.AntiForgeryToken()
+                    <div class="col-md-4">
+                        <label for="deepCleanManualRoomSelect" class="form-label">Select a room (optional)</label>
+                        <select id="deepCleanManualRoomSelect" name="RoomId" class="form-select">
+                            <option value="">-- Select room --</option>
+                            @foreach (var option in Model.RoomOptions)
+                            {
+                                <option value="@option.Value">@option.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="deepCleanManualRoomNumber" class="form-label">Room number *</label>
+                        <input type="text" class="form-control" id="deepCleanManualRoomNumber" name="RoomNumber" required maxlength="64" />
+                    </div>
+                    <div class="col-md-4">
+                        <label for="deepCleanManualCompletedAt" class="form-label">Completion date &amp; time *</label>
+                        <input type="datetime-local" class="form-control" id="deepCleanManualCompletedAt" name="CompletedAtLocal" value="@localNow.ToString("yyyy-MM-ddTHH:mm")" required />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="deepCleanManualDuration" class="form-label">Duration (minutes)</label>
+                        <input type="number" class="form-control" id="deepCleanManualDuration" name="DurationMinutes" min="0" max="1440" value="90" />
+                    </div>
+                    <div class="col-12">
+                        <small class="text-muted">Use this when a Deep Clean was handled outside the checklist.</small>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-outline-primary">Record Manual Deep Clean</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+
     <div id="deepCleanSessionContainer" class="mb-4">
         <div class="card">
             <div class="card-body text-muted">
@@ -223,6 +265,8 @@
             const roomNumberInput = document.getElementById('deepCleanRoomNumber');
             const startTimeInput = document.getElementById('deepCleanStartTime');
             const startCancel = document.getElementById('deepCleanStartCancel');
+            const manualRoomSelect = document.getElementById('deepCleanManualRoomSelect');
+            const manualRoomNumberInput = document.getElementById('deepCleanManualRoomNumber');
             const alertContainer = document.getElementById('deepCleanAlert');
             const sessionContainer = document.getElementById('deepCleanSessionContainer');
             const hasChecklist = appEl.dataset.hasChecklist === 'true';
@@ -338,6 +382,15 @@
                         roomNumberInput.value = '';
                         delete roomNumberInput.dataset.selectedRoomId;
                         delete roomNumberInput.dataset.selectedRoomLabel;
+                    }
+                });
+            }
+
+            if (manualRoomSelect && manualRoomNumberInput) {
+                manualRoomSelect.addEventListener('change', () => {
+                    const option = manualRoomSelect.selectedOptions[0];
+                    if (option && option.value) {
+                        manualRoomNumberInput.value = (option.textContent || option.value).trim();
                     }
                 });
             }

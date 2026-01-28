@@ -105,6 +105,7 @@ namespace hOps.web.Controllers
             };
 
             ViewBag.LocalNow = _timeZoneService.ConvertToUserTime(DateTime.UtcNow);
+            ViewBag.CanRecordManualCompletion = await UserCanRecordManualCompletionAsync(user);
             ViewBag.PmError = TempData["PmError"] ?? TempData["PmSetupError"];
             ViewBag.PmMessage = TempData["PmSetupMessage"];
 
@@ -832,5 +833,13 @@ namespace hOps.web.Controllers
 
             return value.Length <= maxLength ? value : value[..maxLength];
         }
+
+        private async Task<bool> UserCanRecordManualCompletionAsync(ApplicationUser user)
+        {
+            var roles = await _userManager.GetRolesAsync(user);
+            return roles.Any(r => r.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
+                                  r.Equals("Admin", StringComparison.OrdinalIgnoreCase));
+        }
+
     }
 }
