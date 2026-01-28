@@ -17,8 +17,14 @@ namespace hOps.web.Utilities
 
             var normalizedRoomIndex = Math.Max(0, roomIndex);
             var cycleLengthDays = 365.0 / frequencyPerYear;
-            var referenceDate = lastCompletedAtUtc?.Date ?? DateTime.UtcNow.Date.AddDays(-cycleLengthDays);
-            var nextCycleStart = GetNextCycleStart(referenceDate, cycleLengthDays);
+            var currentYearStart = new DateTime(DateTime.UtcNow.Year, 1, 1);
+            var referenceDate = lastCompletedAtUtc?.Date ?? currentYearStart;
+            if (referenceDate < currentYearStart)
+            {
+                referenceDate = currentYearStart;
+            }
+
+            var nextCycleStart = GetNextCycleStart(referenceDate, cycleLengthDays, currentYearStart);
 
             var offsetBusinessDays = normalizedRoomIndex / DailyCapacity;
             var dueDate = AddBusinessDays(nextCycleStart, offsetBusinessDays);
@@ -101,9 +107,14 @@ namespace hOps.web.Utilities
             public DateTime DueDate { get; init; }
         }
 
-        private static DateTime GetNextCycleStart(DateTime referenceDate, double cycleLengthDays)
+        private static DateTime GetNextCycleStart(DateTime referenceDate, double cycleLengthDays, DateTime currentYearStart)
         {
             var cycleStart = GetCycleStart(referenceDate, cycleLengthDays);
+            if (cycleStart < currentYearStart)
+            {
+                cycleStart = currentYearStart;
+            }
+
             if (cycleStart <= referenceDate)
             {
                 cycleStart = cycleStart.AddDays(cycleLengthDays);

@@ -1,0 +1,69 @@
+@model hOps.web.ViewModels.Maintenance.MaintenanceArchiveViewModel
+@{
+    ViewData["Title"] = Model.PageTitle;
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+    <div>
+        <h2 class="mb-0">@Model.PageTitle</h2>
+        <p class="text-muted mb-0 small">@Model.PropertyName &mdash; historical completions.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-controller="PreventiveMaintenance" asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to PMs</a>
+    </div>
+</div>
+
+@if (!Model.AvailableYears.Any())
+{
+    <div class="alert alert-info">No Preventive Maintenance history is available yet.</div>
+}
+else
+{
+    <form method="get" asp-action="Archive" class="row g-3 align-items-end mb-3">
+        <div class="col-auto">
+            <label for="yearSelect" class="form-label mb-1">Year</label>
+            <select id="yearSelect" name="year" class="form-select" onchange="this.form.submit()">
+                @foreach (var yearOption in Model.AvailableYears)
+                {
+                    <option value="@yearOption" selected="@(yearOption == Model.SelectedYear ? "selected" : null)">@yearOption</option>
+                }
+            </select>
+        </div>
+    </form>
+
+    @if (!Model.Rooms.Any())
+    {
+        <div class="alert alert-light border text-muted">No PM completions were logged for @Model.SelectedYear.</div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-striped mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Room</th>
+                            <th>Completion Dates (@Model.SelectedYear)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var room in Model.Rooms.OrderBy(r => r.RoomNumber, StringComparer.OrdinalIgnoreCase))
+                        {
+                            <tr>
+                                <td>@room.RoomNumber</td>
+                                <td>
+                                    @{
+                                        var dates = room.CompletionDates
+                                            .OrderByDescending(d => d)
+                                            .Select(d => TimeZoneService.ConvertToUserTime(d).ToString("MMM d h:mm tt"));
+                                    }
+                                    @string.Join(", ", dates)
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}

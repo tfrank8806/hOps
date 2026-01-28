@@ -111,6 +111,110 @@ namespace hOps.web.Controllers
             return View(viewModel);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> Archive(int? year = null)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["DeepCleanError"] = "Select a property to view Deep Clean archives.";
+                return RedirectToAction("Index", "Home");
+            }
+
+            var propertyId = property.Id;
+            var sessionsQuery = _db.DeepCleanSessions
+                .AsNoTracking()
+                .Where(s => s.PropertyId == propertyId && s.Status == DeepCleanSessionStatus.Completed);
+
+            var availableYears = await sessionsQuery
+                .Select(s => (s.CompletedAtUtc ?? s.StartedAtUtc).Year)
+                .Distinct()
+                .OrderByDescending(y => y)
+                .ToListAsync();
+
+            if (!availableYears.Any())
+            {
+                var emptyModel = new MaintenanceArchiveViewModel
+                {
+                    PageTitle = "Deep Clean Archive",
+                    PropertyId = propertyId,
+                    PropertyName = property.Name,
+                    SelectedYear = DateTime.UtcNow.Year,
+                    AvailableYears = Array.Empty<int>(),
+                    Rooms = Array.Empty<MaintenanceArchiveRoomViewModel>()
+                };
+                return View("Archive", emptyModel);
+            }
+
+            var defaultYear = DateTime.UtcNow.Year - 1;
+            var selectedYear = year.HasValue && availableYears.Contains(year.Value)
+                ? year.Value
+                : (availableYears.Contains(defaultYear) ? defaultYear : availableYears.First());
+
+            var yearStart = new DateTime(selectedYear, 1, 1);
+            var yearEnd = new DateTime(selectedYear, 12, 31, 23, 59, 59, DateTimeKind.Utc);
+
+            var sessions = await sessionsQuery
+                .Where(s => (s.CompletedAtUtc ?? s.StartedAtUtc) >= yearStart &&
+                            (s.CompletedAtUtc ?? s.StartedAtUtc) <= yearEnd)
+                .OrderBy(s => s.CompletedAtUtc ?? s.StartedAtUtc)
+                .ToListAsync();
+
+            var rooms = await _db.Rooms
+                .AsNoTracking()
+                .Where(r => r.PropertyId == propertyId && r.IncludeInDeepClean)
+                .OrderBy(r => r.RoomNumber)
+                .ToListAsync();
+
+            var roomEntries = new List<MaintenanceArchiveRoomViewModel>();
+            foreach (var room in rooms)
+            {
+                var roomSessions = sessions
+                    .Where(s => s.RoomId == room.Id)
+                    .Select(s => s.CompletedAtUtc ?? s.StartedAtUtc)
+                    .Where(d => d != DateTime.MinValue)
+                    .OrderByDescending(d => d)
+                    .ToList();
+
+                if (roomSessions.Any())
+                {
+                    roomEntries.Add(new MaintenanceArchiveRoomViewModel
+                    {
+                        RoomNumber = room.RoomNumber ?? $"Room {room.Id}",
+                        CompletionDates = roomSessions
+                    });
+                }
+            }
+
+            var manualEntries = sessions
+                .Where(s => !s.RoomId.HasValue && !string.IsNullOrWhiteSpace(s.RoomNumber))
+                .GroupBy(s => s.RoomNumber!.Trim())
+                .Select(g => new MaintenanceArchiveRoomViewModel
+                {
+                    RoomNumber = $"Manual: {g.Key}",
+                    CompletionDates = g.Select(s => s.CompletedAtUtc ?? s.StartedAtUtc)
+                        .Where(d => d != DateTime.MinValue)
+                        .OrderByDescending(d => d)
+                        .ToList()
+                })
+                .Where(entry => entry.CompletionDates.Any())
+                .ToList();
+
+            roomEntries.AddRange(manualEntries);
+
+            var archiveModel = new MaintenanceArchiveViewModel
+            {
+                PageTitle = "Deep Clean Archive",
+                PropertyId = propertyId,
+                PropertyName = property.Name,
+                SelectedYear = selectedYear,
+                AvailableYears = availableYears,
+                Rooms = roomEntries
+            };
+
+            return View("Archive", archiveModel);
+        }
+
         [HttpPost]
         [Consumes("application/json")]
         public async Task<IActionResult> StartSession([FromBody] DeepCleanSessionStartRequest request)
@@ -505,6 +609,7 @@ namespace hOps.web.Controllers
                 .OrderByDescending(s => s.CompletedAtUtc)
                 .ToListAsync();
 
+            var currentYear = DateTime.UtcNow.Year;
             var latestLookup = new Dictionary<string, DeepCleanSession>(StringComparer.OrdinalIgnoreCase);
             var completionHistory = new Dictionary<string, List<DateTime>>(StringComparer.OrdinalIgnoreCase);
             foreach (var session in sessions)
@@ -514,7 +619,7 @@ namespace hOps.web.Controllers
                     ? $"room:{session.RoomId.Value}"
                     : $"manual:{(session.RoomNumber ?? string.Empty).Trim()}";
 
-                if (!latestLookup.ContainsKey(key))
+                if (completedAt.Year == currentYear && !latestLookup.ContainsKey(key))
                 {
                     latestLookup[key] = session;
                 }
@@ -525,7 +630,7 @@ namespace hOps.web.Controllers
                     completionHistory[key] = history;
                 }
 
-                if (completedAt != DateTime.MinValue)
+                if (completedAt != DateTime.MinValue && completedAt.Year == currentYear)
                 {
                     history.Add(completedAt);
                 }
@@ -562,10 +667,22 @@ namespace hOps.web.Controllers
             {
                 RoomId = roomId,
                 RoomNumber = string.IsNullOrWhiteSpace(roomNumber) ? (roomId.HasValue ? $"Room {roomId}" : "Room") : roomNumber!,
-                LastCompletedAtUtc = session?.CompletedAtUtc,
                 LastDurationSeconds = session?.TotalDurationSeconds,
-                CompletedByName = BuildUserName(session?.CompletedBy)
+                CompletedByName = session?.CompletedAtUtc.HasValue == true && session.CompletedAtUtc.Value.Year == DateTime.UtcNow.Year
+                    ? BuildUserName(session?.CompletedBy)
+                    : null
             };
+
+            if (completionHistory != null && completionHistory.Count > 0)
+            {
+                var latest = completionHistory
+                    .OrderByDescending(d => d)
+                    .FirstOrDefault();
+                if (latest != default)
+                {
+                    log.LastCompletedAtUtc = latest;
+                }
+            }
 
             var nextDue = MaintenanceScheduleHelper.CalculateNextDueDate(session?.CompletedAtUtc, frequencyPerYear, roomIndex);
             log.NextDueAtUtc = nextDue;

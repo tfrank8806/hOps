@@ -23,6 +23,7 @@
         </div>
         <div class="d-flex gap-2">
             <a asp-controller="Settings" asp-action="DeepCleanSetup" asp-route-propertyId="@Model.PropertyId" class="btn btn-outline-secondary btn-sm">Edit Checklist</a>
+            <a asp-controller="DeepCleans" asp-action="Archive" class="btn btn-outline-secondary btn-sm">View Archive</a>
             <button type="button" class="btn btn-primary" id="deepCleanStartToggle">Start new Deep Clean</button>
         </div>
     </div>
