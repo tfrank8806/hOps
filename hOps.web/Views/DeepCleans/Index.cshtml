@@ -701,7 +701,7 @@
             }
 
             async function postJson(url, payload) {
-                const token = document.querySelector('input[name="__RequestVerificationToken"]');
+                const token = appEl.querySelector('input[name="__RequestVerificationToken"]');
                 const headers = {
                     'Content-Type': 'application/json'
                 };

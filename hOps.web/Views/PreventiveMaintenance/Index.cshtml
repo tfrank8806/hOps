@@ -425,7 +425,7 @@
             }
 
             function getRequestVerificationToken() {
-                const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+                const tokenInput = appEl.querySelector('input[name="__RequestVerificationToken"]');
                 return tokenInput ? tokenInput.value : '';
             }
 
