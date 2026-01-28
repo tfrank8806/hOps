@@ -113,6 +113,120 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
+        public async Task<IActionResult> ActiveSessionStatus()
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                return BadRequest(new { message = "Select a property first." });
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var session = await _db.PreventiveMaintenanceSessions
+                .Include(s => s.Tasks)
+                .Include(s => s.Room)
+                .Where(s => s.PropertyId == property.Id &&
+                            s.CreatedById == user.Id &&
+                            s.Status != PreventiveMaintenanceSessionStatus.Completed &&
+                            s.Status != PreventiveMaintenanceSessionStatus.Cancelled)
+                .OrderByDescending(s => s.StartedAtUtc)
+                .FirstOrDefaultAsync();
+
+            return Ok(new
+            {
+                session = session != null ? BuildSessionDto(session, DateTime.UtcNow) : null
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RecordManualCompletion(PmManualCompletionRequest request)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["PmError"] = "Select a property before recording a manual PM.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            if (!await UserCanRecordManualCompletionAsync(user))
+            {
+                return Forbid();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                TempData["PmError"] = "Enter all required fields to record a manual PM.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            Room? selectedRoom = null;
+            string roomNumber = request.RoomNumber?.Trim() ?? string.Empty;
+            if (request.RoomId.HasValue)
+            {
+                selectedRoom = await _db.Rooms
+                    .FirstOrDefaultAsync(r => r.Id == request.RoomId.Value && r.PropertyId == property.Id && r.IncludeInPreventiveMaintenance);
+                if (selectedRoom == null)
+                {
+                    TempData["PmError"] = "The selected room is not available for PMs at this property.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                roomNumber = selectedRoom.RoomNumber ?? roomNumber;
+            }
+
+            if (string.IsNullOrWhiteSpace(roomNumber))
+            {
+                TempData["PmError"] = "Enter a room number to record a manual PM.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var timeZone = _timeZoneService.GetTimeZone();
+            var completedLocal = request.CompletedAtLocal == default
+                ? _timeZoneService.ConvertToUserTime(DateTime.UtcNow)
+                : request.CompletedAtLocal;
+            var completedUtc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(completedLocal, DateTimeKind.Unspecified), timeZone);
+            var durationMinutes = Math.Clamp(request.DurationMinutes, 0, 1440);
+            var durationSeconds = durationMinutes * 60;
+            var startedUtc = completedUtc.AddSeconds(-durationSeconds);
+            if (startedUtc > completedUtc)
+            {
+                startedUtc = completedUtc;
+            }
+
+            var session = new PreventiveMaintenanceSession
+            {
+                PropertyId = property.Id,
+                RoomId = selectedRoom?.Id,
+                RoomNumber = roomNumber,
+                CreatedById = user.Id,
+                StartedAtUtc = startedUtc,
+                Status = PreventiveMaintenanceSessionStatus.Completed,
+                CompletedAtUtc = completedUtc,
+                CompletedById = user.Id,
+                LastSavedAtUtc = completedUtc,
+                TotalDurationSeconds = durationSeconds
+            };
+
+            _db.PreventiveMaintenanceSessions.Add(session);
+            await _db.SaveChangesAsync();
+
+            TempData["PmMessage"] = $"Recorded a manual PM for {roomNumber}.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpGet]
         public async Task<IActionResult> Archive(int? year = null)
         {
             var property = ViewBag.CurrentProperty as Property;

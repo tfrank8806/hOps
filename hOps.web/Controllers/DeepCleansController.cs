@@ -112,6 +112,37 @@ namespace hOps.web.Controllers
             return View(viewModel);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> ActiveSessionStatus()
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                return BadRequest(new { message = "Select a property first." });
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var session = await _db.DeepCleanSessions
+                .Include(s => s.Tasks)
+                .Include(s => s.Room)
+                .Where(s => s.PropertyId == property.Id &&
+                            s.CreatedById == user.Id &&
+                            s.Status != DeepCleanSessionStatus.Completed &&
+                            s.Status != DeepCleanSessionStatus.Cancelled)
+                .OrderByDescending(s => s.StartedAtUtc)
+                .FirstOrDefaultAsync();
+
+            return Ok(new
+            {
+                session = session != null ? BuildSessionDto(session, DateTime.UtcNow) : null
+            });
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RecordManualCompletion(DeepCleanManualCompletionRequest request)

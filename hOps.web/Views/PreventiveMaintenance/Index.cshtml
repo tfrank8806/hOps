@@ -15,6 +15,7 @@
      data-pause-url="@Url.Action("PauseSession", "PreventiveMaintenance")"
      data-resume-url="@Url.Action("ResumeSession", "PreventiveMaintenance")"
      data-finish-url="@Url.Action("FinishSession", "PreventiveMaintenance")"
+     data-active-session-url="@Url.Action("ActiveSessionStatus", "PreventiveMaintenance")"
      data-has-checklist="@Model.HasChecklist.ToString().ToLowerInvariant()">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
         <div>
@@ -285,6 +286,7 @@
                 resume: appEl.dataset.resumeUrl,
                 finish: appEl.dataset.finishUrl
             };
+            const activeSessionUrl = appEl.dataset.activeSessionUrl;
 
             const initialSession = (() => {
                 try {
@@ -356,15 +358,18 @@
             }
 
             if (startToggle) {
-                startToggle.addEventListener('click', () => {
+                startToggle.addEventListener('click', async () => {
                     if (!hasChecklist) {
                         showAlert('warning', 'Add tasks on the PM Setup page before starting a PM.');
                         return;
                     }
 
                     if (sessionState) {
-                        showAlert('info', 'Finish or pause your current PM before starting another.');
-                        return;
+                        await refreshActiveSession();
+                        if (sessionState) {
+                            showAlert('info', 'Finish or pause your current PM before starting another.');
+                            return;
+                        }
                     }
 
                     toggleStartPanel(true);
@@ -455,6 +460,36 @@
                 return response.json();
             }
 
+            async function refreshActiveSession() {
+                if (!activeSessionUrl) {
+                    return sessionState;
+                }
+
+                try {
+                    const response = await fetch(activeSessionUrl, { headers: { 'Accept': 'application/json' } });
+                    if (!response.ok) {
+                        return sessionState;
+                    }
+
+                    const data = await response.json();
+                    syncSession(data.session || null);
+                    return data.session || null;
+                } catch {
+                    return sessionState;
+                }
+            }
+
+            function handleSessionNotFound(error) {
+                if (error && typeof error.message === 'string' &&
+                    error.message.toLowerCase().includes('session not found')) {
+                    syncSession(null);
+                    showAlert('info', 'Your PM session could not be found and has been cleared.');
+                    return true;
+                }
+
+                return false;
+            }
+
             if (startForm) {
                 startForm.addEventListener('submit', async (event) => {
                     event.preventDefault();
@@ -462,6 +497,14 @@
                     if (!roomNumber) {
                         roomNumberInput.focus();
                         return;
+                    }
+
+                    if (sessionState) {
+                        await refreshActiveSession();
+                        if (sessionState) {
+                            showAlert('info', 'Finish or pause your current PM before starting another.');
+                            return;
+                        }
                     }
 
                     const payload = {
@@ -476,7 +519,9 @@
                         toggleStartPanel(false);
                         showAlert('success', 'PM started.');
                     } catch (error) {
-                        showAlert('danger', error.message || 'Unable to start the PM.');
+                        if (!handleSessionNotFound(error)) {
+                            showAlert('danger', error.message || 'Unable to start the PM.');
+                        }
                     }
                 });
             }
