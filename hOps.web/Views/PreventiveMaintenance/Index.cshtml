@@ -1,4 +1,5 @@
 @using System.Text.Json
+@using System.Linq
 @model hOps.web.ViewModels.PreventiveMaintenance.PreventiveMaintenanceIndexViewModel
 @{
     ViewData["Title"] = "PMs";
@@ -104,13 +105,24 @@
                         <th>Duration</th>
                         <th>Status</th>
                         <th>Next due</th>
+                        @if (Model.CycleDefinitions.Any())
+                        {
+                            foreach (var cycle in Model.CycleDefinitions)
+                            {
+                                <th class="text-nowrap">
+                                    Cycle @cycle.Index
+                                    <div class="small text-muted">@cycle.DueDate.ToString("MMM d")</div>
+                                </th>
+                            }
+                        }
                     </tr>
                 </thead>
                 <tbody>
                     @if (!Model.RoomLogs.Any())
                     {
+                        var totalColumns = 5 + Model.CycleDefinitions.Count;
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-4">
+                            <td colspan="@totalColumns" class="text-center text-muted py-4">
                                 No rooms found for this property. Add rooms first to begin logging PMs.
                             </td>
                         </tr>
@@ -172,6 +184,24 @@
                                         <span class="text-muted">--</span>
                                     }
                                 </td>
+                                @if (Model.CycleDefinitions.Any())
+                                {
+                                    foreach (var cycle in Model.CycleDefinitions)
+                                    {
+                                        var status = log.CycleStatuses.FirstOrDefault(s => s.Index == cycle.Index);
+                                        <td>
+                                            @if (status?.CompletedAt.HasValue == true)
+                                            {
+                                                var completedLocal = TimeZoneService.ConvertToUserTime(status.CompletedAt.Value);
+                                                <span>@completedLocal.ToString("MMM d")</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">--</span>
+                                            }
+                                        </td>
+                                    }
+                                }
                             </tr>
                         }
                     }

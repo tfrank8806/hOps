@@ -7,6 +7,7 @@ using hOps.web.Models;
 using hOps.web.Services;
 using hOps.web.ViewModels.PreventiveMaintenance;
 using hOps.web.ViewModels.WorkOrders;
+using hOps.web.ViewModels.Maintenance;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -77,7 +78,17 @@ namespace hOps.web.Controllers
                 .OrderByDescending(s => s.StartedAtUtc)
                 .FirstOrDefaultAsync();
 
-            var roomLogs = await BuildRoomLogsAsync(propertyId, frequency);
+            var cycleWindows = MaintenanceScheduleHelper.BuildCycleWindows(DateTime.UtcNow, frequency);
+            var cycleDefinitions = cycleWindows
+                .Select(window => new MaintenanceCycleDefinitionViewModel
+                {
+                    Index = window.Index,
+                    DueDate = window.DueDate,
+                    Label = $"Cycle {window.Index}"
+                })
+                .ToList();
+
+            var roomLogs = await BuildRoomLogsAsync(propertyId, frequency, cycleWindows);
 
             var viewModel = new PreventiveMaintenanceIndexViewModel
             {
@@ -89,7 +100,8 @@ namespace hOps.web.Controllers
                 RoomLogs = roomLogs,
                 ActiveSession = activeSession != null
                     ? BuildActiveSessionViewModel(activeSession, DateTime.UtcNow)
-                    : null
+                    : null,
+                CycleDefinitions = cycleDefinitions
             };
 
             ViewBag.LocalNow = _timeZoneService.ConvertToUserTime(DateTime.UtcNow);
@@ -469,7 +481,7 @@ namespace hOps.web.Controllers
             return string.Join(Environment.NewLine, parts);
         }
 
-        private async Task<List<PreventiveMaintenanceRoomLogViewModel>> BuildRoomLogsAsync(int propertyId, int frequencyPerYear)
+        private async Task<List<PreventiveMaintenanceRoomLogViewModel>> BuildRoomLogsAsync(int propertyId, int frequencyPerYear, IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows)
         {
             var rooms = await _db.Rooms
                 .Where(r => r.PropertyId == propertyId)
@@ -483,8 +495,10 @@ namespace hOps.web.Controllers
                 .ToListAsync();
 
             var latestLookup = new Dictionary<string, PreventiveMaintenanceSession>(StringComparer.OrdinalIgnoreCase);
+            var completionHistory = new Dictionary<string, List<DateTime>>(StringComparer.OrdinalIgnoreCase);
             foreach (var session in sessions)
             {
+                var completedAt = session.CompletedAtUtc ?? session.StartedAtUtc;
                 var key = session.RoomId.HasValue
                     ? $"room:{session.RoomId.Value}"
                     : $"manual:{(session.RoomNumber ?? string.Empty).Trim()}";
@@ -493,6 +507,17 @@ namespace hOps.web.Controllers
                 {
                     latestLookup[key] = session;
                 }
+
+                if (!completionHistory.TryGetValue(key, out var history))
+                {
+                    history = new List<DateTime>();
+                    completionHistory[key] = history;
+                }
+
+                if (completedAt != DateTime.MinValue)
+                {
+                    history.Add(completedAt);
+                }
             }
 
             var logs = new List<PreventiveMaintenanceRoomLogViewModel>();
@@ -500,12 +525,17 @@ namespace hOps.web.Controllers
             {
                 var room = rooms[i];
                 latestLookup.TryGetValue($"room:{room.Id}", out var session);
-                logs.Add(BuildRoomLog(room.Id, room.RoomNumber ?? $"Room {room.Id}", session, frequencyPerYear, i));
+                completionHistory.TryGetValue($"room:{room.Id}", out var history);
+                logs.Add(BuildRoomLog(room.Id, room.RoomNumber ?? $"Room {room.Id}", session, frequencyPerYear, i, cycleWindows, history));
             }
 
             var manualLogs = latestLookup
                 .Where(kvp => kvp.Key.StartsWith("manual:", StringComparison.OrdinalIgnoreCase))
-                .Select((kvp, index) => BuildRoomLog(null, kvp.Value.RoomNumber, kvp.Value, frequencyPerYear, rooms.Count + index))
+                .Select((kvp, index) =>
+                {
+                    completionHistory.TryGetValue(kvp.Key, out var history);
+                    return BuildRoomLog(null, kvp.Value.RoomNumber, kvp.Value, frequencyPerYear, rooms.Count + index, cycleWindows, history);
+                })
                 .Take(20);
 
             logs.AddRange(manualLogs);
@@ -515,7 +545,7 @@ namespace hOps.web.Controllers
                 .ToList();
         }
 
-        private static PreventiveMaintenanceRoomLogViewModel BuildRoomLog(int? roomId, string? roomNumber, PreventiveMaintenanceSession? session, int frequencyPerYear, int roomIndex)
+        private static PreventiveMaintenanceRoomLogViewModel BuildRoomLog(int? roomId, string? roomNumber, PreventiveMaintenanceSession? session, int frequencyPerYear, int roomIndex, IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows, List<DateTime>? completionHistory)
         {
             var log = new PreventiveMaintenanceRoomLogViewModel
             {
@@ -544,6 +574,34 @@ namespace hOps.web.Controllers
                 }
             }
 
+            var statuses = new List<MaintenanceCycleStatusViewModel>();
+            if (cycleWindows != null && cycleWindows.Count > 0)
+            {
+                var completions = completionHistory?.OrderBy(d => d).ToList() ?? new List<DateTime>();
+                foreach (var window in cycleWindows)
+                {
+                    DateTime? completion = null;
+                    for (var i = 0; i < completions.Count; i++)
+                    {
+                        var candidate = completions[i];
+                        if (candidate >= window.StartDate && candidate <= window.DueDate)
+                        {
+                            completion = candidate;
+                            completions.RemoveAt(i);
+                            break;
+                        }
+                    }
+
+                    statuses.Add(new MaintenanceCycleStatusViewModel
+                    {
+                        Index = window.Index,
+                        DueDate = window.DueDate,
+                        CompletedAt = completion
+                    });
+                }
+            }
+
+            log.CycleStatuses = statuses;
             return log;
         }
 

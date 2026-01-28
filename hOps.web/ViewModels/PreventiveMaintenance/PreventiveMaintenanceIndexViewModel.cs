@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using hOps.web.Models;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using hOps.web.ViewModels.Maintenance;
 
 namespace hOps.web.ViewModels.PreventiveMaintenance
 {
@@ -16,6 +17,7 @@ namespace hOps.web.ViewModels.PreventiveMaintenance
         public IReadOnlyList<SelectListItem> RoomOptions { get; set; } = Array.Empty<SelectListItem>();
         public IReadOnlyList<PreventiveMaintenanceRoomLogViewModel> RoomLogs { get; set; } = Array.Empty<PreventiveMaintenanceRoomLogViewModel>();
         public PreventiveMaintenanceActiveSessionViewModel? ActiveSession { get; set; }
+        public IReadOnlyList<MaintenanceCycleDefinitionViewModel> CycleDefinitions { get; set; } = Array.Empty<MaintenanceCycleDefinitionViewModel>();
     }
 
     public class PreventiveMaintenanceRoomLogViewModel
@@ -28,6 +30,7 @@ namespace hOps.web.ViewModels.PreventiveMaintenance
         public bool IsOverdue { get; set; }
         public DateTime? NextDueAtUtc { get; set; }
         public string? CompletedByName { get; set; }
+        public IReadOnlyList<MaintenanceCycleStatusViewModel> CycleStatuses { get; set; } = Array.Empty<MaintenanceCycleStatusViewModel>();
     }
 
     public class PreventiveMaintenanceActiveSessionViewModel
@@ -50,4 +53,3 @@ namespace hOps.web.ViewModels.PreventiveMaintenance
         public string? Notes { get; set; }
     }
 }
-

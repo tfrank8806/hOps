@@ -42,6 +42,65 @@ namespace hOps.web.Utilities
             return dueDate;
         }
 
+        public static IReadOnlyList<MaintenanceCycleWindow> BuildCycleWindows(DateTime referenceDate, int frequencyPerYear)
+        {
+            var cycles = new List<MaintenanceCycleWindow>();
+            if (frequencyPerYear <= 0)
+            {
+                return cycles;
+            }
+
+            var yearStart = new DateTime(referenceDate.Year, 1, 1);
+            var monthsPerCycle = 12.0 / frequencyPerYear;
+            var monthAccumulator = 0.0;
+            var cycleStart = yearStart;
+            var lastDueMonth = 0;
+
+            for (int i = 0; i < frequencyPerYear; i++)
+            {
+                monthAccumulator += monthsPerCycle;
+                var dueMonth = (int)Math.Ceiling(monthAccumulator);
+                if (dueMonth <= lastDueMonth)
+                {
+                    dueMonth = lastDueMonth + 1;
+                }
+                if (dueMonth > 12)
+                {
+                    dueMonth = 12;
+                }
+
+                var dueDate = new DateTime(yearStart.Year, dueMonth, DateTime.DaysInMonth(yearStart.Year, dueMonth));
+                if (dueDate < cycleStart)
+                {
+                    dueDate = cycleStart;
+                }
+
+                cycles.Add(new MaintenanceCycleWindow
+                {
+                    Index = i + 1,
+                    StartDate = cycleStart,
+                    DueDate = dueDate
+                });
+
+                if (dueMonth >= 12)
+                {
+                    break;
+                }
+
+                cycleStart = dueDate.AddDays(1);
+                lastDueMonth = dueMonth;
+            }
+
+            return cycles;
+        }
+
+        public sealed class MaintenanceCycleWindow
+        {
+            public int Index { get; init; }
+            public DateTime StartDate { get; init; }
+            public DateTime DueDate { get; init; }
+        }
+
         private static DateTime GetNextCycleStart(DateTime referenceDate, double cycleLengthDays)
         {
             var cycleStart = GetCycleStart(referenceDate, cycleLengthDays);
