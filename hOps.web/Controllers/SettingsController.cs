@@ -1070,7 +1070,9 @@ namespace hOps.web.Controllers
                     Abbreviation = NormalizeRoomAbbreviation(r.Abbreviation),
                     Floor = r.Floor,
                     RoomType = r.RoomType?.Trim() ?? string.Empty,
-                    Description = string.IsNullOrWhiteSpace(r.Description) ? null : r.Description.Trim()
+                    Description = string.IsNullOrWhiteSpace(r.Description) ? null : r.Description.Trim(),
+                    IncludeInPreventiveMaintenance = r.IncludeInPreventiveMaintenance,
+                    IncludeInDeepClean = r.IncludeInDeepClean
                 })
                 .Where(r => !string.IsNullOrWhiteSpace(r.RoomNumber))
                 .ToList();
@@ -1092,6 +1094,8 @@ namespace hOps.web.Controllers
                     existing.Floor = updated.Floor;
                     existing.RoomType = updated.RoomType;
                     existing.Description = updated.Description;
+                    existing.IncludeInPreventiveMaintenance = updated.IncludeInPreventiveMaintenance;
+                    existing.IncludeInDeepClean = updated.IncludeInDeepClean;
                 }
                 else
                 {
@@ -1109,7 +1113,9 @@ namespace hOps.web.Controllers
                     Abbreviation = room.Abbreviation,
                     Floor = room.Floor,
                     RoomType = room.RoomType,
-                    Description = room.Description
+                    Description = room.Description,
+                    IncludeInPreventiveMaintenance = room.IncludeInPreventiveMaintenance,
+                    IncludeInDeepClean = room.IncludeInDeepClean
                 });
             }
 
@@ -1185,7 +1191,9 @@ namespace hOps.web.Controllers
                         Abbreviation = abbreviation,
                         Floor = floor,
                         RoomType = roomType,
-                        Description = string.IsNullOrWhiteSpace(description) ? null : description
+                        Description = string.IsNullOrWhiteSpace(description) ? null : description,
+                        IncludeInPreventiveMaintenance = true,
+                        IncludeInDeepClean = true
                     });
                 }
             }

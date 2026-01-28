@@ -59,7 +59,7 @@ namespace hOps.web.Controllers
             var hasChecklist = await _db.PreventiveMaintenanceTasks.AnyAsync(t => t.PropertyId == propertyId);
 
             var roomOptions = await _db.Rooms
-                .Where(r => r.PropertyId == propertyId)
+                .Where(r => r.PropertyId == propertyId && r.IncludeInPreventiveMaintenance)
                 .OrderBy(r => r.RoomNumber)
                 .Select(r => new SelectListItem
                 {
@@ -484,7 +484,7 @@ namespace hOps.web.Controllers
         private async Task<List<PreventiveMaintenanceRoomLogViewModel>> BuildRoomLogsAsync(int propertyId, int frequencyPerYear, IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows)
         {
             var rooms = await _db.Rooms
-                .Where(r => r.PropertyId == propertyId)
+                .Where(r => r.PropertyId == propertyId && r.IncludeInPreventiveMaintenance)
                 .OrderBy(r => r.RoomNumber)
                 .ToListAsync();
 

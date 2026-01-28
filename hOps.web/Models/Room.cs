@@ -13,6 +13,8 @@ namespace hOps.web.Models
         public int Floor { get; set; }
         public string RoomType { get; set; } = null!;
         public string? Description { get; set; }
+        public bool IncludeInPreventiveMaintenance { get; set; } = true;
+        public bool IncludeInDeepClean { get; set; } = true;
         // optional layout position
         public int X { get; set; }
         public int Y { get; set; }
