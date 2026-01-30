@@ -359,6 +359,7 @@ await ApplyMigrationsWithLegacySupportAsync(dbContext);
      await EnsureProfilePhotoPathColumnAsync(dbContext);
      await EnsureRoomLayoutShapeColumnsAsync(dbContext);
      await EnsureUserHomeLayoutsTableAsync(dbContext);
+     await EnsureSalesLeadSubmissionsTableAsync(dbContext);
  }
 
     await SeedRolesAsync(roleManager);
