@@ -760,10 +760,7 @@
 
             const sidebar = document.getElementById('sidebar');
             const sidebarFabToggle = document.getElementById('sidebarFabToggle');
-            const sidebarToggles = Array.from(document.querySelectorAll('.sidebar-toggle'));
-            if (sidebarFabToggle) {
-                sidebarToggles.push(sidebarFabToggle);
-            }
+            const sidebarToggles = Array.from(document.querySelectorAll('[data-sidebar-toggle]'));
             const sidebarBackdrop = document.getElementById('sidebarBackdrop');
             const sidebarMediaQuery = window.matchMedia('(max-width: 991.98px)');
             const quickMenu = document.getElementById('sidebarQuickMenu');
