@@ -39,14 +39,21 @@ namespace hOps.web.Services
                 return new List<MentionSuggestion>();
             }
 
-            term = term.Trim();
+            var normalizedTerm = term.Trim();
+            if (normalizedTerm.Length == 0)
+            {
+                return new List<MentionSuggestion>();
+            }
+
+            normalizedTerm = normalizedTerm.ToLowerInvariant();
+            var likePattern = $"%{normalizedTerm}%";
 
             return await _userManager.Users
                 .Where(u =>
-                    (u.FirstName != null && EF.Functions.Like(u.FirstName, $"%{term}%")) ||
-                    (u.LastName != null && EF.Functions.Like(u.LastName, $"%{term}%")) ||
-                    (u.Email != null && EF.Functions.Like(u.Email, $"%{term}%")) ||
-                    (u.UserName != null && EF.Functions.Like(u.UserName, $"%{term}%")))
+                    (!string.IsNullOrEmpty(u.FirstName) && EF.Functions.Like(u.FirstName.ToLower(), likePattern)) ||
+                    (!string.IsNullOrEmpty(u.LastName) && EF.Functions.Like(u.LastName.ToLower(), likePattern)) ||
+                    (!string.IsNullOrEmpty(u.Email) && EF.Functions.Like(u.Email.ToLower(), likePattern)) ||
+                    (!string.IsNullOrEmpty(u.UserName) && EF.Functions.Like(u.UserName.ToLower(), likePattern)))
                 .OrderBy(u => u.FirstName)
                 .ThenBy(u => u.LastName)
                 .Take(maxResults)
