@@ -550,7 +550,7 @@
         let getCurrentLayout = () => [];
         let persistLayoutSnapshot = () => { };
 
-        const applyLayout = (layout) => {
+        function applyLayout(layout) {
             const widgetMap = {};
             grid.querySelectorAll('.home-widget').forEach(widget => {
                 widgetMap[widget.dataset.widgetId] = widget;
@@ -569,7 +569,7 @@
                 initializeHeightSlider(widget);
                 grid.appendChild(widget);
             });
-        };
+        }
 
         try {
             const storage = (() => {
