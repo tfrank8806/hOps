@@ -549,6 +549,28 @@
         let persistStoredLayout = () => { };
         let getCurrentLayout = () => [];
         let persistLayoutSnapshot = () => { };
+
+        const applyLayout = (layout) => {
+            const widgetMap = {};
+            grid.querySelectorAll('.home-widget').forEach(widget => {
+                widgetMap[widget.dataset.widgetId] = widget;
+            });
+
+            layout.forEach(entry => {
+                const widget = widgetMap[entry.widgetId];
+                if (!widget) {
+                    return;
+                }
+                updateWidgetSize(
+                    widget,
+                    entry.size ?? widget.dataset.widgetSize ?? 'third',
+                    typeof entry.customSpan === 'number' ? entry.customSpan : undefined);
+                updateWidgetHeight(widget, typeof entry.customHeight === 'number' ? entry.customHeight : undefined);
+                initializeHeightSlider(widget);
+                grid.appendChild(widget);
+            });
+        };
+
         try {
             const storage = (() => {
                 try {
@@ -715,24 +737,6 @@
                 editorGroup?.classList.add('d-none');
                 hint?.classList.add('d-none');
             }
-        };
-
-        const applyLayout = (layout) => {
-            const widgetMap = {};
-            grid.querySelectorAll('.home-widget').forEach(widget => {
-                widgetMap[widget.dataset.widgetId] = widget;
-            });
-
-            layout.forEach(entry => {
-                const widget = widgetMap[entry.widgetId];
-                if (!widget) {
-                    return;
-                }
-                updateWidgetSize(widget, entry.size ?? widget.dataset.widgetSize ?? 'third', typeof entry.customSpan === 'number' ? entry.customSpan : undefined);
-                updateWidgetHeight(widget, typeof entry.customHeight === 'number' ? entry.customHeight : undefined);
-                initializeHeightSlider(widget);
-                grid.appendChild(widget);
-            });
         };
 
         const updateWidgetSize = (widget, sizeKey, overrideSpan) => {
