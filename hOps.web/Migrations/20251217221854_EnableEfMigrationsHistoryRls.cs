@@ -10,6 +10,11 @@ namespace hOps.web.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider != "Npgsql.EntityFrameworkCore.PostgreSQL")
+            {
+                return;
+            }
+
             migrationBuilder.Sql("""
                 ALTER TABLE "__EFMigrationsHistory"
                     ENABLE ROW LEVEL SECURITY;
@@ -57,6 +62,11 @@ namespace hOps.web.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider != "Npgsql.EntityFrameworkCore.PostgreSQL")
+            {
+                return;
+            }
+
             migrationBuilder.Sql("""
                 DROP POLICY IF EXISTS "__EFMigrationsHistory_select_policy" ON "__EFMigrationsHistory";
                 DROP POLICY IF EXISTS "__EFMigrationsHistory_insert_policy" ON "__EFMigrationsHistory";

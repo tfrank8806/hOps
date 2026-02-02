@@ -10,6 +10,11 @@ namespace hOps.web.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider != "Npgsql.EntityFrameworkCore.PostgreSQL")
+            {
+                return;
+            }
+
             migrationBuilder.Sql("""
                 ALTER TABLE "LostFoundEntries"
                     ENABLE ROW LEVEL SECURITY;
@@ -107,6 +112,11 @@ namespace hOps.web.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider != "Npgsql.EntityFrameworkCore.PostgreSQL")
+            {
+                return;
+            }
+
             migrationBuilder.Sql("""
                 DROP POLICY IF EXISTS "LostFoundEntries_select_policy" ON "LostFoundEntries";
                 DROP POLICY IF EXISTS "LostFoundEntries_insert_policy" ON "LostFoundEntries";

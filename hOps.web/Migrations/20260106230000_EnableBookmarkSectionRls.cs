@@ -17,6 +17,11 @@ namespace hOps.web.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider != "Npgsql.EntityFrameworkCore.PostgreSQL")
+            {
+                return;
+            }
+
             foreach (var table in Tables)
             {
                 ApplyServiceRoleOnlyRls(migrationBuilder, table);
@@ -26,6 +31,11 @@ namespace hOps.web.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider != "Npgsql.EntityFrameworkCore.PostgreSQL")
+            {
+                return;
+            }
+
             foreach (var table in Tables)
             {
                 RemoveServiceRoleOnlyRls(migrationBuilder, table);
