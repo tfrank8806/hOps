@@ -51,6 +51,7 @@ public class BaseController : Controller
                 ViewBag.UserProperties = userProperties;
                 ViewBag.CurrentUserId = user.Id;
                 var displayName = $"{user.FirstName} {user.LastName}".Trim();
+                httpContext.Session.SetString("CurrentUserId", user.Id);
                 if (string.IsNullOrWhiteSpace(displayName))
                 {
                     displayName = user.Email ?? user.UserName ?? "My Profile";

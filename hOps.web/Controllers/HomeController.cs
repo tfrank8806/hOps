@@ -234,17 +234,20 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [AllowAnonymous]
         public async Task<IActionResult> SaveWidgetLayout([FromBody] UpdateHomeLayoutRequest request)
         {
             var currentUser = await _userManager.GetUserAsync(User);
-            if (currentUser == null)
-            {
-                return Unauthorized();
-            }
+            var currentUserId = currentUser?.Id ?? HttpContext.Session.GetString("CurrentUserId");
 
             if (request?.Widgets == null || request.Widgets.Count == 0)
             {
                 return BadRequest(new { message = "No widgets were provided." });
+            }
+
+            if (string.IsNullOrWhiteSpace(currentUserId))
+            {
+                return Unauthorized(new { message = "Your session expired. Please refresh the page and sign in again before saving the layout." });
             }
 
             var personaKey = ResolvePersonaKey(request.Persona);
@@ -324,12 +327,12 @@ namespace hOps.web.Controllers
             }
 
             var serialized = JsonSerializer.Serialize(normalized, LayoutSerializerOptions);
-            var layout = await _context.UserHomeLayouts.FirstOrDefaultAsync(l => l.UserId == currentUser.Id && l.PersonaKey == personaKey);
+            var layout = await _context.UserHomeLayouts.FirstOrDefaultAsync(l => l.UserId == currentUserId && l.PersonaKey == personaKey);
             if (layout == null)
             {
                 layout = new UserHomeLayout
                 {
-                    UserId = currentUser.Id,
+                    UserId = currentUserId,
                     PersonaKey = personaKey,
                     LayoutJson = serialized,
                     UpdatedAtUtc = DateTime.UtcNow
