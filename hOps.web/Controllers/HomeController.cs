@@ -43,7 +43,7 @@ namespace hOps.web.Controllers
             new HomeWidgetDefinition { Id = HomeWidgetIds.Bulletins, DisplayName = "Bulletin Board", Description = "Team conversations & reminders", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 690 },
             new HomeWidgetDefinition { Id = HomeWidgetIds.WorkOrders, DisplayName = "Work Orders", Description = "Active tickets and SLAs", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 690 },
             new HomeWidgetDefinition { Id = HomeWidgetIds.UpcomingEvents, DisplayName = "Upcoming Events", Description = "Calendar highlights", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 490 },
-            new HomeWidgetDefinition { Id = HomeWidgetIds.PassOnLogs, DisplayName = "Pass On Logs", Description = "Recent pass on entries", DefaultSize = HomeWidgetSize.Full, DefaultHeight = 490 },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.PassOnLogs, DisplayName = "Pass On Logs", Description = "Recent pass on entries", DefaultSize = HomeWidgetSize.Full, DefaultHeight = 490, DefaultSpanOverride = 8 },
             new HomeWidgetDefinition { Id = HomeWidgetIds.MySchedule, DisplayName = "My Schedule", Description = "Upcoming shifts for you", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 300 },
             new HomeWidgetDefinition { Id = HomeWidgetIds.LostFound, DisplayName = "Lost & Found", Description = "Items awaiting resolution", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 300 },
             new HomeWidgetDefinition { Id = HomeWidgetIds.PackageLog, DisplayName = "Package Log", Description = "Undelivered packages", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 300 },
@@ -276,9 +276,13 @@ namespace hOps.web.Controllers
                 {
                     normalizedSpan = GetSpanForSize(HomeWidgetSize.Full);
                 }
-                else if (normalizedSpan.HasValue && normalizedSpan.Value == GetSpanForSize(parsedSize))
+                else if (normalizedSpan.HasValue)
                 {
-                    normalizedSpan = null;
+                    var defaultSpan = GetDefaultSpanForWidget(definition, parsedSize);
+                    if (normalizedSpan.Value == defaultSpan)
+                    {
+                        normalizedSpan = null;
+                    }
                 }
 
                 var requestedHeight = widget.CustomHeight;
@@ -1588,9 +1592,13 @@ namespace hOps.web.Controllers
                         {
                             sanitizedSpan = GetSpanForSize(HomeWidgetSize.Full);
                         }
-                        else if (sanitizedSpan.HasValue && sanitizedSpan.Value == GetSpanForSize(entry.Size))
+                        else if (sanitizedSpan.HasValue)
                         {
-                            sanitizedSpan = null;
+                            var defaultSpan = GetDefaultSpanForWidget(definition, entry.Size);
+                            if (sanitizedSpan.Value == defaultSpan)
+                            {
+                                sanitizedSpan = null;
+                            }
                         }
                         if (sanitizedHeight.HasValue && Math.Abs(sanitizedHeight.Value - defaultHeight) <= WidgetHeightResetThreshold)
                         {
@@ -1668,6 +1676,17 @@ namespace hOps.web.Controllers
             HomeWidgetSize.Quarter => 3,
             _ => 4
         };
+
+        private static int GetDefaultSpanForWidget(HomeWidgetDefinition definition, HomeWidgetSize size)
+        {
+            if (definition?.DefaultSpanOverride.HasValue == true &&
+                definition.DefaultSize == size)
+            {
+                return ClampSpan(definition.DefaultSpanOverride.Value);
+            }
+
+            return GetSpanForSize(size);
+        }
 
         private static int ClampSpan(int span) => Math.Clamp(span, 1, 12);
         private static int ClampHeight(int height) => Math.Clamp(height, MinWidgetHeight, MaxWidgetHeight);

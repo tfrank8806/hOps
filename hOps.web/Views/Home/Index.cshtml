@@ -149,16 +149,20 @@
             var forceFullWidth = string.Equals(widgetId, HomeWidgetIds.HotelLayout, StringComparison.OrdinalIgnoreCase);
             var effectiveSize = forceFullWidth ? HomeWidgetSize.Full : widget.Size;
             var sizeValue = effectiveSize.ToString().ToLowerInvariant();
-            var defaultSpan = string.Equals(widgetId, HomeWidgetIds.PassOnLogs, StringComparison.OrdinalIgnoreCase)
-                ? 8
-                : effectiveSize switch
-                {
-                    HomeWidgetSize.Full => 12,
-                    HomeWidgetSize.Half => 6,
-                    HomeWidgetSize.Third => 4,
-                    HomeWidgetSize.Quarter => 3,
-                    _ => 4
-                };
+            definitionLookup.TryGetValue(widgetId, out var widgetDefinition);
+            var overrideSpan = widgetDefinition?.DefaultSpanOverride;
+            var defaultSpan = forceFullWidth
+                ? 12
+                : (overrideSpan.HasValue && widgetDefinition?.DefaultSize == effectiveSize
+                    ? overrideSpan.Value
+                    : effectiveSize switch
+                    {
+                        HomeWidgetSize.Full => 12,
+                        HomeWidgetSize.Half => 6,
+                        HomeWidgetSize.Third => 4,
+                        HomeWidgetSize.Quarter => 3,
+                        _ => 4
+                    });
             var storedSpan = widget.CustomSpan.HasValue ? Math.Clamp(widget.CustomSpan.Value, 1, 12) : (int?)null;
             var appliedSpan = forceFullWidth ? 12 : storedSpan ?? defaultSpan;
             var showCustomLabel = !forceFullWidth && storedSpan.HasValue && appliedSpan != defaultSpan;
@@ -173,6 +177,9 @@
             var heightLabelText = GetHeightLabel(appliedHeight, sanitizedDefaultHeight, storedHeight.HasValue);
             var rowSpan = Math.Max(1, (int)Math.Ceiling((double)(appliedHeight + widgetRowGap) / (widgetRowUnit + widgetRowGap)));
             var widgetStyle = $"--widget-span: {appliedSpan}; --widget-height: {appliedHeight}px; --widget-row-span: {rowSpan};";
+            var spanOverrideAttribute = overrideSpan.HasValue
+                ? $" data-span-override-{widgetDefinition?.DefaultSize.ToString().ToLowerInvariant()}=\"{overrideSpan.Value}\""
+                : string.Empty;
             <div class="home-widget"
                  data-widget-id="@widget.WidgetId"
                  data-widget-size="@sizeValue"
@@ -183,6 +190,7 @@
                  @(storedSpan.HasValue ? $"data-custom-span=\"{appliedSpan}\"" : string.Empty)
                  @(storedHeight.HasValue ? $"data-custom-height=\"{appliedHeight}\"" : string.Empty)
                  @(forceFullWidth ? "data-lock-width=\"true\"" : string.Empty)
+                 @Html.Raw(spanOverrideAttribute)
                  style="@widgetStyle"
                  draggable="false">
                 <div class="home-widget__editor d-flex align-items-center gap-2">
@@ -390,13 +398,32 @@
             }
             return clampSpan(span);
         };
+        const buildSpanOverrideKey = (sizeKey) => {
+            if (typeof sizeKey !== 'string' || !sizeKey.length) {
+                return null;
+            }
+            return `spanOverride${sizeKey.charAt(0).toUpperCase()}${sizeKey.slice(1)}`;
+        };
+        const getWidgetDefaultSpan = (widget, sizeKey) => {
+            const normalized = normalizeSizeKey(sizeKey);
+            if (widget) {
+                const overrideKey = buildSpanOverrideKey(normalized);
+                if (overrideKey && Object.prototype.hasOwnProperty.call(widget.dataset, overrideKey)) {
+                    const overrideValue = Number(widget.dataset[overrideKey]);
+                    if (Number.isFinite(overrideValue) && overrideValue > 0) {
+                        return clampSpan(overrideValue);
+                    }
+                }
+            }
+            return getDefaultSpanForSize(normalized);
+        };
         const setSizeLabelText = (widget, span) => {
             const label = widget.querySelector('[data-size-label]');
             if (!label) {
                 return;
             }
             const sizeKey = normalizeSizeKey(widget.dataset.widgetSize);
-            const defaultSpan = getDefaultSpanForSize(sizeKey);
+            const defaultSpan = getWidgetDefaultSpan(widget, sizeKey);
             if (span === defaultSpan) {
                 label.textContent = sizeLabelMap[sizeKey] ?? `~${span} cols`;
             } else {
@@ -745,7 +772,7 @@
             }
             const normalized = normalizeSizeKey(sizeKey);
             widget.dataset.widgetSize = normalized;
-            const defaultSpan = getDefaultSpanForSize(normalized);
+            const defaultSpan = getWidgetDefaultSpan(widget, normalized);
             const spanToApply = typeof overrideSpan === 'number' && Number.isFinite(overrideSpan)
                 ? clampSpan(overrideSpan)
                 : defaultSpan;

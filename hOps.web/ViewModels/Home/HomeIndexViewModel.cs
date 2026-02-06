@@ -204,6 +204,7 @@ namespace hOps.web.ViewModels.Home
         public string? Description { get; init; }
         public HomeWidgetSize DefaultSize { get; init; } = HomeWidgetSize.Third;
         public int DefaultHeight { get; init; } = 300;
+        public int? DefaultSpanOverride { get; init; }
     }
 
     public static class HomeWidgetIds
