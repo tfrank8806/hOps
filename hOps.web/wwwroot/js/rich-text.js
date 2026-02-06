@@ -937,11 +937,11 @@
     }
 
     function cleanupMarkup(markup) {
-        return markup
-            .replace(/\r\n/g, '\n')
-            .replace(/\u00a0/g, ' ')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
+        if (!markup) {
+            return '';
+        }
+
+        return markup.replace(/\r\n/g, '\n');
     }
 
     function escapeHtml(char) {
