@@ -766,7 +766,7 @@
             }
         };
 
-        const updateWidgetSize = (widget, sizeKey, overrideSpan) => {
+        function updateWidgetSize(widget, sizeKey, overrideSpan) {
             if (!widget) {
                 return;
             }
@@ -785,7 +785,7 @@
             widget.style.setProperty('--widget-span', spanToApply);
             widget.style.gridColumn = `span ${spanToApply}`;
             setSizeLabelText(widget, spanToApply);
-        };
+        }
 
         let dragSource = null;
 
