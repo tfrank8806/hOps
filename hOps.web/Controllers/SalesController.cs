@@ -157,6 +157,10 @@ namespace hOps.web.Controllers
             var subject = $"Sales lead - {form.GroupName}".Trim();
             var body = BuildSalesLeadEmailBody(form, selectedContact!, currentProperty, user);
 
+            // Ensure date-only inputs get stored with an explicit UTC kind for PostgreSQL timestamptz columns.
+            DateTime? NormalizeToUtc(DateTime? value) =>
+                value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : null;
+
             var leadSubmission = new SalesLeadSubmission
             {
                 PropertyId = currentProperty.Id,
@@ -171,8 +175,8 @@ namespace hOps.web.Controllers
                 NumberOfGuests = form.NumberOfGuests,
                 BudgetMinimum = form.BudgetMinimum,
                 BudgetMaximum = form.BudgetMaximum,
-                EventStartDate = form.StartDate,
-                EventEndDate = form.EndDate,
+                EventStartDate = NormalizeToUtc(form.StartDate),
+                EventEndDate = NormalizeToUtc(form.EndDate),
                 InquiryTypes = string.Join(",", form.InquiryTypes ?? Enumerable.Empty<string>()),
                 InquiryOtherDetails = form.InquiryOtherDetails,
                 AdditionalDetails = form.AdditionalDetails,
