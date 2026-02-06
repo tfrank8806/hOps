@@ -80,7 +80,10 @@
     <link rel="shortcut icon" type="image/png" href="~/favicon.png" asp-append-version="true" />
     @RenderSection("Styles", required: false)
 </head>
-<body>
+@{
+    var userAuthenticated = User?.Identity?.IsAuthenticated == true ? "true" : "false";
+}
+<body data-user-authenticated="@userAuthenticated">
     <div class="ui-scale-wrapper">
     <a class="skip-link" href="#mainContent">Skip to main content</a>
     @if (SignInManager.IsSignedIn(User))
@@ -2133,7 +2136,12 @@
                 });
             }
 
+            const shouldPollAccessRequests = document.body?.dataset?.userAuthenticated === 'true';
+
             async function fetchAccessRequestCount() {
+                if (!shouldPollAccessRequests) {
+                    return;
+                }
                 try {
                     const res = await fetch('/Admin/GetPendingAccessRequestCount');
                     const count = await res.json();
@@ -2171,8 +2179,10 @@
                 }
             }
 
-            fetchAccessRequestCount();
-            setInterval(fetchAccessRequestCount, 30000);
+            if (shouldPollAccessRequests) {
+                fetchAccessRequestCount();
+                setInterval(fetchAccessRequestCount, 30000);
+            }
         })();
     </script>
 
