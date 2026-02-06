@@ -327,7 +327,12 @@ namespace hOps.web.Controllers
             }
 
             var serialized = JsonSerializer.Serialize(normalized, LayoutSerializerOptions);
-            var layout = await _context.UserHomeLayouts.FirstOrDefaultAsync(l => l.UserId == currentUserId && l.PersonaKey == personaKey);
+            var layouts = await _context.UserHomeLayouts
+                .Where(l => l.UserId == currentUserId && l.PersonaKey == personaKey)
+                .OrderByDescending(l => l.UpdatedAtUtc)
+                .ToListAsync();
+            var layout = layouts.FirstOrDefault();
+            var staleLayouts = layouts.Skip(1).ToList();
             if (layout == null)
             {
                 layout = new UserHomeLayout
@@ -346,6 +351,11 @@ namespace hOps.web.Controllers
                 layout.UpdatedAtUtc = DateTime.UtcNow;
             }
             layout.IsDefault = personaKey.Equals(PersonaOptions[0].Key, StringComparison.OrdinalIgnoreCase);
+
+            if (staleLayouts.Count > 0)
+            {
+                _context.UserHomeLayouts.RemoveRange(staleLayouts);
+            }
 
             await _context.SaveChangesAsync();
             return Ok(new { success = true });
