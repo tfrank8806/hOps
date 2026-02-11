@@ -105,6 +105,49 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(PackageLogEntryEditForm form, bool hideDelivered = true)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                TempData["MailLogError"] = "Unable to update entry. Please check the form and try again.";
+                return RedirectToAction(nameof(Index), new { hideDelivered });
+            }
+
+            var entry = await _context.PackageLogEntries.FirstOrDefaultAsync(e => e.Id == form.Id);
+            if (entry == null)
+            {
+                return NotFound();
+            }
+
+            if (!await UserHasAccessToPropertyAsync(entry.PropertyId, user))
+            {
+                return Forbid();
+            }
+
+            entry.RecipientName = form.RecipientName.Trim();
+            entry.RoomNumber = string.IsNullOrWhiteSpace(form.RoomNumber) ? null : form.RoomNumber.Trim();
+            entry.Carrier = string.IsNullOrWhiteSpace(form.Carrier) ? null : form.Carrier.Trim();
+            entry.TrackingNumber = string.IsNullOrWhiteSpace(form.TrackingNumber) ? null : form.TrackingNumber.Trim();
+            entry.StorageLocation = string.IsNullOrWhiteSpace(form.StorageLocation) ? null : form.StorageLocation.Trim();
+            entry.ArrivalDate = NormalizeDate(form.ArrivalDate);
+            entry.DepartureDate = NormalizeDate(form.DepartureDate);
+            entry.PackageReceivedDate = NormalizeDate(form.PackageReceivedDate);
+            entry.Notes = string.IsNullOrWhiteSpace(form.Notes) ? null : form.Notes.Trim();
+
+            await _context.SaveChangesAsync();
+
+            TempData["MailLogMessage"] = "Package entry updated.";
+            return RedirectToAction(nameof(Index), new { hideDelivered });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleDelivered(int id, bool delivered, bool hideDelivered = true)
         {
             var user = await _userManager.GetUserAsync(User);

@@ -70,4 +70,10 @@ namespace hOps.web.ViewModels.MailLog
         [MaxLength(512)]
         public string? Notes { get; set; }
     }
+
+    public class PackageLogEntryEditForm : PackageLogEntryForm
+    {
+        [Required]
+        public int Id { get; set; }
+    }
 }

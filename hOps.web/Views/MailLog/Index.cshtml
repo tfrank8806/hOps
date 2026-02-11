@@ -170,6 +170,9 @@
                                             </td>
                                             <td data-col="deliveredAt">@(deliveredLocal.HasValue ? deliveredLocal.Value.ToString("g") : "-")</td>
                                             <td class="text-end actions-cell">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary me-1" data-bs-toggle="modal" data-bs-target="#editMailLogModal-@entry.Id">
+                                                    Edit
+                                                </button>
                                                 <form asp-action="ToggleDelivered" method="post" class="d-inline mail-log-toggle-form">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="id" value="@entry.Id" />
@@ -185,6 +188,65 @@
                                                     <input type="hidden" name="hideDelivered" value="@(Model.HideDelivered ? "true" : "false")" />
                                                     <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
                                                 </form>
+                                                <div class="modal fade" id="editMailLogModal-@entry.Id" tabindex="-1" aria-labelledby="editMailLogModalLabel-@entry.Id" aria-hidden="true">
+                                                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title" id="editMailLogModalLabel-@entry.Id">Edit Package Entry</h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                            </div>
+                                                            <form asp-action="Edit" method="post" novalidate>
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="Id" value="@entry.Id" />
+                                                                <input type="hidden" name="hideDelivered" value="@(Model.HideDelivered ? "true" : "false")" />
+                                                                <div class="modal-body">
+                                                                    <div class="row g-3">
+                                                                        <div class="col-md-6">
+                                                                            <label class="form-label" for="mail-log-edit-recipient-@entry.Id">Recipient Name</label>
+                                                                            <input class="form-control" id="mail-log-edit-recipient-@entry.Id" name="RecipientName" value="@entry.RecipientName" maxlength="256" required />
+                                                                        </div>
+                                                                        <div class="col-md-3">
+                                                                            <label class="form-label" for="mail-log-edit-carrier-@entry.Id">Carrier</label>
+                                                                            <input class="form-control" id="mail-log-edit-carrier-@entry.Id" name="Carrier" value="@entry.Carrier" maxlength="128" />
+                                                                        </div>
+                                                                        <div class="col-md-3">
+                                                                            <label class="form-label" for="mail-log-edit-tracking-@entry.Id">Tracking Number</label>
+                                                                            <input class="form-control" id="mail-log-edit-tracking-@entry.Id" name="TrackingNumber" value="@entry.TrackingNumber" maxlength="128" />
+                                                                        </div>
+                                                                        <div class="col-md-3">
+                                                                            <label class="form-label" for="mail-log-edit-room-@entry.Id">Room Number</label>
+                                                                            <input class="form-control" id="mail-log-edit-room-@entry.Id" name="RoomNumber" value="@entry.RoomNumber" maxlength="64" />
+                                                                        </div>
+                                                                        <div class="col-md-3">
+                                                                            <label class="form-label" for="mail-log-edit-storage-@entry.Id">Storage Location</label>
+                                                                            <input class="form-control" id="mail-log-edit-storage-@entry.Id" name="StorageLocation" value="@entry.StorageLocation" maxlength="150" />
+                                                                        </div>
+                                                                        <div class="col-md-3">
+                                                                            <label class="form-label" for="mail-log-edit-arrival-@entry.Id">Arrival Date</label>
+                                                                            <input type="date" class="form-control" id="mail-log-edit-arrival-@entry.Id" name="ArrivalDate" value="@(entry.ArrivalDate.HasValue ? entry.ArrivalDate.Value.ToString("yyyy-MM-dd") : string.Empty)" />
+                                                                        </div>
+                                                                        <div class="col-md-3">
+                                                                            <label class="form-label" for="mail-log-edit-departure-@entry.Id">Departure Date</label>
+                                                                            <input type="date" class="form-control" id="mail-log-edit-departure-@entry.Id" name="DepartureDate" value="@(entry.DepartureDate.HasValue ? entry.DepartureDate.Value.ToString("yyyy-MM-dd") : string.Empty)" />
+                                                                        </div>
+                                                                        <div class="col-md-3">
+                                                                            <label class="form-label" for="mail-log-edit-received-@entry.Id">Package Received Date</label>
+                                                                            <input type="date" class="form-control" id="mail-log-edit-received-@entry.Id" name="PackageReceivedDate" value="@(entry.PackageReceivedDate.HasValue ? entry.PackageReceivedDate.Value.ToString("yyyy-MM-dd") : string.Empty)" />
+                                                                        </div>
+                                                                        <div class="col-12">
+                                                                            <label class="form-label" for="mail-log-edit-notes-@entry.Id">Notes</label>
+                                                                            <textarea class="form-control" id="mail-log-edit-notes-@entry.Id" name="Notes" rows="4" maxlength="512" data-enable-mentions="true">@entry.Notes</textarea>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer">
+                                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                     }
