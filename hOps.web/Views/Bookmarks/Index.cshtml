@@ -115,24 +115,38 @@
                         <span asp-validation-for="Form.Url" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="Form.Description" class="form-label"></label>
-                        <textarea asp-for="Form.Description" class="form-control" rows="3" data-enable-mentions="true"></textarea>
-                        <span asp-validation-for="Form.Description" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
                         <label asp-for="Form.Section" class="form-label">Add To</label>
-                        <select asp-for="Form.Section" class="form-select">
+                        <select asp-for="Form.Section" class="form-select" data-bookmark-section-select>
                             <option value="@BookmarkSection.User">User Bookmarks</option>
                             @if (Model.HasCurrentProperty && Model.CanManagePropertyBookmarks)
                             {
-                                <option value="@BookmarkSection.Property">Property Bookmarks (@(Model.CurrentPropertyName ?? "Current Property"))</option>
+                                <option value="@BookmarkSection.Property">Property Bookmarks</option>
                             }
                             @if (Model.HasCurrentProperty)
                             {
-                                <option value="@BookmarkSection.Team">Team Bookmarks (@(Model.CurrentPropertyName ?? "Current Property"))</option>
+                                <option value="@BookmarkSection.Team">Team Bookmarks</option>
                             }
                         </select>
                         <span asp-validation-for="Form.Section" class="text-danger"></span>
+                    </div>
+                    @if (Model.AccessibleProperties.Any())
+                    {
+                        var requiresProperty = Model.Form.Section == BookmarkSection.Property || Model.Form.Section == BookmarkSection.Team;
+                        <div class="mb-3 @(requiresProperty ? string.Empty : "d-none")" data-property-picker>
+                            <label class="form-label" for="bookmark-add-property">Property</label>
+                            <select class="form-select" id="bookmark-add-property" asp-for="Form.PropertyId">
+                                @foreach (var property in Model.AccessibleProperties)
+                                {
+                                    <option value="@property.Id">@property.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="Form.PropertyId" class="text-danger"></span>
+                        </div>
+                    }
+                    <div class="mb-3">
+                        <label asp-for="Form.Description" class="form-label"></label>
+                        <textarea asp-for="Form.Description" class="form-control" rows="3" data-enable-mentions="true"></textarea>
+                        <span asp-validation-for="Form.Description" class="text-danger"></span>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Add Bookmark</button>
                 </form>
@@ -270,16 +284,31 @@
 
                                                                     if (Model.HasCurrentProperty && Model.CanManagePropertyBookmarks)
                                                                     {
-                                                                        propertySectionOptions.Add(new SelectListItem($"Property Bookmarks ({Model.CurrentPropertyName ?? "Current Property"})", ((int)BookmarkSection.Property).ToString(), bookmark.Section == BookmarkSection.Property));
+                                                                        propertySectionOptions.Add(new SelectListItem("Property Bookmarks", ((int)BookmarkSection.Property).ToString(), bookmark.Section == BookmarkSection.Property));
                                                                     }
 
                                                                     if (Model.HasCurrentProperty)
                                                                     {
-                                                                        propertySectionOptions.Add(new SelectListItem($"Team Bookmarks ({Model.CurrentPropertyName ?? "Current Property"})", ((int)BookmarkSection.Team).ToString(), bookmark.Section == BookmarkSection.Team));
+                                                                        propertySectionOptions.Add(new SelectListItem("Team Bookmarks", ((int)BookmarkSection.Team).ToString(), bookmark.Section == BookmarkSection.Team));
                                                                     }
                                                                 }
-                                                                <select class="form-select" id="bookmark-edit-section-@bookmark.Id" name="Section" asp-items="propertySectionOptions"></select>
-                                                                    <div class="form-text">Moving to a property or team section uses the currently selected property.</div>
+                                                                <select class="form-select" id="bookmark-edit-section-@bookmark.Id" name="Section" asp-items="propertySectionOptions" data-bookmark-section-select></select>
+                                                                    <div class="form-text">Choose the property below when assigning bookmarks to property or team sections.</div>
+                                                                </div>
+                                                                @if (Model.AccessibleProperties.Any())
+                                                                {
+                                                                    var showPropertyPicker = bookmark.Section == BookmarkSection.Property || bookmark.Section == BookmarkSection.Team;
+                                                                    <div class="mb-3 bookmark-property-picker @(showPropertyPicker ? string.Empty : "d-none")" data-property-picker>
+                                                                        <label class="form-label" for="bookmark-edit-property-@bookmark.Id">Property</label>
+                                                                        <select class="form-select" id="bookmark-edit-property-@bookmark.Id" name="PropertyId">
+                                                                            @foreach (var property in Model.AccessibleProperties)
+                                                                            {
+                                                                                <option value="@property.Id" selected="@(bookmark.PropertyId == property.Id ? "selected" : null)">@property.Name</option>
+                                                                            }
+                                                                        </select>
+                                                                    </div>
+                                                                }
+                                                                <div class="form-check form-switch mb-3">
                                                                 </div>
                                                                 <div class="form-check form-switch mb-3">
                                                                     <input class="form-check-input" type="checkbox" id="bookmark-edit-quick-@bookmark.Id" name="ShowInQuickMenu" value="true" @(bookmark.ShowInQuickMenu ? "checked" : null) />
@@ -525,16 +554,29 @@
 
                                                                     if (Model.HasCurrentProperty && Model.CanManagePropertyBookmarks)
                                                                     {
-                                                                        userSectionOptions.Add(new SelectListItem($"Property Bookmarks ({Model.CurrentPropertyName ?? "Current Property"})", ((int)BookmarkSection.Property).ToString(), bookmark.Section == BookmarkSection.Property));
+                                                                        userSectionOptions.Add(new SelectListItem("Property Bookmarks", ((int)BookmarkSection.Property).ToString(), bookmark.Section == BookmarkSection.Property));
                                                                     }
 
                                                                     if (Model.HasCurrentProperty)
                                                                     {
-                                                                        userSectionOptions.Add(new SelectListItem($"Team Bookmarks ({Model.CurrentPropertyName ?? "Current Property"})", ((int)BookmarkSection.Team).ToString(), bookmark.Section == BookmarkSection.Team));
+                                                                        userSectionOptions.Add(new SelectListItem("Team Bookmarks", ((int)BookmarkSection.Team).ToString(), bookmark.Section == BookmarkSection.Team));
                                                                     }
                                                                 }
-                                                                <select class="form-select" id="bookmark-edit-section-@bookmark.Id" name="Section" asp-items="userSectionOptions"></select>
+                                                                <select class="form-select" id="bookmark-edit-section-@bookmark.Id" name="Section" asp-items="userSectionOptions" data-bookmark-section-select></select>
                                                             </div>
+                                                            @if (Model.AccessibleProperties.Any())
+                                                            {
+                                                                var userPickerVisible = bookmark.Section == BookmarkSection.Property || bookmark.Section == BookmarkSection.Team;
+                                                                <div class="mb-3 bookmark-property-picker @(userPickerVisible ? string.Empty : "d-none")" data-property-picker>
+                                                                    <label class="form-label" for="bookmark-edit-property-@bookmark.Id">Property</label>
+                                                                    <select class="form-select" id="bookmark-edit-property-@bookmark.Id" name="PropertyId">
+                                                                        @foreach (var property in Model.AccessibleProperties)
+                                                                        {
+                                                                            <option value="@property.Id" selected="@(bookmark.PropertyId == property.Id ? "selected" : null)">@property.Name</option>
+                                                                        }
+                                                                    </select>
+                                                                </div>
+                                                            }
                                                             <div class="form-check form-switch mb-3">
                                                                 <input class="form-check-input" type="checkbox" id="bookmark-edit-quick-@bookmark.Id" name="ShowInQuickMenu" value="true" @(bookmark.ShowInQuickMenu ? "checked" : null) />
                                                                 <label class="form-check-label" for="bookmark-edit-quick-@bookmark.Id">Show in Quick Bookmarks</label>
@@ -563,5 +605,32 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            const propertyValue = @((int)BookmarkSection.Property);
+            const teamValue = @((int)BookmarkSection.Team);
+
+            document.querySelectorAll('[data-bookmark-section-select]').forEach(select => {
+                const form = select.closest('form');
+                if (!form) {
+                    return;
+                }
+
+                const picker = form.querySelector('[data-property-picker]');
+                if (!picker) {
+                    return;
+                }
+
+                const togglePicker = () => {
+                    const selection = Number(select.value);
+                    const needsProperty = selection === propertyValue || selection === teamValue;
+                    picker.classList.toggle('d-none', !needsProperty);
+                };
+
+                select.addEventListener('change', togglePicker);
+                togglePicker();
+            });
+        })();
+    </script>
 }
 

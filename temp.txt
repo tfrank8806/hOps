@@ -1,2 +1,200 @@
+            return RedirectToAction(nameof(Index));
+        }
 
-placeholder
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleQuick(int id, bool showInQuickMenu)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+
+            var bookmark = await _context.Bookmarks.FirstOrDefaultAsync(b => b.Id == id);
+            if (bookmark == null)
+            {
+                return NotFound();
+            }
+
+            if (!await CanModifyBookmarkAsync(bookmark, currentUser, roles, currentPropertyId))
+            {
+                return Forbid();
+            }
+
+            bookmark.ShowInQuickMenu = showInQuickMenu;
+            await _context.SaveChangesAsync();
+
+            TempData["BookmarkSuccess"] = "Quick bookmarks updated.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<BookmarksIndexViewModel> BuildIndexViewModel(
+            ApplicationUser currentUser,
+            IList<string> roles,
+            int? currentPropertyId,
+            BookmarkFormViewModel? form)
+        {
+            form ??= new BookmarkFormViewModel();
+
+            var userBookmarks = await _context.Bookmarks
+                .Where(b => b.Section == BookmarkSection.User && b.CreatedById == currentUser.Id)
+                .OrderBy(b => b.Name)
+                .ToListAsync();
+
+            var teamBookmarksQuery = _context.Bookmarks
+                .Include(b => b.CreatedBy)
+                .Where(b => b.Section == BookmarkSection.Team);
+
+            var propertyBookmarksQuery = _context.Bookmarks
+                .Include(b => b.CreatedBy)
+                .Where(b => b.Section == BookmarkSection.Property);
+
+            string? propertyName = null;
+
+            if (currentPropertyId.HasValue)
+            {
+                teamBookmarksQuery = teamBookmarksQuery.Where(b => b.PropertyId == currentPropertyId.Value);
+                propertyBookmarksQuery = propertyBookmarksQuery.Where(b => b.PropertyId == currentPropertyId.Value);
+
+                propertyName = await _context.Properties
+                    .Where(p => p.Id == currentPropertyId.Value)
+                    .Select(p => p.Name)
+                    .FirstOrDefaultAsync();
+            }
+            else
+            {
+                teamBookmarksQuery = teamBookmarksQuery.Where(b => false);
+                propertyBookmarksQuery = propertyBookmarksQuery.Where(b => false);
+            }
+
+            return new BookmarksIndexViewModel
+            {
+                UserBookmarks = userBookmarks,
+                TeamBookmarks = await teamBookmarksQuery.OrderBy(b => b.Name).ToListAsync(),
+                PropertyBookmarks = await propertyBookmarksQuery.OrderBy(b => b.Name).ToListAsync(),
+                Form = form,
+                CanManagePropertyBookmarks = roles.Contains("Manager") || roles.Contains("Admin"),
+                HasCurrentProperty = currentPropertyId.HasValue,
+                CurrentPropertyName = propertyName,
+                CurrentUserId = currentUser.Id
+            };
+        }
+
+        private async Task<bool> CanModifyBookmarkAsync(
+            Bookmark bookmark,
+            ApplicationUser currentUser,
+            IList<string> roles,
+            int? currentPropertyId)
+        {
+            if (bookmark.Section == BookmarkSection.User)
+            {
+                return bookmark.CreatedById == currentUser.Id;
+            }
+
+            if (!bookmark.PropertyId.HasValue)
+            {
+                return false;
+            }
+
+            if (!currentPropertyId.HasValue || currentPropertyId.Value != bookmark.PropertyId.Value)
+            {
+                return false;
+            }
+
+            var isAdmin = roles.Contains("Admin");
+            var isManager = roles.Contains("Manager") || isAdmin;
+
+            var hasAccess = isAdmin || await _context.UserPropertyAccesses
+                .AnyAsync(upa => upa.ApplicationUserId == currentUser.Id && upa.PropertyId == bookmark.PropertyId.Value);
+
+            if (!hasAccess)
+            {
+                return false;
+            }
+
+            return bookmark.Section switch
+            {
+                BookmarkSection.Property => isManager,
+                BookmarkSection.Team => bookmark.CreatedById == currentUser.Id || isManager,
+                _ => false
+            };
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> QuickList(bool includeAll = false)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            var currentPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            var canManagePropertyBookmarks = roles.Contains("Manager") || roles.Contains("Admin");
+            var orderLookup = await _context.BookmarkOrderPreferences
+                .Where(p => p.UserId == currentUser.Id)
+                .ToDictionaryAsync(p => p.BookmarkId, p => p.SortOrder);
+
+            List<Bookmark> ApplyOrdering(List<Bookmark> source)
+            {
+                if (!source.Any())
+                {
+                    return source;
+                }
+
+                return source
+                    .OrderBy(b => orderLookup.TryGetValue(b.Id, out var sortOrder) ? sortOrder : int.MaxValue)
+                    .ThenBy(b => b.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            async Task<List<Bookmark>> LoadBookmarksAsync(IQueryable<Bookmark> query)
+            {
+                var bookmarks = await query.AsNoTracking().ToListAsync();
+
+                if (!bookmarks.Any())
+                {
+                    return bookmarks;
+                }
+
+                if (includeAll)
+                {
+                    return ApplyOrdering(bookmarks);
+                }
+
+                var flagged = bookmarks.Where(b => b.ShowInQuickMenu).ToList();
+                if (flagged.Any())
+                {
+                    return ApplyOrdering(flagged);
+                }
+
+                return ApplyOrdering(bookmarks).Take(5).ToList();
+            }
+
+            if (!includeAll)
+            {
+                var quickList = new List<object>();
+
+                void AppendBookmarks(IEnumerable<Bookmark> bookmarks, string sectionLabel, BookmarkSection sectionType)
+                {
+                    foreach (var bookmark in bookmarks)
+                    {
+                        if (quickList.Count >= 12)
+                        {
+                            break;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(bookmark.Url))
+                        {
+                            continue;
+                        }
+
+                        quickList.Add(new
+                        {
+                            id = bookmark.Id,
+                            name = bookmark.Name,

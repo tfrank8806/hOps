@@ -20,6 +20,8 @@ namespace hOps.web.ViewModels
 
         [Required]
         public BookmarkSection Section { get; set; } = BookmarkSection.User;
+
+        public int? PropertyId { get; set; }
     }
 
     public class BookmarkEditViewModel
@@ -29,6 +31,8 @@ namespace hOps.web.ViewModels
 
         [Required]
         public BookmarkSection Section { get; set; }
+
+        public int? PropertyId { get; set; }
 
         [Required]
         [StringLength(200)]
@@ -62,6 +66,8 @@ namespace hOps.web.ViewModels
         public string? CurrentPropertyName { get; set; }
 
         public string CurrentUserId { get; set; } = string.Empty;
+
+        public IReadOnlyCollection<BookmarkPropertyOption> AccessibleProperties { get; set; } = new List<BookmarkPropertyOption>();
     }
 
     public class BookmarkOrderUpdateRequest
@@ -98,5 +104,11 @@ namespace hOps.web.ViewModels
     {
         public int BookmarkId { get; set; }
         public int? SectionId { get; set; }
+    }
+
+    public class BookmarkPropertyOption
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
     }
 }
