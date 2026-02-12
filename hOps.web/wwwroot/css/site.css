@@ -14,6 +14,26 @@ body {
     --bs-backdrop-zindex: 1390;
 }
 
+/* Keep interactive overlays above the sticky header/banner */
+.dropdown-menu {
+    z-index: 1300;
+}
+
+.popover,
+.tooltip {
+    z-index: 1400;
+}
+
+.toast-container,
+.toast {
+    z-index: 1450;
+}
+
+.offcanvas,
+.offcanvas-backdrop {
+    z-index: 1500;
+}
+
 .skip-link {
     position: absolute;
     left: 1rem;
