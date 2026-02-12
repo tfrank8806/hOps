@@ -5,6 +5,7 @@
     }
 
     const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    const rowDataCache = new WeakMap();
     const attachmentsModalEl = document.getElementById('workOrderAttachmentsModal');
     const attachmentsModal = attachmentsModalEl ? bootstrap.Modal.getOrCreateInstance(attachmentsModalEl) : null;
     const attachmentsModalBody = attachmentsModalEl?.querySelector('[data-attachments-modal-body]');
@@ -66,16 +67,26 @@
         });
     });
 
-    function showRowDetails(row) {
-        const payloadRaw = row.dataset.workorder;
-        if (!payloadRaw) {
+    const detailTriggers = document.querySelectorAll('.js-workorder-details');
+    detailTriggers.forEach(trigger => {
+        const row = trigger.closest('.workorder-row');
+        if (!row) {
             return;
         }
 
-        let data;
-        try {
-            data = JSON.parse(payloadRaw);
-        } catch {
+        bootstrap.Popover.getOrCreateInstance(trigger, {
+            trigger: 'hover focus',
+            html: true,
+            container: 'body',
+            placement: 'auto',
+            customClass: 'workorder-details-popover',
+            content: () => buildDetailsPopoverContent(row)
+        });
+    });
+
+    function showRowDetails(row) {
+        const data = getRowData(row);
+        if (!data) {
             return;
         }
 
@@ -205,15 +216,8 @@
             return;
         }
 
-        const payloadRaw = row.dataset.workorder;
-        if (!payloadRaw) {
-            return;
-        }
-
-        let data;
-        try {
-            data = JSON.parse(payloadRaw);
-        } catch {
+        const data = getRowData(row);
+        if (!data) {
             return;
         }
 
@@ -308,5 +312,44 @@
         const div = document.createElement('div');
         div.textContent = text || '';
         return div.innerHTML;
+    }
+
+    function getRowData(row) {
+        if (!row) {
+            return null;
+        }
+
+        if (rowDataCache.has(row)) {
+            return rowDataCache.get(row);
+        }
+
+        const payloadRaw = row.dataset.workorder;
+        if (!payloadRaw) {
+            rowDataCache.set(row, null);
+            return null;
+        }
+
+        try {
+            const data = JSON.parse(payloadRaw);
+            rowDataCache.set(row, data);
+            return data;
+        } catch {
+            rowDataCache.set(row, null);
+            return null;
+        }
+    }
+
+    function buildDetailsPopoverContent(row) {
+        const data = getRowData(row);
+        if (!data) {
+            return '<div class="text-muted small">No details available.</div>';
+        }
+
+        const html = data.detailsHtml || (data.details ? escapeHtml(data.details) : '');
+        if (!html) {
+            return '<div class="text-muted small">No details available.</div>';
+        }
+
+        return `<div class="workorder-details-popover-content">${html}</div>`;
     }
 })();

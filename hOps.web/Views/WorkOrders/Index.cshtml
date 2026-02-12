@@ -333,6 +333,15 @@
             margin-bottom: 0;
         }
 
+        .popover.workorder-details-popover {
+            max-width: 360px;
+        }
+
+        .workorder-details-popover-content {
+            font-size: 0.9rem;
+            white-space: normal;
+        }
+
         .workorder-row[data-workorder] {
             cursor: pointer;
         }
@@ -741,7 +750,9 @@
                     <td class="col-details">
                         @if (!string.IsNullOrWhiteSpace(order.Details))
                         {
-                            <div class="workorder-details">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Details))</div>
+                            <div class="workorder-details js-workorder-details" data-details-trigger="true">
+                                @Html.Raw(MentionMarkupFormatter.ToHtml(order.Details))
+                            </div>
                         }
                         else
                         {
