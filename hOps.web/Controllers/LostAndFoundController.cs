@@ -36,6 +36,8 @@ namespace hOps.web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind(Prefix = "Submission")] LostFoundSubmissionViewModel submission)
         {
+            submission ??= new LostFoundSubmissionViewModel();
+
             var filters = new LostFoundFilterInput();
             var viewModel = await BuildIndexViewModel(filters, submission);
 
@@ -46,6 +48,8 @@ namespace hOps.web.Controllers
             }
 
             var accessiblePropertyIds = viewModel.AccessibleProperties.Select(p => p.Id).ToList();
+            submission.SelectedPropertyIds ??= new List<int>();
+
             var targetPropertyIds = submission.SelectedPropertyIds
                 .Where(id => accessiblePropertyIds.Contains(id))
                 .Distinct()
@@ -477,18 +481,25 @@ namespace hOps.web.Controllers
                 return new LostAndFoundIndexViewModel();
             }
 
+            var sessionPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
+            int? defaultPropertyId = null;
+            if (sessionPropertyId.HasValue && accessiblePropertyIds.Contains(sessionPropertyId.Value))
+            {
+                defaultPropertyId = sessionPropertyId.Value;
+            }
+            else if (accessiblePropertyIds.Count == 1)
+            {
+                defaultPropertyId = accessiblePropertyIds.First();
+            }
+
             var normalizedPropertyFilters = filters.PropertyIds
                 .Where(id => accessiblePropertyIds.Contains(id))
                 .Distinct()
                 .ToList();
 
-            if (!normalizedPropertyFilters.Any())
+            if (!normalizedPropertyFilters.Any() && defaultPropertyId.HasValue)
             {
-                var sessionPropertyId = HttpContext.Session.GetInt32("CurrentPropertyId");
-                if (sessionPropertyId.HasValue && accessiblePropertyIds.Contains(sessionPropertyId.Value))
-                {
-                    normalizedPropertyFilters.Add(sessionPropertyId.Value);
-                }
+                normalizedPropertyFilters.Add(defaultPropertyId.Value);
             }
 
             filters.PropertyIds = normalizedPropertyFilters;
@@ -633,10 +644,12 @@ namespace hOps.web.Controllers
 
             submission ??= new LostFoundSubmissionViewModel();
 
-            submission.SelectedPropertyIds = submission.SelectedPropertyIds
+            var sanitizedSelectedPropertyIds = (submission.SelectedPropertyIds ?? new List<int>())
                 .Where(id => accessiblePropertyIds.Contains(id))
                 .Distinct()
                 .ToList();
+
+            submission.SelectedPropertyIds = sanitizedSelectedPropertyIds;
 
             if (!submission.DateFound.HasValue)
             {
@@ -649,7 +662,11 @@ namespace hOps.web.Controllers
 
             if (!submission.SelectedPropertyIds.Any())
             {
-                if (normalizedPropertyFilters.Any())
+                if (defaultPropertyId.HasValue)
+                {
+                    submission.SelectedPropertyIds = new List<int> { defaultPropertyId.Value };
+                }
+                else if (normalizedPropertyFilters.Any())
                 {
                     submission.SelectedPropertyIds = normalizedPropertyFilters.ToList();
                 }
