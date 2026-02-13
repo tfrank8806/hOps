@@ -1,0 +1,222 @@
+@model hOps.web.ViewModels.Maintenance.MaintenancePmChecklistTasksViewModel
+@{
+    ViewData["Title"] = "Checklist Tasks";
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+        <h2 class="mb-0">@Model.ChecklistName Tasks</h2>
+        <p class="text-muted mb-0 small">@Model.PropertyName &mdash; @(Model.ChecklistType == PreventiveMaintenanceChecklistType.Area ? "Area checklist" : "Room checklist")</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="PmChecklists" asp-route-propertyId="@Model.PropertyId" asp-route-checklistId="@Model.ChecklistId" class="btn btn-outline-secondary btn-sm">Back to Checklists</a>
+    </div>
+</div>
+
+@if (ViewBag.PmChecklistError is string error && !string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-warning">@error</div>
+}
+
+@if (ViewBag.PmChecklistMessage is string message && !string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert alert-success">@message</div>
+}
+
+@if (Model.ChecklistType == PreventiveMaintenanceChecklistType.Area && Model.AreaOptions.Any())
+{
+    <div class="alert alert-info">
+        <strong>Suggested areas:</strong> @string.Join(", ", Model.AreaOptions)
+    </div>
+}
+
+<form asp-action="SaveChecklistTasks" asp-route-checklistId="@Model.ChecklistId" method="post" id="pmSetupForm" class="card">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="propertyId" value="@Model.PropertyId" />
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+            <div>
+                <h5 class="mb-0">Checklist rows</h5>
+                <div class="text-muted small">Drag rows to reorder. Save to keep your changes.</div>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" data-pm-action="add-row" data-position="top">+ Add Row</button>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle table-striped" id="pmTasksTable">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:40px;"></th>
+                        <th>Task</th>
+                        <th>Description</th>
+                        <th class="text-end" style="width:110px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="pmTasksBody">
+                    @if (Model.Tasks.Any())
+                    {
+                        for (var i = 0; i < Model.Tasks.Count; i++)
+                        {
+                            <tr draggable="true" class="pm-task-row">
+                                <td class="text-muted text-center cursor-move">
+                                    <span class="pm-drag-handle" title="Drag to reorder">&#x2630;</span>
+                                </td>
+                                <td>
+                                    <input type="hidden" name="tasks[@i].Id" value="@Model.Tasks[i].Id" />
+                                    <input type="hidden" name="tasks[@i].SortOrder" value="@Model.Tasks[i].SortOrder" />
+                                    <input type="text" class="form-control" name="tasks[@i].Title" value="@Model.Tasks[i].Title" placeholder="Task name" required />
+                                </td>
+                                <td>
+                                    <textarea class="form-control" name="tasks[@i].Description" rows="2" placeholder="Describe what needs to be done">@Model.Tasks[i].Description</textarea>
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-outline-danger btn-sm" data-pm-action="delete-row">Remove</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="text-end mt-3">
+            <button type="submit" class="btn btn-primary">Save Tasks</button>
+        </div>
+    </div>
+</form>
+
+<template id="pmTaskTemplate">
+    <tr draggable="true" class="pm-task-row">
+        <td class="text-muted text-center cursor-move">
+            <span class="pm-drag-handle" title="Drag to reorder">&#x2630;</span>
+        </td>
+        <td>
+            <input type="hidden" name="tasks[#].Id" value="0" />
+            <input type="hidden" name="tasks[#].SortOrder" value="0" />
+            <input type="text" class="form-control" name="tasks[#].Title" placeholder="Task name" required />
+        </td>
+        <td>
+            <textarea class="form-control" name="tasks[#].Description" rows="2" placeholder="Describe what needs to be done"></textarea>
+        </td>
+        <td class="text-end">
+            <button type="button" class="btn btn-outline-danger btn-sm" data-pm-action="delete-row">Remove</button>
+        </td>
+    </tr>
+</template>
+
+@section Scripts {
+    <script>
+        (function () {
+            const tableBody = document.getElementById('pmTasksBody');
+            const rowTemplate = document.getElementById('pmTaskTemplate');
+
+            if (!tableBody || !rowTemplate) {
+                return;
+            }
+
+            function getRows() {
+                return Array.from(tableBody.querySelectorAll('.pm-task-row'));
+            }
+
+            function addRow(position) {
+                const fragment = rowTemplate.content.cloneNode(true);
+                const inputs = fragment.querySelectorAll('input, textarea');
+                const nextIndex = getRows().length;
+                inputs.forEach(input => {
+                    if (input.name?.includes('tasks[#]')) {
+                        input.name = input.name.replace('tasks[#]', `tasks[${nextIndex}]`);
+                    }
+                });
+
+                if (position === 'top') {
+                    tableBody.prepend(fragment);
+                } else {
+                    tableBody.appendChild(fragment);
+                }
+                rebindEvents();
+                updateSortOrders();
+            }
+
+            function deleteRow(button) {
+                const row = button.closest('.pm-task-row');
+                if (!row) {
+                    return;
+                }
+                row.remove();
+                updateInputIndexes();
+            }
+
+            function updateInputIndexes() {
+                const rows = getRows();
+                rows.forEach((row, index) => {
+                    row.querySelectorAll('input[name^="tasks["], textarea[name^="tasks["]').forEach(input => {
+                        input.name = input.name.replace(/tasks\[\d+\]/, `tasks[${index}]`);
+                    });
+                });
+                updateSortOrders();
+            }
+
+            function updateSortOrders() {
+                getRows().forEach((row, index) => {
+                    const sortInput = row.querySelector('input[name$=".SortOrder"]');
+                    if (sortInput) {
+                        sortInput.value = index.toString();
+                    }
+                });
+            }
+
+            function rebindEvents() {
+                document.querySelectorAll('[data-pm-action="delete-row"]').forEach(button => {
+                    button.removeEventListener('click', handleDeleteClick);
+                    button.addEventListener('click', handleDeleteClick);
+                });
+
+                getRows().forEach(row => setupDragHandlers(row));
+            }
+
+            function handleDeleteClick(event) {
+                deleteRow(event.currentTarget);
+            }
+
+            document.querySelectorAll('[data-pm-action="add-row"]').forEach(button => {
+                button.addEventListener('click', () => addRow(button.dataset.position));
+            });
+
+            function setupDragHandlers(row) {
+                if (row.dataset.dragBound === '1') {
+                    return;
+                }
+                row.dataset.dragBound = '1';
+                row.addEventListener('dragstart', (event) => {
+                    event.dataTransfer.effectAllowed = 'move';
+                    row.classList.add('dragging');
+                });
+
+                row.addEventListener('dragend', () => {
+                    row.classList.remove('dragging');
+                    updateInputIndexes();
+                });
+            }
+
+            tableBody.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                const dragging = document.querySelector('.pm-task-row.dragging');
+                const targetRow = event.target.closest('.pm-task-row');
+                if (!dragging || !targetRow || dragging === targetRow) {
+                    return;
+                }
+
+                const bounding = targetRow.getBoundingClientRect();
+                const offset = event.clientY - bounding.top;
+                if (offset > bounding.height / 2) {
+                    targetRow.after(dragging);
+                } else {
+                    targetRow.before(dragging);
+                }
+            });
+
+            rebindEvents();
+            if (getRows().length === 0) {
+                addRow('bottom');
+            }
+        })();
+    </script>
+}

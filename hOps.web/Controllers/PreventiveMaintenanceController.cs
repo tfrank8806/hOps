@@ -80,7 +80,7 @@ namespace hOps.web.Controllers
             var setting = await _db.PreventiveMaintenanceSettings.AsNoTracking().FirstOrDefaultAsync(s => s.PropertyId == propertyId);
             var frequency = setting?.FrequencyPerYear ?? 0;
             var hasChecklist = await _db.PreventiveMaintenanceTasks.AnyAsync(t => t.ChecklistId == selectedChecklist.Id);
-            var areaOptions = ParseAreaOptions(selectedChecklist.AreaOptionsJson);
+            var areaOptions = MaintenanceChecklistHelper.ParseAreaOptions(selectedChecklist.AreaOptionsJson);
 
             var roomOptions = await _db.Rooms
                 .Where(r => r.PropertyId == propertyId && r.IncludeInPreventiveMaintenance)
@@ -254,7 +254,7 @@ namespace hOps.web.Controllers
             }
             else
             {
-                normalizedAreaLabel = NormalizeAreaLabel(request.AreaLabel ?? request.RoomNumber);
+                normalizedAreaLabel = MaintenanceChecklistHelper.NormalizeAreaLabel(request.AreaLabel ?? request.RoomNumber);
                 if (string.IsNullOrWhiteSpace(normalizedAreaLabel))
                 {
                     TempData["PmError"] = "Enter an area label to record a manual PM.";
@@ -474,7 +474,7 @@ namespace hOps.web.Controllers
             }
             else
             {
-                normalizedAreaLabel = NormalizeAreaLabel(request.AreaLabel);
+                normalizedAreaLabel = MaintenanceChecklistHelper.NormalizeAreaLabel(request.AreaLabel);
                 if (string.IsNullOrWhiteSpace(normalizedAreaLabel))
                 {
                     return BadRequest(new { message = "Select or enter an area before starting the PM." });
@@ -896,7 +896,7 @@ namespace hOps.web.Controllers
 
             foreach (var session in sessions)
             {
-                var label = NormalizeAreaLabel(session.AreaLabel ?? session.RoomNumber) ?? "General";
+                var label = MaintenanceChecklistHelper.NormalizeAreaLabel(session.AreaLabel ?? session.RoomNumber) ?? "General";
                 var completedAt = session.CompletedAtUtc ?? session.StartedAtUtc;
 
                 if (!latestLookup.ContainsKey(label))
@@ -920,7 +920,7 @@ namespace hOps.web.Controllers
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var option in configuredAreas ?? Array.Empty<string>())
             {
-                var normalized = NormalizeAreaLabel(option);
+                var normalized = MaintenanceChecklistHelper.NormalizeAreaLabel(option);
                 if (string.IsNullOrWhiteSpace(normalized) || !seen.Add(normalized))
                 {
                     continue;
@@ -1077,44 +1077,6 @@ namespace hOps.web.Controllers
                 .FirstOrDefaultAsync();
         }
 
-        private static List<string> ParseAreaOptions(string? json)
-        {
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                return new List<string>();
-            }
-
-            try
-            {
-                var options = JsonSerializer.Deserialize<List<string>>(json);
-                if (options == null)
-                {
-                    return new List<string>();
-                }
-
-                return options
-                    .Where(o => !string.IsNullOrWhiteSpace(o))
-                    .Select(o => NormalizeAreaLabel(o) ?? string.Empty)
-                    .Where(o => !string.IsNullOrWhiteSpace(o))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-            }
-            catch
-            {
-                return new List<string>();
-            }
-        }
-
-        private static string? NormalizeAreaLabel(string? label)
-        {
-            if (string.IsNullOrWhiteSpace(label))
-            {
-                return null;
-            }
-
-            var trimmed = label.Trim();
-            return trimmed.Length > 160 ? trimmed[..160] : trimmed;
-        }
         private static PreventiveMaintenanceActiveSessionViewModel BuildActiveSessionViewModel(PreventiveMaintenanceSession session, DateTime asOfUtc)
         {
             return new PreventiveMaintenanceActiveSessionViewModel

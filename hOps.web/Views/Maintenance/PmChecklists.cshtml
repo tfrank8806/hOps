@@ -1,0 +1,189 @@
+@model hOps.web.ViewModels.Maintenance.MaintenancePmChecklistsPageViewModel
+@{
+    ViewData["Title"] = "PM Checklists";
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+        <h2 class="mb-0">Preventive Maintenance Checklists</h2>
+        <p class="text-muted mb-0 small">Create and organize reusable PM templates for each property.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-controller="Maintenance" asp-action="RedirectToPms" asp-route-checklistId="@Model.ChecklistEditor?.Id" class="btn btn-outline-secondary btn-sm">Back to PMs</a>
+    </div>
+</div>
+
+@if (ViewBag.PmChecklistError is string error && !string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-warning">@error</div>
+}
+
+@if (ViewBag.PmChecklistMessage is string message && !string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert alert-success">@message</div>
+}
+
+@if (Model.AccessibleProperties.Count > 1)
+{
+    <form method="get" asp-action="PmChecklists" class="mb-4">
+        <label for="propertySelect" class="form-label">Property</label>
+        <select class="form-select" id="propertySelect" name="propertyId" onchange="this.form.submit()">
+            @foreach (var property in Model.AccessibleProperties)
+            {
+                <option value="@property.Id" selected="@(property.Id == Model.PropertyId ? "selected" : null)">@property.Name (@property.Code)</option>
+            }
+        </select>
+        @if (Model.ChecklistEditor?.Id is int editorChecklistId)
+        {
+            <input type="hidden" name="checklistId" value="@editorChecklistId" />
+        }
+    </form>
+}
+
+<div class="row gy-4">
+    <div class="col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <strong>@(Model.ChecklistEditor?.Id.HasValue == true ? "Edit Checklist" : "Create Checklist")</strong>
+            </div>
+            <div class="card-body">
+                <form asp-action="SaveChecklist" method="post" class="vstack gap-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="PropertyId" value="@Model.PropertyId" />
+                    <input type="hidden" name="Id" value="@(Model.ChecklistEditor?.Id)" />
+                    <div>
+                        <label asp-for="ChecklistEditor.Name" class="form-label">Checklist name</label>
+                        <input asp-for="ChecklistEditor.Name" name="Name" class="form-control" maxlength="160" required />
+                        <span asp-validation-for="ChecklistEditor.Name" class="text-danger small"></span>
+                    </div>
+                    <div>
+                        <label asp-for="ChecklistEditor.ChecklistType" class="form-label">Checklist type</label>
+                        <select class="form-select" name="ChecklistType" id="checklistTypeSelect" @(Model.ChecklistEditor?.CanChangeType == false ? "disabled" : null)>
+                            <option value="Room" selected="@(Model.ChecklistEditor?.ChecklistType == PreventiveMaintenanceChecklistType.Room ? "selected" : null)">Room-based</option>
+                            <option value="Area" selected="@(Model.ChecklistEditor?.ChecklistType == PreventiveMaintenanceChecklistType.Area ? "selected" : null)">Area-based</option>
+                        </select>
+                        @if (Model.ChecklistEditor?.CanChangeType == false)
+                        {
+                            <div class="form-text text-warning">Checklist type can’t be changed because sessions already exist.</div>
+                        }
+                    </div>
+                    <div id="areaOptionsWrapper">
+                        <label class="form-label">Suggested areas</label>
+                        <textarea class="form-control" name="AreaOptionsText" id="areaOptionsText" rows="4" placeholder="e.g. Kitchen&#10;Laundry&#10;Patio">@Model.ChecklistEditor?.AreaOptionsText</textarea>
+                        <div class="form-text">Enter one area per line or separate using commas.</div>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="IsActive" value="true" id="checklistActive" @(Model.ChecklistEditor?.IsActive != false ? "checked" : null) />
+                        <label class="form-check-label" for="checklistActive">Checklist is active</label>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">@((Model.ChecklistEditor?.Id.HasValue ?? false) ? "Save Changes" : "Create Checklist")</button>
+                        @if (Model.ChecklistEditor?.Id.HasValue == true)
+                        {
+                            <a asp-action="PmChecklists" asp-route-propertyId="@Model.PropertyId" class="btn btn-outline-secondary">Start New</a>
+                        }
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Checklists</strong>
+                <span class="text-muted small">@Model.Checklists.Count @((Model.Checklists.Count == 1) ? "checklist" : "checklists")</span>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.Checklists.Any())
+                {
+                    <div class="p-4 text-center text-muted">No checklists yet. Use the form to create one.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Tasks</th>
+                                    <th>Sessions</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var checklist in Model.Checklists)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@checklist.Name</div>
+                                            @if (checklist.ChecklistType == PreventiveMaintenanceChecklistType.Area && checklist.AreaOptions.Any())
+                                            {
+                                                <div class="text-muted small">Areas: @string.Join(", ", checklist.AreaOptions)</div>
+                                            }
+                                        </td>
+                                        <td>@(checklist.ChecklistType == PreventiveMaintenanceChecklistType.Area ? "Area" : "Room")</td>
+                                        <td>@checklist.TaskCount</td>
+                                        <td>@checklist.SessionCount</td>
+                                        <td>
+                                            @if (checklist.IsActive)
+                                            {
+                                                <span class="badge bg-success">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="btn-group btn-group-sm">
+                                                <a asp-action="PmChecklists" asp-route-propertyId="@Model.PropertyId" asp-route-checklistId="@checklist.Id" class="btn btn-outline-secondary">Edit</a>
+                                                <a asp-action="ChecklistTasks" asp-route-checklistId="@checklist.Id" asp-route-propertyId="@Model.PropertyId" class="btn btn-outline-primary">Tasks</a>
+                                                <form asp-action="ToggleChecklist" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="propertyId" value="@Model.PropertyId" />
+                                                    <input type="hidden" name="isActive" value="@(!checklist.IsActive)" />
+                                                    <input type="hidden" name="id" value="@checklist.Id" />
+                                                    <button type="submit" class="btn btn-outline-secondary">@((checklist.IsActive ? "Deactivate" : "Activate"))</button>
+                                                </form>
+                                                <form asp-action="DeleteChecklist" method="post" class="d-inline" onsubmit="return confirm('Delete this checklist? This cannot be undone.');">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="propertyId" value="@Model.PropertyId" />
+                                                    <input type="hidden" name="id" value="@checklist.Id" />
+                                                    <button type="submit" class="btn btn-outline-danger">Delete</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            const typeSelect = document.getElementById('checklistTypeSelect');
+            const areaWrapper = document.getElementById('areaOptionsWrapper');
+
+            function syncAreaVisibility() {
+                if (!typeSelect || !areaWrapper) {
+                    return;
+                }
+                areaWrapper.hidden = typeSelect.value !== 'Area';
+            }
+
+            if (typeSelect) {
+                typeSelect.addEventListener('change', syncAreaVisibility);
+                syncAreaVisibility();
+            }
+        })();
+    </script>
+}
