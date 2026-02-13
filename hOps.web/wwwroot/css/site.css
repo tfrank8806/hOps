@@ -2208,14 +2208,10 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 
 .modal.fade .modal-dialog {
-
-    margin-top: 4rem;
-
+    margin-top: calc(var(--main-header-height, 72px) + 1.5rem);
 }
 
 #allBookmarksModal .modal-dialog {
-
-    margin-top: 5.5rem;
-
+    margin-top: calc(var(--main-header-height, 72px) + 3rem);
 }
 
