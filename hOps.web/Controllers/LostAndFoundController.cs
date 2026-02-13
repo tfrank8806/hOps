@@ -127,8 +127,8 @@ namespace hOps.web.Controllers
                     PropertyId = propertyId,
                     Type = submission.Type,
                     Status = LostFoundStatus.Logged,
-                    DateFound = submission.Type == LostFoundType.Found ? submission.DateFound : null,
-                    DateReportedLost = submission.Type == LostFoundType.Lost ? submission.DateReportedLost : null,
+                    DateFound = submission.Type == LostFoundType.Found ? NormalizeDateToUtc(submission.DateFound) : null,
+                    DateReportedLost = submission.Type == LostFoundType.Lost ? NormalizeDateToUtc(submission.DateReportedLost) : null,
                     FoundBy = submission.Type == LostFoundType.Found ? submission.FoundBy?.Trim() : null,
                     GuestName = submission.Type == LostFoundType.Lost ? submission.GuestName?.Trim() : null,
                     GuestPhone = submission.Type == LostFoundType.Lost ? submission.GuestPhone?.Trim() : null,
@@ -308,7 +308,7 @@ namespace hOps.web.Controllers
                     return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
                 }
 
-                entry.DateFound = input.DateFound;
+                entry.DateFound = NormalizeDateToUtc(input.DateFound);
                 entry.ItemFound = input.ItemFound?.Trim();
                 entry.FoundBy = string.IsNullOrWhiteSpace(input.FoundBy) ? null : input.FoundBy.Trim();
                 entry.Stored = string.IsNullOrWhiteSpace(input.Stored) ? null : input.Stored.Trim();
@@ -332,7 +332,7 @@ namespace hOps.web.Controllers
                     return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
                 }
 
-                entry.DateReportedLost = input.DateReportedLost;
+                entry.DateReportedLost = NormalizeDateToUtc(input.DateReportedLost);
                 entry.ItemLost = input.ItemLost?.Trim();
                 entry.GuestName = string.IsNullOrWhiteSpace(input.GuestName) ? null : input.GuestName.Trim();
                 entry.GuestPhone = string.IsNullOrWhiteSpace(input.GuestPhone) ? null : input.GuestPhone.Trim();
@@ -724,6 +724,22 @@ namespace hOps.web.Controllers
                 counterpart.MatchedEntryId = null;
                 _context.LostFoundEntries.Update(counterpart);
             }
+        }
+
+        private static DateTime? NormalizeDateToUtc(DateTime? value)
+        {
+            if (!value.HasValue)
+            {
+                return null;
+            }
+
+            var date = value.Value;
+            return date.Kind switch
+            {
+                DateTimeKind.Utc => date,
+                DateTimeKind.Local => date.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(date, DateTimeKind.Utc)
+            };
         }
     }
 }
