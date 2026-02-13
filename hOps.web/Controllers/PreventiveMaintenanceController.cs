@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Text.Json;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
@@ -38,7 +39,10 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index()
+        [Route("PreventiveMaintenance")]
+        [Route("PreventiveMaintenance/Index")]
+        [Route("Maintenance/PMs")]
+        public async Task<IActionResult> Index(int? checklistId = null)
         {
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
@@ -54,9 +58,29 @@ namespace hOps.web.Controllers
             }
 
             var propertyId = property.Id;
+
+            var checklistEntities = await _db.PreventiveMaintenanceChecklists
+                .Where(c => c.PropertyId == propertyId)
+                .OrderByDescending(c => c.IsActive)
+                .ThenBy(c => c.Name)
+                .ToListAsync();
+
+            var activeChecklists = checklistEntities.Where(c => c.IsActive).ToList();
+            var selectionPool = activeChecklists.Any() ? activeChecklists : checklistEntities;
+            var selectedChecklist = checklistId.HasValue
+                ? selectionPool.FirstOrDefault(c => c.Id == checklistId.Value)
+                : selectionPool.FirstOrDefault();
+
+            if (selectedChecklist == null)
+            {
+                TempData["PmSetupError"] = "Set up a checklist before starting Preventive Maintenance.";
+                return RedirectToAction("Index", "Home");
+            }
+
             var setting = await _db.PreventiveMaintenanceSettings.AsNoTracking().FirstOrDefaultAsync(s => s.PropertyId == propertyId);
             var frequency = setting?.FrequencyPerYear ?? 0;
-            var hasChecklist = await _db.PreventiveMaintenanceTasks.AnyAsync(t => t.PropertyId == propertyId);
+            var hasChecklist = await _db.PreventiveMaintenanceTasks.AnyAsync(t => t.ChecklistId == selectedChecklist.Id);
+            var areaOptions = ParseAreaOptions(selectedChecklist.AreaOptionsJson);
 
             var roomOptions = await _db.Rooms
                 .Where(r => r.PropertyId == propertyId && r.IncludeInPreventiveMaintenance)
@@ -71,6 +95,7 @@ namespace hOps.web.Controllers
             var activeSession = await _db.PreventiveMaintenanceSessions
                 .Include(s => s.Tasks)
                 .Include(s => s.Room)
+                .Include(s => s.Checklist)
                 .Where(s => s.PropertyId == propertyId &&
                             s.CreatedById == user.Id &&
                             s.Status != PreventiveMaintenanceSessionStatus.Completed &&
@@ -88,16 +113,40 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
-            var roomLogs = await BuildRoomLogsAsync(propertyId, frequency, cycleWindows);
+            var roomLogs = selectedChecklist.ChecklistType == PreventiveMaintenanceChecklistType.Room
+                ? await BuildRoomLogsAsync(propertyId, selectedChecklist.Id, frequency, cycleWindows)
+                : new List<PreventiveMaintenanceRoomLogViewModel>();
+            var areaLogs = selectedChecklist.ChecklistType == PreventiveMaintenanceChecklistType.Area
+                ? await BuildAreaLogsAsync(propertyId, selectedChecklist.Id, areaOptions, frequency, cycleWindows)
+                : new List<PreventiveMaintenanceAreaLogViewModel>();
+
+            var checklistOptionsSource = selectionPool.Any()
+                ? selectionPool
+                : new List<PreventiveMaintenanceChecklist> { selectedChecklist };
+            var checklistOptions = checklistOptionsSource
+                .Select(c => new PreventiveMaintenanceChecklistOptionViewModel
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    ChecklistType = c.ChecklistType,
+                    IsActive = c.IsActive
+                })
+                .ToList();
 
             var viewModel = new PreventiveMaintenanceIndexViewModel
             {
                 PropertyId = propertyId,
                 PropertyName = property.Name,
                 FrequencyPerYear = frequency,
-                RoomOptions = roomOptions,
                 HasChecklist = hasChecklist,
+                SelectedChecklistId = selectedChecklist.Id,
+                SelectedChecklistName = selectedChecklist.Name,
+                SelectedChecklistType = selectedChecklist.ChecklistType,
+                Checklists = checklistOptions,
+                AreaOptions = areaOptions,
+                RoomOptions = roomOptions,
                 RoomLogs = roomLogs,
+                AreaLogs = areaLogs,
                 ActiveSession = activeSession != null
                     ? BuildActiveSessionViewModel(activeSession, DateTime.UtcNow)
                     : null,
@@ -130,6 +179,7 @@ namespace hOps.web.Controllers
             var session = await _db.PreventiveMaintenanceSessions
                 .Include(s => s.Tasks)
                 .Include(s => s.Room)
+                .Include(s => s.Checklist)
                 .Where(s => s.PropertyId == property.Id &&
                             s.CreatedById == user.Id &&
                             s.Status != PreventiveMaintenanceSessionStatus.Completed &&
@@ -171,25 +221,52 @@ namespace hOps.web.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            Room? selectedRoom = null;
-            string roomNumber = request.RoomNumber?.Trim() ?? string.Empty;
-            if (request.RoomId.HasValue)
+            var checklist = await GetChecklistForPropertyAsync(property.Id, request.ChecklistId);
+            if (checklist == null)
             {
-                selectedRoom = await _db.Rooms
-                    .FirstOrDefaultAsync(r => r.Id == request.RoomId.Value && r.PropertyId == property.Id && r.IncludeInPreventiveMaintenance);
-                if (selectedRoom == null)
-                {
-                    TempData["PmError"] = "The selected room is not available for PMs at this property.";
-                    return RedirectToAction(nameof(Index));
-                }
-
-                roomNumber = selectedRoom.RoomNumber ?? roomNumber;
+                TempData["PmError"] = "Select a checklist before recording a manual PM.";
+                return RedirectToAction(nameof(Index));
             }
 
-            if (string.IsNullOrWhiteSpace(roomNumber))
+            Room? selectedRoom = null;
+            string roomNumber = request.RoomNumber?.Trim() ?? string.Empty;
+            string? normalizedAreaLabel = null;
+            if (checklist.ChecklistType == PreventiveMaintenanceChecklistType.Room)
             {
-                TempData["PmError"] = "Enter a room number to record a manual PM.";
-                return RedirectToAction(nameof(Index));
+                if (request.RoomId.HasValue)
+                {
+                    selectedRoom = await _db.Rooms
+                        .FirstOrDefaultAsync(r => r.Id == request.RoomId.Value && r.PropertyId == property.Id && r.IncludeInPreventiveMaintenance);
+                    if (selectedRoom == null)
+                    {
+                        TempData["PmError"] = "The selected room is not available for PMs at this property.";
+                        return RedirectToAction(nameof(Index), new { checklistId = checklist.Id });
+                    }
+
+                    roomNumber = selectedRoom.RoomNumber ?? roomNumber;
+                }
+
+                if (string.IsNullOrWhiteSpace(roomNumber))
+                {
+                    TempData["PmError"] = "Enter a room number to record a manual PM.";
+                    return RedirectToAction(nameof(Index), new { checklistId = checklist.Id });
+                }
+            }
+            else
+            {
+                normalizedAreaLabel = NormalizeAreaLabel(request.AreaLabel ?? request.RoomNumber);
+                if (string.IsNullOrWhiteSpace(normalizedAreaLabel))
+                {
+                    TempData["PmError"] = "Enter an area label to record a manual PM.";
+                    return RedirectToAction(nameof(Index), new { checklistId = checklist.Id });
+                }
+
+                roomNumber = normalizedAreaLabel.Length > 32 ? normalizedAreaLabel[..32] : normalizedAreaLabel;
+            }
+
+            if (roomNumber.Length > 32)
+            {
+                roomNumber = roomNumber[..32];
             }
 
             var timeZone = _timeZoneService.GetTimeZone();
@@ -208,8 +285,10 @@ namespace hOps.web.Controllers
             var session = new PreventiveMaintenanceSession
             {
                 PropertyId = property.Id,
+                ChecklistId = checklist.Id,
                 RoomId = selectedRoom?.Id,
                 RoomNumber = roomNumber,
+                AreaLabel = normalizedAreaLabel,
                 CreatedById = user.Id,
                 StartedAtUtc = startedUtc,
                 Status = PreventiveMaintenanceSessionStatus.Completed,
@@ -223,8 +302,9 @@ namespace hOps.web.Controllers
             await _db.SaveChangesAsync();
 
             TempData["PmMessage"] = $"Recorded a manual PM for {roomNumber}.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { checklistId = checklist.Id });
         }
+
 
         [HttpGet]
         public async Task<IActionResult> Archive(int? year = null)
@@ -330,7 +410,7 @@ namespace hOps.web.Controllers
             return View("Archive", archiveModel);
         }
 
-        [HttpPost]
+                [HttpPost]
         [Consumes("application/json")]
         public async Task<IActionResult> StartSession([FromBody] PmSessionStartRequest request)
         {
@@ -352,10 +432,10 @@ namespace hOps.web.Controllers
             }
 
             var propertyId = property.Id;
-            var hasChecklist = await _db.PreventiveMaintenanceTasks.AnyAsync(t => t.PropertyId == propertyId);
-            if (!hasChecklist)
+            var checklist = await GetChecklistForPropertyAsync(propertyId, request.ChecklistId);
+            if (checklist == null || !checklist.IsActive)
             {
-                return BadRequest(new { message = "Set up the PM checklist before starting a session." });
+                return BadRequest(new { message = "Select a checklist before starting the PM." });
             }
 
             var existingActive = await _db.PreventiveMaintenanceSessions
@@ -369,23 +449,39 @@ namespace hOps.web.Controllers
             }
 
             Room? selectedRoom = null;
+            string? normalizedAreaLabel = null;
             string roomNumber = request.RoomNumber?.Trim() ?? string.Empty;
-            if (request.RoomId.HasValue && request.RoomId.Value > 0)
+
+            if (checklist.ChecklistType == PreventiveMaintenanceChecklistType.Room)
             {
-                selectedRoom = await _db.Rooms.FirstOrDefaultAsync(r => r.Id == request.RoomId.Value && r.PropertyId == propertyId);
-                if (selectedRoom == null)
+                if (request.RoomId.HasValue && request.RoomId.Value > 0)
                 {
-                    return BadRequest(new { message = "The selected room is not available for this property." });
+                    selectedRoom = await _db.Rooms.FirstOrDefaultAsync(r => r.Id == request.RoomId.Value && r.PropertyId == propertyId);
+                    if (selectedRoom == null)
+                    {
+                        return BadRequest(new { message = "The selected room is not available for this property." });
+                    }
+
+                    roomNumber = selectedRoom.RoomNumber ?? $"Room {selectedRoom.Id}";
                 }
 
-                roomNumber = selectedRoom.RoomNumber ?? $"Room {selectedRoom.Id}";
-            }
+                if (string.IsNullOrWhiteSpace(roomNumber))
+                {
+                    return BadRequest(new { message = "Enter a room number to start the PM." });
+                }
 
-            if (string.IsNullOrWhiteSpace(roomNumber))
-            {
-                return BadRequest(new { message = "Enter a room number to start the PM." });
+                roomNumber = roomNumber.Length > 32 ? roomNumber[..32] : roomNumber;
             }
-            roomNumber = roomNumber.Length > 32 ? roomNumber[..32] : roomNumber;
+            else
+            {
+                normalizedAreaLabel = NormalizeAreaLabel(request.AreaLabel);
+                if (string.IsNullOrWhiteSpace(normalizedAreaLabel))
+                {
+                    return BadRequest(new { message = "Select or enter an area before starting the PM." });
+                }
+
+                roomNumber = normalizedAreaLabel.Length > 32 ? normalizedAreaLabel[..32] : normalizedAreaLabel;
+            }
 
             var startUtc = DateTime.SpecifyKind(request.StartedAtUtc, DateTimeKind.Utc);
             var nowUtc = DateTime.UtcNow;
@@ -395,7 +491,7 @@ namespace hOps.web.Controllers
             }
 
             var tasks = await _db.PreventiveMaintenanceTasks
-                .Where(t => t.PropertyId == propertyId)
+                .Where(t => t.ChecklistId == checklist.Id)
                 .OrderBy(t => t.SortOrder)
                 .ThenBy(t => t.Id)
                 .ToListAsync();
@@ -408,34 +504,43 @@ namespace hOps.web.Controllers
             var session = new PreventiveMaintenanceSession
             {
                 PropertyId = propertyId,
+                ChecklistId = checklist.Id,
                 RoomId = selectedRoom?.Id,
                 RoomNumber = roomNumber,
+                AreaLabel = normalizedAreaLabel,
                 CreatedById = user.Id,
                 StartedAtUtc = startUtc,
                 Status = PreventiveMaintenanceSessionStatus.InProgress,
                 LastResumedAtUtc = startUtc,
-                LastSavedAtUtc = nowUtc
+                Room = selectedRoom,
+                Checklist = checklist,
+                CreatedBy = user
             };
-
-            foreach (var template in tasks)
-            {
-                session.Tasks.Add(new PreventiveMaintenanceSessionTask
-                {
-                    TemplateTaskId = template.Id,
-                    TaskName = template.Name,
-                    TaskDescription = template.Description,
-                    SortOrder = template.SortOrder
-                });
-            }
 
             _db.PreventiveMaintenanceSessions.Add(session);
             await _db.SaveChangesAsync();
 
+            var createdTasks = tasks.Select((task, index) => new PreventiveMaintenanceSessionTask
+            {
+                SessionId = session.Id,
+                TemplateTaskId = task.Id,
+                TaskName = task.Name,
+                TaskDescription = task.Description,
+                SortOrder = index,
+                Status = PreventiveMaintenanceTaskStatus.NotStarted
+            }).ToList();
+
+            _db.PreventiveMaintenanceSessionTasks.AddRange(createdTasks);
+
+            session.Tasks = createdTasks.ToList();
+            await _db.SaveChangesAsync();
+
             return Ok(new
             {
-                session = BuildSessionDto(session, nowUtc)
+                session = BuildSessionDto(session, DateTime.UtcNow)
             });
         }
+
 
         [HttpPost]
         [Consumes("application/json")]
@@ -460,6 +565,7 @@ namespace hOps.web.Controllers
 
             var session = await _db.PreventiveMaintenanceSessions
                 .Include(s => s.Tasks)
+                .Include(s => s.Checklist)
                 .FirstOrDefaultAsync(s => s.Id == request.SessionId &&
                                           s.PropertyId == property.Id &&
                                           s.CreatedById == user.Id);
@@ -532,6 +638,7 @@ namespace hOps.web.Controllers
 
             var session = await _db.PreventiveMaintenanceSessions
                 .Include(s => s.Tasks)
+                .Include(s => s.Checklist)
                 .FirstOrDefaultAsync(s => s.Id == request.SessionId &&
                                           s.PropertyId == property.Id &&
                                           s.CreatedById == user.Id);
@@ -592,6 +699,7 @@ namespace hOps.web.Controllers
 
             var session = await _db.PreventiveMaintenanceSessions
                 .Include(s => s.Tasks)
+                .Include(s => s.Checklist)
                 .FirstOrDefaultAsync(s => s.Id == request.SessionId &&
                                           s.PropertyId == property.Id &&
                                           s.CreatedById == user.Id);
@@ -657,7 +765,7 @@ namespace hOps.web.Controllers
                         CreatedAt = DateTime.UtcNow,
                         DueDate = DateTime.UtcNow.Date.AddDays(1),
                         CreatedById = user.Id,
-                        Location = session.RoomNumber
+                        Location = session.AreaLabel ?? session.RoomNumber
                     };
 
                     workOrder.Properties.Add(new WorkOrderProperty
@@ -681,9 +789,10 @@ namespace hOps.web.Controllers
 
         private static string BuildIssueDetails(PreventiveMaintenanceSession session, PreventiveMaintenanceSessionTask task)
         {
+            var location = session.AreaLabel ?? session.Room?.RoomNumber ?? session.RoomNumber;
             var parts = new List<string>
             {
-                $"Room: {session.RoomNumber}",
+                $"Location: {location}",
                 $"Task: {task.TaskName}"
             };
 
@@ -700,7 +809,7 @@ namespace hOps.web.Controllers
             return string.Join(Environment.NewLine, parts);
         }
 
-        private async Task<List<PreventiveMaintenanceRoomLogViewModel>> BuildRoomLogsAsync(int propertyId, int frequencyPerYear, IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows)
+        private async Task<List<PreventiveMaintenanceRoomLogViewModel>> BuildRoomLogsAsync(int propertyId, int checklistId, int frequencyPerYear, IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows)
         {
             var rooms = await _db.Rooms
                 .Where(r => r.PropertyId == propertyId && r.IncludeInPreventiveMaintenance)
@@ -709,7 +818,9 @@ namespace hOps.web.Controllers
 
             var sessions = await _db.PreventiveMaintenanceSessions
                 .Include(s => s.CompletedBy)
-                .Where(s => s.PropertyId == propertyId && s.Status == PreventiveMaintenanceSessionStatus.Completed)
+                .Where(s => s.PropertyId == propertyId &&
+                            s.ChecklistId == checklistId &&
+                            s.Status == PreventiveMaintenanceSessionStatus.Completed)
                 .OrderByDescending(s => s.CompletedAtUtc)
                 .ToListAsync();
 
@@ -764,6 +875,107 @@ namespace hOps.web.Controllers
                 .OrderBy(l => l.RoomNumber, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
+
+        private async Task<List<PreventiveMaintenanceAreaLogViewModel>> BuildAreaLogsAsync(
+            int propertyId,
+            int checklistId,
+            IReadOnlyList<string> configuredAreas,
+            int frequencyPerYear,
+            IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows)
+        {
+            var sessions = await _db.PreventiveMaintenanceSessions
+                .Include(s => s.CompletedBy)
+                .Where(s => s.PropertyId == propertyId &&
+                            s.ChecklistId == checklistId &&
+                            s.Status == PreventiveMaintenanceSessionStatus.Completed)
+                .OrderByDescending(s => s.CompletedAtUtc)
+                .ToListAsync();
+
+            var latestLookup = new Dictionary<string, PreventiveMaintenanceSession>(StringComparer.OrdinalIgnoreCase);
+            var completionHistory = new Dictionary<string, List<DateTime>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var session in sessions)
+            {
+                var label = NormalizeAreaLabel(session.AreaLabel ?? session.RoomNumber) ?? "General";
+                var completedAt = session.CompletedAtUtc ?? session.StartedAtUtc;
+
+                if (!latestLookup.ContainsKey(label))
+                {
+                    latestLookup[label] = session;
+                }
+
+                if (!completionHistory.TryGetValue(label, out var history))
+                {
+                    history = new List<DateTime>();
+                    completionHistory[label] = history;
+                }
+
+                if (completedAt != DateTime.MinValue)
+                {
+                    history.Add(completedAt);
+                }
+            }
+
+            var labels = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var option in configuredAreas ?? Array.Empty<string>())
+            {
+                var normalized = NormalizeAreaLabel(option);
+                if (string.IsNullOrWhiteSpace(normalized) || !seen.Add(normalized))
+                {
+                    continue;
+                }
+
+                labels.Add(normalized);
+            }
+
+            foreach (var label in latestLookup.Keys)
+            {
+                if (seen.Add(label))
+                {
+                    labels.Add(label);
+                }
+            }
+
+            if (labels.Count == 0)
+            {
+                labels.Add("General");
+            }
+
+            var areaLogs = new List<PreventiveMaintenanceAreaLogViewModel>();
+            for (var i = 0; i < labels.Count; i++)
+            {
+                var label = labels[i];
+                latestLookup.TryGetValue(label, out var session);
+                completionHistory.TryGetValue(label, out var history);
+                areaLogs.Add(BuildAreaLog(label, session, frequencyPerYear, i, cycleWindows, history));
+            }
+
+            return areaLogs;
+        }
+
+        private PreventiveMaintenanceAreaLogViewModel BuildAreaLog(
+            string label,
+            PreventiveMaintenanceSession? session,
+            int frequencyPerYear,
+            int areaIndex,
+            IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows,
+            List<DateTime>? completionHistory)
+        {
+            var roomLog = BuildRoomLog(null, label, session, frequencyPerYear, areaIndex, cycleWindows, completionHistory);
+            return new PreventiveMaintenanceAreaLogViewModel
+            {
+                AreaLabel = roomLog.RoomNumber,
+                LastCompletedAtUtc = roomLog.LastCompletedAtUtc,
+                LastDurationSeconds = roomLog.LastDurationSeconds,
+                IsDue = roomLog.IsDue,
+                IsOverdue = roomLog.IsOverdue,
+                NextDueAtUtc = roomLog.NextDueAtUtc,
+                CompletedByName = roomLog.CompletedByName,
+                CycleStatuses = roomLog.CycleStatuses
+            };
+        }
+
 
         private static PreventiveMaintenanceRoomLogViewModel BuildRoomLog(int? roomId, string? roomNumber, PreventiveMaintenanceSession? session, int frequencyPerYear, int roomIndex, IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows, List<DateTime>? completionHistory)
         {
@@ -837,13 +1049,83 @@ namespace hOps.web.Controllers
             return log;
         }
 
+        
+        private async Task<PreventiveMaintenanceChecklist?> GetChecklistForPropertyAsync(int propertyId, int? checklistId)
+        {
+            if (checklistId.HasValue && checklistId.Value > 0)
+            {
+                var explicitChecklist = await _db.PreventiveMaintenanceChecklists
+                    .FirstOrDefaultAsync(c => c.PropertyId == propertyId && c.Id == checklistId.Value);
+                if (explicitChecklist != null)
+                {
+                    return explicitChecklist;
+                }
+            }
+
+            var activeChecklist = await _db.PreventiveMaintenanceChecklists
+                .Where(c => c.PropertyId == propertyId && c.IsActive)
+                .OrderBy(c => c.Name)
+                .FirstOrDefaultAsync();
+            if (activeChecklist != null)
+            {
+                return activeChecklist;
+            }
+
+            return await _db.PreventiveMaintenanceChecklists
+                .Where(c => c.PropertyId == propertyId)
+                .OrderBy(c => c.Name)
+                .FirstOrDefaultAsync();
+        }
+
+        private static List<string> ParseAreaOptions(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return new List<string>();
+            }
+
+            try
+            {
+                var options = JsonSerializer.Deserialize<List<string>>(json);
+                if (options == null)
+                {
+                    return new List<string>();
+                }
+
+                return options
+                    .Where(o => !string.IsNullOrWhiteSpace(o))
+                    .Select(o => NormalizeAreaLabel(o) ?? string.Empty)
+                    .Where(o => !string.IsNullOrWhiteSpace(o))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+            catch
+            {
+                return new List<string>();
+            }
+        }
+
+        private static string? NormalizeAreaLabel(string? label)
+        {
+            if (string.IsNullOrWhiteSpace(label))
+            {
+                return null;
+            }
+
+            var trimmed = label.Trim();
+            return trimmed.Length > 160 ? trimmed[..160] : trimmed;
+        }
         private static PreventiveMaintenanceActiveSessionViewModel BuildActiveSessionViewModel(PreventiveMaintenanceSession session, DateTime asOfUtc)
         {
             return new PreventiveMaintenanceActiveSessionViewModel
             {
                 SessionId = session.Id,
+                ChecklistId = session.ChecklistId,
+                ChecklistName = session.Checklist?.Name ?? "Checklist",
+                ChecklistType = session.Checklist?.ChecklistType ?? PreventiveMaintenanceChecklistType.Room,
                 RoomNumber = session.RoomNumber,
                 RoomLabel = session.Room?.RoomNumber ?? session.RoomNumber,
+                AreaLabel = session.AreaLabel,
                 StartedAtUtc = session.StartedAtUtc,
                 Status = session.Status,
                 TotalDurationSeconds = GetEffectiveDurationSeconds(session, asOfUtc),
@@ -862,11 +1144,16 @@ namespace hOps.web.Controllers
             };
         }
 
-        private static object BuildSessionDto(PreventiveMaintenanceSession session, DateTime asOfUtc)
+
+                private static object BuildSessionDto(PreventiveMaintenanceSession session, DateTime asOfUtc)
         {
             return new
             {
                 id = session.Id,
+                checklistId = session.ChecklistId,
+                checklistName = session.Checklist?.Name,
+                checklistType = (session.Checklist?.ChecklistType ?? PreventiveMaintenanceChecklistType.Room).ToString(),
+                areaLabel = session.AreaLabel,
                 roomNumber = session.RoomNumber,
                 roomLabel = session.Room?.RoomNumber ?? session.RoomNumber,
                 status = session.Status.ToString(),
@@ -885,6 +1172,7 @@ namespace hOps.web.Controllers
                     })
             };
         }
+
 
         private static double GetEffectiveDurationSeconds(PreventiveMaintenanceSession session, DateTime asOfUtc)
         {

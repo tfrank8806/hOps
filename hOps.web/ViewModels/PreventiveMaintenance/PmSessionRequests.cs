@@ -9,9 +9,15 @@ namespace hOps.web.ViewModels.PreventiveMaintenance
     public class PmSessionStartRequest
     {
         [Required]
+        public int ChecklistId { get; set; }
+
+        [Required]
         public string RoomNumber { get; set; } = string.Empty;
 
         public int? RoomId { get; set; }
+
+        [MaxLength(160)]
+        public string? AreaLabel { get; set; }
 
         [Required]
         public DateTime StartedAtUtc { get; set; }
