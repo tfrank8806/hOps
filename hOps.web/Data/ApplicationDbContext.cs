@@ -70,6 +70,7 @@ namespace hOps.web.Data
         public DbSet<ScheduleAssignment> ScheduleAssignments { get; set; }
         public DbSet<ScheduleTimeOffRequest> ScheduleTimeOffRequests { get; set; }
         public DbSet<PreventiveMaintenanceSetting> PreventiveMaintenanceSettings { get; set; }
+        public DbSet<PreventiveMaintenanceChecklist> PreventiveMaintenanceChecklists { get; set; }
         public DbSet<PreventiveMaintenanceTask> PreventiveMaintenanceTasks { get; set; }
         public DbSet<PreventiveMaintenanceSession> PreventiveMaintenanceSessions { get; set; }
         public DbSet<PreventiveMaintenanceSessionTask> PreventiveMaintenanceSessionTasks { get; set; }
@@ -78,6 +79,10 @@ namespace hOps.web.Data
         public DbSet<DeepCleanChecklistItem> DeepCleanChecklistItems { get; set; }
         public DbSet<DeepCleanSession> DeepCleanSessions { get; set; }
         public DbSet<DeepCleanSessionTask> DeepCleanSessionTasks { get; set; }
+
+        public DbSet<EquipmentItem> EquipmentItems { get; set; }
+        public DbSet<MaintenanceLogTemplate> MaintenanceLogTemplates { get; set; }
+        public DbSet<MaintenanceLogEntry> MaintenanceLogEntries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -181,6 +186,12 @@ namespace hOps.web.Data
                 .WithOne(wp => wp.WorkOrder)
                 .HasForeignKey(wp => wp.WorkOrderId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<WorkOrder>()
+                .HasOne(wo => wo.EquipmentItem)
+                .WithMany()
+                .HasForeignKey(wo => wo.EquipmentItemId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             builder.Entity<WorkOrderProperty>()
                 .HasOne(wp => wp.WorkOrder)
@@ -715,6 +726,32 @@ namespace hOps.web.Data
                 .HasIndex(s => s.PropertyId)
                 .IsUnique();
 
+            builder.Entity<PreventiveMaintenanceChecklist>()
+                .Property(c => c.ChecklistType)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+
+            builder.Entity<PreventiveMaintenanceChecklist>()
+                .HasOne(c => c.Property)
+                .WithMany(p => p.PreventiveMaintenanceChecklists)
+                .HasForeignKey(c => c.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<PreventiveMaintenanceChecklist>()
+                .HasOne(c => c.CreatedBy)
+                .WithMany()
+                .HasForeignKey(c => c.CreatedById)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<PreventiveMaintenanceChecklist>()
+                .HasOne(c => c.UpdatedBy)
+                .WithMany()
+                .HasForeignKey(c => c.UpdatedById)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<PreventiveMaintenanceChecklist>()
+                .HasIndex(c => new { c.PropertyId, c.IsActive });
+
             builder.Entity<PreventiveMaintenanceTask>()
                 .HasOne(t => t.Property)
                 .WithMany(p => p.PreventiveMaintenanceTasks)
@@ -722,13 +759,28 @@ namespace hOps.web.Data
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<PreventiveMaintenanceTask>()
+                .HasOne(t => t.Checklist)
+                .WithMany(c => c.Tasks)
+                .HasForeignKey(t => t.ChecklistId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<PreventiveMaintenanceTask>()
                 .HasIndex(t => new { t.PropertyId, t.SortOrder });
+
+            builder.Entity<PreventiveMaintenanceTask>()
+                .HasIndex(t => new { t.ChecklistId, t.SortOrder });
 
             builder.Entity<PreventiveMaintenanceSession>()
                 .HasOne(s => s.Property)
                 .WithMany(p => p.PreventiveMaintenanceSessions)
                 .HasForeignKey(s => s.PropertyId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<PreventiveMaintenanceSession>()
+                .HasOne(s => s.Checklist)
+                .WithMany(c => c.Sessions)
+                .HasForeignKey(s => s.ChecklistId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<PreventiveMaintenanceSession>()
                 .HasOne(s => s.Room)
@@ -832,6 +884,44 @@ namespace hOps.web.Data
 
             builder.Entity<DeepCleanSessionTask>()
                 .HasIndex(t => new { t.SessionId, t.SortOrder });
+
+            builder.Entity<EquipmentItem>()
+                .HasOne(e => e.Property)
+                .WithMany(p => p.EquipmentItems)
+                .HasForeignKey(e => e.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<EquipmentItem>()
+                .HasIndex(e => new { e.PropertyId, e.Name });
+
+            builder.Entity<MaintenanceLogTemplate>()
+                .Property(t => t.ScheduleType)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+
+            builder.Entity<MaintenanceLogTemplate>()
+                .HasOne(t => t.Property)
+                .WithMany(p => p.MaintenanceLogTemplates)
+                .HasForeignKey(t => t.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<MaintenanceLogTemplate>()
+                .HasIndex(t => new { t.PropertyId, t.IsActive });
+
+            builder.Entity<MaintenanceLogEntry>()
+                .HasOne(e => e.Template)
+                .WithMany(t => t.Entries)
+                .HasForeignKey(e => e.TemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<MaintenanceLogEntry>()
+                .HasOne(e => e.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<MaintenanceLogEntry>()
+                .HasIndex(e => new { e.TemplateId, e.EntryDate });
         }
     }
 }

@@ -59,11 +59,15 @@ namespace hOps.web.Models
         public ICollection<ScheduleTimeOffRequest> ScheduleTimeOffRequests { get; set; } = new List<ScheduleTimeOffRequest>();
 
         public PreventiveMaintenanceSetting? PreventiveMaintenanceSetting { get; set; }
+        public ICollection<PreventiveMaintenanceChecklist> PreventiveMaintenanceChecklists { get; set; } = new List<PreventiveMaintenanceChecklist>();
         public ICollection<PreventiveMaintenanceTask> PreventiveMaintenanceTasks { get; set; } = new List<PreventiveMaintenanceTask>();
         public ICollection<PreventiveMaintenanceSession> PreventiveMaintenanceSessions { get; set; } = new List<PreventiveMaintenanceSession>();
 
         public DeepCleanSetting? DeepCleanSetting { get; set; }
         public ICollection<DeepCleanChecklistItem> DeepCleanChecklistItems { get; set; } = new List<DeepCleanChecklistItem>();
         public ICollection<DeepCleanSession> DeepCleanSessions { get; set; } = new List<DeepCleanSession>();
+
+        public ICollection<EquipmentItem> EquipmentItems { get; set; } = new List<EquipmentItem>();
+        public ICollection<MaintenanceLogTemplate> MaintenanceLogTemplates { get; set; } = new List<MaintenanceLogTemplate>();
     }
 }

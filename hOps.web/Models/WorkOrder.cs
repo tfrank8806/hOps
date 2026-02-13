@@ -34,6 +34,9 @@ namespace hOps.web.Models
         public int? DepartmentId { get; set; }
         public Department? Department { get; set; }
 
+        public int? EquipmentItemId { get; set; }
+        public EquipmentItem? EquipmentItem { get; set; }
+
         public ICollection<WorkOrderProperty> Properties { get; set; } = new List<WorkOrderProperty>();
 
         public ICollection<WorkOrderAttachment> Attachments { get; set; } = new List<WorkOrderAttachment>();

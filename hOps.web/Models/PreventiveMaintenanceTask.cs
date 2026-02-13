@@ -18,6 +18,9 @@ namespace hOps.web.Models
 
         public int SortOrder { get; set; }
 
+        public int ChecklistId { get; set; }
+        public PreventiveMaintenanceChecklist Checklist { get; set; } = null!;
+
         public int PropertyId { get; set; }
         public Property Property { get; set; } = null!;
 
@@ -25,4 +28,3 @@ namespace hOps.web.Models
         public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
     }
 }
-

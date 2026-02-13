@@ -13,11 +13,17 @@ namespace hOps.web.Models
         public int PropertyId { get; set; }
         public Property Property { get; set; } = null!;
 
+        public int ChecklistId { get; set; }
+        public PreventiveMaintenanceChecklist Checklist { get; set; } = null!;
+
         public int? RoomId { get; set; }
         public Room? Room { get; set; }
 
         [MaxLength(32)]
         public string RoomNumber { get; set; } = string.Empty;
+
+        [MaxLength(160)]
+        public string? AreaLabel { get; set; }
 
         public DateTime StartedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime? CompletedAtUtc { get; set; }
@@ -39,4 +45,3 @@ namespace hOps.web.Models
         public ICollection<PreventiveMaintenanceSessionTask> Tasks { get; set; } = new List<PreventiveMaintenanceSessionTask>();
     }
 }
-
