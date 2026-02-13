@@ -19,6 +19,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.IO;
 using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 var forceSqlite = ShouldForceSqlite(builder.Configuration);
@@ -26,6 +27,13 @@ var forceSqlite = ShouldForceSqlite(builder.Configuration);
 // ----------------------
 // 1. Services Registration
 // ----------------------
+
+var dataProtectionKeysPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys");
+Directory.CreateDirectory(dataProtectionKeysPath);
+
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
+    .SetApplicationName("hOps.web");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
