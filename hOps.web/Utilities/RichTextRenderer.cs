@@ -28,11 +28,25 @@ namespace hOps.web.Utilities
             ["pink"] = "rich-text-color-pink",
             ["gray"] = "rich-text-color-gray"
         };
+        private static readonly IReadOnlyDictionary<string, string> EmailColorHexByClass = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["rich-text-color-red"] = "#b42318",
+            ["rich-text-color-orange"] = "#c2410c",
+            ["rich-text-color-yellow"] = "#b58105",
+            ["rich-text-color-green"] = "#15803d",
+            ["rich-text-color-teal"] = "#0f766e",
+            ["rich-text-color-blue"] = "#2563eb",
+            ["rich-text-color-purple"] = "#7c3aed",
+            ["rich-text-color-pink"] = "#db2777",
+            ["rich-text-color-gray"] = "#334155"
+        };
 
         private static readonly Regex ColorTagRegex = new(@"\{\{(/?color(?::(?<name>[a-z0-9-]+))?)\}\}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex HtmlBreakTagRegex = new(@"(<br\s*/?>|</p>|</div>|</li>|</ul>|</ol>)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex HtmlTagRegex = new(@"<[^>]+>", RegexOptions.Compiled);
         private static readonly Regex CollapseWhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
+        private static readonly Regex RichTextSpanRegex = new("<span class=\"(?<classes>[^\"]*rich-text[^\"]*)\">", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex MarkTagRegex = new("<mark(\\s+[^>]*)?>", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public static string ToHtml(string? content)
         {
@@ -169,6 +183,17 @@ namespace hOps.web.Utilities
             return html;
         }
 
+        public static string ToEmailHtml(string? content)
+        {
+            var html = ToHtml(content);
+            if (string.IsNullOrWhiteSpace(html))
+            {
+                return string.Empty;
+            }
+
+            return ApplyEmailInlineStyles(html);
+        }
+
         public static string ToPlainText(string? content)
         {
             if (string.IsNullOrWhiteSpace(content))
@@ -265,6 +290,51 @@ namespace hOps.web.Utilities
             html = Replace(html, @"\~\~(.+?)\~\~", m => $"<del>{m.Groups[1].Value}</del>");
 
             html = Replace(html, @"\=\=(.+?)\=\=", m => $"<mark>{m.Groups[1].Value}</mark>");
+
+            return html;
+        }
+
+        private static string ApplyEmailInlineStyles(string html)
+        {
+            if (string.IsNullOrEmpty(html))
+            {
+                return string.Empty;
+            }
+
+            html = RichTextSpanRegex.Replace(html, match =>
+            {
+                var classes = match.Groups["classes"].Value
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (classes.Length == 0)
+                {
+                    return match.Value;
+                }
+
+                var styles = new StringBuilder();
+                foreach (var className in classes)
+                {
+                    if (className.Equals("rich-text-underline", StringComparison.OrdinalIgnoreCase))
+                    {
+                        styles.Append("text-decoration:underline;");
+                    }
+
+                    if (EmailColorHexByClass.TryGetValue(className, out var colorHex))
+                    {
+                        styles.Append($"color:{colorHex};");
+                    }
+                }
+
+                if (styles.Length == 0)
+                {
+                    return match.Value;
+                }
+
+                return $"<span style=\"{styles}\">";
+            });
+
+            html = MarkTagRegex.Replace(
+                html,
+                "<mark style=\"background-color:#fff2a8;padding:0 0.2em;border-radius:0.2em;\">");
 
             return html;
         }

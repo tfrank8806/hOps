@@ -414,17 +414,9 @@ namespace hOps.web.Controllers
 
             var actorName = FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
             var subject = $"New log: {log.Title}";
-            var preview = RichTextRenderer.ToPlainText(log.Body ?? string.Empty);
-            if (!string.IsNullOrWhiteSpace(preview) && preview.Length > 500)
-            {
-                preview = $"{preview[..500]}...";
-            }
-
             var safeActor = WebUtility.HtmlEncode(actorName);
             var safeTitle = WebUtility.HtmlEncode(log.Title);
-            var safePreview = string.IsNullOrWhiteSpace(preview)
-                ? null
-                : WebUtility.HtmlEncode(preview).Replace("\r\n", "\n").Replace("\n", "<br/>");
+            var summaryHtml = RichTextRenderer.ToEmailHtml(log.Body);
             var safeProperties = propertyNames.Any()
                 ? string.Join(", ", propertyNames.Select(WebUtility.HtmlEncode))
                 : null;
@@ -435,9 +427,10 @@ namespace hOps.web.Controllers
             {
                 bodyBuilder.AppendLine($@"<p><strong>Properties:</strong> {safeProperties}</p>");
             }
-            if (safePreview != null)
+            if (!string.IsNullOrWhiteSpace(summaryHtml))
             {
-                bodyBuilder.AppendLine($@"<p><strong>Summary:</strong><br/>{safePreview}</p>");
+                bodyBuilder.AppendLine("<p><strong>Summary:</strong></p>");
+                bodyBuilder.AppendLine($@"<div style=""font-size:14px;line-height:1.5;word-break:break-word;"">{summaryHtml}</div>");
             }
             bodyBuilder.AppendLine($@"<p><a href=""{linkUrl}"">Review the log</a></p>");
 
