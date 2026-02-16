@@ -753,6 +753,7 @@ namespace hOps.web.Controllers
             };
 
             _context.PassOnLogComments.Add(comment);
+            MarkLogUnreadForUnseenCommentViewers(log, currentUser.Id, comment.CreatedAt);
             await _context.SaveChangesAsync();
 
             var link = Url.Action(nameof(Details), "PassOnLogs", new { id = log.Id }, Request.Scheme)
@@ -1163,6 +1164,44 @@ namespace hOps.web.Controllers
         {
             public PassOnLogAttachment Attachment { get; init; } = null!;
             public string PhysicalPath { get; init; } = string.Empty;
+        }
+
+        private void MarkLogUnreadForUnseenCommentViewers(PassOnLog log, string actorId, DateTime commentCreatedAt)
+        {
+            if (log.Views == null)
+            {
+                return;
+            }
+
+            var staleViews = log.Views
+                .Where(v => v.ViewerId != actorId && v.ViewedAt < commentCreatedAt)
+                .ToList();
+
+            if (staleViews.Count > 0)
+            {
+                _context.PassOnLogViews.RemoveRange(staleViews);
+                foreach (var view in staleViews)
+                {
+                    log.Views.Remove(view);
+                }
+            }
+
+            var actorView = log.Views.FirstOrDefault(v => v.ViewerId == actorId);
+            if (actorView == null)
+            {
+                var newView = new PassOnLogView
+                {
+                    PassOnLogId = log.Id,
+                    ViewerId = actorId,
+                    ViewedAt = commentCreatedAt
+                };
+                _context.PassOnLogViews.Add(newView);
+                log.Views.Add(newView);
+            }
+            else
+            {
+                actorView.ViewedAt = commentCreatedAt;
+            }
         }
 
         private static bool IsLogUnread(PassOnLog log, string userId)
