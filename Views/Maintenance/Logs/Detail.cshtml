@@ -1,0 +1,197 @@
+@using hOps.web.ViewModels.Maintenance
+@model hOps.web.ViewModels.Maintenance.MaintenanceLogTemplateDetailViewModel
+
+@{
+    ViewData["Title"] = $"{Model.TemplateName} Log";
+    var message = ViewBag.MaintenanceLogMessage as string;
+    var error = ViewBag.MaintenanceLogError as string;
+    var entryInput = ViewBag.EntryInput as MaintenanceLogEntryInputModel ?? new MaintenanceLogEntryInputModel
+    {
+        EntryDate = DateTime.UtcNow.Date
+    };
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h2 class="mb-0">@Model.TemplateName</h2>
+            <p class="text-muted mb-0">@Model.PropertyName — @Model.ScheduleSummary</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to templates</a>
+            @if (Model.CanManage)
+            {
+                <a asp-action="Edit" asp-route-id="@Model.TemplateId" class="btn btn-primary btn-sm">Edit Template</a>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="alert alert-success">@message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <input type="hidden" name="id" value="@Model.TemplateId" />
+                <div class="col-md-3">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" name="start" value="@(Model.FilterStart?.ToString("yyyy-MM-dd") ?? string.Empty)" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">End Date</label>
+                    <input type="date" name="end" value="@(Model.FilterEnd?.ToString("yyyy-MM-dd") ?? string.Empty)" class="form-control" />
+                </div>
+                <div class="col-md-6 d-flex gap-2">
+                    <button type="submit" class="btn btn-outline-secondary">Apply Filter</button>
+                    <a asp-action="Detail" asp-route-id="@Model.TemplateId" class="btn btn-outline-secondary">Clear</a>
+                    <a asp-action="Export"
+                       asp-route-id="@Model.TemplateId"
+                       asp-route-start="@(Model.FilterStart?.ToString("yyyy-MM-dd"))"
+                       asp-route-end="@(Model.FilterEnd?.ToString("yyyy-MM-dd"))"
+                       class="btn btn-outline-secondary">
+                        Export CSV
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Add Entry</h5>
+                    <form asp-action="CreateEntry" asp-route-id="@Model.TemplateId" method="post" class="row g-3">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="start" value="@(Model.FilterStart?.ToString("yyyy-MM-dd") ?? string.Empty)" />
+                        <input type="hidden" name="end" value="@(Model.FilterEnd?.ToString("yyyy-MM-dd") ?? string.Empty)" />
+                        <div class="col-12">
+                            <label class="form-label">Entry Date</label>
+                            <input type="date" name="EntryDate" value="@entryInput.EntryDate.ToString("yyyy-MM-dd")" class="form-control" />
+                            @Html.ValidationMessage("EntryDate", null, new { @class = "text-danger" })
+                        </div>
+                        @foreach (var column in Model.Columns)
+                        {
+                            var value = entryInput.Values.TryGetValue(column.Key, out var existing) ? existing : string.Empty;
+                            <div class="col-12">
+                                <label class="form-label">@column.Label @if (column.Required) { <span class="text-danger">*</span> }</label>
+                                @switch (column.Type)
+                                {
+                                    case "number":
+                                        <input type="number" step="any" class="form-control" name="Values[@column.Key]" value="@value" />
+                                        break;
+                                    case "checkbox":
+                                        <div class="form-check">
+                                            <input type="hidden" name="Values[@column.Key]" value="false" />
+                                            <input type="checkbox" class="form-check-input" name="Values[@column.Key]" value="true" @(string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ? "checked" : null) id="entry-checkbox-@column.Key" />
+                                            <label class="form-check-label" for="entry-checkbox-@column.Key">Completed</label>
+                                        </div>
+                                        break;
+                                    case "select":
+                                        <select class="form-select" name="Values[@column.Key]">
+                                            <option value="">Select...</option>
+                                            @foreach (var option in column.Options)
+                                            {
+                                                <option value="@option" selected="@(string.Equals(option, value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option</option>
+                                            }
+                                        </select>
+                                        break;
+                                    default:
+                                        <input type="text" class="form-control" name="Values[@column.Key]" value="@value" />
+                                        break;
+                                }
+                                @Html.ValidationMessage($"Values[{column.Key}]", null, new { @class = "text-danger" })
+                            </div>
+                        }
+                        <div class="col-12 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-primary">Record Entry</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title d-flex justify-content-between align-items-center">
+                        <span>Entries</span>
+                        <small class="text-muted">Showing @Model.Entries.Count entry@(Model.Entries.Count == 1 ? string.Empty : "ies")</small>
+                    </h5>
+                    @if (!Model.Entries.Any())
+                    {
+                        <p class="text-muted mb-0">No entries yet.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Recorded By</th>
+                                        @foreach (var column in Model.Columns)
+                                        {
+                                            <th>@column.Label</th>
+                                        }
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var entry in Model.Entries)
+                                    {
+                                        <tr>
+                                            <td>@entry.EntryDate.ToString("MMM d, yyyy")</td>
+                                            <td>
+                                                <div class="d-flex flex-column">
+                                                    <span>@entry.CreatedByName</span>
+                                                    <small class="text-muted">@TimeZoneService.ConvertToUserTime(entry.CreatedAtUtc).ToString("g")</small>
+                                                </div>
+                                            </td>
+                                            @foreach (var column in Model.Columns)
+                                            {
+                                                entry.Values.TryGetValue(column.Key, out var value);
+                                                <td>
+                                                    @if (column.Type == "checkbox")
+                                                    {
+                                                        <span class="badge @(string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ? "bg-success" : "bg-secondary")">
+                                                            @(string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ? "Yes" : "No")
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        @(!string.IsNullOrWhiteSpace(value) ? value : "—")
+                                                    }
+                                                </td>
+                                            }
+                                            <td class="text-end">
+                                                @if (Model.CanManage)
+                                                {
+                                                    <form asp-action="DeleteEntry"
+                                                          asp-route-templateId="@Model.TemplateId"
+                                                          asp-route-entryId="@entry.Id"
+                                                          asp-route-start="@(Model.FilterStart?.ToString("yyyy-MM-dd"))"
+                                                          asp-route-end="@(Model.FilterEnd?.ToString("yyyy-MM-dd"))"
+                                                          method="post"
+                                                          onsubmit="return confirm('Delete this log entry?');">
+                                                        @Html.AntiForgeryToken()
+                                                        <button type="submit" class="btn btn-link text-danger p-0">Delete</button>
+                                                    </form>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

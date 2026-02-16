@@ -8,6 +8,10 @@
 @{
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
     var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+    var maintenanceActive = string.Equals(currentController, "PreventiveMaintenance", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(currentController, "Maintenance", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(currentController, "MaintenanceEquipment", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(currentController, "MaintenanceLogs", StringComparison.OrdinalIgnoreCase);
     var mainContainerClass = ViewData["MainContainerClass"] as string ?? string.Empty;
     var contentSurfaceClass = ViewData["ContentSurfaceClass"] as string ?? string.Empty;
     var unreadDirectMessageCount = ViewBag.UnreadDirectMessageCount is int count ? count : 0;
@@ -322,10 +326,15 @@
                                     <span class="sidebar-text">Deep Cleans</span>
                                 </a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link @(currentController == "PreventiveMaintenance" ? "active" : string.Empty)" asp-controller="PreventiveMaintenance" asp-action="Index">
-                                    <span class="sidebar-text">PMs</span>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle @(maintenanceActive ? "active" : string.Empty)" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <span class="sidebar-text">Maintenance</span>
                                 </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" asp-controller="PreventiveMaintenance" asp-action="Index">PMs</a></li>
+                                    <li><a class="dropdown-item" asp-controller="MaintenanceEquipment" asp-action="Index">Equipment</a></li>
+                                    <li><a class="dropdown-item" asp-controller="MaintenanceLogs" asp-action="Index">Logs</a></li>
+                                </ul>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link @(currentController == "Calendar" ? "active" : string.Empty)" asp-controller="Calendar" asp-action="Index">

@@ -1,4 +1,4 @@
-ï»¿using hOps.web.Data;
+using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
 using hOps.web.ViewModels.Settings;
@@ -118,7 +118,7 @@ namespace hOps.web.Controllers
             return RedirectToAction(actionName);
         }
 
-        // â€” Departments CRUD â€”
+        // — Departments CRUD —
 
         public async Task<IActionResult> Departments(int? propertyId = null, bool onlyGlobal = false)
         {
@@ -346,7 +346,7 @@ namespace hOps.web.Controllers
             return RedirectToSettingsList(nameof(Departments), propertyId, onlyGlobal);
         }
 
-        // â€” WorkOrderTypes CRUD â€”
+        // — WorkOrderTypes CRUD —
 
         public async Task<IActionResult> WorkOrderTypes(int? propertyId = null, bool onlyGlobal = false)
         {
@@ -568,7 +568,7 @@ namespace hOps.web.Controllers
             return RedirectToSettingsList(nameof(WorkOrderTypes), propertyId, onlyGlobal);
         }
 
-        // â€” PhonebookTypes CRUD â€”
+        // — PhonebookTypes CRUD —
 
         public async Task<IActionResult> PhonebookTypes(int? propertyId = null, bool onlyGlobal = false)
         {
@@ -795,7 +795,7 @@ namespace hOps.web.Controllers
             return RedirectToSettingsList(nameof(PhonebookTypes), propertyId, onlyGlobal);
         }
 
-        // â€” CalendarCategories CRUD â€”
+        // — CalendarCategories CRUD —
 
         public async Task<IActionResult> CalendarCategories(int? propertyId = null, bool onlyGlobal = false)
         {
@@ -1252,7 +1252,7 @@ namespace hOps.web.Controllers
 
             foreach (var room in rooms)
             {
-                var csvLine = string.Join(",", new[]
+                var csvLine = string.Join("","", new[]
                 {
                     EscapeCsv(room.RoomNumber),
                     EscapeCsv(room.Abbreviation),
@@ -1270,264 +1270,38 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> PmSetup(int? propertyId = null)
+        public IActionResult PmSetup(int? propertyId = null)
         {
-            var properties = await GetEditablePropertiesAsync();
-            if (!properties.Any())
-            {
-                return Forbid();
-            }
-
-            var selectedId = propertyId.HasValue && properties.Any(p => p.Id == propertyId.Value)
-                ? propertyId!.Value
-                : properties.First().Id;
-
-            var selectedProperty = properties.First(p => p.Id == selectedId);
-
-            var setting = await _db.PreventiveMaintenanceSettings
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.PropertyId == selectedProperty.Id);
-
-            var tasks = await _db.PreventiveMaintenanceTasks
-                .AsNoTracking()
-                .Where(t => t.PropertyId == selectedProperty.Id)
-                .OrderBy(t => t.SortOrder)
-                .ThenBy(t => t.Id)
-                .ToListAsync();
-
-            var viewModel = new PmSetupViewModel
-            {
-                PropertyId = selectedProperty.Id,
-                PropertyName = selectedProperty.Name,
-                FrequencyPerYear = setting?.FrequencyPerYear ?? 4,
-                AccessibleProperties = properties,
-                Tasks = tasks
-                    .Select(t => new PmSetupTaskRow
-                    {
-                        Id = t.Id,
-                        Title = t.Name,
-                        Description = t.Description,
-                        SortOrder = t.SortOrder
-                    })
-                    .ToList()
-            };
-
-            return View("PmSetup", viewModel);
+            TempData["PmChecklistMessage"] = "Preventive maintenance setup moved to Maintenance -> PMs.";
+            return RedirectToAction("PmChecklists", "Maintenance", new { propertyId });
         }
 
-        [HttpPost]
+                [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SavePmChecklist(int propertyId, int frequencyPerYear, List<PmSetupTaskRow> tasks)
+        public IActionResult SavePmChecklist(int propertyId, int frequencyPerYear, List<PmSetupTaskRow> tasks)
         {
-            var properties = await GetEditablePropertiesAsync();
-            var selectedProperty = properties.FirstOrDefault(p => p.Id == propertyId);
-            if (selectedProperty == null)
-            {
-                return Forbid();
-            }
-
-            var normalizedFrequency = Math.Clamp(frequencyPerYear, 1, 52);
-            tasks ??= new List<PmSetupTaskRow>();
-
-            var sanitizedTasks = tasks
-                .Where(t => !string.IsNullOrWhiteSpace(t.Title))
-                .Select((t, index) => new
-                {
-                    Id = t.Id,
-                    Title = t.Title.Trim(),
-                    Description = string.IsNullOrWhiteSpace(t.Description) ? null : t.Description!.Trim(),
-                    SortOrder = index
-                })
-                .ToList();
-
-            var user = await _userManager.GetUserAsync(User);
-            var now = DateTime.UtcNow;
-
-            var setting = await _db.PreventiveMaintenanceSettings.FirstOrDefaultAsync(s => s.PropertyId == propertyId);
-            if (setting == null)
-            {
-                setting = new PreventiveMaintenanceSetting
-                {
-                    PropertyId = propertyId
-                };
-                _db.PreventiveMaintenanceSettings.Add(setting);
-            }
-
-            setting.FrequencyPerYear = normalizedFrequency;
-            setting.UpdatedAtUtc = now;
-            setting.UpdatedByUserId = user?.Id;
-
-            var existingTasks = await _db.PreventiveMaintenanceTasks
-                .Where(t => t.PropertyId == propertyId)
-                .ToListAsync();
-
-            var retainedIds = new HashSet<int>();
-            foreach (var row in sanitizedTasks)
-            {
-                if (row.Id > 0)
-                {
-                    var match = existingTasks.FirstOrDefault(t => t.Id == row.Id);
-                    if (match != null)
-                    {
-                        retainedIds.Add(match.Id);
-                        match.Name = row.Title;
-                        match.Description = row.Description;
-                        match.SortOrder = row.SortOrder;
-                        match.UpdatedAtUtc = now;
-                        continue;
-                    }
-                }
-
-                var newTask = new PreventiveMaintenanceTask
-                {
-                    PropertyId = propertyId,
-                    Name = row.Title,
-                    Description = row.Description,
-                    SortOrder = row.SortOrder,
-                    CreatedAtUtc = now,
-                    UpdatedAtUtc = now
-                };
-                _db.PreventiveMaintenanceTasks.Add(newTask);
-            }
-
-            var obsoleteTasks = existingTasks
-                .Where(t => !retainedIds.Contains(t.Id))
-                .ToList();
-
-            if (obsoleteTasks.Any())
-            {
-                _db.PreventiveMaintenanceTasks.RemoveRange(obsoleteTasks);
-            }
-
-            await _db.SaveChangesAsync();
-
-            TempData["PmSetupMessage"] = "Preventative maintenance checklist saved.";
-            return RedirectToAction(nameof(PmSetup), new { propertyId });
+            TempData["PmChecklistError"] = "Preventive maintenance setup moved to Maintenance -> PMs.";
+            return RedirectToAction("PmChecklists", "Maintenance", new { propertyId });
         }
 
-        [HttpPost]
+                [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ImportPmChecklist(int propertyId, IFormFile? csvFile)
+        public IActionResult ImportPmChecklist(int propertyId, IFormFile? csvFile)
         {
-            var properties = await GetEditablePropertiesAsync();
-            var selectedProperty = properties.FirstOrDefault(p => p.Id == propertyId);
-            if (selectedProperty == null)
-            {
-                return Forbid();
-            }
-
-            if (csvFile == null || csvFile.Length == 0)
-            {
-                TempData["PmSetupError"] = "Select a CSV file to import your checklist.";
-                return RedirectToAction(nameof(PmSetup), new { propertyId });
-            }
-
-            var importedTasks = new List<PreventiveMaintenanceTask>();
-            try
-            {
-                using var stream = csvFile.OpenReadStream();
-                using var reader = new StreamReader(stream);
-                string? line;
-                var lineIndex = 0;
-                while ((line = await reader.ReadLineAsync()) != null)
-                {
-                    if (lineIndex == 0 && line.StartsWith("Task", StringComparison.OrdinalIgnoreCase))
-                    {
-                        lineIndex++;
-                        continue;
-                    }
-
-                    if (string.IsNullOrWhiteSpace(line))
-                    {
-                        continue;
-                    }
-
-                    var columns = line.Split(',');
-                    var title = columns.ElementAtOrDefault(0)?.Trim();
-                    var description = columns.ElementAtOrDefault(1)?.Trim();
-
-                    if (string.IsNullOrWhiteSpace(title))
-                    {
-                        continue;
-                    }
-
-                    importedTasks.Add(new PreventiveMaintenanceTask
-                    {
-                        PropertyId = propertyId,
-                        Name = title,
-                        Description = string.IsNullOrWhiteSpace(description) ? null : description,
-                        SortOrder = importedTasks.Count
-                    });
-                    lineIndex++;
-                }
-            }
-            catch
-            {
-                TempData["PmSetupError"] = "Unable to read the uploaded file.";
-                return RedirectToAction(nameof(PmSetup), new { propertyId });
-            }
-
-            if (!importedTasks.Any())
-            {
-                TempData["PmSetupError"] = "No checklist tasks were found in the uploaded file.";
-                return RedirectToAction(nameof(PmSetup), new { propertyId });
-            }
-
-            var existingTasks = await _db.PreventiveMaintenanceTasks
-                .Where(t => t.PropertyId == propertyId)
-                .ToListAsync();
-
-            if (existingTasks.Any())
-            {
-                _db.PreventiveMaintenanceTasks.RemoveRange(existingTasks);
-                await _db.SaveChangesAsync();
-            }
-
-            var now = DateTime.UtcNow;
-            foreach (var task in importedTasks)
-            {
-                task.CreatedAtUtc = now;
-                task.UpdatedAtUtc = now;
-            }
-
-            _db.PreventiveMaintenanceTasks.AddRange(importedTasks);
-            await _db.SaveChangesAsync();
-
-            TempData["PmSetupMessage"] = $"Imported {importedTasks.Count} checklist item{(importedTasks.Count == 1 ? string.Empty : "s")}.";
-            return RedirectToAction(nameof(PmSetup), new { propertyId });
+            TempData["PmChecklistError"] = "Preventive maintenance setup moved to Maintenance -> PMs.";
+            return RedirectToAction("PmChecklists", "Maintenance", new { propertyId });
         }
+
+    
 
         [HttpGet]
-        public async Task<IActionResult> DownloadPmChecklist(int propertyId)
+        public IActionResult DownloadPmChecklist(int propertyId)
         {
-            var properties = await GetEditablePropertiesAsync();
-            var selectedProperty = properties.FirstOrDefault(p => p.Id == propertyId);
-            if (selectedProperty == null)
-            {
-                return Forbid();
-            }
-
-            var tasks = await _db.PreventiveMaintenanceTasks
-                .Where(t => t.PropertyId == propertyId)
-                .OrderBy(t => t.SortOrder)
-                .ThenBy(t => t.Id)
-                .ToListAsync();
-
-            var builder = new StringBuilder();
-            builder.AppendLine("Task,Description");
-
-            foreach (var task in tasks)
-            {
-                builder.AppendLine(string.Join(",", new[]
-                {
-                    EscapeCsv(task.Name),
-                    EscapeCsv(task.Description)
-                }));
-            }
-
-            var fileName = $"pm-checklist-property-{propertyId}.csv";
-            return File(Encoding.UTF8.GetBytes(builder.ToString()), "text/csv", fileName);
+            TempData["PmChecklistError"] = "Preventive maintenance setup moved to Maintenance -> PMs.";
+            return RedirectToAction("PmChecklists", "Maintenance", new { propertyId });
         }
+
+
 
         [HttpGet]
         public IActionResult DownloadPmTemplate()
@@ -1786,7 +1560,7 @@ namespace hOps.web.Controllers
 
             foreach (var task in tasks)
             {
-                builder.AppendLine(string.Join(",", new[]
+                builder.AppendLine(string.Join("","", new[]
                 {
                     EscapeCsv(task.Task),
                     EscapeCsv(task.Description)
@@ -2486,6 +2260,16 @@ namespace hOps.web.Controllers
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
 
 
 

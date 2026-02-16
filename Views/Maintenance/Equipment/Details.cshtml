@@ -1,0 +1,97 @@
+@model hOps.web.ViewModels.Maintenance.MaintenanceEquipmentDetailsViewModel
+
+@{
+    ViewData["Title"] = "Equipment Details";
+    var message = ViewBag.EquipmentMessage as string;
+    var error = ViewBag.EquipmentError as string;
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between flex-wrap align-items-center mb-3 gap-2">
+        <div>
+            <h2 class="mb-0">@Model.Name</h2>
+            <p class="text-muted mb-0">@Model.PropertyName</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to list</a>
+            @if (Model.CanManage)
+            {
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary btn-sm">Edit</a>
+                <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this equipment item?');">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                </form>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="alert alert-success">@message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Category</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.Category) ? Model.Category : "—")</dd>
+
+                        <dt class="col-sm-4">Location</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.Location) ? Model.Location : "—")</dd>
+
+                        <dt class="col-sm-4">Brand</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.Brand) ? Model.Brand : "—")</dd>
+
+                        <dt class="col-sm-4">Model</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.Model) ? Model.Model : "—")</dd>
+
+                        <dt class="col-sm-4">Serial Number</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.SerialNumber) ? Model.SerialNumber : "—")</dd>
+
+                        <dt class="col-sm-4">Installed On</dt>
+                        <dd class="col-sm-8">@Model.InstalledOn?.ToString("MMM d, yyyy") ?? "—"</dd>
+
+                        <dt class="col-sm-4">Warranty Ends</dt>
+                        <dd class="col-sm-8">@Model.WarrantyEndsOn?.ToString("MMM d, yyyy") ?? "—"</dd>
+
+                        <dt class="col-sm-4">Vendor</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.VendorName) ? Model.VendorName : "—")</dd>
+
+                        <dt class="col-sm-4">Vendor Phone</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.VendorPhone) ? Model.VendorPhone : "—")</dd>
+
+                        <dt class="col-sm-4">Vendor Email</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.VendorEmail) ? Model.VendorEmail : "—")</dd>
+
+                        <dt class="col-sm-4">Notes</dt>
+                        <dd class="col-sm-8">
+                            @if (!string.IsNullOrWhiteSpace(Model.Notes))
+                            {
+                                <pre class="mb-0 bg-transparent border-0 p-0 text-wrap">@Model.Notes</pre>
+                            }
+                            else
+                            {
+                                <span>—</span>
+                            }
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Audit</h5>
+                    <p class="mb-2"><strong>Created:</strong> @TimeZoneService.ConvertToUserTime(Model.CreatedAtUtc).ToString("g")</p>
+                    <p class="mb-0"><strong>Last Updated:</strong> @TimeZoneService.ConvertToUserTime(Model.UpdatedAtUtc).ToString("g")</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

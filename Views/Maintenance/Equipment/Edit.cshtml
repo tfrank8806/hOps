@@ -1,0 +1,104 @@
+@model hOps.web.ViewModels.Maintenance.MaintenanceEquipmentEditorViewModel
+
+@{
+    var pageTitle = Model.IsEditMode ? "Edit Equipment" : "Add Equipment";
+    ViewData["Title"] = pageTitle;
+    var formAction = Model.IsEditMode ? "Edit" : "Create";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between flex-wrap align-items-center mb-3 gap-2">
+        <div>
+            <h2 class="mb-0">@pageTitle</h2>
+            <p class="text-muted mb-0">@Model.PropertyName</p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form asp-action="@formAction" asp-route-id="@Model.Id" method="post" class="row g-3">
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                <div class="col-md-6">
+                    <label asp-for="Name" class="form-label"></label>
+                    <input asp-for="Name" class="form-control" />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Category" class="form-label"></label>
+                    <input asp-for="Category" class="form-control" />
+                    <span asp-validation-for="Category" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="Location" class="form-label"></label>
+                    <input asp-for="Location" class="form-control" />
+                    <span asp-validation-for="Location" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Brand" class="form-label"></label>
+                    <input asp-for="Brand" class="form-control" />
+                    <span asp-validation-for="Brand" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="Model" class="form-label"></label>
+                    <input asp-for="Model" class="form-control" />
+                    <span asp-validation-for="Model" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SerialNumber" class="form-label"></label>
+                    <input asp-for="SerialNumber" class="form-control" />
+                    <span asp-validation-for="SerialNumber" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="VendorName" class="form-label"></label>
+                    <input asp-for="VendorName" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="VendorPhone" class="form-label"></label>
+                    <input asp-for="VendorPhone" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="VendorEmail" class="form-label"></label>
+                    <input asp-for="VendorEmail" class="form-control" />
+                    <span asp-validation-for="VendorEmail" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="InstalledOn" class="form-label"></label>
+                    <input asp-for="InstalledOn" class="form-control" type="date" />
+                    <span asp-validation-for="InstalledOn" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="WarrantyEndsOn" class="form-label"></label>
+                    <input asp-for="WarrantyEndsOn" class="form-control" type="date" />
+                    <span asp-validation-for="WarrantyEndsOn" class="text-danger"></span>
+                </div>
+
+                <div class="col-12">
+                    <label asp-for="Notes" class="form-label"></label>
+                    <textarea asp-for="Notes" class="form-control" rows="4"></textarea>
+                    <span asp-validation-for="Notes" class="text-danger"></span>
+                </div>
+
+                <div class="col-12 d-flex justify-content-between">
+                    <a asp-action="Index" class="btn btn-outline-secondary">Back to list</a>
+                    <div class="d-flex gap-2">
+                        @if (Model.IsEditMode)
+                        {
+                            <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">Cancel</a>
+                        }
+                        else
+                        {
+                            <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                        }
+                        <button type="submit" class="btn btn-primary">@ (Model.IsEditMode ? "Save Changes" : "Create Equipment")</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,243 @@
+@model hOps.web.ViewModels.Maintenance.MaintenanceLogTemplateEditorViewModel
+
+@{
+    var pageTitle = Model.IsEditMode ? "Edit Maintenance Log Template" : "Create Maintenance Log Template";
+    ViewData["Title"] = pageTitle;
+    var formAction = Model.IsEditMode ? "Edit" : "Create";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h2 class="mb-0">@pageTitle</h2>
+            <p class="text-muted mb-0">@Model.PropertyName</p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form asp-action="@formAction" asp-route-id="@Model.Id" method="post">
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label asp-for="Name" class="form-label"></label>
+                        <input asp-for="Name" class="form-control" />
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="ScheduleType" class="form-label">Schedule</label>
+                        <select asp-for="ScheduleType" class="form-select" id="scheduleTypeSelect">
+                            <option value="None">None</option>
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="DueTimeLocal" class="form-label">Due Time (optional)</label>
+                        <input asp-for="DueTimeLocal" type="time" class="form-control" />
+                    </div>
+                    <div class="col-md-6 d-none" id="weeklyDaysFieldset">
+                        <label class="form-label">Weekly Days</label>
+                        <div class="d-flex flex-wrap gap-3">
+                            @{
+                                var dayNames = Enum.GetNames(typeof(DayOfWeek));
+                                for (var i = 0; i < dayNames.Length; i++)
+                                {
+                                    <div class="form-check">
+                                        <input type="hidden" name="WeeklyDays[@i]" value="false" />
+                                        <input class="form-check-input" type="checkbox" name="WeeklyDays[@i]" value="true" @(Model.WeeklyDays.Length > i && Model.WeeklyDays[i] ? "checked" : null) id="weekday-@i" />
+                                        <label class="form-check-label" for="weekday-@i">@dayNames[i]</label>
+                                    </div>;
+                                }
+                            }
+                        </div>
+                    </div>
+                    <div class="col-md-3 d-none" id="monthlyDayFieldset">
+                        <label asp-for="DayOfMonth" class="form-label">Day of Month</label>
+                        <input asp-for="DayOfMonth" type="number" min="1" max="31" class="form-control" />
+                        <span asp-validation-for="DayOfMonth" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-center">
+                        <div class="form-check mt-4 pt-2">
+                            <input asp-for="IsActive" class="form-check-input" />
+                            <label asp-for="IsActive" class="form-check-label">Active</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Columns</h5>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="addColumnBtn">Add Column</button>
+                </div>
+
+                <div id="columnsContainer">
+                    @{
+                        var columns = Model.Columns ?? new List<hOps.web.ViewModels.Maintenance.MaintenanceLogColumnEditorViewModel>();
+                        if (columns.Count == 0)
+                        {
+                            columns.Add(new hOps.web.ViewModels.Maintenance.MaintenanceLogColumnEditorViewModel());
+                        }
+                        for (var i = 0; i < columns.Count; i++)
+                        {
+                            var column = columns[i];
+                            <div class="border rounded p-3 mb-3 column-editor" data-index="@i">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Label</label>
+                                        <input type="text" name="Columns[@i].Label" value="@column.Label" class="form-control" />
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Key</label>
+                                        <input type="text" name="Columns[@i].Key" value="@column.Key" class="form-control" />
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Type</label>
+                                        <select name="Columns[@i].Type" class="form-select column-type-select">
+                                            <option value="text" selected="@(column.Type == "text" ? "selected" : null)">Text</option>
+                                            <option value="number" selected="@(column.Type == "number" ? "selected" : null)">Number</option>
+                                            <option value="checkbox" selected="@(column.Type == "checkbox" ? "selected" : null)">Checkbox</option>
+                                            <option value="select" selected="@(column.Type == "select" ? "selected" : null)">Dropdown</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-center">
+                                        <div class="form-check mt-4 pt-2">
+                                            <input class="form-check-input" type="checkbox" name="Columns[@i].Required" value="true" @(column.Required ? "checked" : null) id="column-required-@i" />
+                                            <label class="form-check-label" for="column-required-@i">Required</label>
+                                            <input type="hidden" name="Columns[@i].Required" value="false" />
+                                        </div>
+                                    </div>
+                                    <div class="col-md-12 column-options-group @(column.Type == "select" ? string.Empty : "d-none")">
+                                        <label class="form-label">Dropdown Options (one per line)</label>
+                                        <textarea name="Columns[@i].OptionsText" class="form-control" rows="3">@column.OptionsText</textarea>
+                                    </div>
+                                </div>
+                                <div class="text-end mt-2">
+                                    <button type="button" class="btn btn-link text-danger p-0 remove-column-btn" @(columns.Count == 1 ? "disabled" : null)>Remove</button>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <template id="columnTemplate">
+                    <div class="border rounded p-3 mb-3 column-editor" data-index="__index__">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Label</label>
+                                <input type="text" class="form-control" data-name-template="Columns[__index__].Label" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Key</label>
+                                <input type="text" class="form-control" data-name-template="Columns[__index__].Key" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Type</label>
+                                <select class="form-select column-type-select" data-name-template="Columns[__index__].Type">
+                                    <option value="text" selected>Text</option>
+                                    <option value="number">Number</option>
+                                    <option value="checkbox">Checkbox</option>
+                                    <option value="select">Dropdown</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-center">
+                                <div class="form-check mt-4 pt-2">
+                                    <input class="form-check-input" type="checkbox" value="true" data-name-template="Columns[__index__].Required" />
+                                    <label class="form-check-label">Required</label>
+                                    <input type="hidden" value="false" data-name-template="Columns[__index__].Required" data-hidden-marker="true" />
+                                </div>
+                            </div>
+                            <div class="col-md-12 column-options-group d-none">
+                                <label class="form-label">Dropdown Options (one per line)</label>
+                                <textarea class="form-control" rows="3" data-name-template="Columns[__index__].OptionsText"></textarea>
+                            </div>
+                        </div>
+                        <div class="text-end mt-2">
+                            <button type="button" class="btn btn-link text-danger p-0 remove-column-btn">Remove</button>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">@ (Model.IsEditMode ? "Save Changes" : "Create Template")</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const scheduleTypeSelect = document.getElementById('scheduleTypeSelect');
+            const weeklyFieldset = document.getElementById('weeklyDaysFieldset');
+            const monthlyFieldset = document.getElementById('monthlyDayFieldset');
+            const updateScheduleVisibility = () => {
+                const value = scheduleTypeSelect.value;
+                weeklyFieldset.classList.toggle('d-none', value !== 'Weekly');
+                monthlyFieldset.classList.toggle('d-none', value !== 'Monthly');
+            };
+            scheduleTypeSelect.addEventListener('change', updateScheduleVisibility);
+            updateScheduleVisibility();
+
+            const container = document.getElementById('columnsContainer');
+            const template = document.getElementById('columnTemplate');
+            const addBtn = document.getElementById('addColumnBtn');
+
+            const bindColumnRow = (row) => {
+                row.querySelectorAll('.column-type-select').forEach(select => {
+                    select.addEventListener('change', event => {
+                        const optionsGroup = event.target.closest('.column-editor').querySelector('.column-options-group');
+                        if (!optionsGroup) {
+                            return;
+                        }
+                        optionsGroup.classList.toggle('d-none', event.target.value !== 'select');
+                    });
+                    select.dispatchEvent(new Event('change'));
+                });
+
+                row.querySelectorAll('.remove-column-btn').forEach(button => {
+                    button.addEventListener('click', () => {
+                        if (container.children.length <= 1) {
+                            return;
+                        }
+                        row.remove();
+                        renumberColumns();
+                    });
+                });
+            };
+
+            const renumberColumns = () => {
+                Array.from(container.children).forEach((row, index) => {
+                    row.querySelectorAll('input[name], select[name], textarea[name]').forEach(input => {
+                        const name = input.name;
+                        const updated = name.replace(/Columns\[\d+\]/, `Columns[${index}]`);
+                        input.name = updated;
+                    });
+                });
+            };
+
+            addBtn.addEventListener('click', () => {
+                const fragment = template.content.cloneNode(true);
+                fragment.querySelectorAll('[data-name-template]').forEach(element => {
+                    const templateName = element.dataset.nameTemplate;
+                    const nextIndex = container.children.length;
+                    const actualName = templateName.replace(/__index__/g, nextIndex);
+                    element.name = actualName;
+                    if (element.dataset.hiddenMarker === 'true') {
+                        element.value = 'false';
+                    }
+                });
+
+                const row = fragment.querySelector('.column-editor');
+                container.appendChild(fragment);
+                bindColumnRow(container.lastElementChild);
+            });
+
+            Array.from(container.children).forEach(row => bindColumnRow(row));
+        })();
+    </script>
+}

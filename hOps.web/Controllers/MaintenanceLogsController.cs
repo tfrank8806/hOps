@@ -1,0 +1,801 @@
+#nullable enable
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+using hOps.web.Data;
+using hOps.web.Models;
+using hOps.web.Utilities;
+using hOps.web.ViewModels.Maintenance;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace hOps.web.Controllers
+{
+    [Authorize]
+    [AutoValidateAntiforgeryToken]
+    [Route("Maintenance/Logs")]
+    public class MaintenanceLogsController : BaseController
+    {
+        private const int MaxEntryDisplayCount = 500;
+
+        private readonly ApplicationDbContext _db;
+        private static readonly JsonSerializerOptions EntrySerializerOptions = new(JsonSerializerDefaults.Web);
+
+        public MaintenanceLogsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+            : base(context, userManager)
+        {
+            _db = context;
+        }
+
+        [HttpGet("")]
+        public async Task<IActionResult> Index()
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["MaintenanceLogError"] = "Select a property to view maintenance logs.";
+                return RedirectToAction("Index", "Home");
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var canManage = UserCanManage(roles);
+
+            var templates = await _db.MaintenanceLogTemplates
+                .Where(t => t.PropertyId == property.Id)
+                .OrderByDescending(t => t.IsActive)
+                .ThenBy(t => t.Name)
+                .ToListAsync();
+
+            var templateIds = templates.Select(t => t.Id).ToList();
+            var stats = await _db.MaintenanceLogEntries
+                .Where(e => templateIds.Contains(e.TemplateId))
+                .GroupBy(e => e.TemplateId)
+                .Select(group => new
+                {
+                    TemplateId = group.Key,
+                    Count = group.Count(),
+                    LastDate = group.Max(e => e.EntryDate)
+                })
+                .ToListAsync();
+            var statsLookup = stats.ToDictionary(s => s.TemplateId, s => s);
+
+            var summaries = templates.Select(template =>
+            {
+                statsLookup.TryGetValue(template.Id, out var templateStats);
+                return new MaintenanceLogTemplateSummaryViewModel
+                {
+                    Id = template.Id,
+                    Name = template.Name,
+                    ScheduleType = template.ScheduleType,
+                    ScheduleSummary = MaintenanceLogTemplateHelper.BuildScheduleSummary(template),
+                    IsActive = template.IsActive,
+                    EntryCount = templateStats?.Count ?? 0,
+                    LastEntryDate = templateStats?.LastDate
+                };
+            }).ToList();
+
+            var viewModel = new MaintenanceLogsIndexViewModel
+            {
+                PropertyId = property.Id,
+                PropertyName = property.Name,
+                CanManage = canManage,
+                Templates = summaries
+            };
+
+            ViewBag.MaintenanceLogMessage = TempData["MaintenanceLogMessage"];
+            ViewBag.MaintenanceLogError = TempData["MaintenanceLogError"];
+
+            return View("Logs/Index", viewModel);
+        }
+
+        [HttpGet("Create")]
+        public async Task<IActionResult> Create()
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["MaintenanceLogError"] = "Select a property before creating a maintenance log template.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!UserCanManage(roles))
+            {
+                return Forbid();
+            }
+
+            var viewModel = new MaintenanceLogTemplateEditorViewModel
+            {
+                PropertyId = property.Id,
+                PropertyName = property.Name,
+                CanManage = true,
+                Columns = new List<MaintenanceLogColumnEditorViewModel>
+                {
+                    new MaintenanceLogColumnEditorViewModel { Label = "Task / Item", Key = "task", Required = true },
+                    new MaintenanceLogColumnEditorViewModel { Label = "Status", Key = "status" }
+                }
+            };
+
+            return View("Logs/Editor", viewModel);
+        }
+
+        [HttpPost("Create")]
+        public async Task<IActionResult> Create(MaintenanceLogTemplateEditorViewModel viewModel)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["MaintenanceLogError"] = "Select a property before creating a maintenance log template.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!UserCanManage(roles))
+            {
+                return Forbid();
+            }
+
+            viewModel.PropertyId = property.Id;
+            viewModel.PropertyName = property.Name;
+            viewModel.CanManage = true;
+
+            var sanitizedColumns = BuildColumnDefinitions(viewModel);
+            if (!sanitizedColumns.Any())
+            {
+                ModelState.AddModelError(string.Empty, "Add at least one column to capture log entries.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return View("Logs/Editor", viewModel);
+            }
+
+            var template = new MaintenanceLogTemplate
+            {
+                Name = viewModel.Name.Trim(),
+                PropertyId = property.Id,
+                ScheduleType = viewModel.ScheduleType,
+                WeeklyDaysBitmask = viewModel.ScheduleType == MaintenanceLogScheduleType.Weekly
+                    ? MaintenanceLogTemplateHelper.BuildWeeklyBitmask(GetSelectedDays(viewModel))
+                    : 0,
+                DayOfMonth = viewModel.ScheduleType == MaintenanceLogScheduleType.Monthly ? viewModel.DayOfMonth : null,
+                DueTimeLocal = viewModel.DueTimeLocal,
+                IsActive = viewModel.IsActive,
+                ColumnsJson = MaintenanceLogTemplateHelper.BuildColumnsJson(sanitizedColumns),
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+
+            _db.MaintenanceLogTemplates.Add(template);
+            await _db.SaveChangesAsync();
+
+            TempData["MaintenanceLogMessage"] = "Maintenance log template created.";
+            return RedirectToAction(nameof(Detail), new { id = template.Id });
+        }
+
+        [HttpGet("{id:int}/Edit")]
+        public async Task<IActionResult> Edit(int id)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["MaintenanceLogError"] = "Select a property before editing maintenance logs.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!UserCanManage(roles))
+            {
+                return Forbid();
+            }
+
+            var template = await _db.MaintenanceLogTemplates
+                .FirstOrDefaultAsync(t => t.Id == id && t.PropertyId == property.Id);
+            if (template == null)
+            {
+                return NotFound();
+            }
+
+            var columns = MaintenanceLogTemplateHelper.ParseColumns(template.ColumnsJson);
+            var viewModel = new MaintenanceLogTemplateEditorViewModel
+            {
+                Id = template.Id,
+                PropertyId = property.Id,
+                PropertyName = property.Name,
+                CanManage = true,
+                Name = template.Name,
+                ScheduleType = template.ScheduleType,
+                DayOfMonth = template.DayOfMonth,
+                WeeklyDays = BuildWeeklySelection(template.WeeklyDaysBitmask),
+                DueTimeLocal = template.DueTimeLocal,
+                IsActive = template.IsActive,
+                Columns = BuildColumnEditors(columns)
+            };
+
+            return View("Logs/Editor", viewModel);
+        }
+
+        [HttpPost("{id:int}/Edit")]
+        public async Task<IActionResult> Edit(int id, MaintenanceLogTemplateEditorViewModel viewModel)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["MaintenanceLogError"] = "Select a property before editing maintenance logs.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!UserCanManage(roles))
+            {
+                return Forbid();
+            }
+
+            var template = await _db.MaintenanceLogTemplates
+                .FirstOrDefaultAsync(t => t.Id == id && t.PropertyId == property.Id);
+            if (template == null)
+            {
+                return NotFound();
+            }
+
+            viewModel.Id = id;
+            viewModel.PropertyId = property.Id;
+            viewModel.PropertyName = property.Name;
+            viewModel.CanManage = true;
+
+            var sanitizedColumns = BuildColumnDefinitions(viewModel);
+            if (!sanitizedColumns.Any())
+            {
+                ModelState.AddModelError(string.Empty, "Add at least one column to capture log entries.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return View("Logs/Editor", viewModel);
+            }
+
+            template.Name = viewModel.Name.Trim();
+            template.ScheduleType = viewModel.ScheduleType;
+            template.WeeklyDaysBitmask = viewModel.ScheduleType == MaintenanceLogScheduleType.Weekly
+                ? MaintenanceLogTemplateHelper.BuildWeeklyBitmask(GetSelectedDays(viewModel))
+                : 0;
+            template.DayOfMonth = viewModel.ScheduleType == MaintenanceLogScheduleType.Monthly ? viewModel.DayOfMonth : null;
+            template.DueTimeLocal = viewModel.DueTimeLocal;
+            template.IsActive = viewModel.IsActive;
+            template.ColumnsJson = MaintenanceLogTemplateHelper.BuildColumnsJson(sanitizedColumns);
+            template.UpdatedAtUtc = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            TempData["MaintenanceLogMessage"] = "Maintenance log template updated.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        [HttpGet("{id:int}")]
+        public async Task<IActionResult> Detail(int id, DateTime? start = null, DateTime? end = null)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["MaintenanceLogError"] = "Select a property to view maintenance logs.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var canManage = UserCanManage(roles);
+
+            var template = await _db.MaintenanceLogTemplates
+                .Include(t => t.Property)
+                .FirstOrDefaultAsync(t => t.Id == id && t.PropertyId == property.Id);
+            if (template == null)
+            {
+                return NotFound();
+            }
+
+            var viewModel = await BuildDetailViewModelAsync(template, canManage, start, end);
+
+            ViewBag.MaintenanceLogMessage = TempData["MaintenanceLogMessage"];
+            ViewBag.MaintenanceLogError = TempData["MaintenanceLogError"];
+
+            return View("Logs/Detail", viewModel);
+        }
+
+        [HttpPost("{id:int}/Entries")]
+        public async Task<IActionResult> CreateEntry(int id, MaintenanceLogEntryInputModel input, DateTime? start = null, DateTime? end = null)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["MaintenanceLogError"] = "Select a property before recording maintenance log entries.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var template = await _db.MaintenanceLogTemplates
+                .Include(t => t.Property)
+                .FirstOrDefaultAsync(t => t.Id == id && t.PropertyId == property.Id);
+            if (template == null)
+            {
+                return NotFound();
+            }
+
+            var columns = MaintenanceLogTemplateHelper.ParseColumns(template.ColumnsJson);
+            if (!columns.Any())
+            {
+                TempData["MaintenanceLogError"] = "This template has no columns configured.";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
+            if (input.EntryDate == default)
+            {
+                ModelState.AddModelError(nameof(input.EntryDate), "Select a date for this entry.");
+            }
+
+            var normalizedValues = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var column in columns)
+            {
+                input.Values ??= new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                input.Values.TryGetValue(column.Key, out var raw);
+
+                var normalized = NormalizeValue(raw);
+                if (column.Type == "checkbox")
+                {
+                    normalized = raw?.Equals("true", StringComparison.OrdinalIgnoreCase) == true ? "true" : "false";
+                }
+
+                if (column.Type == "select" && column.Options.Any())
+                {
+                    if (string.IsNullOrWhiteSpace(normalized))
+                    {
+                        normalized = null;
+                    }
+                    else if (!column.Options.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+                    {
+                        ModelState.AddModelError($"Values[{column.Key}]", $"Select a value from the available options for {column.Label}.");
+                    }
+                }
+
+                if (column.Type == "number" && !string.IsNullOrWhiteSpace(normalized) && !decimal.TryParse(normalized, out _))
+                {
+                    ModelState.AddModelError($"Values[{column.Key}]", $"{column.Label} must be a number.");
+                }
+
+                if (column.Required && string.IsNullOrWhiteSpace(normalized))
+                {
+                    ModelState.AddModelError($"Values[{column.Key}]", $"{column.Label} is required.");
+                }
+
+                normalizedValues[column.Key] = normalized;
+            }
+
+            if (!ModelState.IsValid)
+            {
+                var detailModel = await BuildDetailViewModelAsync(template, await UserCanManageAsync(user), start, end);
+                ViewBag.EntryInput = input;
+                return View("Logs/Detail", detailModel);
+            }
+
+            var entry = new MaintenanceLogEntry
+            {
+                TemplateId = template.Id,
+                EntryDate = input.EntryDate.Date,
+                ValuesJson = JsonSerializer.Serialize(normalizedValues, EntrySerializerOptions),
+                CreatedByUserId = user.Id,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            _db.MaintenanceLogEntries.Add(entry);
+            await _db.SaveChangesAsync();
+
+            TempData["MaintenanceLogMessage"] = "Log entry recorded.";
+            return RedirectToAction(nameof(Detail), new
+            {
+                id,
+                start = start?.ToString("yyyy-MM-dd"),
+                end = end?.ToString("yyyy-MM-dd")
+            });
+        }
+
+        [HttpPost("{templateId:int}/Entries/{entryId:int}/Delete")]
+        public async Task<IActionResult> DeleteEntry(int templateId, int entryId, DateTime? start = null, DateTime? end = null)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["MaintenanceLogError"] = "Select a property before editing maintenance logs.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!UserCanManage(roles))
+            {
+                return Forbid();
+            }
+
+            var entry = await _db.MaintenanceLogEntries
+                .Include(e => e.Template)
+                .FirstOrDefaultAsync(e => e.Id == entryId && e.TemplateId == templateId && e.Template.PropertyId == property.Id);
+
+            if (entry == null)
+            {
+                TempData["MaintenanceLogError"] = "Log entry not found.";
+                return RedirectToAction(nameof(Detail), new { id = templateId });
+            }
+
+            _db.MaintenanceLogEntries.Remove(entry);
+            await _db.SaveChangesAsync();
+
+            TempData["MaintenanceLogMessage"] = "Log entry deleted.";
+            return RedirectToAction(nameof(Detail), new
+            {
+                id = templateId,
+                start = start?.ToString("yyyy-MM-dd"),
+                end = end?.ToString("yyyy-MM-dd")
+            });
+        }
+
+        [HttpGet("{id:int}/Export.csv")]
+        public async Task<IActionResult> Export(int id, DateTime? start = null, DateTime? end = null)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["MaintenanceLogError"] = "Select a property before exporting maintenance logs.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var template = await _db.MaintenanceLogTemplates
+                .FirstOrDefaultAsync(t => t.Id == id && t.PropertyId == property.Id);
+            if (template == null)
+            {
+                return NotFound();
+            }
+
+            var columns = MaintenanceLogTemplateHelper.ParseColumns(template.ColumnsJson);
+
+            var query = _db.MaintenanceLogEntries
+                .Include(e => e.CreatedByUser)
+                .Where(e => e.TemplateId == template.Id);
+
+            if (start.HasValue)
+            {
+                var startDate = start.Value.Date;
+                query = query.Where(e => e.EntryDate >= startDate);
+            }
+
+            if (end.HasValue)
+            {
+                var endDate = end.Value.Date;
+                query = query.Where(e => e.EntryDate <= endDate);
+            }
+
+            var entries = await query
+                .OrderBy(e => e.EntryDate)
+                .ThenBy(e => e.Id)
+                .ToListAsync();
+
+            var header = new List<string>
+            {
+                "Entry Date",
+                "Created By",
+                "Created At"
+            };
+            header.AddRange(columns.Select(column => column.Label));
+
+            var builder = new StringBuilder();
+            builder.AppendLine(string.Join(",", header.Select(Csv)));
+
+            foreach (var entry in entries)
+            {
+                var values = ParseEntryValues(entry.ValuesJson);
+                var row = new List<string>
+                {
+                    Csv(entry.EntryDate.ToString("yyyy-MM-dd")),
+                    Csv(BuildUserName(entry.CreatedByUser)),
+                    Csv(entry.CreatedAtUtc.ToString("u"))
+                };
+
+                foreach (var column in columns)
+                {
+                    values.TryGetValue(column.Key, out var value);
+                    row.Add(Csv(value));
+                }
+
+                builder.AppendLine(string.Join(",", row));
+            }
+
+            var safeTemplate = SanitizeFileName(template.Name);
+            var safeProperty = SanitizeFileName(property.Name);
+            var fileName = $"{safeProperty}-{safeTemplate}-logs-{DateTime.UtcNow:yyyyMMdd}.csv";
+            var bytes = Encoding.UTF8.GetBytes(builder.ToString());
+            return File(bytes, "text/csv", fileName);
+        }
+
+        private async Task<bool> UserCanManageAsync(ApplicationUser user)
+        {
+            var roles = await _userManager.GetRolesAsync(user);
+            return UserCanManage(roles);
+        }
+
+        private static bool UserCanManage(IList<string> roles)
+        {
+            return roles.Any(role =>
+                role.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                role.Equals("Manager", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static IEnumerable<DayOfWeek> GetSelectedDays(MaintenanceLogTemplateEditorViewModel viewModel)
+        {
+            var days = new List<DayOfWeek>();
+            var selections = viewModel.WeeklyDays ?? Array.Empty<bool>();
+            for (var index = 0; index < selections.Length; index++)
+            {
+                if (selections[index])
+                {
+                    days.Add((DayOfWeek)index);
+                }
+            }
+
+            return days;
+        }
+
+        private static bool[] BuildWeeklySelection(int bitmask)
+        {
+            var selection = new bool[7];
+            var days = MaintenanceLogTemplateHelper.ParseWeeklyBitmask(bitmask);
+            foreach (var day in days)
+            {
+                selection[(int)day] = true;
+            }
+
+            return selection;
+        }
+
+        private static List<MaintenanceLogColumnEditorViewModel> BuildColumnEditors(IReadOnlyList<MaintenanceLogColumnDefinition> columns)
+        {
+            if (columns.Count == 0)
+            {
+                return new List<MaintenanceLogColumnEditorViewModel>
+                {
+                    new MaintenanceLogColumnEditorViewModel()
+                };
+            }
+
+            return columns
+                .Select(column => new MaintenanceLogColumnEditorViewModel
+                {
+                    Key = column.Key,
+                    Label = column.Label,
+                    Type = column.Type,
+                    Required = column.Required,
+                    OptionsText = string.Join(Environment.NewLine, column.Options)
+                })
+                .ToList();
+        }
+
+        private static List<MaintenanceLogColumnDefinition> BuildColumnDefinitions(MaintenanceLogTemplateEditorViewModel viewModel)
+        {
+            var results = new List<MaintenanceLogColumnDefinition>();
+            if (viewModel.Columns == null)
+            {
+                return results;
+            }
+
+            foreach (var editor in viewModel.Columns)
+            {
+                if (string.IsNullOrWhiteSpace(editor.Label) && string.IsNullOrWhiteSpace(editor.Key))
+                {
+                    continue;
+                }
+
+                results.Add(new MaintenanceLogColumnDefinition
+                {
+                    Key = string.IsNullOrWhiteSpace(editor.Key) ? editor.Label : editor.Key,
+                    Label = string.IsNullOrWhiteSpace(editor.Label) ? editor.Key : editor.Label,
+                    Type = string.IsNullOrWhiteSpace(editor.Type) ? MaintenanceLogColumnDefinition.DefaultColumnType : editor.Type,
+                    Required = editor.Required,
+                    Options = MaintenanceLogTemplateHelper.ParseOptions(editor.OptionsText)
+                });
+            }
+
+            return results;
+        }
+
+        private async Task<MaintenanceLogTemplateDetailViewModel> BuildDetailViewModelAsync(
+            MaintenanceLogTemplate template,
+            bool canManage,
+            DateTime? start,
+            DateTime? end)
+        {
+            var columns = MaintenanceLogTemplateHelper.ParseColumns(template.ColumnsJson);
+
+            var query = _db.MaintenanceLogEntries
+                .Include(e => e.CreatedByUser)
+                .Where(e => e.TemplateId == template.Id);
+
+            if (start.HasValue)
+            {
+                var startDate = start.Value.Date;
+                query = query.Where(e => e.EntryDate >= startDate);
+            }
+
+            if (end.HasValue)
+            {
+                var endDate = end.Value.Date;
+                query = query.Where(e => e.EntryDate <= endDate);
+            }
+
+            var entries = await query
+                .OrderByDescending(e => e.EntryDate)
+                .ThenByDescending(e => e.Id)
+                .Take(MaxEntryDisplayCount)
+                .ToListAsync();
+
+            var entryModels = entries.Select(entry => new MaintenanceLogEntryViewModel
+            {
+                Id = entry.Id,
+                EntryDate = entry.EntryDate,
+                CreatedAtUtc = entry.CreatedAtUtc,
+                CreatedByName = BuildUserName(entry.CreatedByUser),
+                Values = BuildEntryValueDictionary(entry.ValuesJson, columns)
+            }).ToList();
+
+            return new MaintenanceLogTemplateDetailViewModel
+            {
+                TemplateId = template.Id,
+                TemplateName = template.Name,
+                PropertyId = template.PropertyId,
+                PropertyName = template.Property.Name,
+                CanManage = canManage,
+                ScheduleType = template.ScheduleType,
+                ScheduleSummary = MaintenanceLogTemplateHelper.BuildScheduleSummary(template),
+                IsActive = template.IsActive,
+                Columns = columns,
+                Entries = entryModels,
+                FilterStart = start?.Date,
+                FilterEnd = end?.Date
+            };
+        }
+
+        private static IReadOnlyDictionary<string, string?> BuildEntryValueDictionary(
+            string? json,
+            IReadOnlyList<MaintenanceLogColumnDefinition> columns)
+        {
+            var values = ParseEntryValues(json);
+            var ordered = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var column in columns)
+            {
+                values.TryGetValue(column.Key, out var value);
+                ordered[column.Key] = value;
+            }
+
+            return ordered;
+        }
+
+        private static Dictionary<string, string?> ParseEntryValues(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            try
+            {
+                var values = JsonSerializer.Deserialize<Dictionary<string, string?>>(json, EntrySerializerOptions);
+                return values != null
+                    ? new Dictionary<string, string?>(values, StringComparer.OrdinalIgnoreCase)
+                    : new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        private static string? NormalizeValue(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var trimmed = value.Trim();
+            return trimmed.Length > 500 ? trimmed[..500] : trimmed;
+        }
+
+        private static string Csv(string? value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return string.Empty;
+            }
+
+            var needsQuotes = value.Contains(',') || value.Contains('"') || value.Contains('\n');
+            var sanitized = value.Replace("\"", "\"\"");
+            return needsQuotes ? $"\"{sanitized}\"" : sanitized;
+        }
+
+        private static string SanitizeFileName(string value)
+        {
+            var invalid = System.IO.Path.GetInvalidFileNameChars();
+            var sanitized = new string(value
+                .Select(ch => invalid.Contains(ch) ? '-' : ch)
+                .ToArray());
+            return string.IsNullOrWhiteSpace(sanitized) ? "logs" : sanitized;
+        }
+
+        private static string? BuildUserName(ApplicationUser? user)
+        {
+            if (user == null)
+            {
+                return null;
+            }
+
+            var fullName = $"{user.FirstName} {user.LastName}".Trim();
+            if (!string.IsNullOrWhiteSpace(fullName))
+            {
+                return fullName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(user.Email))
+            {
+                return user.Email;
+            }
+
+            return user.UserName;
+        }
+    }
+}
