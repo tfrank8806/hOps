@@ -120,13 +120,13 @@
                         <div class="d-flex flex-column gap-2">
                             <div class="d-flex flex-wrap gap-3 align-items-center">
                                 <div class="form-check form-check-inline mb-0">
-                                    <input type="hidden" name="rooms[@i].IncludeInPreventiveMaintenance" value="false" />
                                     <input class="form-check-input" type="checkbox" name="rooms[@i].IncludeInPreventiveMaintenance" value="true" @(Model[i].IncludeInPreventiveMaintenance ? "checked" : null) id="room-@i-pm">
+                                    <input type="hidden" name="rooms[@i].IncludeInPreventiveMaintenance" value="false" />
                                     <label class="form-check-label" for="room-@i-pm">PM</label>
                                 </div>
                                 <div class="form-check form-check-inline mb-0">
-                                    <input type="hidden" name="rooms[@i].IncludeInDeepClean" value="false" />
                                     <input class="form-check-input" type="checkbox" name="rooms[@i].IncludeInDeepClean" value="true" @(Model[i].IncludeInDeepClean ? "checked" : null) id="room-@i-dc">
+                                    <input type="hidden" name="rooms[@i].IncludeInDeepClean" value="false" />
                                     <label class="form-check-label" for="room-@i-dc">Deep Clean</label>
                                 </div>
                             </div>
@@ -152,13 +152,13 @@
                         <div class="d-flex flex-column gap-2">
                             <div class="d-flex flex-wrap gap-3 align-items-center">
                                 <div class="form-check form-check-inline mb-0">
-                                    <input type="hidden" name="rooms[#].IncludeInPreventiveMaintenance" value="false" />
                                     <input class="form-check-input" type="checkbox" name="rooms[#].IncludeInPreventiveMaintenance" value="true" checked />
+                                    <input type="hidden" name="rooms[#].IncludeInPreventiveMaintenance" value="false" />
                                     <label class="form-check-label">PM</label>
                                 </div>
                                 <div class="form-check form-check-inline mb-0">
-                                    <input type="hidden" name="rooms[#].IncludeInDeepClean" value="false" />
                                     <input class="form-check-input" type="checkbox" name="rooms[#].IncludeInDeepClean" value="true" checked />
+                                    <input type="hidden" name="rooms[#].IncludeInDeepClean" value="false" />
                                     <label class="form-check-label">Deep Clean</label>
                                 </div>
                             </div>
