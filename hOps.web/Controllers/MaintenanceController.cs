@@ -28,12 +28,6 @@ namespace hOps.web.Controllers
             _db = context;
         }
 
-        [HttpGet("PMs")]
-        public IActionResult RedirectToPms([FromQuery] int? checklistId = null)
-        {
-            return RedirectToAction("Index", "PreventiveMaintenance", new { checklistId });
-        }
-
         [HttpGet("PMs/Checklists")]
         public async Task<IActionResult> PmChecklists(int? propertyId = null, int? checklistId = null)
         {
