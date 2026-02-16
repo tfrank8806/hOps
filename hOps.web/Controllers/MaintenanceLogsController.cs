@@ -23,6 +23,9 @@ namespace hOps.web.Controllers
     public class MaintenanceLogsController : BaseController
     {
         private const int MaxEntryDisplayCount = 500;
+        private const string LogsIndexView = "~/Views/Maintenance/Logs/Index.cshtml";
+        private const string LogsEditorView = "~/Views/Maintenance/Logs/Editor.cshtml";
+        private const string LogsDetailView = "~/Views/Maintenance/Logs/Detail.cshtml";
 
         private readonly ApplicationDbContext _db;
         private static readonly JsonSerializerOptions EntrySerializerOptions = new(JsonSerializerDefaults.Web);
@@ -97,7 +100,7 @@ namespace hOps.web.Controllers
             ViewBag.MaintenanceLogMessage = TempData["MaintenanceLogMessage"];
             ViewBag.MaintenanceLogError = TempData["MaintenanceLogError"];
 
-            return View("Logs/Index", viewModel);
+            return View(LogsIndexView, viewModel);
         }
 
         [HttpGet("Create")]
@@ -134,7 +137,7 @@ namespace hOps.web.Controllers
                 }
             };
 
-            return View("Logs/Editor", viewModel);
+            return View(LogsEditorView, viewModel);
         }
 
         [HttpPost("Create")]
@@ -171,7 +174,7 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                return View("Logs/Editor", viewModel);
+                return View(LogsEditorView, viewModel);
             }
 
             var template = new MaintenanceLogTemplate
@@ -242,7 +245,7 @@ namespace hOps.web.Controllers
                 Columns = BuildColumnEditors(columns)
             };
 
-            return View("Logs/Editor", viewModel);
+            return View(LogsEditorView, viewModel);
         }
 
         [HttpPost("{id:int}/Edit")]
@@ -287,7 +290,7 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                return View("Logs/Editor", viewModel);
+                return View(LogsEditorView, viewModel);
             }
 
             template.Name = viewModel.Name.Trim();
@@ -339,7 +342,7 @@ namespace hOps.web.Controllers
             ViewBag.MaintenanceLogMessage = TempData["MaintenanceLogMessage"];
             ViewBag.MaintenanceLogError = TempData["MaintenanceLogError"];
 
-            return View("Logs/Detail", viewModel);
+            return View(LogsDetailView, viewModel);
         }
 
         [HttpPost("{id:int}/Entries")]
@@ -419,7 +422,7 @@ namespace hOps.web.Controllers
             {
                 var detailModel = await BuildDetailViewModelAsync(template, await UserCanManageAsync(user), start, end);
                 ViewBag.EntryInput = input;
-                return View("Logs/Detail", detailModel);
+                return View(LogsDetailView, detailModel);
             }
 
             var entry = new MaintenanceLogEntry
@@ -799,3 +802,4 @@ namespace hOps.web.Controllers
         }
     }
 }
+

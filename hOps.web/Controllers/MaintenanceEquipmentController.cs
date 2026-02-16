@@ -20,6 +20,10 @@ namespace hOps.web.Controllers
     [Route("Maintenance/Equipment")]
     public class MaintenanceEquipmentController : BaseController
     {
+        private const string EquipmentIndexView = "~/Views/Maintenance/Equipment/Index.cshtml";
+        private const string EquipmentEditView = "~/Views/Maintenance/Equipment/Edit.cshtml";
+        private const string EquipmentDetailsView = "~/Views/Maintenance/Equipment/Details.cshtml";
+
         private readonly ApplicationDbContext _db;
 
         public MaintenanceEquipmentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
@@ -77,7 +81,7 @@ namespace hOps.web.Controllers
             ViewBag.EquipmentMessage = TempData["EquipmentMessage"];
             ViewBag.EquipmentError = TempData["EquipmentError"];
 
-            return View("Equipment/Index", viewModel);
+            return View(EquipmentIndexView, viewModel);
         }
 
         [HttpGet("Create")]
@@ -109,7 +113,7 @@ namespace hOps.web.Controllers
                 CanManage = true
             };
 
-            return View("Equipment/Edit", viewModel);
+            return View(EquipmentEditView, viewModel);
         }
 
         [HttpPost("Create")]
@@ -140,7 +144,7 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                return View("Equipment/Edit", viewModel);
+                return View(EquipmentEditView, viewModel);
             }
 
             var now = DateTime.UtcNow;
@@ -222,7 +226,7 @@ namespace hOps.web.Controllers
             ViewBag.EquipmentMessage = TempData["EquipmentMessage"];
             ViewBag.EquipmentError = TempData["EquipmentError"];
 
-            return View("Equipment/Details", viewModel);
+            return View(EquipmentDetailsView, viewModel);
         }
 
         [HttpGet("{id:int}/Edit")]
@@ -313,7 +317,7 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                return View("Equipment/Edit", viewModel);
+                return View(EquipmentEditView, viewModel);
             }
 
             entity.Name = viewModel.Name.Trim();
