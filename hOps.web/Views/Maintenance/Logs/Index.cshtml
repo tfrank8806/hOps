@@ -12,10 +12,7 @@
             <h2 class="mb-0">Maintenance Logs</h2>
             <p class="text-muted mb-0">@Model.PropertyName</p>
         </div>
-        @if (Model.CanManage)
-        {
-            <a asp-action="Create" class="btn btn-primary btn-sm">Create Template</a>
-        }
+        <a asp-action="Create" class="btn btn-primary btn-sm">Create Template</a>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(message))
