@@ -64,6 +64,7 @@
                         </select>
                         @if (Model.ChecklistEditor?.CanChangeType == false)
                         {
+                            <input type="hidden" name="ChecklistType" value="@Model.ChecklistEditor?.ChecklistType" />
                             <div class="form-text text-warning">Checklist type can’t be changed because sessions already exist.</div>
                         }
                     </div>
