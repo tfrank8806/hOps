@@ -23,6 +23,7 @@ using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 var forceSqlite = ShouldForceSqlite(builder.Configuration);
+var supabaseStorageOptions = SupabaseStorageOptions.FromConfiguration(builder.Configuration);
 
 // ----------------------
 // 1. Services Registration
@@ -295,6 +296,7 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Authent
 builder.Services.Configure<CaptchaOptions>(builder.Configuration.GetSection("Captcha"));
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddHttpClient<ICaptchaValidator, GoogleRecaptchaValidator>();
+builder.Services.AddSingleton(supabaseStorageOptions);
 
 var jwtSettings = builder.Configuration.GetSection("Authentication:Jwt").Get<JwtOptions>() ?? new JwtOptions();
 var jwtSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SigningKey));
