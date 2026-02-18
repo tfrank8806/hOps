@@ -414,27 +414,8 @@ namespace hOps.web.Controllers
 
             var actorName = FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
             var subject = $"New log: {log.Title}";
-            var safeActor = WebUtility.HtmlEncode(actorName);
-            var safeTitle = WebUtility.HtmlEncode(log.Title);
-            var summaryHtml = RichTextRenderer.ToEmailHtml(log.Body);
-            var safeProperties = propertyNames.Any()
-                ? string.Join(", ", propertyNames.Select(WebUtility.HtmlEncode))
-                : null;
-
-            var bodyBuilder = new StringBuilder();
-            bodyBuilder.AppendLine($@"<p>{safeActor} posted a new log titled <strong>{safeTitle}</strong>.</p>");
-            if (safeProperties != null)
-            {
-                bodyBuilder.AppendLine($@"<p><strong>Properties:</strong> {safeProperties}</p>");
-            }
-            if (!string.IsNullOrWhiteSpace(summaryHtml))
-            {
-                bodyBuilder.AppendLine("<p><strong>Summary:</strong></p>");
-                bodyBuilder.AppendLine($@"<div style=""font-size:14px;line-height:1.5;word-break:break-word;"">{summaryHtml}</div>");
-            }
-            bodyBuilder.AppendLine($@"<p><a href=""{linkUrl}"">Review the log</a></p>");
-
-            var htmlBody = bodyBuilder.ToString();
+            var introHtml = $@"<p>{WebUtility.HtmlEncode(actorName)} posted a new log titled <strong>{WebUtility.HtmlEncode(log.Title)}</strong>.</p>";
+            var htmlBody = introHtml + BuildPassOnLogEmailBody(log, linkUrl, propertyNames, log.Comments);
 
             foreach (var recipient in emailRecipients)
             {
@@ -447,6 +428,106 @@ namespace hOps.web.Controllers
                     _logger.LogError(ex, "Unable to send log email notification to user {UserId}", recipient.Id);
                 }
             }
+        }
+
+        private async Task SendLogCommentEmailsAsync(
+            PassOnLog log,
+            PassOnLogComment comment,
+            ApplicationUser actor,
+            string linkUrl,
+            List<ApplicationUser> recipients)
+        {
+            var emailRecipients = recipients
+                .Where(r => r.EmailOnLogEntry && !string.IsNullOrWhiteSpace(r.Email))
+                .ToList();
+
+            if (!emailRecipients.Any())
+            {
+                return;
+            }
+
+            var propertyNames = log.Properties
+                .Select(lp => lp.Property?.Name ?? $"Property #{lp.PropertyId}")
+                .Distinct()
+                .ToList();
+
+            var actorName = FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
+            var subject = $"New comment on: {log.Title}";
+            var introHtml = $@"<p>{WebUtility.HtmlEncode(actorName)} added a new comment on <strong>{WebUtility.HtmlEncode(log.Title)}</strong>.</p>";
+            var htmlBody = introHtml + BuildPassOnLogEmailBody(log, linkUrl, propertyNames, log.Comments);
+
+            foreach (var recipient in emailRecipients)
+            {
+                try
+                {
+                    await _emailSender.SendEmailAsync(recipient.Email!, subject, htmlBody);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unable to send log comment email notification to user {UserId}", recipient.Id);
+                }
+            }
+        }
+
+        private static string BuildPassOnLogEmailBody(
+            PassOnLog log,
+            string linkUrl,
+            IReadOnlyCollection<string> propertyNames,
+            IEnumerable<PassOnLogComment>? comments = null)
+        {
+            var safeProperties = propertyNames.Any()
+                ? string.Join(", ", propertyNames.Select(WebUtility.HtmlEncode))
+                : null;
+
+            var summaryHtml = RichTextRenderer.ToEmailHtml(log.Body);
+            var bodyBuilder = new StringBuilder();
+
+            if (!string.IsNullOrWhiteSpace(safeProperties))
+            {
+                bodyBuilder.AppendLine($@"<p><strong>Properties:</strong> {safeProperties}</p>");
+            }
+
+            if (!string.IsNullOrWhiteSpace(summaryHtml))
+            {
+                bodyBuilder.AppendLine("<p><strong>Summary:</strong></p>");
+                bodyBuilder.AppendLine($@"<div style=""font-size:14px;line-height:1.5;word-break:break-word;"">{summaryHtml}</div>");
+            }
+
+            var orderedComments = comments?
+                .Where(c => c != null)
+                .OrderBy(c => c.CreatedAt)
+                .ToList() ?? new List<PassOnLogComment>();
+
+            if (orderedComments.Any())
+            {
+                bodyBuilder.AppendLine(@"<hr style=""margin:24px 0;border:none;border-top:1px solid #e5e7eb;""/>");
+                bodyBuilder.AppendLine("<p><strong>Comments</strong></p>");
+
+                foreach (var passOnComment in orderedComments)
+                {
+                    var authorName = FormatUserName(
+                        passOnComment.CreatedBy?.FirstName,
+                        passOnComment.CreatedBy?.LastName,
+                        passOnComment.CreatedBy?.Email ?? string.Empty);
+                    var safeAuthor = WebUtility.HtmlEncode(authorName);
+                    var timestamp = passOnComment.CreatedAt.ToString("MMM d, yyyy h:mm tt 'UTC'");
+                    var safeTimestamp = WebUtility.HtmlEncode(timestamp);
+                    var commentHtml = RichTextRenderer.ToEmailHtml(passOnComment.Body);
+                    if (string.IsNullOrWhiteSpace(commentHtml))
+                    {
+                        commentHtml = "<p style=\"margin:0;color:#6b7280;\">(No details provided)</p>";
+                    }
+
+                    bodyBuilder.AppendLine($@"
+<div style=""margin-bottom:16px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;"">
+    <div style=""font-size:13px;color:#111827;""><strong>{safeAuthor}</strong><span style=""color:#6b7280;margin-left:8px;"">{safeTimestamp}</span></div>
+    <div style=""margin-top:8px;font-size:14px;line-height:1.5;word-break:break-word;"">{commentHtml}</div>
+</div>");
+                }
+            }
+
+            bodyBuilder.AppendLine($@"<p><a href=""{linkUrl}"">Review the log</a></p>");
+            return bodyBuilder.ToString();
         }
 
         [HttpGet]
@@ -753,6 +834,8 @@ namespace hOps.web.Controllers
             };
 
             _context.PassOnLogComments.Add(comment);
+            log.Comments.Add(comment);
+            comment.CreatedBy = currentUser;
             MarkLogUnreadForUnseenCommentViewers(log, currentUser.Id, comment.CreatedAt);
             await _context.SaveChangesAsync();
 
@@ -765,6 +848,9 @@ namespace hOps.web.Controllers
                 $"Pass On Log Comment: {log.Title}",
                 link,
                 comment.Body);
+
+            var logAlertRecipients = await GetLogEntryAlertRecipientsAsync(log, currentUser);
+            await SendLogCommentEmailsAsync(log, comment, currentUser, link, logAlertRecipients);
 
             if (!string.IsNullOrWhiteSpace(input.ReturnUrl) && Url.IsLocalUrl(input.ReturnUrl))
             {
