@@ -23,7 +23,11 @@
             <p class="text-muted mb-0 small">Log PM sessions, track durations, and stay ahead of upcoming rooms.</p>
         </div>
         <div class="d-flex gap-2">
-            <a asp-controller="Settings" asp-action="PmSetup" asp-route-propertyId="@Model.PropertyId" class="btn btn-outline-secondary btn-sm">Edit Checklist</a>
+            <a asp-controller="Maintenance"
+               asp-action="PmChecklists"
+               asp-route-propertyId="@Model.PropertyId"
+               asp-route-checklistId="@Model.SelectedChecklistId"
+               class="btn btn-outline-secondary btn-sm">Edit Checklist</a>
             <a asp-controller="PreventiveMaintenance" asp-action="Archive" class="btn btn-outline-secondary btn-sm">View Archive</a>
             <button type="button" class="btn btn-primary" id="pmStartToggle">Start new PM</button>
         </div>
