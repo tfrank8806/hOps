@@ -114,14 +114,23 @@ namespace hOps.web.Utilities
 
                     return dayText;
                 case MaintenanceLogScheduleType.Monthly:
+                case MaintenanceLogScheduleType.Quarterly:
+                case MaintenanceLogScheduleType.Yearly:
                     var day = template.DayOfMonth ?? 1;
                     var ordinal = GetOrdinal(day);
+                    var period = template.ScheduleType switch
+                    {
+                        MaintenanceLogScheduleType.Monthly => "Monthly",
+                        MaintenanceLogScheduleType.Quarterly => "Quarterly",
+                        MaintenanceLogScheduleType.Yearly => "Yearly",
+                        _ => "Monthly"
+                    };
                     if (template.DueTimeLocal.HasValue)
                     {
-                        return $"Monthly on the {ordinal} by {FormatTime(template.DueTimeLocal.Value)}";
+                        return $"{period} on the {ordinal} by {FormatTime(template.DueTimeLocal.Value)}";
                     }
 
-                    return $"Monthly on the {ordinal}";
+                    return $"{period} on the {ordinal}";
                 default:
                     return "No schedule";
             }

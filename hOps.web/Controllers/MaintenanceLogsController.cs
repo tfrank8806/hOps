@@ -173,7 +173,7 @@ namespace hOps.web.Controllers
                 WeeklyDaysBitmask = viewModel.ScheduleType == MaintenanceLogScheduleType.Weekly
                     ? MaintenanceLogTemplateHelper.BuildWeeklyBitmask(GetSelectedDays(viewModel))
                     : 0,
-                DayOfMonth = viewModel.ScheduleType == MaintenanceLogScheduleType.Monthly ? viewModel.DayOfMonth : null,
+                DayOfMonth = RequiresDayOfMonth(viewModel.ScheduleType) ? viewModel.DayOfMonth : null,
                 DueTimeLocal = viewModel.DueTimeLocal,
                 IsActive = viewModel.IsActive,
                 ColumnsJson = MaintenanceLogTemplateHelper.BuildColumnsJson(sanitizedColumns),
@@ -286,7 +286,7 @@ namespace hOps.web.Controllers
             template.WeeklyDaysBitmask = viewModel.ScheduleType == MaintenanceLogScheduleType.Weekly
                 ? MaintenanceLogTemplateHelper.BuildWeeklyBitmask(GetSelectedDays(viewModel))
                 : 0;
-            template.DayOfMonth = viewModel.ScheduleType == MaintenanceLogScheduleType.Monthly ? viewModel.DayOfMonth : null;
+                template.DayOfMonth = RequiresDayOfMonth(viewModel.ScheduleType) ? viewModel.DayOfMonth : null;
             template.DueTimeLocal = viewModel.DueTimeLocal;
             template.IsActive = viewModel.IsActive;
             template.ColumnsJson = MaintenanceLogTemplateHelper.BuildColumnsJson(sanitizedColumns);
@@ -593,6 +593,13 @@ namespace hOps.web.Controllers
             }
 
             return selection;
+        }
+
+        private static bool RequiresDayOfMonth(MaintenanceLogScheduleType scheduleType)
+        {
+            return scheduleType == MaintenanceLogScheduleType.Monthly
+                || scheduleType == MaintenanceLogScheduleType.Quarterly
+                || scheduleType == MaintenanceLogScheduleType.Yearly;
         }
 
         private static List<MaintenanceLogColumnEditorViewModel> BuildColumnEditors(IReadOnlyList<MaintenanceLogColumnDefinition> columns)
