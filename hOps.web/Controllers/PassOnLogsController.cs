@@ -420,12 +420,12 @@ namespace hOps.web.Controllers
             var actorName = PassOnLogEmailHelper.FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
             var subject = $"New log: {log.Title}";
             var introHtml = $@"<p>{WebUtility.HtmlEncode(actorName)} posted a new log titled <strong>{WebUtility.HtmlEncode(log.Title)}</strong>.</p>";
-            var htmlBody = introHtml + PassOnLogEmailHelper.BuildLogEmailBody(log, linkUrl, propertyNames, log.Comments);
-
             foreach (var recipient in emailRecipients)
             {
                 try
                 {
+                    var recipientTimeZone = ResolveUserTimeZone(recipient);
+                    var htmlBody = introHtml + PassOnLogEmailHelper.BuildLogEmailBody(log, linkUrl, propertyNames, log.Comments, recipientTimeZone);
                     await _emailSender.SendEmailAsync(recipient.Email!, subject, htmlBody);
                 }
                 catch (Exception ex)
@@ -459,12 +459,12 @@ namespace hOps.web.Controllers
             var actorName = PassOnLogEmailHelper.FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
             var subject = $"New comment on: {log.Title}";
             var introHtml = $@"<p>{WebUtility.HtmlEncode(actorName)} added a new comment on <strong>{WebUtility.HtmlEncode(log.Title)}</strong>.</p>";
-            var htmlBody = introHtml + PassOnLogEmailHelper.BuildLogEmailBody(log, linkUrl, propertyNames, log.Comments);
-
             foreach (var recipient in emailRecipients)
             {
                 try
                 {
+                    var recipientTimeZone = ResolveUserTimeZone(recipient);
+                    var htmlBody = introHtml + PassOnLogEmailHelper.BuildLogEmailBody(log, linkUrl, propertyNames, log.Comments, recipientTimeZone);
                     await _emailSender.SendEmailAsync(recipient.Email!, subject, htmlBody);
                 }
                 catch (Exception ex)
@@ -1242,6 +1242,23 @@ namespace hOps.web.Controllers
             }
 
             return !log.Views.Any(v => v.ViewerId == userId);
+        }
+
+        private static TimeZoneInfo ResolveUserTimeZone(ApplicationUser? user)
+        {
+            var normalized = DefaultTimeZoneProvider.NormalizeForStorage(user?.TimeZoneId);
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(normalized);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return TimeZoneInfo.Utc;
+            }
+            catch (InvalidTimeZoneException)
+            {
+                return TimeZoneInfo.Utc;
+            }
         }
 
     }

@@ -868,15 +868,11 @@ namespace hOps.web.Controllers
             var safeIssue = WebUtility.HtmlEncode(workOrder.Issue ?? string.Empty);
             var safeLocation = string.IsNullOrWhiteSpace(workOrder.Location) ? null : WebUtility.HtmlEncode(workOrder.Location);
             var dueDateValue = workOrder.DueDate;
-            var dueDateText = dueDateValue == default
-                ? "Not set"
-                : _timeZoneService.ConvertToUserTime(dueDateValue).ToString("MMM d, yyyy h:mm tt");
-            dueDateText = WebUtility.HtmlEncode(dueDateText);
 
             var detailPreview = string.IsNullOrWhiteSpace(workOrder.Details) ? null : workOrder.Details.Trim();
             if (!string.IsNullOrWhiteSpace(detailPreview) && detailPreview.Length > 500)
             {
-                detailPreview = $"{detailPreview[..500]}ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½";
+                detailPreview = $"{detailPreview[..500]}A??'A+??TA???sA,A_A??'A??,???A???sA,A?A??'A??,???A???sA,A?";
             }
             var safeDetails = string.IsNullOrWhiteSpace(detailPreview)
                 ? null
@@ -890,40 +886,40 @@ namespace hOps.web.Controllers
                 ? string.Join(", ", propertyNames.Select(WebUtility.HtmlEncode))
                 : null;
 
-            var bodyBuilder = new StringBuilder();
-            bodyBuilder.AppendLine($@"<p>{safeActor} created a new work order assigned to <strong>{safeDepartment}</strong>.</p>");
-            bodyBuilder.AppendLine($@"<p><strong>Issue:</strong> {safeIssue}</p>");
-            if (safeLocation != null)
-            {
-                bodyBuilder.AppendLine($@"<p><strong>Location:</strong> {safeLocation}</p>");
-            }
-            bodyBuilder.AppendLine($@"<p><strong>Due Date:</strong> {dueDateText}</p>");
-            if (safeProperties != null)
-            {
-                bodyBuilder.AppendLine($@"<p><strong>Properties:</strong> {safeProperties}</p>");
-            }
-            if (safeDetails != null)
-            {
-                bodyBuilder.AppendLine($@"<p><strong>Details:</strong><br/>{safeDetails}</p>");
-            }
-            bodyBuilder.AppendLine($@"<p><a href=""{workOrderLink}"">Open work order</a></p>");
-
-            var htmlBody = bodyBuilder.ToString();
-
             foreach (var recipient in recipients)
             {
                 try
                 {
-                    await _emailSender.SendEmailAsync(recipient.Email!, subject, htmlBody);
+                    var recipientTimeZone = ResolveUserTimeZone(recipient);
+                    var dueDateText = FormatDueDate(dueDateValue, recipientTimeZone);
+                    var safeDueDate = WebUtility.HtmlEncode(dueDateText);
+
+                    var bodyBuilder = new StringBuilder();
+                    bodyBuilder.AppendLine($"<p>{safeActor} created a new work order assigned to <strong>{safeDepartment}</strong>.</p>");
+                    bodyBuilder.AppendLine($"<p><strong>Issue:</strong> {safeIssue}</p>");
+                    if (safeLocation != null)
+                    {
+                        bodyBuilder.AppendLine($"<p><strong>Location:</strong> {safeLocation}</p>");
+                    }
+                    bodyBuilder.AppendLine($"<p><strong>Due Date:</strong> {safeDueDate}</p>");
+                    if (safeProperties != null)
+                    {
+                        bodyBuilder.AppendLine($"<p><strong>Properties:</strong> {safeProperties}</p>");
+                    }
+                    if (safeDetails != null)
+                    {
+                        bodyBuilder.AppendLine($"<p><strong>Details:</strong><br/>{safeDetails}</p>");
+                    }
+                    bodyBuilder.AppendLine($"<p><a href=\"{workOrderLink}\">Open work order</a></p>");
+
+                    await _emailSender.SendEmailAsync(recipient.Email!, subject, bodyBuilder.ToString());
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Unable to send work order email notification to user {UserId}", recipient.Id);
                 }
             }
-        }
-
-        private async Task CreateDepartmentNotificationsAsync(
+        }        private async Task CreateDepartmentNotificationsAsync(
             IEnumerable<string> userIds,
             WorkOrder workOrder,
             string workOrderLink,
@@ -950,6 +946,42 @@ namespace hOps.web.Controllers
             }
 
             await _context.SaveChangesAsync();
+        }
+
+        private static TimeZoneInfo ResolveUserTimeZone(ApplicationUser? user)
+        {
+            var normalized = DefaultTimeZoneProvider.NormalizeForStorage(user?.TimeZoneId);
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(normalized);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return TimeZoneInfo.Utc;
+            }
+            catch (InvalidTimeZoneException)
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+
+        private static string FormatDueDate(DateTime dueDate, TimeZoneInfo timeZone)
+        {
+            if (dueDate == default)
+            {
+                return "Not set";
+            }
+
+            var normalized = dueDate.Kind switch
+            {
+                DateTimeKind.Local => dueDate.ToUniversalTime(),
+                DateTimeKind.Unspecified => DateTime.SpecifyKind(dueDate, DateTimeKind.Utc),
+                _ => dueDate
+            };
+
+            var local = TimeZoneInfo.ConvertTimeFromUtc(normalized, timeZone);
+            var offset = new DateTimeOffset(local, timeZone.GetUtcOffset(local));
+            return offset.ToString("MMM d, yyyy h:mm tt zzz");
         }
 
         private static string BuildUserDisplayName(ApplicationUser? user)
@@ -1394,4 +1426,5 @@ namespace hOps.web.Controllers
         }
     }
 }
+
 

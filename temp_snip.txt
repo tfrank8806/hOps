@@ -1,81 +1,96 @@
-@model hOps.web.ViewModels.Maintenance.MaintenanceLogTemplateEditorViewModel
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Text;
+using hOps.web.Models;
 
-@{
-    var pageTitle = Model.IsEditMode ? "Edit Maintenance Log Template" : "Create Maintenance Log Template";
-    ViewData["Title"] = pageTitle;
-    var formAction = Model.IsEditMode ? "Edit" : "Create";
+namespace hOps.web.Utilities
+{
+    public static class PassOnLogEmailHelper
+    {
+        public static string FormatUserName(string? firstName, string? lastName, string? email)
+        {
+            var name = $"{firstName} {lastName}".Trim();
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                return name;
+            }
+
+            return string.IsNullOrWhiteSpace(email) ? "Unknown User" : email!;
+        }
+
+        public static string FormatUserName(ApplicationUser? user)
+        {
+            if (user == null)
+            {
+                return "Unknown User";
+            }
+
+            return FormatUserName(user.FirstName, user.LastName, user.Email);
+        }
+
+        public static string BuildLogEmailBody(
+            PassOnLog log,
+            string linkUrl,
+            IReadOnlyCollection<string>? propertyNames = null,
+            IEnumerable<PassOnLogComment>? comments = null)
+        {
+            var names = propertyNames ?? log.Properties
+                .Select(lp => lp.Property?.Name ?? $"Property #{lp.PropertyId}")
+                .Distinct()
+                .ToList();
+
+            var safeProperties = names.Any()
+                ? string.Join(", ", names.Select(WebUtility.HtmlEncode))
+                : null;
+
+            var summaryHtml = RichTextRenderer.ToEmailHtml(log.Body);
+            var bodyBuilder = new StringBuilder();
+
+            if (!string.IsNullOrWhiteSpace(safeProperties))
+            {
+                bodyBuilder.AppendLine($@"<p><strong>Properties:</strong> {safeProperties}</p>");
+            }
+
+            if (!string.IsNullOrWhiteSpace(summaryHtml))
+            {
+                bodyBuilder.AppendLine("<p><strong>Summary:</strong></p>");
+                bodyBuilder.AppendLine($@"<div style=""font-size:14px;line-height:1.5;word-break:break-word;"">{summaryHtml}</div>");
+            }
+
+            var orderedComments = comments?
+                .Where(c => c != null)
+                .OrderBy(c => c.CreatedAt)
+                .ToList() ?? new List<PassOnLogComment>();
+
+            if (orderedComments.Any())
+            {
+                bodyBuilder.AppendLine(@"<hr style=""margin:24px 0;border:none;border-top:1px solid #e5e7eb;""/>");
+                bodyBuilder.AppendLine("<p><strong>Comments</strong></p>");
+
+                foreach (var comment in orderedComments)
+                {
+                    var authorName = FormatUserName(comment.CreatedBy?.FirstName, comment.CreatedBy?.LastName, comment.CreatedBy?.Email);
+                    var safeAuthor = WebUtility.HtmlEncode(authorName);
+                    var timestamp = comment.CreatedAt.ToString("MMM d, yyyy h:mm tt 'UTC'");
+                    var safeTimestamp = WebUtility.HtmlEncode(timestamp);
+                    var commentHtml = RichTextRenderer.ToEmailHtml(comment.Body);
+                    if (string.IsNullOrWhiteSpace(commentHtml))
+                    {
+                        commentHtml = "<p style=\"margin:0;color:#6b7280;\">(No details provided)</p>";
+                    }
+
+                    bodyBuilder.AppendLine($@"
+<div style=""margin-bottom:16px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;"">
+    <div style=""font-size:13px;color:#111827;""><strong>{safeAuthor}</strong><span style=""color:#6b7280;margin-left:8px;"">{safeTimestamp}</span></div>
+    <div style=""margin-top:8px;font-size:14px;line-height:1.5;word-break:break-word;"">{commentHtml}</div>
+</div>");
+                }
+            }
+
+            bodyBuilder.AppendLine($@"<p><a href=""{linkUrl}"">Review the log</a></p>");
+            return bodyBuilder.ToString();
+        }
+    }
 }
-
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <div>
-            <h2 class="mb-0">@pageTitle</h2>
-            <p class="text-muted mb-0">@Model.PropertyName</p>
-        </div>
-    </div>
-
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <form asp-action="@formAction" asp-route-id="@Model.Id" method="post">
-                @Html.AntiForgeryToken()
-                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
-
-                <div class="row g-3 mb-4">
-                    <div class="col-md-6">
-                        <label asp-for="Name" class="form-label"></label>
-                        <input asp-for="Name" class="form-control" />
-                        <span asp-validation-for="Name" class="text-danger"></span>
-                    </div>
-                    <div class="col-md-3">
-                        <label asp-for="ScheduleType" class="form-label">Schedule</label>
-                        <select asp-for="ScheduleType" class="form-select" id="scheduleTypeSelect">
-                            <option value="None">None</option>
-                            <option value="Daily">Daily</option>
-                            <option value="Weekly">Weekly</option>
-                            <option value="Monthly">Monthly</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label asp-for="DueTimeLocal" class="form-label">Due Time (optional)</label>
-                        <input asp-for="DueTimeLocal" type="time" class="form-control" />
-                    </div>
-                    <div class="col-md-6 d-none" id="weeklyDaysFieldset">
-                        <label class="form-label">Weekly Days</label>
-                        <div class="d-flex flex-wrap gap-3">
-                            @{
-                                var dayNames = Enum.GetNames(typeof(DayOfWeek));
-                                for (var i = 0; i < dayNames.Length; i++)
-                                {
-                                    <div class="form-check">
-                                        <input type="hidden" name="WeeklyDays[@i]" value="false" />
-                                        <input class="form-check-input" type="checkbox" name="WeeklyDays[@i]" value="true" @(Model.WeeklyDays.Length > i && Model.WeeklyDays[i] ? "checked" : null) id="weekday-@i" />
-                                        <label class="form-check-label" for="weekday-@i">@dayNames[i]</label>
-                                    </div>;
-                                }
-                            }
-                        </div>
-                    </div>
-                    <div class="col-md-3 d-none" id="monthlyDayFieldset">
-                        <label asp-for="DayOfMonth" class="form-label">Day of Month</label>
-                        <input asp-for="DayOfMonth" type="number" min="1" max="31" class="form-control" />
-                        <span asp-validation-for="DayOfMonth" class="text-danger"></span>
-                    </div>
-                    <div class="col-md-3 d-flex align-items-center">
-                        <div class="form-check mt-4 pt-2">
-                            <input asp-for="IsActive" class="form-check-input" />
-                            <label asp-for="IsActive" class="form-check-label">Active</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Columns</h5>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="addColumnBtn">Add Column</button>
-                </div>
-
-                <div id="columnsContainer">
-                    @{
-                        var columns = Model.Columns ?? new List<hOps.web.ViewModels.Maintenance.MaintenanceLogColumnEditorViewModel>();
-                        if (columns.Count == 0)
-                        {
-                            columns.Add(new hOps.web.ViewModels.Maintenance.MaintenanceLogColumnEditorViewModel());

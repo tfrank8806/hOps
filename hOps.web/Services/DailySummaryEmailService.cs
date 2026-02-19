@@ -226,7 +226,7 @@ namespace hOps.web.Services
 <div style=""border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:16px;"">
     <h4 style=""margin:0 0 8px;font-size:16px;"">{safeTitle}</h4>
     <p style=""margin:0 0 12px;font-size:13px;color:#6b7280;"">Posted by {author} on {localTimestamp}.</p>
-    {PassOnLogEmailHelper.BuildLogEmailBody(log, link, propertyNames, log.Comments)}
+    {PassOnLogEmailHelper.BuildLogEmailBody(log, link, propertyNames, log.Comments, userTimeZone)}
 </div>");
             }
 

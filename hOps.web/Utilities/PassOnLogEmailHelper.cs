@@ -34,7 +34,8 @@ namespace hOps.web.Utilities
             PassOnLog log,
             string linkUrl,
             IReadOnlyCollection<string>? propertyNames = null,
-            IEnumerable<PassOnLogComment>? comments = null)
+            IEnumerable<PassOnLogComment>? comments = null,
+            TimeZoneInfo? recipientTimeZone = null)
         {
             var names = propertyNames ?? log.Properties
                 .Select(lp => lp.Property?.Name ?? $"Property #{lp.PropertyId}")
@@ -64,6 +65,8 @@ namespace hOps.web.Utilities
                 .OrderBy(c => c.CreatedAt)
                 .ToList() ?? new List<PassOnLogComment>();
 
+            var targetZone = recipientTimeZone ?? TimeZoneInfo.Utc;
+
             if (orderedComments.Any())
             {
                 bodyBuilder.AppendLine(@"<hr style=""margin:24px 0;border:none;border-top:1px solid #e5e7eb;""/>");
@@ -73,7 +76,9 @@ namespace hOps.web.Utilities
                 {
                     var authorName = FormatUserName(comment.CreatedBy?.FirstName, comment.CreatedBy?.LastName, comment.CreatedBy?.Email);
                     var safeAuthor = WebUtility.HtmlEncode(authorName);
-                    var timestamp = comment.CreatedAt.ToString("MMM d, yyyy h:mm tt 'UTC'");
+                    var commentLocal = ConvertToTimeZone(comment.CreatedAt, targetZone);
+                    var commentOffset = new DateTimeOffset(commentLocal, targetZone.GetUtcOffset(commentLocal));
+                    var timestamp = commentOffset.ToString("MMM d, yyyy h:mm tt zzz");
                     var safeTimestamp = WebUtility.HtmlEncode(timestamp);
                     var commentHtml = RichTextRenderer.ToEmailHtml(comment.Body);
                     if (string.IsNullOrWhiteSpace(commentHtml))
@@ -91,6 +96,17 @@ namespace hOps.web.Utilities
 
             bodyBuilder.AppendLine($@"<p><a href=""{linkUrl}"">Review the log</a></p>");
             return bodyBuilder.ToString();
+        }
+
+        private static DateTime ConvertToTimeZone(DateTime utcValue, TimeZoneInfo zone)
+        {
+            var normalized = utcValue.Kind switch
+            {
+                DateTimeKind.Unspecified => DateTime.SpecifyKind(utcValue, DateTimeKind.Utc),
+                DateTimeKind.Local => utcValue.ToUniversalTime(),
+                _ => utcValue
+            };
+            return TimeZoneInfo.ConvertTimeFromUtc(normalized, zone);
         }
     }
 }
