@@ -186,6 +186,11 @@ namespace hOps.web.Controllers
                 };
             }).ToList();
 
+            if (filters.ShowUnreadOnly)
+            {
+                logItems = logItems.Where(item => item.IsUnread).ToList();
+            }
+
             var model = new PassOnLogIndexViewModel
             {
                 Logs = logItems,

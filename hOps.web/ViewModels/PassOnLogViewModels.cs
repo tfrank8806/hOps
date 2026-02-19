@@ -87,6 +87,7 @@ namespace hOps.web.ViewModels
         public List<SelectListItem> CreatorOptions { get; set; } = new();
         public List<SelectListItem> SortOptions { get; set; } = new();
         public List<PassOnLogPropertyOptionViewModel> PropertyOptions { get; set; } = new();
+        public bool ShowUnreadOnly { get; set; }
 
         public void Normalize()
         {

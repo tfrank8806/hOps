@@ -8,7 +8,8 @@
         (Model.Filters.CreatorIds?.Any() ?? false) ||
         (Model.Filters.PropertyIds?.Any() ?? false) ||
         !string.IsNullOrWhiteSpace(Model.Filters.SearchTerm) ||
-        !string.Equals(Model.Filters.SortOrder, "newest", StringComparison.OrdinalIgnoreCase);
+        !string.Equals(Model.Filters.SortOrder, "newest", StringComparison.OrdinalIgnoreCase) ||
+        Model.Filters.ShowUnreadOnly;
     var filterCollapseClass = hasActiveFilters ? "collapse show" : "collapse";
     var filterToggleText = hasActiveFilters ? "Hide Filters" : "Show Filters";
 }
@@ -117,6 +118,18 @@
             <div class="col-12 col-lg-4">
                 <label class="form-label" for="SearchTerm">Keyword</label>
                 <input type="text" class="form-control" id="SearchTerm" name="SearchTerm" value="@Model.Filters.SearchTerm" placeholder="Search title or body" />
+            </div>
+            <div class="col-sm-6 col-md-3 col-lg-2 d-flex align-items-center">
+                <div class="form-check mt-4 pt-2">
+                    <input type="hidden" name="ShowUnreadOnly" value="false" />
+                    <input class="form-check-input"
+                           type="checkbox"
+                           id="ShowUnreadOnly"
+                           name="ShowUnreadOnly"
+                           value="true"
+                           @(Model.Filters.ShowUnreadOnly ? "checked" : null) />
+                    <label class="form-check-label" for="ShowUnreadOnly">Unread only</label>
+                </div>
             </div>
         </div>
     </div>
