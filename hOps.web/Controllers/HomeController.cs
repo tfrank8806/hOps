@@ -993,7 +993,6 @@ namespace hOps.web.Controllers
                 .Select(wp => wp.WorkOrder)
                 .Where(wo => wo.Status == "New" || wo.Status == "In Progress" || wo.Status == "Escalated")
                 .OrderByDescending(wo => wo.CreatedAt)
-                .Take(5)
                 .Select(wo => new
                 {
                     WorkOrder = wo,
@@ -1250,7 +1249,6 @@ namespace hOps.web.Controllers
             var packages = await _context.PackageLogEntries
                 .Where(entry => entry.PropertyId == propertyId && !entry.Delivered)
                 .OrderByDescending(entry => entry.LoggedAt)
-                .Take(5)
                 .Select(entry => new PackageLogSummaryViewModel
                 {
                     Id = entry.Id,

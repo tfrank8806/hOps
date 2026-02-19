@@ -33,9 +33,15 @@
                 {
                     var createdLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
                     <li class="mb-3 pb-3 border-bottom">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <div class="fw-semibold">@log.Title</div>
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="fw-semibold">@log.Title</span>
+                                    @if (!log.IsRead)
+                                    {
+                                        <span class="badge rounded-pill bg-primary text-white">Unread</span>
+                                    }
+                                </div>
                                 <div class="text-muted small">@createdLocal.ToString("g")</div>
                             </div>
                             @if (!string.IsNullOrWhiteSpace(log.DetailUrl))
