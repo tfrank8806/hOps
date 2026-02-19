@@ -117,7 +117,7 @@ namespace hOps.web.Controllers
                 .ThenBy(c => c.LastName)
                 .Select(creator => new SelectListItem
                 {
-                    Text = FormatUserName(creator.FirstName, creator.LastName, creator.Email ?? string.Empty),
+                    Text = PassOnLogEmailHelper.FormatUserName(creator.FirstName, creator.LastName, creator.Email ?? string.Empty),
                     Value = creator.Id,
                     Selected = creatorFilterSet.Contains(creator.Id)
                 })
@@ -170,7 +170,7 @@ namespace hOps.web.Controllers
 
             var logItems = logs.Select(log =>
             {
-                var creatorName = FormatUserName(log.CreatedBy?.FirstName, log.CreatedBy?.LastName, log.CreatedBy?.Email ?? string.Empty);
+                var creatorName = PassOnLogEmailHelper.FormatUserName(log.CreatedBy?.FirstName, log.CreatedBy?.LastName, log.CreatedBy?.Email ?? string.Empty);
 
                 return new PassOnLogListItemViewModel
                 {
@@ -363,7 +363,7 @@ namespace hOps.web.Controllers
                 return;
             }
 
-            var actorName = FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
+            var actorName = PassOnLogEmailHelper.FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
             var now = DateTime.UtcNow;
 
             foreach (var recipient in recipients)
@@ -412,10 +412,10 @@ namespace hOps.web.Controllers
                 .Distinct()
                 .ToList();
 
-            var actorName = FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
+            var actorName = PassOnLogEmailHelper.FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
             var subject = $"New log: {log.Title}";
             var introHtml = $@"<p>{WebUtility.HtmlEncode(actorName)} posted a new log titled <strong>{WebUtility.HtmlEncode(log.Title)}</strong>.</p>";
-            var htmlBody = introHtml + BuildPassOnLogEmailBody(log, linkUrl, propertyNames, log.Comments);
+            var htmlBody = introHtml + PassOnLogEmailHelper.BuildLogEmailBody(log, linkUrl, propertyNames, log.Comments);
 
             foreach (var recipient in emailRecipients)
             {
@@ -451,10 +451,10 @@ namespace hOps.web.Controllers
                 .Distinct()
                 .ToList();
 
-            var actorName = FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
+            var actorName = PassOnLogEmailHelper.FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
             var subject = $"New comment on: {log.Title}";
             var introHtml = $@"<p>{WebUtility.HtmlEncode(actorName)} added a new comment on <strong>{WebUtility.HtmlEncode(log.Title)}</strong>.</p>";
-            var htmlBody = introHtml + BuildPassOnLogEmailBody(log, linkUrl, propertyNames, log.Comments);
+            var htmlBody = introHtml + PassOnLogEmailHelper.BuildLogEmailBody(log, linkUrl, propertyNames, log.Comments);
 
             foreach (var recipient in emailRecipients)
             {
@@ -467,67 +467,6 @@ namespace hOps.web.Controllers
                     _logger.LogError(ex, "Unable to send log comment email notification to user {UserId}", recipient.Id);
                 }
             }
-        }
-
-        private static string BuildPassOnLogEmailBody(
-            PassOnLog log,
-            string linkUrl,
-            IReadOnlyCollection<string> propertyNames,
-            IEnumerable<PassOnLogComment>? comments = null)
-        {
-            var safeProperties = propertyNames.Any()
-                ? string.Join(", ", propertyNames.Select(WebUtility.HtmlEncode))
-                : null;
-
-            var summaryHtml = RichTextRenderer.ToEmailHtml(log.Body);
-            var bodyBuilder = new StringBuilder();
-
-            if (!string.IsNullOrWhiteSpace(safeProperties))
-            {
-                bodyBuilder.AppendLine($@"<p><strong>Properties:</strong> {safeProperties}</p>");
-            }
-
-            if (!string.IsNullOrWhiteSpace(summaryHtml))
-            {
-                bodyBuilder.AppendLine("<p><strong>Summary:</strong></p>");
-                bodyBuilder.AppendLine($@"<div style=""font-size:14px;line-height:1.5;word-break:break-word;"">{summaryHtml}</div>");
-            }
-
-            var orderedComments = comments?
-                .Where(c => c != null)
-                .OrderBy(c => c.CreatedAt)
-                .ToList() ?? new List<PassOnLogComment>();
-
-            if (orderedComments.Any())
-            {
-                bodyBuilder.AppendLine(@"<hr style=""margin:24px 0;border:none;border-top:1px solid #e5e7eb;""/>");
-                bodyBuilder.AppendLine("<p><strong>Comments</strong></p>");
-
-                foreach (var passOnComment in orderedComments)
-                {
-                    var authorName = FormatUserName(
-                        passOnComment.CreatedBy?.FirstName,
-                        passOnComment.CreatedBy?.LastName,
-                        passOnComment.CreatedBy?.Email ?? string.Empty);
-                    var safeAuthor = WebUtility.HtmlEncode(authorName);
-                    var timestamp = passOnComment.CreatedAt.ToString("MMM d, yyyy h:mm tt 'UTC'");
-                    var safeTimestamp = WebUtility.HtmlEncode(timestamp);
-                    var commentHtml = RichTextRenderer.ToEmailHtml(passOnComment.Body);
-                    if (string.IsNullOrWhiteSpace(commentHtml))
-                    {
-                        commentHtml = "<p style=\"margin:0;color:#6b7280;\">(No details provided)</p>";
-                    }
-
-                    bodyBuilder.AppendLine($@"
-<div style=""margin-bottom:16px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;"">
-    <div style=""font-size:13px;color:#111827;""><strong>{safeAuthor}</strong><span style=""color:#6b7280;margin-left:8px;"">{safeTimestamp}</span></div>
-    <div style=""margin-top:8px;font-size:14px;line-height:1.5;word-break:break-word;"">{commentHtml}</div>
-</div>");
-                }
-            }
-
-            bodyBuilder.AppendLine($@"<p><a href=""{linkUrl}"">Review the log</a></p>");
-            return bodyBuilder.ToString();
         }
 
         [HttpGet]
@@ -1156,7 +1095,7 @@ namespace hOps.web.Controllers
 
         private PassOnLogDetailsViewModel BuildDetailsViewModel(PassOnLog log, string currentUserId, int? nextLogId, int? previousLogId, bool canDelete)
         {
-            var creatorName = FormatUserName(log.CreatedBy?.FirstName, log.CreatedBy?.LastName, log.CreatedBy?.Email ?? string.Empty);
+            var creatorName = PassOnLogEmailHelper.FormatUserName(log.CreatedBy?.FirstName, log.CreatedBy?.LastName, log.CreatedBy?.Email ?? string.Empty);
 
             var vm = new PassOnLogDetailsViewModel
             {
@@ -1173,7 +1112,7 @@ namespace hOps.web.Controllers
                     .OrderBy(c => c.CreatedAt)
                     .Select(c =>
                     {
-                        var commentCreatorName = FormatUserName(c.CreatedBy?.FirstName, c.CreatedBy?.LastName, c.CreatedBy?.Email ?? string.Empty);
+                        var commentCreatorName = PassOnLogEmailHelper.FormatUserName(c.CreatedBy?.FirstName, c.CreatedBy?.LastName, c.CreatedBy?.Email ?? string.Empty);
                         return new PassOnLogCommentViewModel
                         {
                             Id = c.Id,
@@ -1188,7 +1127,7 @@ namespace hOps.web.Controllers
                     .OrderByDescending(v => v.ViewedAt)
                     .Select(v => new PassOnLogViewerViewModel
                     {
-                        Name = FormatUserName(v.Viewer?.FirstName, v.Viewer?.LastName, v.Viewer?.Email ?? string.Empty),
+                        Name = PassOnLogEmailHelper.FormatUserName(v.Viewer?.FirstName, v.Viewer?.LastName, v.Viewer?.Email ?? string.Empty),
                         ViewedAt = v.ViewedAt
                     })
                     .ToList(),
@@ -1300,16 +1239,6 @@ namespace hOps.web.Controllers
             return !log.Views.Any(v => v.ViewerId == userId);
         }
 
-        private static string FormatUserName(string? firstName, string? lastName, string email)
-        {
-            var name = ($"{firstName} {lastName}").Trim();
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                return name;
-            }
-
-            return string.IsNullOrWhiteSpace(email) ? "Unknown User" : email;
-        }
     }
 }
 

@@ -246,7 +246,7 @@ namespace hOps.web.Controllers.Api
             {
                 Id = comment.Id,
                 Body = comment.Body,
-                CreatorName = FormatUserName(comment.CreatedBy),
+                CreatorName = PassOnLogEmailHelper.FormatUserName(comment.CreatedBy),
                 CreatorPhotoUrl = comment.CreatedBy?.ProfilePhotoPath,
                 CreatedAtUtc = comment.CreatedAt
             };
@@ -261,7 +261,7 @@ namespace hOps.web.Controllers.Api
                 Id = log.Id,
                 Title = log.Title,
                 Preview = BuildPreview(log.Body),
-                CreatorName = FormatUserName(log.CreatedBy),
+                CreatorName = PassOnLogEmailHelper.FormatUserName(log.CreatedBy),
                 CreatorPhotoUrl = log.CreatedBy?.ProfilePhotoPath,
                 CreatedAtUtc = log.CreatedAt,
                 IsUnread = IsLogUnread(log, currentUserId),
@@ -284,7 +284,7 @@ namespace hOps.web.Controllers.Api
                 Id = log.Id,
                 Title = log.Title,
                 Body = log.Body,
-                CreatorName = FormatUserName(log.CreatedBy),
+                CreatorName = PassOnLogEmailHelper.FormatUserName(log.CreatedBy),
                 CreatorPhotoUrl = log.CreatedBy?.ProfilePhotoPath,
                 CreatedAtUtc = log.CreatedAt,
                 UpdatedAtUtc = log.UpdatedAt,
@@ -302,7 +302,7 @@ namespace hOps.web.Controllers.Api
                     {
                         Id = c.Id,
                         Body = c.Body,
-                        CreatorName = FormatUserName(c.CreatedBy),
+                        CreatorName = PassOnLogEmailHelper.FormatUserName(c.CreatedBy),
                         CreatorPhotoUrl = c.CreatedBy?.ProfilePhotoPath,
                         CreatedAtUtc = c.CreatedAt
                     })
@@ -344,20 +344,5 @@ namespace hOps.web.Controllers.Api
                 : $"{preview[..180]}...";
         }
 
-        private static string FormatUserName(ApplicationUser? user)
-        {
-            if (user == null)
-            {
-                return "Unknown";
-            }
-
-            var name = $"{user.FirstName} {user.LastName}".Trim();
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                return name;
-            }
-
-            return user.Email ?? "Unknown";
-        }
     }
 }
