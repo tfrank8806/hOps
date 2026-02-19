@@ -40,6 +40,37 @@
     </form>
 }
 
+<div class="card mb-4">
+    <div class="card-body">
+        <form asp-action="SaveChecklistSettings" method="post" class="row g-3 align-items-end">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="propertyId" value="@Model.PropertyId" />
+            <div class="col-md-4 col-sm-6">
+                <label for="pmFrequencyInput" class="form-label">PM frequency per year</label>
+                <input type="number"
+                       class="form-control"
+                       id="pmFrequencyInput"
+                       name="frequencyPerYear"
+                       value="@(Model.FrequencyPerYear > 0 ? Model.FrequencyPerYear : 4)"
+                       min="1"
+                       max="52"
+                       required />
+                @if (Model.FrequencyPerYear > 0)
+                {
+                    <div class="form-text">Currently set to <strong>@Model.FrequencyPerYear</strong> PM cycles each year.</div>
+                }
+                else
+                {
+                    <div class="form-text">Set how many PM cycles each room should complete annually (default is 4).</div>
+                }
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <button type="submit" class="btn btn-primary mt-2 mt-sm-0">Save Frequency</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="row gy-4">
     <div class="col-lg-5">
         <div class="card shadow-sm">

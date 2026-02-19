@@ -14,6 +14,7 @@ namespace hOps.web.ViewModels.Maintenance
         public IReadOnlyList<Property> AccessibleProperties { get; set; } = new List<Property>();
         public IReadOnlyList<MaintenancePmChecklistSummaryViewModel> Checklists { get; set; } = new List<MaintenancePmChecklistSummaryViewModel>();
         public MaintenancePmChecklistEditorViewModel ChecklistEditor { get; set; } = new();
+        public int FrequencyPerYear { get; set; }
     }
 
     public class MaintenancePmChecklistSummaryViewModel

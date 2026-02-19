@@ -148,6 +148,59 @@ namespace hOps.web.Controllers
             return RedirectToAction(nameof(PmChecklists), new { propertyId = selectedProperty.Id, checklistId = request.Id });
         }
 
+        [HttpPost("PMs/Checklists/Frequency")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveChecklistSettings(int propertyId, int frequencyPerYear)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            if (!UserCanManageMaintenance(roles))
+            {
+                return Forbid();
+            }
+
+            var properties = await GetManageablePropertiesAsync(currentUser, roles);
+            var selectedProperty = properties.FirstOrDefault(p => p.Id == propertyId);
+            if (selectedProperty == null)
+            {
+                return Forbid();
+            }
+
+            var normalizedFrequency = Math.Clamp(frequencyPerYear, 1, 52);
+            var now = DateTime.UtcNow;
+
+            var setting = await _db.PreventiveMaintenanceSettings
+                .FirstOrDefaultAsync(s => s.PropertyId == propertyId);
+
+            if (setting == null)
+            {
+                setting = new PreventiveMaintenanceSetting
+                {
+                    PropertyId = propertyId,
+                    FrequencyPerYear = normalizedFrequency,
+                    UpdatedAtUtc = now,
+                    UpdatedByUserId = currentUser.Id
+                };
+                _db.PreventiveMaintenanceSettings.Add(setting);
+            }
+            else
+            {
+                setting.FrequencyPerYear = normalizedFrequency;
+                setting.UpdatedAtUtc = now;
+                setting.UpdatedByUserId = currentUser.Id;
+            }
+
+            await _db.SaveChangesAsync();
+
+            TempData["PmChecklistMessage"] = "PM frequency updated.";
+            return RedirectToAction(nameof(PmChecklists), new { propertyId });
+        }
+
         [HttpPost("PMs/Checklists/{id:int}/Toggle")]
         public async Task<IActionResult> ToggleChecklist(int id, int propertyId, bool isActive)
         {
@@ -401,6 +454,10 @@ namespace hOps.web.Controllers
                 ? properties.First(p => p.Id == propertyId.Value)
                 : properties.First();
 
+            var setting = await _db.PreventiveMaintenanceSettings
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.PropertyId == selectedProperty.Id);
+
             var checklistEntities = await _db.PreventiveMaintenanceChecklists
                 .AsNoTracking()
                 .Where(c => c.PropertyId == selectedProperty.Id)
@@ -453,7 +510,8 @@ namespace hOps.web.Controllers
                 PropertyName = selectedProperty.Name,
                 AccessibleProperties = properties,
                 Checklists = summaries,
-                ChecklistEditor = editor
+                ChecklistEditor = editor,
+                FrequencyPerYear = setting?.FrequencyPerYear ?? 0
             };
         }
 
