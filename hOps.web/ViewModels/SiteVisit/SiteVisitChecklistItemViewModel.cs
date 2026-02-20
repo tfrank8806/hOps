@@ -1,15 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 
+using hOps.web.Models.SiteVisit;
+
 namespace hOps.web.ViewModels.SiteVisit
 {
-    public enum SiteVisitChecklistStatus
-    {
-        NotReviewed,
-        Compliant,
-        NeedsReview,
-        NotCompliant
-    }
-
     public class SiteVisitChecklistItemViewModel
     {
         [Required]

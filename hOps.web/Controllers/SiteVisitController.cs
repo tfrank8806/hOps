@@ -10,10 +10,12 @@ using ClosedXML.Excel;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
+using hOps.web.Models.SiteVisit;
 using hOps.web.ViewModels.SiteVisit;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace hOps.web.Controllers
@@ -38,6 +40,7 @@ namespace hOps.web.Controllers
         };
 
         private const string SuccessTempDataKey = "SiteVisitSuccessMessage";
+        private const string LogSuccessTempDataKey = "SiteVisitLogMessage";
 
         public SiteVisitController(
             ApplicationDbContext context,
@@ -82,7 +85,7 @@ namespace hOps.web.Controllers
             ModelState.Clear();
             var isValid = TryValidateModel(model);
 
-            var recipients = ParseRecipients(model);
+            var recipients = ParseRecipients(model.RecipientEmails, nameof(model.RecipientEmails), requireAtLeastOne: true);
             if (recipients.Count == 0)
             {
                 ModelState.AddModelError(nameof(model.RecipientEmails), "Enter at least one valid email address.");
@@ -101,10 +104,14 @@ namespace hOps.web.Controllers
                 return View("Index", model);
             }
 
-            var attachment = CreateWorkbookAttachment(model);
+            var currentProperty = ViewBag.CurrentProperty as Property;
+            var currentUser = await _userManager.GetUserAsync(User);
+            var report = BuildReportEntity(model, recipients, currentProperty, currentUser);
+
+            var attachment = CreateWorkbookAttachment(report);
             var attachmentList = new[] { attachment };
-            var subject = BuildEmailSubject(model);
-            var body = BuildEmailBody(model);
+            var subject = BuildEmailSubject(report);
+            var body = BuildEmailBody(report);
 
             var successCount = 0;
             foreach (var recipient in recipients)
@@ -127,12 +134,122 @@ namespace hOps.web.Controllers
                 return View("Index", model);
             }
 
+            try
+            {
+                await _context.SiteVisitReports.AddAsync(report);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to persist site visit report for {Property}", report.PropertyName);
+                ModelState.AddModelError(string.Empty, "Your email was sent but we could not save the visit to the log.");
+                EnsurePlaceholderRow(model);
+                return View("Index", model);
+            }
+
             var successText = $"Site visit checklist emailed to {successCount} recipient{(successCount == 1 ? string.Empty : "s")}.";
             TempData[SuccessTempDataKey] = successText;
 
             _logger.LogInformation("Site visit checklist emailed to {RecipientCount} recipient(s) for property {Property}", successCount, model.PropertyName ?? "(unspecified)");
 
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Log()
+        {
+            ViewData["Title"] = "Site Visit Log";
+            ViewData["MainContainerClass"] = "main-inner--wide";
+
+            if (TempData.TryGetValue(LogSuccessTempDataKey, out var message) && message is string alert)
+            {
+                ViewBag.LogSuccessMessage = alert;
+                TempData.Remove(LogSuccessTempDataKey);
+            }
+
+            var viewModel = await BuildLogViewModelAsync();
+            return View(viewModel);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateLogEntry(SiteVisitLogUpdateViewModel model)
+        {
+            ViewData["Title"] = "Site Visit Log";
+            ViewData["MainContainerClass"] = "main-inner--wide";
+
+            var report = await _context.SiteVisitReports
+                .Include(r => r.Items)
+                .FirstOrDefaultAsync(r => r.Id == model.Id);
+
+            if (report == null)
+            {
+                ModelState.AddModelError(string.Empty, "We could not find that site visit.");
+                ViewBag.ActiveLogEntryId = model.Id;
+                var missingViewModel = await BuildLogViewModelAsync(model.Id, model);
+                return View("Log", missingViewModel);
+            }
+
+            var requireRecipients = string.Equals(model.SubmitAction, "email", StringComparison.OrdinalIgnoreCase);
+            var recipients = ParseRecipients(model.RecipientEmails, nameof(model.RecipientEmails), requireRecipients);
+
+            if (requireRecipients && recipients.Count == 0)
+            {
+                ModelState.AddModelError(nameof(model.RecipientEmails), "Enter at least one recipient before emailing an update.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                ViewBag.ActiveLogEntryId = model.Id;
+                var invalidViewModel = await BuildLogViewModelAsync(model.Id, model);
+                return View("Log", invalidViewModel);
+            }
+
+            report.AssignedTo = string.IsNullOrWhiteSpace(model.AssignedTo) ? null : model.AssignedTo.Trim();
+            report.ProgressStatus = model.ProgressStatus;
+            report.CompletionNotes = string.IsNullOrWhiteSpace(model.CompletionNotes) ? null : model.CompletionNotes.Trim();
+            report.RecipientEmails = recipients.Count > 0 ? string.Join(", ", recipients) : null;
+            report.UpdatedAtUtc = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            if (requireRecipients && recipients.Count > 0)
+            {
+                var attachment = CreateWorkbookAttachment(report);
+                var attachmentList = new[] { attachment };
+                var subject = BuildEmailSubject(report);
+                var body = BuildEmailBody(report);
+                var successCount = 0;
+
+                foreach (var recipient in recipients)
+                {
+                    try
+                    {
+                        await _emailSender.SendEmailAsync(recipient, subject, body, attachmentList);
+                        successCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to send updated site visit to {Recipient}", recipient);
+                    }
+                }
+
+                if (successCount == 0)
+                {
+                    ModelState.AddModelError(string.Empty, "We could not send the updated site visit. Please try again.");
+                    ViewBag.ActiveLogEntryId = model.Id;
+                    var failureViewModel = await BuildLogViewModelAsync(model.Id, model);
+                    return View("Log", failureViewModel);
+                }
+
+                TempData[LogSuccessTempDataKey] = $"Update emailed to {successCount} recipient{(successCount == 1 ? string.Empty : "s")}.";
+            }
+            else
+            {
+                TempData[LogSuccessTempDataKey] = "Site visit progress saved.";
+            }
+
+            return RedirectToAction(nameof(Log));
         }
 
         private SiteVisitPageViewModel BuildInitialModel()
@@ -168,6 +285,110 @@ namespace hOps.web.Controllers
             }
         }
 
+        private SiteVisitReport BuildReportEntity(
+            SiteVisitPageViewModel model,
+            IReadOnlyList<string> recipients,
+            Property? property,
+            ApplicationUser? createdBy)
+        {
+            var now = DateTime.UtcNow;
+
+            var report = new SiteVisitReport
+            {
+                PropertyId = property?.Id,
+                PropertyName = model.PropertyName ?? property?.Name ?? "Property",
+                VisitDate = model.VisitDate,
+                LeaderName = string.IsNullOrWhiteSpace(model.LeaderName) ? null : model.LeaderName.Trim(),
+                SummaryNotes = string.IsNullOrWhiteSpace(model.SummaryNotes) ? null : model.SummaryNotes,
+                RecipientEmails = recipients.Count > 0 ? string.Join(", ", recipients) : null,
+                AssignedTo = null,
+                ProgressStatus = SiteVisitProgressStatus.NotStarted,
+                CompletionNotes = null,
+                CreatedByUserId = createdBy?.Id,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            };
+
+            foreach (var item in model.Items)
+            {
+                report.Items.Add(new SiteVisitReportItem
+                {
+                    Title = item.Title,
+                    Status = item.Status,
+                    Notes = item.Notes
+                });
+            }
+
+            return report;
+        }
+
+        private SiteVisitLogEntryViewModel MapLogEntry(SiteVisitReport report)
+        {
+            return new SiteVisitLogEntryViewModel
+            {
+                Id = report.Id,
+                PropertyName = report.PropertyName,
+                VisitDate = report.VisitDate,
+                LeaderName = report.LeaderName,
+                SummaryNotes = report.SummaryNotes,
+                AssignedTo = report.AssignedTo,
+                ProgressStatus = report.ProgressStatus,
+                CompletionNotes = report.CompletionNotes,
+                RecipientEmails = report.RecipientEmails,
+                CreatedByDisplayName = BuildDisplayName(report.CreatedByUser),
+                CreatedAtUtc = report.CreatedAtUtc,
+                UpdatedAtUtc = report.UpdatedAtUtc,
+                Items = report.Items
+                    .OrderBy(i => i.Id)
+                    .Select(i => new SiteVisitChecklistItemViewModel
+                    {
+                        Title = i.Title,
+                        Status = i.Status,
+                        Notes = i.Notes
+                    })
+                    .ToList()
+            };
+        }
+
+        private async Task<SiteVisitLogViewModel> BuildLogViewModelAsync(int? activeEntryId = null, SiteVisitLogUpdateViewModel? pendingUpdate = null)
+        {
+            var currentProperty = ViewBag.CurrentProperty as Property;
+            var propertyId = currentProperty?.Id;
+
+            var query = _context.SiteVisitReports
+                .Include(r => r.Items)
+                .Include(r => r.CreatedByUser)
+                .OrderByDescending(r => r.VisitDate)
+                .ThenByDescending(r => r.Id)
+                .AsQueryable();
+
+            if (propertyId.HasValue)
+            {
+                query = query.Where(r => r.PropertyId == propertyId.Value);
+            }
+
+            var reports = await query.Take(50).ToListAsync();
+            var entries = reports.Select(MapLogEntry).ToList();
+
+            if (activeEntryId.HasValue && pendingUpdate != null)
+            {
+                var entry = entries.FirstOrDefault(e => e.Id == activeEntryId.Value);
+                if (entry != null)
+                {
+                    entry.AssignedTo = pendingUpdate.AssignedTo;
+                    entry.ProgressStatus = pendingUpdate.ProgressStatus;
+                    entry.CompletionNotes = pendingUpdate.CompletionNotes;
+                    entry.RecipientEmails = pendingUpdate.RecipientEmails;
+                }
+            }
+
+            return new SiteVisitLogViewModel
+            {
+                CurrentPropertyName = currentProperty?.Name,
+                Entries = entries
+            };
+        }
+
         private void NormalizeModel(SiteVisitPageViewModel model)
         {
             model.PropertyName = model.PropertyName?.Trim();
@@ -199,16 +420,21 @@ namespace hOps.web.Controllers
                 .ToList();
         }
 
-        private IReadOnlyList<string> ParseRecipients(SiteVisitPageViewModel model)
+        private IReadOnlyList<string> ParseRecipients(string? rawValue, string modelStateKey, bool requireAtLeastOne)
         {
             var recipients = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (string.IsNullOrWhiteSpace(model.RecipientEmails))
+
+            if (string.IsNullOrWhiteSpace(rawValue))
             {
+                if (requireAtLeastOne)
+                {
+                    ModelState.AddModelError(modelStateKey, "Enter at least one email address.");
+                }
                 return recipients.ToList();
             }
 
             var validator = new EmailAddressAttribute();
-            var tokens = model.RecipientEmails
+            var tokens = rawValue
                 .Split(new[] { ',', ';', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var token in tokens)
@@ -221,17 +447,22 @@ namespace hOps.web.Controllers
 
                 if (!validator.IsValid(trimmed))
                 {
-                    ModelState.AddModelError(nameof(model.RecipientEmails), $"'{trimmed}' is not a valid email address.");
+                    ModelState.AddModelError(modelStateKey, $"'{trimmed}' is not a valid email address.");
                     continue;
                 }
 
                 recipients.Add(trimmed);
             }
 
+            if (requireAtLeastOne && recipients.Count == 0)
+            {
+                ModelState.AddModelError(modelStateKey, "Enter at least one email address.");
+            }
+
             return recipients.ToList();
         }
 
-        private EmailAttachment CreateWorkbookAttachment(SiteVisitPageViewModel model)
+        private EmailAttachment CreateWorkbookAttachment(SiteVisitReport report)
         {
             using var workbook = new XLWorkbook();
             var worksheet = workbook.Worksheets.Add("Site Visit");
@@ -241,16 +472,24 @@ namespace hOps.web.Controllers
             worksheet.Range(1, 1, 1, 3).Merge();
 
             worksheet.Cell(2, 1).Value = "Property";
-            worksheet.Cell(2, 2).Value = model.PropertyName ?? "Not specified";
+            worksheet.Cell(2, 2).Value = report.PropertyName ?? "Not specified";
             worksheet.Cell(3, 1).Value = "Visit date";
-            worksheet.Cell(3, 2).Value = model.VisitDate.ToString("D");
+            worksheet.Cell(3, 2).Value = report.VisitDate.ToString("D");
             worksheet.Cell(4, 1).Value = "Visit lead";
-            worksheet.Cell(4, 2).Value = string.IsNullOrWhiteSpace(model.LeaderName) ? "Not specified" : model.LeaderName;
+            worksheet.Cell(4, 2).Value = string.IsNullOrWhiteSpace(report.LeaderName) ? "Not specified" : report.LeaderName;
             worksheet.Cell(5, 1).Value = "Summary notes";
-            worksheet.Cell(5, 2).Value = model.SummaryNotes ?? "—";
+            worksheet.Cell(5, 2).Value = report.SummaryNotes ?? "—";
             worksheet.Range(5, 2, 5, 3).Merge();
 
-            var headerRow = 7;
+            worksheet.Cell(6, 1).Value = "Assigned To";
+            worksheet.Cell(6, 2).Value = string.IsNullOrWhiteSpace(report.AssignedTo) ? "Unassigned" : report.AssignedTo;
+            worksheet.Cell(7, 1).Value = "Progress";
+            worksheet.Cell(7, 2).Value = ProgressLabel(report.ProgressStatus);
+            worksheet.Cell(8, 1).Value = "Completion Notes";
+            worksheet.Cell(8, 2).Value = string.IsNullOrWhiteSpace(report.CompletionNotes) ? "—" : report.CompletionNotes;
+            worksheet.Range(8, 2, 8, 3).Merge();
+
+            var headerRow = 10;
             worksheet.Cell(headerRow, 1).Value = "Checklist Item";
             worksheet.Cell(headerRow, 2).Value = "Status";
             worksheet.Cell(headerRow, 3).Value = "Notes";
@@ -259,7 +498,7 @@ namespace hOps.web.Controllers
                 .Fill.SetBackgroundColor(XLColor.FromHtml("#e9ecef"));
 
             var row = headerRow + 1;
-            foreach (var item in model.Items)
+            foreach (var item in report.Items.OrderBy(i => i.Id))
             {
                 worksheet.Cell(row, 1).Value = item.Title;
                 worksheet.Cell(row, 2).Value = StatusLabel(item.Status);
@@ -286,7 +525,7 @@ namespace hOps.web.Controllers
 
             using var stream = new MemoryStream();
             workbook.SaveAs(stream);
-            var fileName = $"SiteVisit-{BuildSafeFileSegment(model.PropertyName)}-{model.VisitDate:yyyyMMdd}.xlsx";
+            var fileName = $"SiteVisit-{BuildSafeFileSegment(report.PropertyName)}-{report.VisitDate:yyyyMMdd}.xlsx";
             return new EmailAttachment(fileName, stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         }
 
@@ -302,27 +541,47 @@ namespace hOps.web.Controllers
             };
         }
 
-        private string BuildEmailSubject(SiteVisitPageViewModel model)
+        private static string ProgressLabel(SiteVisitProgressStatus status)
         {
-            var property = string.IsNullOrWhiteSpace(model.PropertyName) ? "Property" : model.PropertyName;
-            return $"Site Visit Checklist - {property} ({model.VisitDate:MMM d, yyyy})";
+            return status switch
+            {
+                SiteVisitProgressStatus.NotStarted => "Not Started",
+                SiteVisitProgressStatus.InProgress => "In Progress",
+                SiteVisitProgressStatus.Complete => "Complete",
+                _ => status.ToString()
+            };
         }
 
-        private string BuildEmailBody(SiteVisitPageViewModel model)
+        private string BuildEmailSubject(SiteVisitReport report)
+        {
+            var property = string.IsNullOrWhiteSpace(report.PropertyName) ? "Property" : report.PropertyName;
+            return $"Site Visit Checklist - {property} ({report.VisitDate:MMM d, yyyy})";
+        }
+
+        private string BuildEmailBody(SiteVisitReport report)
         {
             var builder = new StringBuilder();
-            var property = Encode(model.PropertyName ?? "Not specified");
-            var leader = Encode(string.IsNullOrWhiteSpace(model.LeaderName) ? "Not specified" : model.LeaderName!);
-            var summary = EncodeWithBreaks(model.SummaryNotes);
+            var property = Encode(report.PropertyName ?? "Not specified");
+            var leader = Encode(string.IsNullOrWhiteSpace(report.LeaderName) ? "Not specified" : report.LeaderName!);
+            var summary = EncodeWithBreaks(report.SummaryNotes);
+            var assignedTo = Encode(string.IsNullOrWhiteSpace(report.AssignedTo) ? "Unassigned" : report.AssignedTo!);
+            var progress = Encode(ProgressLabel(report.ProgressStatus));
+            var completionNotes = EncodeWithBreaks(report.CompletionNotes);
 
             builder.Append("<p>");
-            builder.Append($"Site visit summary for <strong>{property}</strong> on <strong>{model.VisitDate:D}</strong>.");
+            builder.Append($"Site visit summary for <strong>{property}</strong> on <strong>{report.VisitDate:D}</strong>.");
             builder.Append("</p>");
             builder.Append("<ul>");
             builder.Append($"<li><strong>Visit lead:</strong> {leader}</li>");
+            builder.Append($"<li><strong>Assigned to:</strong> {assignedTo}</li>");
+            builder.Append($"<li><strong>Progress:</strong> {progress}</li>");
             if (!string.IsNullOrWhiteSpace(summary))
             {
                 builder.Append($"<li><strong>Summary:</strong> {summary}</li>");
+            }
+            if (!string.IsNullOrWhiteSpace(completionNotes))
+            {
+                builder.Append($"<li><strong>Completion notes:</strong> {completionNotes}</li>");
             }
             builder.Append("</ul>");
 
@@ -333,7 +592,7 @@ namespace hOps.web.Controllers
             builder.Append("<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;\">Notes</th>");
             builder.Append("</tr></thead><tbody>");
 
-            foreach (var item in model.Items)
+            foreach (var item in report.Items.OrderBy(i => i.Id))
             {
                 var notes = EncodeWithBreaks(item.Notes);
                 builder.Append("<tr>");
@@ -352,6 +611,32 @@ namespace hOps.web.Controllers
         private string Encode(string? value)
         {
             return _htmlEncoder.Encode(value ?? string.Empty);
+        }
+
+        private static string BuildDisplayName(ApplicationUser? user)
+        {
+            if (user == null)
+            {
+                return "Unknown user";
+            }
+
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(user.FirstName))
+            {
+                parts.Add(user.FirstName.Trim());
+            }
+
+            if (!string.IsNullOrWhiteSpace(user.LastName))
+            {
+                parts.Add(user.LastName.Trim());
+            }
+
+            if (parts.Count > 0)
+            {
+                return string.Join(' ', parts);
+            }
+
+            return user.Email ?? user.UserName ?? "Unknown user";
         }
 
         private string EncodeWithBreaks(string? value)

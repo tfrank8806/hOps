@@ -113,3 +113,59 @@
         min-width: auto;
     }
 }
+
+.site-visit-log-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.site-visit-log-entry {
+    border: 1px solid #e9ecef;
+    border-radius: 1rem;
+    margin-bottom: 1rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.site-visit-log-entry--active {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.12);
+}
+
+.site-visit-log-entry__header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.site-visit-empty {
+    border-radius: 1rem;
+}
+
+.progress-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background-color: #e9ecef;
+    color: #495057;
+}
+
+.progress-status-badge--danger {
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+.progress-status-badge--warning {
+    background-color: #fff3cd;
+    color: #664d03;
+}
+
+.progress-status-badge--success {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}

@@ -33,9 +33,14 @@
                 Capture observations, grade each focus area, and instantly share the completed checklist in Excel.
             </p>
         </div>
-        <div class="text-end text-muted small">
-            <div>@(Model.PropertyName ?? (ViewBag.CurrentProperty?.Name as string) ?? "Property TBD")</div>
-            <div>@Model.VisitDate.ToString("D")</div>
+        <div class="text-end">
+            <div class="text-muted small">
+                <div>@(Model.PropertyName ?? (ViewBag.CurrentProperty?.Name as string) ?? "Property TBD")</div>
+                <div>@Model.VisitDate.ToString("D")</div>
+            </div>
+            <a class="btn btn-outline-secondary btn-sm mt-2" asp-controller="SiteVisit" asp-action="Log">
+                View Site Visit Log
+            </a>
         </div>
     </div>
 

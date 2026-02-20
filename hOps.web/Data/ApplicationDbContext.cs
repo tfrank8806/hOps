@@ -1,4 +1,5 @@
 ﻿using hOps.web.Models;
+using hOps.web.Models.SiteVisit;
 using hOps.web.Utilities;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -83,6 +84,8 @@ namespace hOps.web.Data
         public DbSet<EquipmentItem> EquipmentItems { get; set; }
         public DbSet<MaintenanceLogTemplate> MaintenanceLogTemplates { get; set; }
         public DbSet<MaintenanceLogEntry> MaintenanceLogEntries { get; set; }
+        public DbSet<SiteVisitReport> SiteVisitReports { get; set; }
+        public DbSet<SiteVisitReportItem> SiteVisitReportItems { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -922,6 +925,59 @@ namespace hOps.web.Data
 
             builder.Entity<MaintenanceLogEntry>()
                 .HasIndex(e => new { e.TemplateId, e.EntryDate });
+
+            builder.Entity<SiteVisitReport>()
+                .HasOne(r => r.Property)
+                .WithMany()
+                .HasForeignKey(r => r.PropertyId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<SiteVisitReport>()
+                .HasOne(r => r.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(r => r.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<SiteVisitReport>()
+                .Property(r => r.ProgressStatus)
+                .HasConversion<int>();
+
+            builder.Entity<SiteVisitReport>()
+                .Property(r => r.PropertyName)
+                .HasMaxLength(200);
+
+            builder.Entity<SiteVisitReport>()
+                .Property(r => r.LeaderName)
+                .HasMaxLength(200);
+
+            builder.Entity<SiteVisitReport>()
+                .Property(r => r.AssignedTo)
+                .HasMaxLength(200);
+
+            builder.Entity<SiteVisitReport>()
+                .Property(r => r.RecipientEmails)
+                .HasMaxLength(1000);
+
+            builder.Entity<SiteVisitReport>()
+                .Property(r => r.SummaryNotes)
+                .HasMaxLength(2000);
+
+            builder.Entity<SiteVisitReport>()
+                .Property(r => r.CompletionNotes)
+                .HasMaxLength(2000);
+
+            builder.Entity<SiteVisitReport>()
+                .HasIndex(r => new { r.PropertyId, r.VisitDate });
+
+            builder.Entity<SiteVisitReportItem>()
+                .HasOne(i => i.Report)
+                .WithMany(r => r.Items)
+                .HasForeignKey(i => i.SiteVisitReportId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<SiteVisitReportItem>()
+                .Property(i => i.Status)
+                .HasConversion<int>();
         }
     }
 }

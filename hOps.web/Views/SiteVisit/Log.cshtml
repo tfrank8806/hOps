@@ -1,0 +1,214 @@
+@model SiteVisitLogViewModel
+@{
+    ViewData["Title"] = "Site Visit Log";
+    var activeEntryId = ViewBag.ActiveLogEntryId as int?;
+    var statusClasses = new Dictionary<SiteVisitChecklistStatus, string>
+    {
+        { SiteVisitChecklistStatus.Compliant, "status-compliant" },
+        { SiteVisitChecklistStatus.NeedsReview, "status-needs-review" },
+        { SiteVisitChecklistStatus.NotCompliant, "status-not-compliant" },
+        { SiteVisitChecklistStatus.NotReviewed, string.Empty }
+    };
+    string StatusLabelText(SiteVisitChecklistStatus status) => status switch
+    {
+        SiteVisitChecklistStatus.Compliant => "Compliant",
+        SiteVisitChecklistStatus.NeedsReview => "Needs Review",
+        SiteVisitChecklistStatus.NotCompliant => "Not Compliant",
+        SiteVisitChecklistStatus.NotReviewed => "Not Reviewed",
+        _ => status.ToString()
+    };
+    string ProgressLabelText(SiteVisitProgressStatus status) => status switch
+    {
+        SiteVisitProgressStatus.NotStarted => "Not Started",
+        SiteVisitProgressStatus.InProgress => "In Progress",
+        SiteVisitProgressStatus.Complete => "Complete",
+        _ => status.ToString()
+    };
+    string FieldValue(string fieldName, string? fallback) =>
+        activeEntryId.HasValue && ViewData.ModelState.TryGetValue(fieldName, out var state) && !string.IsNullOrEmpty(state.AttemptedValue)
+            ? state.AttemptedValue
+            : fallback ?? string.Empty;
+    IEnumerable<string> FieldErrors(string fieldName) =>
+        activeEntryId.HasValue && ViewData.ModelState.TryGetValue(fieldName, out var state) && state.Errors.Count > 0
+            ? state.Errors.Select(e => e.ErrorMessage)
+            : Enumerable.Empty<string>();
+    IEnumerable<string> GeneralErrors() =>
+        activeEntryId.HasValue && ViewData.ModelState.TryGetValue(string.Empty, out var state) && state.Errors.Count > 0
+            ? state.Errors.Select(e => e.ErrorMessage)
+            : Enumerable.Empty<string>();
+}
+
+<div class="site-visit-log-page" data-log-list>
+    <div class="site-visit-header">
+        <div>
+            <p class="text-uppercase text-muted fw-semibold small mb-1">Property leadership log</p>
+            <h1 class="h2 mb-2">Site Visit Log</h1>
+            <p class="text-muted mb-0">Review recent visits and track follow-up progress for your property team.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" asp-controller="SiteVisit" asp-action="Index">
+                New Site Visit
+            </a>
+        </div>
+    </div>
+
+    @if (ViewBag.LogSuccessMessage is string successMsg)
+    {
+        <div class="alert alert-success">
+            @successMsg
+        </div>
+    }
+
+    @if (activeEntryId.HasValue && GeneralErrors().Any())
+    {
+        <div class="alert alert-danger">
+            @foreach (var error in GeneralErrors())
+            {
+                <div>@error</div>
+            }
+        </div>
+    }
+
+    @if (!Model.Entries.Any())
+    {
+        <div class="card border-0 shadow-sm site-visit-empty">
+            <div class="card-body text-center py-5">
+                <h2 class="h5 mb-2">No site visits yet</h2>
+                <p class="text-muted mb-4">Share a site visit checklist to populate this log for your property.</p>
+                <a class="btn btn-primary" asp-controller="SiteVisit" asp-action="Index">Start a Site Visit</a>
+            </div>
+        </div>
+    }
+    else
+    {
+        foreach (var entry in Model.Entries)
+        {
+            var isActive = activeEntryId.HasValue && activeEntryId.Value == entry.Id;
+            var assignedValue = FieldValue(nameof(SiteVisitLogUpdateViewModel.AssignedTo), entry.AssignedTo);
+            var completionValue = FieldValue(nameof(SiteVisitLogUpdateViewModel.CompletionNotes), entry.CompletionNotes);
+            var recipientsValue = FieldValue(nameof(SiteVisitLogUpdateViewModel.RecipientEmails), entry.RecipientEmails);
+            var progressValue = entry.ProgressStatus;
+            if (isActive && ViewData.ModelState.TryGetValue(nameof(SiteVisitLogUpdateViewModel.ProgressStatus), out var progressState) && Enum.TryParse<SiteVisitProgressStatus>(progressState.AttemptedValue, true, out var parsedProgress))
+            {
+                progressValue = parsedProgress;
+            }
+            var createdAtLocal = TimeZoneService.ConvertToUserTime(entry.CreatedAtUtc);
+            var updatedAtLocal = TimeZoneService.ConvertToUserTime(entry.UpdatedAtUtc);
+            var progressBadgeClass = progressValue switch
+            {
+                SiteVisitProgressStatus.NotStarted => "progress-status-badge progress-status-badge--danger",
+                SiteVisitProgressStatus.InProgress => "progress-status-badge progress-status-badge--warning",
+                SiteVisitProgressStatus.Complete => "progress-status-badge progress-status-badge--success",
+                _ => "progress-status-badge"
+            };
+            <form asp-action="UpdateLogEntry" method="post" class="card site-visit-log-entry @(isActive ? "site-visit-log-entry--active" : string.Empty)">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" value="@entry.Id" />
+                <div class="card-body">
+                    <div class="site-visit-log-entry__header">
+                        <div>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <h2 class="h5 mb-0">@entry.PropertyName</h2>
+                                <span class="@progressBadgeClass">@ProgressLabelText(progressValue)</span>
+                            </div>
+                            <div class="text-muted small">
+                                Visit date @entry.VisitDate.ToString("MMMM d, yyyy") · Lead @(string.IsNullOrWhiteSpace(entry.LeaderName) ? "Not specified" : entry.LeaderName)
+                            </div>
+                        </div>
+                        <div class="text-muted text-end small">
+                            <div>Created @createdAtLocal.ToString("MMM d, yyyy h:mm tt") by @(entry.CreatedByDisplayName ?? "Unknown")</div>
+                            <div>Updated @updatedAtLocal.ToString("MMM d, yyyy h:mm tt")</div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-3">
+                        <div class="col-md-4">
+                            <label class="form-label" for="assigned_@entry.Id">Assigned To</label>
+                            <input class="form-control" id="assigned_@entry.Id" name="AssignedTo" value="@assignedValue" />
+                            @if (isActive)
+                            {
+                                foreach (var error in FieldErrors(nameof(SiteVisitLogUpdateViewModel.AssignedTo)))
+                                {
+                                    <div class="text-danger small">@error</div>
+                                }
+                            }
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="progress_@entry.Id">Progress</label>
+                            <select class="form-select" id="progress_@entry.Id" name="ProgressStatus">
+                                @foreach (SiteVisitProgressStatus status in Enum.GetValues(typeof(SiteVisitProgressStatus)))
+                                {
+                                    <option value="@status" selected="@(status == progressValue)">@ProgressLabelText(status)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="recipients_@entry.Id">Send to</label>
+                            <input class="form-control" id="recipients_@entry.Id" name="RecipientEmails" value="@recipientsValue" placeholder="leader@brand.com, team@brand.com" />
+                            <div class="form-text">Separate multiple addresses with commas or line breaks.</div>
+                            @if (isActive)
+                            {
+                                foreach (var error in FieldErrors(nameof(SiteVisitLogUpdateViewModel.RecipientEmails)))
+                                {
+                                    <div class="text-danger small">@error</div>
+                                }
+                            }
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="completion_@entry.Id">Completion Notes</label>
+                            <textarea class="form-control" id="completion_@entry.Id" name="CompletionNotes" rows="3" data-log-notes>@completionValue</textarea>
+                            @if (isActive)
+                            {
+                                foreach (var error in FieldErrors(nameof(SiteVisitLogUpdateViewModel.CompletionNotes)))
+                                {
+                                    <div class="text-danger small">@error</div>
+                                }
+                            }
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mt-4 gap-2">
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" name="SubmitAction" value="save">
+                                Save Progress
+                            </button>
+                            <button type="submit" class="btn btn-outline-primary" name="SubmitAction" value="email">
+                                Save &amp; Email Update
+                            </button>
+                        </div>
+                        <button class="btn btn-link text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#checklist_@entry.Id" aria-expanded="false">
+                            Checklist details
+                        </button>
+                    </div>
+                </div>
+                <div class="collapse border-top" id="checklist_@entry.Id">
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Checklist Item</th>
+                                    <th style="width: 200px;">Status</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in entry.Items)
+                                {
+                                    var css = statusClasses.TryGetValue(item.Status, out var cls) ? cls : string.Empty;
+                                    <tr>
+                                        <td>@item.Title</td>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="status-dot @(string.IsNullOrEmpty(css) ? string.Empty : css)"></span>
+                                                @StatusLabelText(item.Status)
+                                            </div>
+                                        </td>
+                                        <td>@(string.IsNullOrWhiteSpace(item.Notes) ? "-" : item.Notes)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </form>
+        }
+    }
+</div>

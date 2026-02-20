@@ -132,3 +132,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     checklistBody.querySelectorAll('[data-checklist-row]').forEach(row => registerRow(row));
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    const today = new Date();
+    const pad = value => value.toString().padStart(2, '0');
+    const todayValue = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+    document.querySelectorAll('input[type="date"]').forEach(input => {
+        if (!input || input.value) {
+            return;
+        }
+
+        input.value = todayValue;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const notes = document.querySelectorAll('[data-log-notes]');
+    if (!notes.length) {
+        return;
+    }
+
+    const adjust = textarea => {
+        textarea.style.height = 'auto';
+        const desired = Math.max(56, Math.min(textarea.scrollHeight, 400));
+        textarea.style.height = `${desired}px`;
+    };
+
+    notes.forEach(area => {
+        adjust(area);
+        area.addEventListener('input', () => adjust(area));
+    });
+});
