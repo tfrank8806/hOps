@@ -1,0 +1,115 @@
+.site-visit-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.site-visit-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.site-visit-card {
+    border-radius: 1rem;
+    border: 1px solid #e9ecef;
+    box-shadow: none;
+}
+
+.site-visit-card .card-header {
+    border-bottom: none;
+    background-color: transparent;
+}
+
+.site-visit-table {
+    font-size: 0.95rem;
+}
+
+.site-visit-table th {
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    color: #6c757d;
+}
+
+.site-visit-status {
+    min-width: 170px;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.site-visit-status.status-compliant {
+    border-color: #198754;
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.site-visit-status.status-needs-review {
+    border-color: #d4a017;
+    background-color: #fff3cd;
+    color: #664d03;
+}
+
+.site-visit-status.status-not-compliant {
+    border-color: #c0333f;
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+.status-dot {
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 999px;
+    background-color: #ced4da;
+    display: inline-flex;
+}
+
+.status-dot.status-compliant {
+    background-color: #198754;
+}
+
+.status-dot.status-needs-review {
+    background-color: #d4a017;
+}
+
+.status-dot.status-not-compliant {
+    background-color: #c0333f;
+}
+
+.site-visit-notes {
+    min-height: 2.5rem;
+    resize: none;
+}
+
+.site-visit-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.site-visit-legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.5rem;
+}
+
+.site-visit-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #495057;
+}
+
+.site-visit-email-card .form-text {
+    font-size: 0.85rem;
+}
+
+@media (max-width: 767.98px) {
+    .site-visit-status {
+        min-width: auto;
+    }
+}
