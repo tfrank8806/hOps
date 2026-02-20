@@ -12,6 +12,7 @@
                             string.Equals(currentController, "Maintenance", StringComparison.OrdinalIgnoreCase) ||
                             string.Equals(currentController, "MaintenanceEquipment", StringComparison.OrdinalIgnoreCase) ||
                             string.Equals(currentController, "MaintenanceLogs", StringComparison.OrdinalIgnoreCase);
+    var siteVisitActive = string.Equals(currentController, "SiteVisit", StringComparison.OrdinalIgnoreCase);
     var mainContainerClass = ViewData["MainContainerClass"] as string ?? string.Empty;
     var contentSurfaceClass = ViewData["ContentSurfaceClass"] as string ?? string.Empty;
     var unreadDirectMessageCount = ViewBag.UnreadDirectMessageCount is int count ? count : 0;
@@ -326,17 +327,14 @@
                                     <span class="sidebar-text">Deep Cleans</span>
                                 </a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link @(currentController == "SiteVisit" ? "active" : string.Empty)" asp-controller="SiteVisit" asp-action="Index">
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle @(siteVisitActive ? "active" : string.Empty)" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     <span class="sidebar-text">Site Visit</span>
                                 </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link @((currentController == "SiteVisit" && string.Equals(currentAction, "Log", StringComparison.OrdinalIgnoreCase)) ? "active" : string.Empty)"
-                                   asp-controller="SiteVisit"
-                                   asp-action="Log">
-                                    <span class="sidebar-text">Site Visit Log</span>
-                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" asp-controller="SiteVisit" asp-action="Index">Checklist</a></li>
+                                    <li><a class="dropdown-item" asp-controller="SiteVisit" asp-action="Log">Log</a></li>
+                                </ul>
                             </li>
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle @(maintenanceActive ? "active" : string.Empty)" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
