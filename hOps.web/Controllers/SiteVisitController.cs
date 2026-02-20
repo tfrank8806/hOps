@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -13,8 +14,10 @@ using hOps.web.Services;
 using hOps.web.Models.SiteVisit;
 using hOps.web.ViewModels.SiteVisit;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -41,6 +44,9 @@ namespace hOps.web.Controllers
 
         private const string SuccessTempDataKey = "SiteVisitSuccessMessage";
         private const string LogSuccessTempDataKey = "SiteVisitLogMessage";
+        private const string TemplateSuccessTempDataKey = "SiteVisitTemplateSuccessMessage";
+        private const int TemplateRowLimit = 200;
+        private const int TemplateFileSizeLimitBytes = 2 * 1024 * 1024;
 
         public SiteVisitController(
             ApplicationDbContext context,
@@ -56,12 +62,15 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public IActionResult Index()
+        public async Task<IActionResult> Index(int? templateId = null)
         {
             ViewData["Title"] = "Site Visit";
             ViewData["MainContainerClass"] = "main-inner--wide";
 
-            var model = BuildInitialModel();
+            var templates = await LoadTemplatesAsync();
+            var currentProperty = ViewBag.CurrentProperty as Property;
+            var templateRequested = Request.Query.ContainsKey("templateId");
+            var model = BuildInitialModel(currentProperty, templates, templateId, !templateRequested);
 
             if (TempData.TryGetValue(SuccessTempDataKey, out var message) && message is string successMessage)
             {
@@ -100,6 +109,7 @@ namespace hOps.web.Controllers
 
             if (!isValid)
             {
+                await PopulateTemplateOptionsAsync(model);
                 EnsurePlaceholderRow(model);
                 return View("Index", model);
             }
@@ -130,6 +140,7 @@ namespace hOps.web.Controllers
             if (successCount == 0)
             {
                 ModelState.AddModelError(string.Empty, "We could not send the site visit email. Please verify the addresses and try again.");
+                await PopulateTemplateOptionsAsync(model);
                 EnsurePlaceholderRow(model);
                 return View("Index", model);
             }
@@ -143,6 +154,7 @@ namespace hOps.web.Controllers
             {
                 _logger.LogError(ex, "Failed to persist site visit report for {Property}", report.PropertyName);
                 ModelState.AddModelError(string.Empty, "Your email was sent but we could not save the visit to the log.");
+                await PopulateTemplateOptionsAsync(model);
                 EnsurePlaceholderRow(model);
                 return View("Index", model);
             }
@@ -153,6 +165,104 @@ namespace hOps.web.Controllers
             _logger.LogInformation("Site visit checklist emailed to {RecipientCount} recipient(s) for property {Property}", successCount, model.PropertyName ?? "(unspecified)");
 
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Templates()
+        {
+            ViewData["Title"] = "Site Visit Templates";
+            ViewData["MainContainerClass"] = "main-inner--wide";
+
+            var viewModel = await BuildTemplateManagerViewModelAsync();
+            if (TempData.TryGetValue(TemplateSuccessTempDataKey, out var message) && message is string successMessage)
+            {
+                viewModel.SuccessMessage = successMessage;
+                TempData.Remove(TemplateSuccessTempDataKey);
+            }
+
+            return View(viewModel);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UploadTemplate(SiteVisitTemplateUploadViewModel form)
+        {
+            ViewData["Title"] = "Site Visit Templates";
+            ViewData["MainContainerClass"] = "main-inner--wide";
+
+            var rowTitles = new List<string>();
+            if (form.CsvFile == null || form.CsvFile.Length == 0)
+            {
+                ModelState.AddModelError(nameof(form.CsvFile), "Select a CSV file to upload.");
+            }
+            else if (form.CsvFile.Length > TemplateFileSizeLimitBytes)
+            {
+                ModelState.AddModelError(nameof(form.CsvFile), "The CSV file is too large. Limit uploads to 2 MB.");
+            }
+
+            if (ModelState.IsValid && form.CsvFile != null)
+            {
+                try
+                {
+                    rowTitles = await ParseTemplateCsvAsync(form.CsvFile);
+                    if (rowTitles.Count == 0)
+                    {
+                        ModelState.AddModelError(nameof(form.CsvFile), "The file did not contain any checklist rows.");
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    ModelState.AddModelError(nameof(form.CsvFile), ex.Message);
+                }
+            }
+
+            if (!ModelState.IsValid)
+            {
+                var invalidViewModel = await BuildTemplateManagerViewModelAsync();
+                invalidViewModel.Upload = form;
+                return View("Templates", invalidViewModel);
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            var template = new SiteVisitTemplate
+            {
+                Name = form.Name.Trim(),
+                Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
+                CreatedByUserId = user?.Id,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+
+            for (var index = 0; index < rowTitles.Count; index++)
+            {
+                template.Items.Add(new SiteVisitTemplateItem
+                {
+                    Title = rowTitles[index],
+                    SortOrder = index
+                });
+            }
+
+            await _context.SiteVisitTemplates.AddAsync(template);
+            await _context.SaveChangesAsync();
+
+            var suffix = rowTitles.Count == 1 ? "item" : "items";
+            TempData[TemplateSuccessTempDataKey] = $"Template '{template.Name}' created with {rowTitles.Count} {suffix}.";
+
+            return RedirectToAction(nameof(Templates));
+        }
+
+        [HttpGet]
+        public IActionResult DownloadBlankTemplate()
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("Title");
+            foreach (var entry in DefaultChecklistItems)
+            {
+                builder.AppendLine($"\"{entry.Replace("\"", "\"\"", StringComparison.Ordinal)}\"");
+            }
+
+            var payload = Encoding.UTF8.GetBytes(builder.ToString());
+            return File(payload, "text/csv", "site-visit-template.csv");
         }
 
         [HttpGet]
@@ -252,18 +362,260 @@ namespace hOps.web.Controllers
             return RedirectToAction(nameof(Log));
         }
 
-        private SiteVisitPageViewModel BuildInitialModel()
+        private SiteVisitPageViewModel BuildInitialModel(
+            Property? currentProperty,
+            IReadOnlyList<SiteVisitTemplate> templates,
+            int? requestedTemplateId,
+            bool fallbackToFirstTemplate)
         {
-            var currentProperty = ViewBag.CurrentProperty as Property;
+            SiteVisitTemplate? templateToApply = null;
+
+            if (requestedTemplateId.HasValue)
+            {
+                templateToApply = templates.FirstOrDefault(t => t.Id == requestedTemplateId.Value);
+            }
+            else if (fallbackToFirstTemplate && templates.Count > 0)
+            {
+                templateToApply = templates[0];
+            }
+
             var model = new SiteVisitPageViewModel
             {
                 PropertyName = currentProperty?.Name,
                 VisitDate = DateTime.Today,
-                Items = BuildDefaultItems()
+                Items = templateToApply != null ? BuildItemsFromTemplate(templateToApply) : BuildDefaultItems(),
+                SelectedTemplateId = templateToApply?.Id
             };
+
+            if (templates.Count > 0)
+            {
+                model.TemplateOptions = BuildTemplateSelectList(templates, model.SelectedTemplateId);
+            }
 
             EnsurePlaceholderRow(model);
             return model;
+        }
+
+        private async Task<List<SiteVisitTemplate>> LoadTemplatesAsync()
+        {
+            var templates = await _context.SiteVisitTemplates
+                .Include(t => t.Items)
+                .AsNoTracking()
+                .OrderBy(t => t.Name)
+                .ToListAsync();
+
+            foreach (var template in templates)
+            {
+                template.Items = template.Items
+                    .OrderBy(i => i.SortOrder)
+                    .ThenBy(i => i.Id)
+                    .ToList();
+            }
+
+            return templates;
+        }
+
+        private async Task PopulateTemplateOptionsAsync(SiteVisitPageViewModel model)
+        {
+            var templates = await LoadTemplatesAsync();
+            if (templates.Count > 0)
+            {
+                model.TemplateOptions = BuildTemplateSelectList(templates, model.SelectedTemplateId);
+            }
+            else
+            {
+                model.TemplateOptions = new List<SelectListItem>();
+            }
+        }
+
+        private static List<SiteVisitChecklistItemViewModel> BuildItemsFromTemplate(SiteVisitTemplate template)
+        {
+            return template.Items
+                .OrderBy(i => i.SortOrder)
+                .ThenBy(i => i.Id)
+                .Select(item => new SiteVisitChecklistItemViewModel
+                {
+                    Title = item.Title,
+                    Status = SiteVisitChecklistStatus.NotReviewed
+                })
+                .ToList();
+        }
+
+        private static List<SelectListItem> BuildTemplateSelectList(IEnumerable<SiteVisitTemplate> templates, int? selectedTemplateId)
+        {
+            var options = new List<SelectListItem>
+            {
+                new()
+                {
+                    Value = string.Empty,
+                    Text = "Custom checklist (start from scratch)",
+                    Selected = !selectedTemplateId.HasValue
+                }
+            };
+
+            options.AddRange(templates.Select(template => new SelectListItem
+            {
+                Value = template.Id.ToString(CultureInfo.InvariantCulture),
+                Text = $"{template.Name} ({template.Items.Count} {(template.Items.Count == 1 ? "item" : "items")})",
+                Selected = selectedTemplateId.HasValue && selectedTemplateId.Value == template.Id
+            }));
+
+            return options;
+        }
+
+        private async Task<SiteVisitTemplateManagerViewModel> BuildTemplateManagerViewModelAsync()
+        {
+            var templates = await _context.SiteVisitTemplates
+                .AsNoTracking()
+                .OrderBy(t => t.Name)
+                .Select(t => new
+                {
+                    t.Id,
+                    t.Name,
+                    t.Description,
+                    t.UpdatedAtUtc,
+                    ItemCount = t.Items.Count,
+                    CreatorFirstName = t.CreatedByUser != null ? t.CreatedByUser.FirstName : null,
+                    CreatorLastName = t.CreatedByUser != null ? t.CreatedByUser.LastName : null,
+                    CreatorEmail = t.CreatedByUser != null ? t.CreatedByUser.Email : null,
+                    CreatorUserName = t.CreatedByUser != null ? t.CreatedByUser.UserName : null
+                })
+                .ToListAsync();
+
+            var summaries = templates
+                .Select(t =>
+                {
+                    string? createdBy = null;
+                    var nameParts = new List<string>();
+                    if (!string.IsNullOrWhiteSpace(t.CreatorFirstName))
+                    {
+                        nameParts.Add(t.CreatorFirstName.Trim());
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(t.CreatorLastName))
+                    {
+                        nameParts.Add(t.CreatorLastName.Trim());
+                    }
+
+                    if (nameParts.Count > 0)
+                    {
+                        createdBy = string.Join(' ', nameParts);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(t.CreatorEmail))
+                    {
+                        createdBy = t.CreatorEmail;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(t.CreatorUserName))
+                    {
+                        createdBy = t.CreatorUserName;
+                    }
+
+                    return new SiteVisitTemplateSummaryViewModel
+                    {
+                        Id = t.Id,
+                        Name = t.Name,
+                        Description = t.Description,
+                        ItemCount = t.ItemCount,
+                        UpdatedAtUtc = t.UpdatedAtUtc,
+                        CreatedByName = createdBy
+                    };
+                })
+                .ToList();
+
+            return new SiteVisitTemplateManagerViewModel
+            {
+                Templates = summaries,
+                Upload = new SiteVisitTemplateUploadViewModel()
+            };
+        }
+
+        private async Task<List<string>> ParseTemplateCsvAsync(IFormFile file)
+        {
+            var titles = new List<string>();
+
+            using var stream = file.OpenReadStream();
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+
+            string? line;
+            var lineNumber = 0;
+            while ((line = await reader.ReadLineAsync()) != null)
+            {
+                lineNumber++;
+
+                if (titles.Count >= TemplateRowLimit)
+                {
+                    throw new InvalidOperationException($"Templates can include up to {TemplateRowLimit} checklist rows.");
+                }
+
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                var cells = SplitCsvLine(line);
+                if (lineNumber == 1 && cells.Count > 0 && cells[0].Trim().Equals("title", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var title = cells.Count > 0 ? cells[0].Trim() : string.Empty;
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    continue;
+                }
+
+                if (title.Length > 200)
+                {
+                    title = title.Substring(0, 200).Trim();
+                }
+
+                titles.Add(title);
+            }
+
+            return titles;
+        }
+
+        private static List<string> SplitCsvLine(string line)
+        {
+            var values = new List<string>();
+            if (line == null)
+            {
+                return values;
+            }
+
+            var builder = new StringBuilder();
+            var inQuotes = false;
+
+            for (var i = 0; i < line.Length; i++)
+            {
+                var character = line[i];
+                if (character == '"')
+                {
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        builder.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes;
+                    }
+
+                    continue;
+                }
+
+                if (character == ',' && !inQuotes)
+                {
+                    values.Add(builder.ToString());
+                    builder.Clear();
+                    continue;
+                }
+
+                builder.Append(character);
+            }
+
+            values.Add(builder.ToString());
+            return values;
         }
 
         private static List<SiteVisitChecklistItemViewModel> BuildDefaultItems()
@@ -304,6 +656,7 @@ namespace hOps.web.Controllers
                 AssignedTo = null,
                 ProgressStatus = SiteVisitProgressStatus.NotStarted,
                 CompletionNotes = null,
+                SiteVisitTemplateId = model.SelectedTemplateId,
                 CreatedByUserId = createdBy?.Id,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now

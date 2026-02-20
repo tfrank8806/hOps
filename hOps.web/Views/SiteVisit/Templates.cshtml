@@ -1,0 +1,116 @@
+@model hOps.web.ViewModels.SiteVisit.SiteVisitTemplateManagerViewModel
+@{
+    ViewData["Title"] = "Site Visit Templates";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <p class="text-uppercase text-muted fw-semibold small mb-1">Checklist library</p>
+        <h1 class="h2 mb-2">Site Visit Templates</h1>
+        <p class="text-muted mb-0">
+            Upload CSV files with your recurring checkpoints and reuse them when kicking off a new site visit.
+        </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="DownloadBlankTemplate" class="btn btn-outline-secondary">
+            Download blank template
+        </a>
+        <a asp-action="Index" class="btn btn-primary">
+            Back to Site Visit
+        </a>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="status">
+        @Model.SuccessMessage
+    </div>
+}
+
+<div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"
+     style="display:@(ViewData.ModelState.ErrorCount > 0 ? "block" : "none")"></div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Saved templates</h2>
+                @if (Model.Templates.Any())
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var template in Model.Templates)
+                        {
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                                    <div>
+                                        <div class="fw-semibold">@template.Name</div>
+                                        @if (!string.IsNullOrWhiteSpace(template.Description))
+                                        {
+                                            <div class="text-muted small">@template.Description</div>
+                                        }
+                                    </div>
+                                    <span class="badge bg-light text-dark">
+                                        @template.ItemCount @((template.ItemCount == 1 ? "item" : "items"))
+                                    </span>
+                                </div>
+                                <div class="text-muted small mt-2 d-flex flex-wrap gap-3">
+                                    <span>Last updated @template.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy")</span>
+                                    @if (!string.IsNullOrWhiteSpace(template.CreatedByName))
+                                    {
+                                        <span>Created by @template.CreatedByName</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info mb-0">
+                        No templates yet. Upload a CSV on the right to get started.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Upload CSV template</h2>
+                <p class="text-muted small">
+                    CSV format: first column header <code>Title</code> with one checklist item per row.
+                    Up to 200 rows are supported.
+                </p>
+                <form asp-action="UploadTemplate" method="post" enctype="multipart/form-data" class="vstack gap-3">
+                    @Html.AntiForgeryToken()
+                    <div>
+                        <label asp-for="Upload.Name" class="form-label"></label>
+                        <input asp-for="Upload.Name" class="form-control" />
+                        <span asp-validation-for="Upload.Name" class="text-danger small"></span>
+                    </div>
+                    <div>
+                        <label asp-for="Upload.Description" class="form-label"></label>
+                        <textarea asp-for="Upload.Description" class="form-control" rows="2"></textarea>
+                        <span asp-validation-for="Upload.Description" class="text-danger small"></span>
+                    </div>
+                    <div>
+                        <label asp-for="Upload.CsvFile" class="form-label"></label>
+                        <input asp-for="Upload.CsvFile" type="file" class="form-control" accept=".csv,text/csv" />
+                        <div class="form-text">
+                            CSV files up to 2&nbsp;MB. We'll trim blank lines and duplicate entries automatically.
+                        </div>
+                        <span asp-validation-for="Upload.CsvFile" class="text-danger small"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        Upload template
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

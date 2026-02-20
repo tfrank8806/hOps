@@ -38,9 +38,14 @@
                 <div>@(Model.PropertyName ?? (ViewBag.CurrentProperty?.Name as string) ?? "Property TBD")</div>
                 <div>@Model.VisitDate.ToString("D")</div>
             </div>
-            <a class="btn btn-outline-secondary btn-sm mt-2" asp-controller="SiteVisit" asp-action="Log">
-                View Site Visit Log
-            </a>
+            <div class="d-flex flex-wrap gap-2 justify-content-end mt-2">
+                <a class="btn btn-outline-secondary btn-sm" asp-controller="SiteVisit" asp-action="Log">
+                    View Site Visit Log
+                </a>
+                <a class="btn btn-outline-primary btn-sm" asp-controller="SiteVisit" asp-action="Templates">
+                    Manage Templates
+                </a>
+            </div>
         </div>
     </div>
 
@@ -93,6 +98,50 @@
             <div class="col-lg-8">
                 <div class="card site-visit-card mb-4 mb-lg-0">
                     <div class="card-body d-flex flex-column gap-3">
+                        @if (Model.HasTemplateOptions)
+                        {
+                            <div class="bg-light border rounded-3 p-3">
+                                <form method="get"
+                                      class="d-flex flex-wrap align-items-end gap-2"
+                                      data-template-picker>
+                                    <div>
+                                        <label class="form-label form-label-sm fw-semibold text-uppercase text-muted small mb-1"
+                                               for="templateIdSelect">
+                                            Checklist template
+                                        </label>
+                                        <select class="form-select form-select-sm"
+                                                id="templateIdSelect"
+                                                name="templateId">
+                                            @foreach (var option in Model.TemplateOptions)
+                                            {
+                                                if (option.Selected)
+                                                {
+                                                    <option value="@option.Value" selected="selected">@option.Text</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@option.Value">@option.Text</option>
+                                                }
+                                            }
+                                        </select>
+                                    </div>
+                                    <button type="submit"
+                                            class="btn btn-sm btn-outline-primary"
+                                            data-template-apply>
+                                        Apply template
+                                    </button>
+                                    <a asp-action="Templates" class="btn btn-link btn-sm text-decoration-none">
+                                        Manage templates
+                                    </a>
+                                </form>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info small mb-0">
+                                Want to reuse this checklist later? <a asp-action="Templates" class="alert-link">Create a template</a> from a CSV upload.
+                            </div>
+                        }
                         <div class="site-visit-actions">
                             <div>
                                 <h2 class="h5 mb-1">Checklist</h2>

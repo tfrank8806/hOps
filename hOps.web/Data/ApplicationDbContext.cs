@@ -86,6 +86,8 @@ namespace hOps.web.Data
         public DbSet<MaintenanceLogEntry> MaintenanceLogEntries { get; set; }
         public DbSet<SiteVisitReport> SiteVisitReports { get; set; }
         public DbSet<SiteVisitReportItem> SiteVisitReportItems { get; set; }
+        public DbSet<SiteVisitTemplate> SiteVisitTemplates { get; set; }
+        public DbSet<SiteVisitTemplateItem> SiteVisitTemplateItems { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -969,6 +971,12 @@ namespace hOps.web.Data
             builder.Entity<SiteVisitReport>()
                 .HasIndex(r => new { r.PropertyId, r.VisitDate });
 
+            builder.Entity<SiteVisitReport>()
+                .HasOne(r => r.Template)
+                .WithMany(t => t.Reports)
+                .HasForeignKey(r => r.SiteVisitTemplateId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             builder.Entity<SiteVisitReportItem>()
                 .HasOne(i => i.Report)
                 .WithMany(r => r.Items)
@@ -978,6 +986,36 @@ namespace hOps.web.Data
             builder.Entity<SiteVisitReportItem>()
                 .Property(i => i.Status)
                 .HasConversion<int>();
+
+            builder.Entity<SiteVisitTemplate>()
+                .HasOne(t => t.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(t => t.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<SiteVisitTemplate>()
+                .Property(t => t.Name)
+                .HasMaxLength(200);
+
+            builder.Entity<SiteVisitTemplate>()
+                .Property(t => t.Description)
+                .HasMaxLength(500);
+
+            builder.Entity<SiteVisitTemplate>()
+                .HasIndex(t => t.Name);
+
+            builder.Entity<SiteVisitTemplateItem>()
+                .HasOne(i => i.Template)
+                .WithMany(t => t.Items)
+                .HasForeignKey(i => i.SiteVisitTemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<SiteVisitTemplateItem>()
+                .Property(i => i.Title)
+                .HasMaxLength(200);
+
+            builder.Entity<SiteVisitTemplateItem>()
+                .HasIndex(i => new { i.SiteVisitTemplateId, i.SortOrder });
         }
     }
 }

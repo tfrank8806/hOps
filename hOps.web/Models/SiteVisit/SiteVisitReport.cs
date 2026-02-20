@@ -14,6 +14,10 @@ namespace hOps.web.Models.SiteVisit
 
         public string PropertyName { get; set; } = string.Empty;
 
+        public int? SiteVisitTemplateId { get; set; }
+
+        public SiteVisitTemplate? Template { get; set; }
+
         public DateTime VisitDate { get; set; }
 
         public string? LeaderName { get; set; }

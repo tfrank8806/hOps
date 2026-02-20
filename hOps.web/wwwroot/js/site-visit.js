@@ -1,4 +1,24 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const templatePicker = document.querySelector('[data-template-picker]');
+    if (!templatePicker) {
+        return;
+    }
+
+    const templateSelect = templatePicker.querySelector('select[name="templateId"]');
+    if (!templateSelect) {
+        return;
+    }
+
+    templateSelect.addEventListener('change', () => {
+        if (typeof templatePicker.requestSubmit === 'function') {
+            templatePicker.requestSubmit();
+        } else {
+            templatePicker.submit();
+        }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
     const checklistBody = document.querySelector('[data-checklist-body]');
     if (!checklistBody) {
         return;
