@@ -31,6 +31,7 @@ namespace hOps.web.Controllers
         private const string CalendarCategoriesReportKey = "calendarCategories";
         private const string LostFoundReportKey = "lostFound";
         private const string WorkOrdersReportKey = "workOrders";
+        private const string WorkOrderSummaryReportKey = "workOrderSummary";
         private const string CalendarEventsReportKey = "calendarEvents";
         private const string PassOnLogsReportKey = "passOnLogs";
         private const string PhonebookReportKey = "phonebook";
@@ -56,6 +57,8 @@ namespace hOps.web.Controllers
                     "Lost and found items captured across your selected properties."),
                 new(WorkOrdersReportKey, "Work Orders Report", true, true,
                     "Detailed work order activity with property coverage and key metadata."),
+                new(WorkOrderSummaryReportKey, "Work Order Summary", true, true,
+                    "Topline counts of created, completed, and still-open work orders for the selected timeframe."),
                 new(CalendarEventsReportKey, "Calendar Report", true, true,
                     "Calendar events scheduled for the chosen properties."),
                 new(PassOnLogsReportKey, "Pass On Logs Report", true, true,
@@ -659,6 +662,8 @@ namespace hOps.web.Controllers
                     return await BuildLostFoundReport(definition, propertyIds, startDate, endDate);
                 case WorkOrdersReportKey:
                     return await BuildWorkOrdersReport(definition, propertyIds, startDate, endDate, filters);
+                case WorkOrderSummaryReportKey:
+                    return await BuildWorkOrderSummaryReport(definition, propertyIds, startDate, endDate);
                 case CalendarEventsReportKey:
                     return await BuildCalendarEventsReport(definition, propertyIds, startDate, endDate, filters);
                 case PassOnLogsReportKey:
@@ -1188,6 +1193,97 @@ namespace hOps.web.Controllers
                     };
                 })
                 .ToList();
+
+            return new ReportResultViewModel
+            {
+                Title = definition.DisplayName,
+                Headers = headers,
+                Rows = rows
+            };
+        }
+
+        private async Task<ReportResultViewModel> BuildWorkOrderSummaryReport(
+            ReportDefinition definition,
+            IReadOnlyCollection<int> propertyIds,
+            DateTime? startDate,
+            DateTime? endDate)
+        {
+            var headers = new List<string>
+            {
+                "Property",
+                "Work Orders Created",
+                "Completed",
+                "Open"
+            };
+
+            if (!propertyIds.Any())
+            {
+                return new ReportResultViewModel
+                {
+                    Title = definition.DisplayName,
+                    Headers = headers,
+                    Rows = new List<IReadOnlyList<string>>()
+                };
+            }
+
+            var (startBoundary, endBoundary) = ToRangeBounds(startDate, endDate);
+
+            var query = _context.WorkOrderProperties
+                .AsNoTracking()
+                .Where(wp => propertyIds.Contains(wp.PropertyId));
+
+            if (startBoundary.HasValue)
+            {
+                var startValue = startBoundary.Value;
+                query = query.Where(wp => wp.WorkOrder.CreatedAt >= startValue);
+            }
+
+            if (endBoundary.HasValue)
+            {
+                var endValue = endBoundary.Value;
+                query = query.Where(wp => wp.WorkOrder.CreatedAt < endValue);
+            }
+
+            var summaries = await query
+                .GroupBy(wp => new
+                {
+                    wp.PropertyId,
+                    PropertyName = wp.Property != null ? wp.Property.Name : null
+                })
+                .Select(group => new
+                {
+                    PropertyName = group.Key.PropertyName ?? "Property",
+                    CreatedCount = group.Count(),
+                    CompletedCount = group.Sum(wp => wp.WorkOrder.Status == "Completed" ? 1 : 0),
+                    OpenCount = group.Sum(wp =>
+                        wp.WorkOrder.Status == "Completed" || wp.WorkOrder.Status == "Cancelled"
+                            ? 0
+                            : 1)
+                })
+                .OrderBy(result => result.PropertyName)
+                .ToListAsync();
+
+            var rows = summaries
+                .Select(summary => (IReadOnlyList<string>)new List<string>
+                {
+                    NormalizeText(summary.PropertyName),
+                    summary.CreatedCount.ToString(CultureInfo.InvariantCulture),
+                    summary.CompletedCount.ToString(CultureInfo.InvariantCulture),
+                    summary.OpenCount.ToString(CultureInfo.InvariantCulture)
+                })
+                .ToList();
+
+            if (rows.Any())
+            {
+                var totals = new List<string>
+                {
+                    "All Selected Properties",
+                    summaries.Sum(s => s.CreatedCount).ToString(CultureInfo.InvariantCulture),
+                    summaries.Sum(s => s.CompletedCount).ToString(CultureInfo.InvariantCulture),
+                    summaries.Sum(s => s.OpenCount).ToString(CultureInfo.InvariantCulture)
+                };
+                rows.Add(totals);
+            }
 
             return new ReportResultViewModel
             {
