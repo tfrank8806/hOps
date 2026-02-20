@@ -17,20 +17,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const value = (select.value || '').toLowerCase();
-        let className = 'status-compliant';
-        if (value === 'needsreview') {
+        let className = '';
+        if (value === 'compliant') {
+            className = 'status-compliant';
+        } else if (value === 'needsreview') {
             className = 'status-needs-review';
         } else if (value === 'notcompliant') {
             className = 'status-not-compliant';
         }
 
         select.classList.remove(...statusClasses);
-        select.classList.add(className);
+        if (className) {
+            select.classList.add(className);
+        }
 
         const dot = row.querySelector('[data-status-dot]');
         if (dot) {
             dot.classList.remove(...statusClasses);
-            dot.classList.add(className);
+            if (className) {
+                dot.classList.add(className);
+            }
         }
     };
 
@@ -57,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const statusSelect = row.querySelector('[data-status-select]');
             if (statusSelect) {
-                statusSelect.value = 'Compliant';
+                statusSelect.value = 'NotReviewed';
                 updateStatusDecoration(row);
             }
 

@@ -155,7 +155,7 @@ namespace hOps.web.Controllers
                 .Select(title => new SiteVisitChecklistItemViewModel
                 {
                     Title = title,
-                    Status = SiteVisitChecklistStatus.Compliant
+                    Status = SiteVisitChecklistStatus.NotReviewed
                 })
                 .ToList();
         }
@@ -265,15 +265,19 @@ namespace hOps.web.Controllers
                 worksheet.Cell(row, 2).Value = StatusLabel(item.Status);
                 worksheet.Cell(row, 3).Value = item.Notes ?? string.Empty;
 
-                var statusColor = item.Status switch
+                XLColor? statusColor = item.Status switch
                 {
                     SiteVisitChecklistStatus.Compliant => XLColor.FromHtml("#d1e7dd"),
                     SiteVisitChecklistStatus.NeedsReview => XLColor.FromHtml("#fff3cd"),
                     SiteVisitChecklistStatus.NotCompliant => XLColor.FromHtml("#f8d7da"),
-                    _ => XLColor.White
+                    _ => null
                 };
 
-                worksheet.Cell(row, 2).Style.Fill.SetBackgroundColor(statusColor);
+                if (statusColor != null)
+                {
+                    worksheet.Cell(row, 2).Style.Fill.SetBackgroundColor(statusColor);
+                }
+
                 worksheet.Cell(row, 3).Style.Alignment.WrapText = true;
                 row++;
             }
@@ -293,6 +297,7 @@ namespace hOps.web.Controllers
                 SiteVisitChecklistStatus.Compliant => "Compliant",
                 SiteVisitChecklistStatus.NeedsReview => "Needs Review",
                 SiteVisitChecklistStatus.NotCompliant => "Not Compliant",
+                SiteVisitChecklistStatus.NotReviewed => "Not Reviewed",
                 _ => status.ToString()
             };
         }

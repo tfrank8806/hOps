@@ -7,6 +7,7 @@
     var nextIndex = Model.Items.Count;
     var statusMetadata = new (SiteVisitChecklistStatus Status, string Label, string Description, string Css)[]
     {
+        (SiteVisitChecklistStatus.NotReviewed, "Not Reviewed", "Not yet graded", string.Empty),
         (SiteVisitChecklistStatus.Compliant, "Compliant", "Green - Fully compliant", "status-compliant"),
         (SiteVisitChecklistStatus.NeedsReview, "Needs Review", "Yellow - Follow-up required", "status-needs-review"),
         (SiteVisitChecklistStatus.NotCompliant, "Not Compliant", "Red - Immediate attention", "status-not-compliant")
@@ -121,10 +122,10 @@
                                             </td>
                                             <td>
                                                 <div class="d-flex align-items-center gap-2">
-                                                    <span class="status-dot @css" data-status-dot aria-hidden="true"></span>
-                                                    <select asp-for="Items[i].Status"
-                                                            class="form-select form-select-sm site-visit-status @css"
-                                                            data-status-select>
+                <span class="status-dot @(string.IsNullOrWhiteSpace(css) ? string.Empty : css)" data-status-dot aria-hidden="true"></span>
+                <select asp-for="Items[i].Status"
+                        class="form-select form-select-sm site-visit-status @(string.IsNullOrWhiteSpace(css) ? string.Empty : css)"
+                        data-status-select>
                                                         @foreach (var option in statusMetadata)
                                                         {
                                                             <option value="@option.Status">@option.Label</option>
@@ -209,8 +210,8 @@
         </td>
         <td>
             <div class="d-flex align-items-center gap-2">
-                <span class="status-dot status-compliant" data-status-dot aria-hidden="true"></span>
-                <select class="form-select form-select-sm site-visit-status status-compliant"
+                <span class="status-dot" data-status-dot aria-hidden="true"></span>
+                <select class="form-select form-select-sm site-visit-status"
                         name="Items[__index__].Status"
                         data-status-select>
                     @foreach (var option in statusMetadata)

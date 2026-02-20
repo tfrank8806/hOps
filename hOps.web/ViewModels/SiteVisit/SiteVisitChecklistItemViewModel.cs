@@ -4,6 +4,7 @@ namespace hOps.web.ViewModels.SiteVisit
 {
     public enum SiteVisitChecklistStatus
     {
+        NotReviewed,
         Compliant,
         NeedsReview,
         NotCompliant
@@ -18,7 +19,7 @@ namespace hOps.web.ViewModels.SiteVisit
 
         [Required]
         [Display(Name = "Status")]
-        public SiteVisitChecklistStatus Status { get; set; } = SiteVisitChecklistStatus.Compliant;
+        public SiteVisitChecklistStatus Status { get; set; } = SiteVisitChecklistStatus.NotReviewed;
 
         [StringLength(2000)]
         [Display(Name = "Notes")]
