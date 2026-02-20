@@ -10,8 +10,8 @@ body {
     color: var(--brand-text, #1f2739);
     font-size: var(--font-body-size);
     line-height: var(--font-body-line);
-    --bs-modal-zindex: 1400;
-    --bs-backdrop-zindex: 1390;
+    --bs-modal-zindex: 2000;
+    --bs-backdrop-zindex: 1990;
 }
 
 /* Keep interactive overlays above the sticky header/banner */
@@ -34,15 +34,6 @@ body {
     z-index: 1500;
 }
 
-.modal {
-    --bs-modal-zindex: 1600;
-    z-index: 1600;
-}
-
-.modal-backdrop {
-    --bs-backdrop-zindex: 1590;
-    z-index: 1590;
-}
 
 .skip-link {
     position: absolute;
