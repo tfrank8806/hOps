@@ -184,6 +184,7 @@
                         <table class="table align-middle mb-0">
                             <thead>
                                 <tr>
+                                    <th style="width: 200px;">Section</th>
                                     <th>Checklist Item</th>
                                     <th style="width: 200px;">Status</th>
                                     <th>Notes</th>
@@ -194,6 +195,7 @@
                                 {
                                     var css = statusClasses.TryGetValue(item.Status, out var cls) ? cls : string.Empty;
                                     <tr>
+                                        <td>@(string.IsNullOrWhiteSpace(item.SectionName) ? "-" : item.SectionName)</td>
                                         <td>@item.Title</td>
                                         <td>
                                             <div class="d-flex align-items-center gap-2">

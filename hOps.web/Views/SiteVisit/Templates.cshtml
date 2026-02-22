@@ -79,7 +79,7 @@
             <div class="card-body">
                 <h2 class="h5 mb-3">Upload CSV template</h2>
                 <p class="text-muted small">
-                    CSV format: first column header <code>Title</code> with one checklist item per row.
+                    CSV format: columns <code>Section</code> and <code>Title</code> (section may be blank) with one checklist item per row.
                     Up to 200 rows are supported.
                 </p>
                 <form asp-action="UploadTemplate" method="post" enctype="multipart/form-data" class="vstack gap-3">
@@ -99,6 +99,7 @@
                         <input asp-for="Upload.CsvFile" type="file" class="form-control" accept=".csv,text/csv" />
                         <div class="form-text">
                             CSV files up to 2&nbsp;MB. We'll trim blank lines and duplicate entries automatically.
+                            Use the same section name for consecutive items to group them together.
                         </div>
                         <span asp-validation-for="Upload.CsvFile" class="text-danger small"></span>
                     </div>

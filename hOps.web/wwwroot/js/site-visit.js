@@ -74,8 +74,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const removeRow = row => {
         const rowCount = checklistBody.querySelectorAll('[data-checklist-row]').length;
         if (rowCount <= 1) {
+            const sectionInput = row.querySelector('input[name*=".SectionName"]');
             const titleInput = row.querySelector('input[name*=".Title"]');
             const notesInput = row.querySelector('[data-notes-input]');
+            if (sectionInput) {
+                sectionInput.value = '';
+            }
             if (titleInput) {
                 titleInput.value = '';
                 titleInput.focus();

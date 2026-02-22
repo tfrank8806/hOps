@@ -30,16 +30,21 @@ namespace hOps.web.Controllers
         private readonly HtmlEncoder _htmlEncoder;
         private readonly ILogger<SiteVisitController> _logger;
 
-        private static readonly string[] DefaultChecklistItems =
+        private static readonly (string Section, string Title)[] DefaultChecklistEntries =
         {
-            "Arrival experience & curb appeal",
-            "Lobby and public space presentation",
-            "Front desk engagement & service",
-            "Guest room readiness and housekeeping",
-            "Back-of-house cleanliness & organization",
-            "Maintenance and safety equipment checks",
-            "Brand standards / marketing compliance",
-            "Team engagement & training conversations"
+            ("Grounds & Landscaping", "Arrival experience & curb appeal"),
+            ("Grounds & Landscaping", "Trees & shrubs are trimmed and healthy"),
+            ("Grounds & Landscaping", "Irrigation systems are leak-free and scheduled"),
+            ("Grounds & Landscaping", "Pavement and parking lot are clean and in good repair"),
+            ("Public Areas", "Lobby and public space presentation"),
+            ("Public Areas", "HVAC temperatures are comfortable"),
+            ("Public Areas", "Floors, walls, and ceilings are clean"),
+            ("Public Areas", "Front desk engagement & service"),
+            ("Guest Rooms", "Guest room readiness and housekeeping"),
+            ("Back of House", "Back-of-house cleanliness & organization"),
+            ("Maintenance & Safety", "Maintenance and safety equipment checks"),
+            ("Brand & Team", "Brand standards / marketing compliance"),
+            ("Brand & Team", "Team engagement & training conversations")
         };
 
         private const string SuccessTempDataKey = "SiteVisitSuccessMessage";
@@ -190,7 +195,7 @@ namespace hOps.web.Controllers
             ViewData["Title"] = "Site Visit Templates";
             ViewData["MainContainerClass"] = "main-inner--wide";
 
-            var rowTitles = new List<string>();
+            var parsedRows = new List<(string? Section, string Title)>();
             if (form.CsvFile == null || form.CsvFile.Length == 0)
             {
                 ModelState.AddModelError(nameof(form.CsvFile), "Select a CSV file to upload.");
@@ -204,8 +209,8 @@ namespace hOps.web.Controllers
             {
                 try
                 {
-                    rowTitles = await ParseTemplateCsvAsync(form.CsvFile);
-                    if (rowTitles.Count == 0)
+                    parsedRows = await ParseTemplateCsvAsync(form.CsvFile);
+                    if (parsedRows.Count == 0)
                     {
                         ModelState.AddModelError(nameof(form.CsvFile), "The file did not contain any checklist rows.");
                     }
@@ -233,11 +238,13 @@ namespace hOps.web.Controllers
                 UpdatedAtUtc = DateTime.UtcNow
             };
 
-            for (var index = 0; index < rowTitles.Count; index++)
+            for (var index = 0; index < parsedRows.Count; index++)
             {
+                var row = parsedRows[index];
                 template.Items.Add(new SiteVisitTemplateItem
                 {
-                    Title = rowTitles[index],
+                    SectionName = row.Section,
+                    Title = row.Title,
                     SortOrder = index
                 });
             }
@@ -245,8 +252,8 @@ namespace hOps.web.Controllers
             await _context.SiteVisitTemplates.AddAsync(template);
             await _context.SaveChangesAsync();
 
-            var suffix = rowTitles.Count == 1 ? "item" : "items";
-            TempData[TemplateSuccessTempDataKey] = $"Template '{template.Name}' created with {rowTitles.Count} {suffix}.";
+            var suffix = parsedRows.Count == 1 ? "item" : "items";
+            TempData[TemplateSuccessTempDataKey] = $"Template '{template.Name}' created with {parsedRows.Count} {suffix}.";
 
             return RedirectToAction(nameof(Templates));
         }
@@ -255,10 +262,21 @@ namespace hOps.web.Controllers
         public IActionResult DownloadBlankTemplate()
         {
             var builder = new StringBuilder();
-            builder.AppendLine("Title");
-            foreach (var entry in DefaultChecklistItems)
+            builder.AppendLine("Section,Title");
+            foreach (var entry in DefaultChecklistEntries)
             {
-                builder.AppendLine($"\"{entry.Replace("\"", "\"\"", StringComparison.Ordinal)}\"");
+                builder.AppendLine($"{EscapeForCsv(entry.Section)},{EscapeForCsv(entry.Title)}");
+            }
+
+            static string EscapeForCsv(string? value)
+            {
+                var text = value ?? string.Empty;
+                var needsQuotes = text.Contains(',', StringComparison.Ordinal) ||
+                                  text.Contains('"', StringComparison.Ordinal) ||
+                                  text.Contains('\n') ||
+                                  text.Contains('\r');
+                var cleaned = text.Replace("\"", "\"\"", StringComparison.Ordinal);
+                return needsQuotes ? $"\"{cleaned}\"" : cleaned;
             }
 
             var payload = Encoding.UTF8.GetBytes(builder.ToString());
@@ -435,6 +453,7 @@ namespace hOps.web.Controllers
                 .ThenBy(i => i.Id)
                 .Select(item => new SiteVisitChecklistItemViewModel
                 {
+                    SectionName = item.SectionName,
                     Title = item.Title,
                     Status = SiteVisitChecklistStatus.NotReviewed
                 })
@@ -529,9 +548,9 @@ namespace hOps.web.Controllers
             };
         }
 
-        private async Task<List<string>> ParseTemplateCsvAsync(IFormFile file)
+        private async Task<List<(string? Section, string Title)>> ParseTemplateCsvAsync(IFormFile file)
         {
-            var titles = new List<string>();
+            var rows = new List<(string? Section, string Title)>();
 
             using var stream = file.OpenReadStream();
             using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
@@ -542,7 +561,7 @@ namespace hOps.web.Controllers
             {
                 lineNumber++;
 
-                if (titles.Count >= TemplateRowLimit)
+                if (rows.Count >= TemplateRowLimit)
                 {
                     throw new InvalidOperationException($"Templates can include up to {TemplateRowLimit} checklist rows.");
                 }
@@ -553,15 +572,42 @@ namespace hOps.web.Controllers
                 }
 
                 var cells = SplitCsvLine(line);
-                if (lineNumber == 1 && cells.Count > 0 && cells[0].Trim().Equals("title", StringComparison.OrdinalIgnoreCase))
+                if (lineNumber == 1)
+                {
+                    if (cells.Count > 1 &&
+                        cells[0].Trim().Equals("section", StringComparison.OrdinalIgnoreCase) &&
+                        cells[1].Trim().Equals("title", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (cells.Count == 1 && cells[0].Trim().Equals("title", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                }
+
+                string? section = null;
+                string title;
+
+                if (cells.Count > 1)
+                {
+                    section = string.IsNullOrWhiteSpace(cells[0]) ? null : cells[0].Trim();
+                    title = cells[1].Trim();
+                }
+                else
+                {
+                    title = cells[0].Trim();
+                }
+
+                if (string.IsNullOrWhiteSpace(title))
                 {
                     continue;
                 }
 
-                var title = cells.Count > 0 ? cells[0].Trim() : string.Empty;
-                if (string.IsNullOrWhiteSpace(title))
+                if (!string.IsNullOrWhiteSpace(section) && section.Length > 200)
                 {
-                    continue;
+                    section = section.Substring(0, 200).Trim();
                 }
 
                 if (title.Length > 200)
@@ -569,10 +615,10 @@ namespace hOps.web.Controllers
                     title = title.Substring(0, 200).Trim();
                 }
 
-                titles.Add(title);
+                rows.Add((section, title));
             }
 
-            return titles;
+            return rows;
         }
 
         private static List<string> SplitCsvLine(string line)
@@ -620,10 +666,11 @@ namespace hOps.web.Controllers
 
         private static List<SiteVisitChecklistItemViewModel> BuildDefaultItems()
         {
-            return DefaultChecklistItems
-                .Select(title => new SiteVisitChecklistItemViewModel
+            return DefaultChecklistEntries
+                .Select(entry => new SiteVisitChecklistItemViewModel
                 {
-                    Title = title,
+                    SectionName = entry.Section,
+                    Title = entry.Title,
                     Status = SiteVisitChecklistStatus.NotReviewed
                 })
                 .ToList();
@@ -666,6 +713,7 @@ namespace hOps.web.Controllers
             {
                 report.Items.Add(new SiteVisitReportItem
                 {
+                    SectionName = item.SectionName,
                     Title = item.Title,
                     Status = item.Status,
                     Notes = item.Notes
@@ -695,6 +743,7 @@ namespace hOps.web.Controllers
                     .OrderBy(i => i.Id)
                     .Select(i => new SiteVisitChecklistItemViewModel
                     {
+                        SectionName = i.SectionName,
                         Title = i.Title,
                         Status = i.Status,
                         Notes = i.Notes
@@ -765,6 +814,7 @@ namespace hOps.web.Controllers
             model.Items = (model.Items ?? new List<SiteVisitChecklistItemViewModel>())
                 .Select(item => new SiteVisitChecklistItemViewModel
                 {
+                    SectionName = string.IsNullOrWhiteSpace(item.SectionName) ? null : item.SectionName.Trim(),
                     Title = (item.Title ?? string.Empty).Trim(),
                     Status = item.Status,
                     Notes = string.IsNullOrWhiteSpace(item.Notes) ? null : item.Notes.Trim()
@@ -822,7 +872,7 @@ namespace hOps.web.Controllers
 
             worksheet.Cell(1, 1).Value = "Site Visit Checklist";
             worksheet.Cell(1, 1).Style.Font.Bold = true;
-            worksheet.Range(1, 1, 1, 3).Merge();
+            worksheet.Range(1, 1, 1, 4).Merge();
 
             worksheet.Cell(2, 1).Value = "Property";
             worksheet.Cell(2, 2).Value = report.PropertyName ?? "Not specified";
@@ -843,19 +893,21 @@ namespace hOps.web.Controllers
             worksheet.Range(8, 2, 8, 3).Merge();
 
             var headerRow = 10;
-            worksheet.Cell(headerRow, 1).Value = "Checklist Item";
-            worksheet.Cell(headerRow, 2).Value = "Status";
-            worksheet.Cell(headerRow, 3).Value = "Notes";
-            worksheet.Range(headerRow, 1, headerRow, 3).Style
+            worksheet.Cell(headerRow, 1).Value = "Section";
+            worksheet.Cell(headerRow, 2).Value = "Checklist Item";
+            worksheet.Cell(headerRow, 3).Value = "Status";
+            worksheet.Cell(headerRow, 4).Value = "Notes";
+            worksheet.Range(headerRow, 1, headerRow, 4).Style
                 .Font.SetBold()
                 .Fill.SetBackgroundColor(XLColor.FromHtml("#e9ecef"));
 
             var row = headerRow + 1;
             foreach (var item in report.Items.OrderBy(i => i.Id))
             {
-                worksheet.Cell(row, 1).Value = item.Title;
-                worksheet.Cell(row, 2).Value = StatusLabel(item.Status);
-                worksheet.Cell(row, 3).Value = item.Notes ?? string.Empty;
+                worksheet.Cell(row, 1).Value = item.SectionName ?? string.Empty;
+                worksheet.Cell(row, 2).Value = item.Title;
+                worksheet.Cell(row, 3).Value = StatusLabel(item.Status);
+                worksheet.Cell(row, 4).Value = item.Notes ?? string.Empty;
 
                 XLColor? statusColor = item.Status switch
                 {
@@ -867,14 +919,14 @@ namespace hOps.web.Controllers
 
                 if (statusColor != null)
                 {
-                    worksheet.Cell(row, 2).Style.Fill.SetBackgroundColor(statusColor);
+                    worksheet.Cell(row, 3).Style.Fill.SetBackgroundColor(statusColor);
                 }
 
-                worksheet.Cell(row, 3).Style.Alignment.WrapText = true;
+                worksheet.Cell(row, 4).Style.Alignment.WrapText = true;
                 row++;
             }
 
-            worksheet.Columns(1, 3).AdjustToContents();
+            worksheet.Columns(1, 4).AdjustToContents();
 
             using var stream = new MemoryStream();
             workbook.SaveAs(stream);
@@ -940,6 +992,7 @@ namespace hOps.web.Controllers
 
             builder.Append("<table style=\"border-collapse:collapse;width:100%;max-width:800px;\">");
             builder.Append("<thead><tr>");
+            builder.Append("<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;width:160px;\">Section</th>");
             builder.Append("<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;\">Item</th>");
             builder.Append("<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;width:150px;\">Status</th>");
             builder.Append("<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;\">Notes</th>");
@@ -948,7 +1001,9 @@ namespace hOps.web.Controllers
             foreach (var item in report.Items.OrderBy(i => i.Id))
             {
                 var notes = EncodeWithBreaks(item.Notes);
+                var section = string.IsNullOrWhiteSpace(item.SectionName) ? "&nbsp;" : Encode(item.SectionName);
                 builder.Append("<tr>");
+                builder.Append($"<td style=\"border-bottom:1px solid #f1f3f5;padding:8px;\">{section}</td>");
                 builder.Append($"<td style=\"border-bottom:1px solid #f1f3f5;padding:8px;\">{Encode(item.Title)}</td>");
                 builder.Append($"<td style=\"border-bottom:1px solid #f1f3f5;padding:8px;\">{StatusLabel(item.Status)}</td>");
                 builder.Append($"<td style=\"border-bottom:1px solid #f1f3f5;padding:8px;\">{(string.IsNullOrWhiteSpace(notes) ? "&nbsp;" : notes)}</td>");

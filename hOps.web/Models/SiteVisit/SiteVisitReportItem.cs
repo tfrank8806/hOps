@@ -11,6 +11,9 @@ namespace hOps.web.Models.SiteVisit
         public SiteVisitReport? Report { get; set; }
 
         [MaxLength(200)]
+        public string? SectionName { get; set; }
+
+        [MaxLength(200)]
         public string Title { get; set; } = string.Empty;
 
         public SiteVisitChecklistStatus Status { get; set; } = SiteVisitChecklistStatus.NotReviewed;

@@ -987,6 +987,10 @@ namespace hOps.web.Data
                 .Property(i => i.Status)
                 .HasConversion<int>();
 
+            builder.Entity<SiteVisitReportItem>()
+                .Property(i => i.SectionName)
+                .HasMaxLength(200);
+
             builder.Entity<SiteVisitTemplate>()
                 .HasOne(t => t.CreatedByUser)
                 .WithMany()
@@ -1012,6 +1016,10 @@ namespace hOps.web.Data
 
             builder.Entity<SiteVisitTemplateItem>()
                 .Property(i => i.Title)
+                .HasMaxLength(200);
+
+            builder.Entity<SiteVisitTemplateItem>()
+                .Property(i => i.SectionName)
                 .HasMaxLength(200);
 
             builder.Entity<SiteVisitTemplateItem>()

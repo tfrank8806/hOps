@@ -155,6 +155,7 @@
                             <table class="table align-middle site-visit-table mb-0">
                                 <thead>
                                     <tr>
+                                        <th scope="col" style="width: 220px;">Section</th>
                                         <th scope="col">Checklist Item</th>
                                         <th scope="col" style="width: 220px;">Status</th>
                                         <th scope="col">Notes</th>
@@ -168,7 +169,13 @@
                                         var css = StatusCssClass(item.Status);
                                         <tr data-checklist-row data-index="@i">
                                             <td>
-                            <input type="hidden" name="Items.Index" value="@i" />
+                                                <input type="hidden" name="Items.Index" value="@i" />
+                                                <input asp-for="Items[i].SectionName"
+                                                       class="form-control form-control-sm"
+                                                       placeholder="e.g. Grounds &amp; Landscaping" />
+                                                <span asp-validation-for="Items[i].SectionName" class="text-danger small"></span>
+                                            </td>
+                                            <td>
                                                 <input asp-for="Items[i].Title"
                                                        class="form-control form-control-sm"
                                                        placeholder="Enter checklist focus" />
@@ -258,6 +265,11 @@
     <tr data-checklist-row data-index="__index__">
         <td>
             <input type="hidden" name="Items.Index" value="__index__" />
+            <input class="form-control form-control-sm"
+                   name="Items[__index__].SectionName"
+                   placeholder="e.g. Public Areas" />
+        </td>
+        <td>
             <input class="form-control form-control-sm"
                    name="Items[__index__].Title"
                    placeholder="Enter checklist focus" />

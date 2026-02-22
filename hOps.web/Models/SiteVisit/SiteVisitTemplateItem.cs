@@ -10,6 +10,9 @@ namespace hOps.web.Models.SiteVisit
 
         public SiteVisitTemplate Template { get; set; } = null!;
 
+        [MaxLength(200)]
+        public string? SectionName { get; set; }
+
         [Required]
         [MaxLength(200)]
         public string Title { get; set; } = string.Empty;
