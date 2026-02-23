@@ -28,7 +28,7 @@ namespace hOps.web.ViewModels.WorkOrders
 
         [DataType(DataType.Date)]
         [Display(Name = "Due Date")]
-        public DateTime DueDate { get; set; } = DateTime.UtcNow.Date.AddDays(1);
+        public DateTime DueDate { get; set; } = DateTime.UtcNow.Date;
 
         [Display(Name = "Assign To")]
         public int? DepartmentId { get; set; }

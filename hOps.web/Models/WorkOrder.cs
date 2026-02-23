@@ -24,7 +24,7 @@ namespace hOps.web.Models
         public string? Details { get; set; }
 
         [DataType(DataType.Date)]
-        public DateTime DueDate { get; set; } = DateTime.UtcNow.Date.AddDays(1);
+        public DateTime DueDate { get; set; } = DateTime.UtcNow.Date;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
