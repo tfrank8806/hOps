@@ -11,9 +11,9 @@ namespace hOps.web.Models
         public int Id { get; set; }
 
         [Required]
-        [Display(Name = "Type")]
         public string TypeName { get; set; } = string.Empty;
 
+        [Display(Name = "Type")]
         public int? PhonebookTypeId { get; set; }
 
         public PhonebookType? PhonebookType { get; set; }

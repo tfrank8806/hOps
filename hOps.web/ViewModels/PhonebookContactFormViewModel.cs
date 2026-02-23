@@ -16,32 +16,21 @@ namespace hOps.web.ViewModels
 
         public string Title => IsEdit ? "Edit Contact" : "Add Contact";
 
-        public IEnumerable<SelectListItem> TypeOptions
-        {
-            get
-            {
-                var options = Types
-                    .Select(type => new SelectListItem
-                    {
-                        Value = type.Name,
-                        Text = type.Name,
-                        Selected = Contact?.TypeName != null &&
-                            string.Equals(Contact.TypeName, type.Name, StringComparison.OrdinalIgnoreCase)
-                    })
-                    .ToList();
-
-                var hasSelection = options.Any(option => option.Selected);
-
-                options.Insert(0, new SelectListItem
+        public IEnumerable<SelectListItem> TypeOptions =>
+            Types
+                .OrderBy(t => t.Name)
+                .Select(type => new SelectListItem
+                {
+                    Value = type.Id.ToString(),
+                    Text = type.Name,
+                    Selected = Contact?.PhonebookTypeId == type.Id
+                })
+                .Prepend(new SelectListItem
                 {
                     Value = string.Empty,
                     Text = "Select a type",
                     Disabled = true,
-                    Selected = !hasSelection
+                    Selected = Contact?.PhonebookTypeId == null
                 });
-
-                return options;
-            }
-        }
     }
 }

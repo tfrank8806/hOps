@@ -232,27 +232,24 @@ namespace hOps.web.Controllers
 
         private async Task ValidateTypeAsync(PhonebookContact contact, int propertyId)
         {
-            contact.TypeName = contact.TypeName?.Trim() ?? string.Empty;
-
-            if (string.IsNullOrWhiteSpace(contact.TypeName))
+            if (!contact.PhonebookTypeId.HasValue)
             {
-                ModelState.AddModelError("Contact.TypeName", "Type is required.");
-                contact.PhonebookTypeId = null;
+                ModelState.AddModelError("Contact.PhonebookTypeId", "Type is required.");
+                contact.TypeName = string.Empty;
                 return;
             }
 
-            var normalizedType = contact.TypeName.ToLowerInvariant();
             var match = await _context.PhonebookTypes
-                .FirstOrDefaultAsync(t => t.PropertyId == propertyId && t.Name.ToLower() == normalizedType);
+                .FirstOrDefaultAsync(t => t.Id == contact.PhonebookTypeId.Value && t.PropertyId == propertyId);
 
             if (match == null)
             {
-                ModelState.AddModelError("Contact.TypeName", "Selected type is no longer available.");
+                ModelState.AddModelError("Contact.PhonebookTypeId", "Selected type is no longer available.");
+                contact.TypeName = string.Empty;
                 contact.PhonebookTypeId = null;
                 return;
             }
 
-            contact.PhonebookTypeId = match.Id;
             contact.TypeName = match.Name;
         }
 
