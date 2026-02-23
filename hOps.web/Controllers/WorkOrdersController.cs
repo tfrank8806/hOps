@@ -919,17 +919,29 @@ namespace hOps.web.Controllers
                     _logger.LogError(ex, "Unable to send work order email notification to user {UserId}", recipient.Id);
                 }
             }
-        }        private async Task CreateDepartmentNotificationsAsync(
+        }
+
+        private async Task CreateDepartmentNotificationsAsync(
             IEnumerable<string> userIds,
             WorkOrder workOrder,
             string workOrderLink,
             string departmentName)
         {
             var now = DateTime.UtcNow;
-            var notificationTitle = $"New {departmentName} work order";
+            var locationText = string.IsNullOrWhiteSpace(workOrder.Location)
+                ? null
+                : workOrder.Location.Trim();
+            var locationPrefix = string.IsNullOrWhiteSpace(locationText)
+                ? string.Empty
+                : $"Room {locationText} • ";
+            var notificationTitle = $"{locationPrefix}New {departmentName} work order".Trim();
             var notificationContent = string.IsNullOrWhiteSpace(workOrder.Issue)
                 ? $"Work order #{workOrder.Id}"
                 : workOrder.Issue;
+            if (!string.IsNullOrWhiteSpace(locationText))
+            {
+                notificationContent = $"Room {locationText}: {notificationContent}";
+            }
 
             foreach (var userId in userIds)
             {
