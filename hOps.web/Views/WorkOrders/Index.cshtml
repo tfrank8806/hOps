@@ -548,7 +548,7 @@
                     <div class="d-flex align-items-center gap-3">
                         <h5 class="mb-0">Work Orders (@Model.WorkOrders.Count)</h5>
                         <form method="get" class="d-flex align-items-center gap-2 hide-completed-form">
-                            <input type="hidden" name="HideCompleted" value="false" />
+                            <input type="hidden" name="HideCompleted" value="false" data-hide-completed-hidden @(Model.Filters.HideCompleted ? "disabled" : null) />
                             <input type="hidden" name="SortOrder" value="@Model.Filters.SortOrder" />
                             @if (!string.IsNullOrWhiteSpace(Model.Filters.RoomNumber))
                             {
@@ -579,7 +579,13 @@
                                 <input type="hidden" name="PropertyIds" value="@propertyId" />
                             }
                             <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="hideCompletedToggle" name="HideCompleted" value="true" @(Model.Filters.HideCompleted ? "checked" : null) onchange="this.form.submit()" />
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       id="hideCompletedToggle"
+                                       name="HideCompleted"
+                                       value="true"
+                                       @(Model.Filters.HideCompleted ? "checked" : null)
+                                       onchange="const hidden=this.form.querySelector('[data-hide-completed-hidden]'); if(hidden){hidden.disabled=this.checked;} this.form.submit();" />
                                 <label class="form-check-label" for="hideCompletedToggle">Hide completed</label>
                             </div>
                         </form>
