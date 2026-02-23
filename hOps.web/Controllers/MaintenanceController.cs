@@ -2,7 +2,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
@@ -10,6 +12,7 @@ using hOps.web.Utilities;
 using hOps.web.ViewModels.Maintenance;
 using hOps.web.ViewModels.PreventiveMaintenance;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +25,7 @@ namespace hOps.web.Controllers
     public class MaintenanceController : BaseController
     {
         private readonly ApplicationDbContext _db;
+        private const int ChecklistTemplateRowLimit = 500;
         public MaintenanceController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
             : base(context, userManager)
         {
@@ -291,6 +295,167 @@ namespace hOps.web.Controllers
             return RedirectToAction(nameof(PmChecklists), new { propertyId });
         }
 
+        [HttpGet("PMs/Checklists/{checklistId:int}/DownloadCsv")]
+        public async Task<IActionResult> DownloadChecklistCsv(int checklistId)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            if (!UserCanManageMaintenance(roles))
+            {
+                return Forbid();
+            }
+
+            var checklist = await _db.PreventiveMaintenanceChecklists
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == checklistId);
+            if (checklist == null)
+            {
+                return NotFound();
+            }
+
+            var properties = await GetManageablePropertiesAsync(currentUser, roles);
+            if (properties.All(p => p.Id != checklist.PropertyId))
+            {
+                return Forbid();
+            }
+
+            var tasks = await _db.PreventiveMaintenanceTasks
+                .AsNoTracking()
+                .Where(t => t.ChecklistId == checklistId)
+                .OrderBy(t => t.SortOrder)
+                .ThenBy(t => t.Id)
+                .ToListAsync();
+
+            var builder = new StringBuilder();
+            builder.AppendLine("Task,Description");
+            foreach (var task in tasks)
+            {
+                builder.AppendLine($"{EscapeCsvCell(task.Name)},{EscapeCsvCell(task.Description)}");
+            }
+
+            var payload = Encoding.UTF8.GetBytes(builder.ToString());
+            var fileName = $"pm-checklist-{CreateSafeFileName(checklist.Name)}.csv";
+            return File(payload, "text/csv", fileName);
+        }
+
+        [HttpGet("PMs/Checklists/Template/Download")]
+        public IActionResult DownloadChecklistTemplateCsv()
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("Task,Description");
+            builder.AppendLine("\"Inspect HVAC filters\",\"Replace or clean as needed; record readings\"");
+            builder.AppendLine("\"Check fire extinguisher pressure\",\"Verify seal is intact and tag is signed\"");
+            var payload = Encoding.UTF8.GetBytes(builder.ToString());
+            return File(payload, "text/csv", "pm-checklist-template.csv");
+        }
+
+        [HttpPost("PMs/Checklists/Template/Upload")]
+        public async Task<IActionResult> UploadChecklistTemplate(MaintenancePmTemplateUploadViewModel form)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            if (!UserCanManageMaintenance(roles))
+            {
+                return Forbid();
+            }
+
+            var properties = await GetManageablePropertiesAsync(currentUser, roles);
+            var property = properties.FirstOrDefault(p => p.Id == form.PropertyId);
+            if (property == null)
+            {
+                return Forbid();
+            }
+
+            if (form.CsvFile == null || form.CsvFile.Length == 0)
+            {
+                ModelState.AddModelError(nameof(form.CsvFile), "Select a CSV file to upload.");
+            }
+
+            List<(string Title, string? Description)> rows = new();
+            if (ModelState.IsValid && form.CsvFile != null)
+            {
+                try
+                {
+                    rows = await ParseChecklistTemplateCsvAsync(form.CsvFile);
+                    if (rows.Count == 0)
+                    {
+                        ModelState.AddModelError(nameof(form.CsvFile), "The file did not contain any checklist rows.");
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    ModelState.AddModelError(nameof(form.CsvFile), ex.Message);
+                }
+            }
+
+            if (!ModelState.IsValid)
+            {
+                var viewModel = await BuildChecklistPageAsync(currentUser, roles, form.PropertyId, null, null, form);
+                if (viewModel == null)
+                {
+                    return Forbid();
+                }
+                return View("PmChecklists", viewModel);
+            }
+
+            var areaLabels = form.ChecklistType == PreventiveMaintenanceChecklistType.Area
+                ? ExtractAreaOptions(form.AreaOptionsText)
+                : new List<string>();
+            var areaJson = form.ChecklistType == PreventiveMaintenanceChecklistType.Area
+                ? MaintenanceChecklistHelper.BuildAreaOptionsJson(areaLabels)
+                : "[]";
+
+            var now = DateTime.UtcNow;
+            var checklist = new PreventiveMaintenanceChecklist
+            {
+                PropertyId = property.Id,
+                Name = form.Name.Trim(),
+                ChecklistType = form.ChecklistType,
+                AreaOptionsJson = areaJson,
+                IsActive = true,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+                CreatedById = currentUser.Id,
+                UpdatedById = currentUser.Id
+            };
+
+            _db.PreventiveMaintenanceChecklists.Add(checklist);
+            await _db.SaveChangesAsync();
+
+            var tasks = rows
+                .Select((row, index) => new PreventiveMaintenanceTask
+                {
+                    ChecklistId = checklist.Id,
+                    PropertyId = property.Id,
+                    Name = row.Title,
+                    Description = row.Description,
+                    SortOrder = index,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                })
+                .ToList();
+
+            if (tasks.Any())
+            {
+                _db.PreventiveMaintenanceTasks.AddRange(tasks);
+                await _db.SaveChangesAsync();
+            }
+
+            var suffix = rows.Count == 1 ? "task" : "tasks";
+            TempData["PmChecklistMessage"] = $"Checklist '{checklist.Name}' created with {rows.Count} {suffix}.";
+            return RedirectToAction(nameof(PmChecklists), new { propertyId = property.Id, checklistId = checklist.Id });
+        }
+
         [HttpGet("PMs/Checklists/{checklistId:int}/Tasks")]
         public async Task<IActionResult> ChecklistTasks(int checklistId, int? propertyId = null)
         {
@@ -442,7 +607,8 @@ namespace hOps.web.Controllers
             IList<string> roles,
             int? propertyId,
             int? checklistId,
-            MaintenancePmChecklistEditorViewModel? editorOverride = null)
+            MaintenancePmChecklistEditorViewModel? editorOverride = null,
+            MaintenancePmTemplateUploadViewModel? templateOverride = null)
         {
             var properties = await GetManageablePropertiesAsync(user, roles);
             if (!properties.Any())
@@ -511,8 +677,142 @@ namespace hOps.web.Controllers
                 AccessibleProperties = properties,
                 Checklists = summaries,
                 ChecklistEditor = editor,
+                TemplateUpload = templateOverride ?? new MaintenancePmTemplateUploadViewModel
+                {
+                    PropertyId = selectedProperty.Id,
+                    ChecklistType = templateOverride?.ChecklistType ?? PreventiveMaintenanceChecklistType.Room,
+                    Name = templateOverride?.Name ?? string.Empty,
+                    AreaOptionsText = templateOverride?.AreaOptionsText
+                },
                 FrequencyPerYear = setting?.FrequencyPerYear ?? 0
             };
+        }
+
+        private async Task<List<(string Title, string? Description)>> ParseChecklistTemplateCsvAsync(IFormFile file)
+        {
+            var rows = new List<(string Title, string? Description)>();
+
+            using var stream = file.OpenReadStream();
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+
+            string? line;
+            var lineNumber = 0;
+            while ((line = await reader.ReadLineAsync()) != null)
+            {
+                lineNumber++;
+
+                if (rows.Count >= ChecklistTemplateRowLimit)
+                {
+                    throw new InvalidOperationException($"Templates can include up to {ChecklistTemplateRowLimit} rows.");
+                }
+
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                var cells = SplitCsvLine(line);
+                if (lineNumber == 1 && cells.Count > 0 && cells[0].Trim().Equals("task", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var title = cells.Count > 0 ? cells[0].Trim() : string.Empty;
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    continue;
+                }
+
+                var description = cells.Count > 1 ? cells[1].Trim() : null;
+
+                if (title.Length > 200)
+                {
+                    title = title.Substring(0, 200).Trim();
+                }
+
+                if (!string.IsNullOrWhiteSpace(description) && description!.Length > 1000)
+                {
+                    description = description.Substring(0, 1000).Trim();
+                }
+
+                rows.Add((title, string.IsNullOrWhiteSpace(description) ? null : description));
+            }
+
+            return rows;
+        }
+
+        private static List<string> SplitCsvLine(string line)
+        {
+            var values = new List<string>();
+            if (line == null)
+            {
+                return values;
+            }
+
+            var builder = new StringBuilder();
+            var inQuotes = false;
+
+            for (var i = 0; i < line.Length; i++)
+            {
+                var ch = line[i];
+                if (ch == '"')
+                {
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        builder.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes;
+                    }
+
+                    continue;
+                }
+
+                if (ch == ',' && !inQuotes)
+                {
+                    values.Add(builder.ToString());
+                    builder.Clear();
+                    continue;
+                }
+
+                builder.Append(ch);
+            }
+
+            values.Add(builder.ToString());
+            return values;
+        }
+
+        private static string EscapeCsvCell(string? value)
+        {
+            var text = value ?? string.Empty;
+            var needsQuotes = text.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0;
+            if (!needsQuotes)
+            {
+                return text;
+            }
+
+            var sanitized = text.Replace("\"", "\"\"", StringComparison.Ordinal);
+            return $"\"{sanitized}\"";
+        }
+
+        private static string CreateSafeFileName(string? title)
+        {
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                return "pm-checklist";
+            }
+
+            var invalid = Path.GetInvalidFileNameChars();
+            var builder = new StringBuilder(title.Length);
+            foreach (var ch in title.Trim())
+            {
+                builder.Append(invalid.Contains(ch) ? '-' : ch);
+            }
+
+            var cleaned = builder.ToString().Trim('-');
+            return string.IsNullOrWhiteSpace(cleaned) ? "pm-checklist" : cleaned.ToLowerInvariant();
         }
 
         private MaintenancePmChecklistEditorViewModel BuildEditorViewModel(

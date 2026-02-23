@@ -71,6 +71,51 @@
     </div>
 </div>
 
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div>
+                <h5 class="mb-0">Import checklist from CSV</h5>
+                <div class="text-muted small">Upload tasks in bulk or start with the blank template.</div>
+            </div>
+            <a asp-action="DownloadChecklistTemplateCsv" class="btn btn-outline-secondary btn-sm">Download blank CSV</a>
+        </div>
+        <form asp-action="UploadChecklistTemplate" method="post" enctype="multipart/form-data" class="row g-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="TemplateUpload.PropertyId" value="@Model.PropertyId" />
+            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            <div class="col-md-6">
+                <label asp-for="TemplateUpload.Name" class="form-label"></label>
+                <input asp-for="TemplateUpload.Name" class="form-control" />
+                <span asp-validation-for="TemplateUpload.Name" class="text-danger small"></span>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <label asp-for="TemplateUpload.ChecklistType" class="form-label"></label>
+                <select asp-for="TemplateUpload.ChecklistType" class="form-select">
+                    <option value="Room">Room-based</option>
+                    <option value="Area">Area-based</option>
+                </select>
+                <span asp-validation-for="TemplateUpload.ChecklistType" class="text-danger small"></span>
+            </div>
+            <div class="col-12">
+                <label asp-for="TemplateUpload.AreaOptionsText" class="form-label"></label>
+                <textarea asp-for="TemplateUpload.AreaOptionsText" class="form-control" rows="2" placeholder="Lobby, Pool Deck, Fitness Center"></textarea>
+                <div class="form-text">Only used for area checklists. Separate values with commas.</div>
+                <span asp-validation-for="TemplateUpload.AreaOptionsText" class="text-danger small"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="TemplateUpload.CsvFile" class="form-label"></label>
+                <input asp-for="TemplateUpload.CsvFile" type="file" class="form-control" accept=".csv,text/csv" />
+                <div class="form-text">Columns: Task, Description. Up to 500 rows.</div>
+                <span asp-validation-for="TemplateUpload.CsvFile" class="text-danger small"></span>
+            </div>
+            <div class="col-md-3 col-sm-6 align-self-end">
+                <button type="submit" class="btn btn-primary w-100">Import Checklist</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="row gy-4">
     <div class="col-lg-5">
         <div class="card shadow-sm">

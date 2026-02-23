@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using hOps.web.Models;
 using hOps.web.ViewModels.PreventiveMaintenance;
+using Microsoft.AspNetCore.Http;
 
 namespace hOps.web.ViewModels.Maintenance
 {
@@ -14,6 +15,7 @@ namespace hOps.web.ViewModels.Maintenance
         public IReadOnlyList<Property> AccessibleProperties { get; set; } = new List<Property>();
         public IReadOnlyList<MaintenancePmChecklistSummaryViewModel> Checklists { get; set; } = new List<MaintenancePmChecklistSummaryViewModel>();
         public MaintenancePmChecklistEditorViewModel ChecklistEditor { get; set; } = new();
+        public MaintenancePmTemplateUploadViewModel TemplateUpload { get; set; } = new();
         public int FrequencyPerYear { get; set; }
     }
 
@@ -77,5 +79,24 @@ namespace hOps.web.ViewModels.Maintenance
         public bool IsActive { get; set; } = true;
 
         public string? AreaOptionsText { get; set; }
+    }
+
+    public class MaintenancePmTemplateUploadViewModel
+    {
+        [Required]
+        public int PropertyId { get; set; }
+
+        [Required]
+        [MaxLength(160)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        public PreventiveMaintenanceChecklistType ChecklistType { get; set; } = PreventiveMaintenanceChecklistType.Room;
+
+        [Display(Name = "Suggested Areas (Area checklists only)")]
+        public string? AreaOptionsText { get; set; }
+
+        [Required]
+        public IFormFile? CsvFile { get; set; }
     }
 }
