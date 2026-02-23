@@ -453,7 +453,7 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AdvanceStatus(int id, string? status)
+        public async Task<IActionResult> AdvanceStatus(int id, string? status, string? completionNotes)
         {
             var user = await _userManager.GetUserAsync(User);
             var roles = user != null
@@ -509,9 +509,33 @@ namespace hOps.web.Controllers
             var alreadyAtStatus = workOrder.Status.Equals(nextStatus, StringComparison.OrdinalIgnoreCase) ||
                 (nextStatus.Equals("New", StringComparison.OrdinalIgnoreCase) && workOrder.Status.Equals("Open", StringComparison.OrdinalIgnoreCase));
 
+            var shouldSave = false;
+
             if (!alreadyAtStatus)
             {
                 workOrder.Status = nextStatus;
+                shouldSave = true;
+            }
+
+            var trimmedNotes = string.IsNullOrWhiteSpace(completionNotes) ? null : completionNotes.Trim();
+            var isCompleting = nextStatus.Equals("Completed", StringComparison.OrdinalIgnoreCase);
+
+            if (isCompleting)
+            {
+                if (!string.Equals(workOrder.CompletionNotes ?? string.Empty, trimmedNotes ?? string.Empty, StringComparison.Ordinal))
+                {
+                    workOrder.CompletionNotes = trimmedNotes;
+                    shouldSave = true;
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(workOrder.CompletionNotes))
+            {
+                workOrder.CompletionNotes = null;
+                shouldSave = true;
+            }
+
+            if (shouldSave)
+            {
                 await _context.SaveChangesAsync();
             }
 
@@ -564,7 +588,7 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CompleteDepartmentWorkOrder(int id, string? returnUrl)
+        public async Task<IActionResult> CompleteDepartmentWorkOrder(int id, string? returnUrl, string? completionNotes)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -603,9 +627,22 @@ namespace hOps.web.Controllers
                 return Forbid();
             }
 
-            if (!string.Equals(workOrder.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            var trimmedNotes = string.IsNullOrWhiteSpace(completionNotes) ? null : completionNotes.Trim();
+            var statusChanged = !string.Equals(workOrder.Status, "Completed", StringComparison.OrdinalIgnoreCase);
+            var notesChanged = !string.Equals(workOrder.CompletionNotes ?? string.Empty, trimmedNotes ?? string.Empty, StringComparison.Ordinal);
+
+            if (statusChanged)
             {
                 workOrder.Status = "Completed";
+            }
+
+            if (notesChanged)
+            {
+                workOrder.CompletionNotes = trimmedNotes;
+            }
+
+            if (statusChanged || notesChanged)
+            {
                 await _context.SaveChangesAsync();
                 TempData["ToDoMessage"] = $"Marked work order #{id} complete.";
             }
@@ -1174,6 +1211,7 @@ namespace hOps.web.Controllers
                     WorkOrderType = wo.WorkOrderType?.Name,
                     Issue = wo.Issue,
                     Details = wo.Details,
+                    CompletionNotes = wo.CompletionNotes,
                     DueDate = wo.DueDate,
                     CreatedAt = wo.CreatedAt,
                     Department = wo.Department?.Name,

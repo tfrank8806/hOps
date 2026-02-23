@@ -23,6 +23,9 @@ namespace hOps.web.Models
         [MaxLength(2000)]
         public string? Details { get; set; }
 
+        [MaxLength(2000)]
+        public string? CompletionNotes { get; set; }
+
         [DataType(DataType.Date)]
         public DateTime DueDate { get; set; } = DateTime.UtcNow.Date;
 

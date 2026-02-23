@@ -679,6 +679,8 @@
                                         issueHtml = MentionMarkupFormatter.ToHtml(order.Issue),
                                         details = order.Details ?? string.Empty,
                                         detailsHtml = string.IsNullOrWhiteSpace(order.Details) ? string.Empty : MentionMarkupFormatter.ToHtml(order.Details),
+                                        completionNotes = order.CompletionNotes ?? string.Empty,
+                                        completionNotesHtml = string.IsNullOrWhiteSpace(order.CompletionNotes) ? string.Empty : MentionMarkupFormatter.ToHtml(order.CompletionNotes),
                                         location = order.Location,
                                         status = order.Status,
                                         statusColor = order.StatusColor,
@@ -711,11 +713,11 @@
                                 var advanceUrl = $"{Url.Action("AdvanceStatus", new { id = order.Id })}{filterQueryString}";
                                 <form method="post" action="@advanceUrl" class="workorder-progress-form">
                                     @Html.AntiForgeryToken()
+                                    <input type="hidden" name="CompletionNotes" value="@order.CompletionNotes" data-completion-notes />
                                     <label class="visually-hidden" for="workorder_status_@order.Id">Update Status</label>
                                     <select id="workorder_status_@order.Id"
                                             class="form-select form-select-sm workorder-status-select"
                                             name="Status"
-                                            onchange="this.form.submit()"
                                             title="Update status">
                                         @foreach (var statusOption in Model.StatusOptions)
                                         {
@@ -977,6 +979,10 @@
                     <div class="fw-semibold text-uppercase small text-muted">Details</div>
                     <div data-workorder-field="details" class="text-body"></div>
                 </div>
+                <div class="mb-3 d-none" data-completion-notes-container>
+                    <div class="fw-semibold text-uppercase small text-muted">Completion Notes</div>
+                    <div data-workorder-field="completionNotes" class="text-body"></div>
+                </div>
                 <div class="mb-2" data-workorder-attachments-section>
                     <div class="fw-semibold text-uppercase small text-muted">Attachments</div>
                     <div class="row g-3 workorder-modal-attachments" data-workorder-attachments></div>
@@ -1000,6 +1006,25 @@
             <div class="modal-body">
                 <div class="row g-3" data-attachments-modal-body></div>
                 <p class="text-muted mb-0 d-none" data-attachments-modal-empty>No attachments available for this work order.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="completeWorkOrderModal" tabindex="-1" aria-labelledby="completeWorkOrderModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="completeWorkOrderModalLabel">Add Completion Notes</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-2">Share any closing details or follow-ups. This step is optional.</p>
+                <textarea class="form-control" rows="4" data-complete-notes-input placeholder="Enter completion notes (optional)"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" data-complete-submit>Mark Complete</button>
             </div>
         </div>
     </div>

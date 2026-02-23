@@ -16,6 +16,7 @@
         meta: modalEl.querySelector('[data-workorder-field="meta"]'),
         issue: modalEl.querySelector('[data-workorder-field="issue"]'),
         details: modalEl.querySelector('[data-workorder-field="details"]'),
+        completionNotes: modalEl.querySelector('[data-workorder-field="completionNotes"]'),
         location: modalEl.querySelector('[data-workorder-field="location"]'),
         department: modalEl.querySelector('[data-workorder-field="department"]'),
         dueDate: modalEl.querySelector('[data-workorder-field="dueDate"]'),
@@ -28,6 +29,7 @@
     const attachmentsSection = modalEl.querySelector('[data-workorder-attachments-section]');
     const attachmentsContainer = modalEl.querySelector('[data-workorder-attachments]');
     const attachmentsEmpty = modalEl.querySelector('[data-workorder-attachments-empty]');
+    const completionNotesSection = modalEl.querySelector('[data-completion-notes-container]');
 
     const rows = document.querySelectorAll('.workorder-row[data-workorder]');
     rows.forEach(row => {
@@ -108,6 +110,22 @@
                 fields.details.textContent = data.details;
             } else {
                 fields.details.innerHTML = '<span class="text-muted">No additional details provided.</span>';
+            }
+        }
+
+        if (fields.completionNotes && completionNotesSection) {
+            const notesHtml = data.completionNotesHtml || '';
+            const notesText = data.completionNotes || '';
+            const hasNotes = Boolean((notesHtml && notesHtml.trim()) || (notesText && notesText.trim()));
+            completionNotesSection.classList.toggle('d-none', !hasNotes);
+            if (hasNotes) {
+                if (notesHtml) {
+                    fields.completionNotes.innerHTML = notesHtml;
+                } else {
+                    fields.completionNotes.textContent = notesText;
+                }
+            } else {
+                fields.completionNotes.textContent = '';
             }
         }
 
@@ -351,5 +369,110 @@
         }
 
         return `<div class="workorder-details-popover-content">${html}</div>`;
+    }
+})();
+
+(() => {
+    if (typeof bootstrap === 'undefined') {
+        return;
+    }
+
+    const completionModalEl = document.getElementById('completeWorkOrderModal');
+    if (!completionModalEl) {
+        return;
+    }
+
+    const completionNotesInput = completionModalEl.querySelector('[data-complete-notes-input]');
+    const completionSubmitBtn = completionModalEl.querySelector('[data-complete-submit]');
+    const completionModal = bootstrap.Modal.getOrCreateInstance(completionModalEl);
+    let pendingCompletionForm = null;
+    let pendingCompletionSelect = null;
+    let pendingPreviousValue = null;
+    let completionConfirmed = false;
+
+    const statusSelects = document.querySelectorAll('.workorder-status-select');
+    statusSelects.forEach(select => {
+        select.dataset.currentValue = select.value;
+        select.addEventListener('change', event => handleStatusChange(event, select));
+    });
+
+    document.querySelectorAll('[data-complete-button]').forEach(button => {
+        button.addEventListener('click', event => {
+            event.preventDefault();
+            const form = button.closest('form');
+            if (!form) {
+                return;
+            }
+            openCompletionModal(form, null);
+        });
+    });
+
+    completionSubmitBtn?.addEventListener('click', () => {
+        if (!pendingCompletionForm) {
+            completionModal.hide();
+            return;
+        }
+
+        const notesField = pendingCompletionForm.querySelector('[data-completion-notes]');
+        if (notesField) {
+            notesField.value = completionNotesInput?.value.trim() ?? '';
+        }
+
+        completionConfirmed = true;
+        if (pendingCompletionSelect) {
+            pendingCompletionSelect.dataset.currentValue = pendingCompletionSelect.value;
+        }
+
+        const formToSubmit = pendingCompletionForm;
+        completionModal.hide();
+        pendingCompletionForm = null;
+        pendingCompletionSelect = null;
+        pendingPreviousValue = null;
+        formToSubmit.submit();
+    });
+
+    completionModalEl.addEventListener('hidden.bs.modal', () => {
+        if (!completionConfirmed && pendingCompletionSelect && pendingPreviousValue !== null) {
+            pendingCompletionSelect.value = pendingPreviousValue;
+        }
+
+        completionConfirmed = false;
+        pendingCompletionForm = null;
+        pendingCompletionSelect = null;
+        pendingPreviousValue = null;
+        if (completionNotesInput) {
+            completionNotesInput.value = '';
+        }
+    });
+
+    function handleStatusChange(event, select) {
+        const form = select.closest('form');
+        if (!form) {
+            return;
+        }
+
+        const selectedValue = (select.value || '').toLowerCase();
+        if (selectedValue === 'completed') {
+            event.preventDefault();
+            openCompletionModal(form, select);
+        } else {
+            select.dataset.currentValue = select.value;
+            const notesField = form.querySelector('[data-completion-notes]');
+            if (notesField) {
+                notesField.value = '';
+            }
+            form.submit();
+        }
+    }
+
+    function openCompletionModal(form, select) {
+        const hiddenNotes = form.querySelector('[data-completion-notes]');
+        if (completionNotesInput) {
+            completionNotesInput.value = hiddenNotes?.value || '';
+        }
+        pendingCompletionForm = form;
+        pendingCompletionSelect = select || null;
+        pendingPreviousValue = select ? (select.dataset.currentValue || select.value) : null;
+        completionModal.show();
     }
 })();

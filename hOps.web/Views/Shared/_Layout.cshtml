@@ -602,7 +602,8 @@
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="id" value="@task.WorkOrderId" />
                                                     <input type="hidden" name="returnUrl" value="@currentUrl" />
-                                                    <button type="submit" class="btn btn-success btn-sm">Complete</button>
+                                                    <input type="hidden" name="CompletionNotes" data-completion-notes />
+                                                    <button type="submit" class="btn btn-success btn-sm" data-complete-button>Complete</button>
                                                 </form>
                                             </div>
                                         </div>

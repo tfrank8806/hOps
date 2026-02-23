@@ -23,6 +23,7 @@ namespace hOps.web.ViewModels.WorkOrders
         public string SlaStatusClass { get; set; } = string.Empty;
         public string SlaSummary { get; set; } = string.Empty;
         public bool IsOverdue { get; set; }
+        public string? CompletionNotes { get; set; }
         public List<string> Properties { get; set; } = new();
         public List<WorkOrderAttachmentViewModel> Attachments { get; set; } = new();
     }
