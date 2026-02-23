@@ -12,5 +12,14 @@ namespace hOps.web.ViewModels
         public string? SearchTerm { get; set; }
 
         public int? SelectedTypeId { get; set; }
+
+        public string SortOption { get; set; } = PhonebookSortOptions.LastName;
+    }
+
+    public static class PhonebookSortOptions
+    {
+        public const string LastName = "lastName";
+        public const string FirstName = "firstName";
+        public const string Company = "company";
     }
 }

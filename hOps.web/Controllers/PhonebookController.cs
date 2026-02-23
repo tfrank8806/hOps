@@ -19,15 +19,17 @@ namespace hOps.web.Controllers
         {
         }
 
-        public async Task<IActionResult> Index(string? search, int? typeId)
+        public async Task<IActionResult> Index(string? search, int? typeId, string? sort)
         {
+            var sortOption = NormalizeSortOption(sort);
             var currentProperty = ViewBag.CurrentProperty as Property;
             if (currentProperty == null)
             {
                 return View(new PhonebookIndexViewModel
                 {
                     SearchTerm = search,
-                    SelectedTypeId = null
+                    SelectedTypeId = null,
+                    SortOption = sortOption
                 });
             }
 
@@ -68,12 +70,24 @@ namespace hOps.web.Controllers
                 typeId = null;
             }
 
-            var contacts = await contactsQuery
+            IQueryable<PhonebookContact> orderedQuery = sortOption switch
+            {
+                PhonebookSortOptions.FirstName => contactsQuery
+                    .OrderBy(c => c.FirstName ?? string.Empty)
+                    .ThenBy(c => c.LastName ?? string.Empty)
+                    .ThenBy(c => c.Company ?? string.Empty),
+                PhonebookSortOptions.Company => contactsQuery
+                    .OrderBy(c => c.Company ?? string.Empty)
+                    .ThenBy(c => c.LastName ?? string.Empty)
+                    .ThenBy(c => c.FirstName ?? string.Empty),
+                _ => contactsQuery
+                    .OrderBy(c => c.LastName ?? string.Empty)
+                    .ThenBy(c => c.FirstName ?? string.Empty)
+                    .ThenBy(c => c.Company ?? string.Empty)
+            };
+
+            var contacts = await orderedQuery
                 .AsNoTracking()
-                .OrderBy(c => c.TypeName)
-                .ThenBy(c => c.LastName)
-                .ThenBy(c => c.FirstName)
-                .ThenBy(c => c.Company)
                 .ToListAsync();
 
             var vm = new PhonebookIndexViewModel
@@ -81,7 +95,8 @@ namespace hOps.web.Controllers
                 Contacts = contacts,
                 Types = types,
                 SearchTerm = search,
-                SelectedTypeId = typeId
+                SelectedTypeId = typeId,
+                SortOption = sortOption
             };
 
             return View(vm);
@@ -244,6 +259,16 @@ namespace hOps.web.Controllers
         private int? GetCurrentPropertyId()
         {
             return (ViewBag.CurrentProperty as Property)?.Id;
+        }
+
+        private static string NormalizeSortOption(string? sort)
+        {
+            return sort?.Trim().ToLowerInvariant() switch
+            {
+                PhonebookSortOptions.FirstName => PhonebookSortOptions.FirstName,
+                PhonebookSortOptions.Company => PhonebookSortOptions.Company,
+                _ => PhonebookSortOptions.LastName
+            };
         }
     }
 }

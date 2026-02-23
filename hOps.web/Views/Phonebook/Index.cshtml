@@ -3,6 +3,7 @@
 @using System.Text.Json
 @using System.Text.Encodings.Web
 @using System.Linq
+@using hOps.web.ViewModels
 @{ 
     ViewData["Title"] = "Phonebook";
     ViewData["MainContainerClass"] = "main-inner--wide";
@@ -62,6 +63,7 @@
         return trimmed;
     }
 
+    var selectedSort = string.IsNullOrWhiteSpace(Model.SortOption) ? PhonebookSortOptions.LastName : Model.SortOption;
     var contactsData = Model.Contacts.Select(contact => new
     {
         id = contact.Id,
@@ -116,7 +118,7 @@
                        value="@Model.SearchTerm"
                        placeholder="Search by name, company, or contact details" />
             </div>
-            <div class="col-lg-4">
+            <div class="col-lg-3">
                 <label class="form-label" for="typeFilter">Filter by Type</label>
                 <select class="form-select" id="typeFilter" name="typeId">
                     <option value="">All types</option>
@@ -126,11 +128,19 @@
                     }
                 </select>
             </div>
-            <div class="col-lg-2 d-flex gap-2">
-                <button type="submit" class="btn btn-primary flex-grow-1">Apply</button>
+            <div class="col-lg-3">
+                <label class="form-label" for="sortSelect">Sort</label>
+                <select class="form-select" id="sortSelect" name="sort">
+                    <option value="@PhonebookSortOptions.LastName" selected="@(selectedSort == PhonebookSortOptions.LastName ? "selected" : null)">Last name (A–Z)</option>
+                    <option value="@PhonebookSortOptions.FirstName" selected="@(selectedSort == PhonebookSortOptions.FirstName ? "selected" : null)">First name (A–Z)</option>
+                    <option value="@PhonebookSortOptions.Company" selected="@(selectedSort == PhonebookSortOptions.Company ? "selected" : null)">Company (A–Z)</option>
+                </select>
+            </div>
+            <div class="col-12 d-flex gap-2 justify-content-end">
+                <button type="submit" class="btn btn-primary">Apply</button>
                 @if (hasFilters)
                 {
-                    <a class="btn btn-outline-secondary flex-grow-1" asp-action="Index">Clear</a>
+                    <a class="btn btn-outline-secondary" asp-action="Index">Clear</a>
                 }
             </div>
         </form>
