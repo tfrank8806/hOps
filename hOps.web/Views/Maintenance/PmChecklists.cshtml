@@ -224,7 +224,11 @@
                                                     <input type="hidden" name="id" value="@checklist.Id" />
                                                     <button type="submit" class="btn btn-outline-secondary">@((checklist.IsActive ? "Deactivate" : "Activate"))</button>
                                                 </form>
-                                                <form asp-action="DeleteChecklist" method="post" class="d-inline" onsubmit="return confirm('Delete this checklist? This cannot be undone.');">
+                                                <form asp-action="DeleteChecklist"
+                                                      asp-route-id="@checklist.Id"
+                                                      method="post"
+                                                      class="d-inline"
+                                                      onsubmit="return confirm('Delete this checklist? This cannot be undone.');">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="propertyId" value="@Model.PropertyId" />
                                                     <input type="hidden" name="id" value="@checklist.Id" />
