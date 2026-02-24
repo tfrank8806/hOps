@@ -355,7 +355,7 @@ namespace hOps.web.Controllers
         }
 
         [HttpPost("PMs/Checklists/Template/Upload")]
-        public async Task<IActionResult> UploadChecklistTemplate(MaintenancePmTemplateUploadViewModel form)
+        public async Task<IActionResult> UploadChecklistTemplate([Bind(Prefix = "TemplateUpload")] MaintenancePmTemplateUploadViewModel form)
         {
             var currentUser = await _userManager.GetUserAsync(User);
             if (currentUser == null)
