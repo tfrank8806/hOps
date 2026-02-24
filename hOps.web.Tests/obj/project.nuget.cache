@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "mjETzn8tJic=",
+  "dgSpecHash": "OuScBvA8kBg=",
   "success": true,
-  "projectFilePath": "C:\\hops\\hOps.web.Tests\\hOps.web.Tests.csproj",
+  "projectFilePath": "C:\\hOps\\hOps.web.Tests\\hOps.web.Tests.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\bouncycastle.cryptography\\2.6.1\\bouncycastle.cryptography.2.6.1.nupkg.sha512",
     "C:\\Users\\Tyler Frankenberger\\.nuget\\packages\\castle.core\\5.1.1\\castle.core.5.1.1.nupkg.sha512",
