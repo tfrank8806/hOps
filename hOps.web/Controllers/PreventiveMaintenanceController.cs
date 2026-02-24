@@ -47,7 +47,9 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["PmError"] = "Select a property to access Preventative Maintenance.";
+                const string propertyMessage = "Select a property to access Preventive Maintenance.";
+                TempData["PmError"] = propertyMessage;
+                TempData["HomeError"] = propertyMessage;
                 return RedirectToAction("Index", "Home");
             }
 
@@ -73,8 +75,10 @@ namespace hOps.web.Controllers
 
             if (selectedChecklist == null)
             {
-                TempData["PmSetupError"] = "Set up a checklist before starting Preventive Maintenance.";
-                return RedirectToAction("Index", "Home");
+                const string setupMessage = "Set up a checklist before starting Preventive Maintenance.";
+                TempData["PmSetupError"] = setupMessage;
+                TempData["PmChecklistError"] = setupMessage;
+                return RedirectToAction("PmChecklists", "Maintenance", new { propertyId = property.Id });
             }
 
             var setting = await _db.PreventiveMaintenanceSettings.AsNoTracking().FirstOrDefaultAsync(s => s.PropertyId == propertyId);
