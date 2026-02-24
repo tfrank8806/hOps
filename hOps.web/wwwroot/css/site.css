@@ -4,7 +4,7 @@ body {
 }
 
 body {
-    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    font-family: "Inter", "Segoe UI", "Segoe UI Emoji", "Segoe UI Symbol", "Apple Color Emoji", "Noto Color Emoji", Arial, sans-serif;
     margin: 0;
     background: var(--brand-page-bg, linear-gradient(180deg, #f3f8ff 0%, #eaf1fb 60%, #dde6f5 100%));
     color: var(--brand-text, #1f2739);
@@ -12,6 +12,15 @@ body {
     line-height: var(--font-body-line);
     --bs-modal-zindex: 2000;
     --bs-backdrop-zindex: 1990;
+}
+
+.text-input,
+input,
+textarea,
+select,
+button,
+.rich-text-editor {
+    font-family: inherit;
 }
 
 /* Keep interactive overlays above the sticky header/banner */
