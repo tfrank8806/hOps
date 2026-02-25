@@ -1,12 +1,13 @@
-﻿using hOps.web.Models;
+using hOps.web.Models;
 using hOps.web.Models.SiteVisit;
 using hOps.web.Utilities;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace hOps.web.Data
 {
-    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IDataProtectionKeyContext
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options)
@@ -84,6 +85,7 @@ namespace hOps.web.Data
         public DbSet<EquipmentItem> EquipmentItems { get; set; }
         public DbSet<MaintenanceLogTemplate> MaintenanceLogTemplates { get; set; }
         public DbSet<MaintenanceLogEntry> MaintenanceLogEntries { get; set; }
+        public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
         public DbSet<SiteVisitReport> SiteVisitReports { get; set; }
         public DbSet<SiteVisitReportItem> SiteVisitReportItems { get; set; }
         public DbSet<SiteVisitTemplate> SiteVisitTemplates { get; set; }
@@ -1027,3 +1029,4 @@ namespace hOps.web.Data
         }
     }
 }
+

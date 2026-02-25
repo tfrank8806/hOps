@@ -23,6 +23,7 @@ namespace hOps.web.Models
         public TimeSpan? DueTimeLocal { get; set; }
 
         public bool IsActive { get; set; } = true;
+        public int DisplayOrder { get; set; }
 
         public int PropertyId { get; set; }
         public Property Property { get; set; } = null!;

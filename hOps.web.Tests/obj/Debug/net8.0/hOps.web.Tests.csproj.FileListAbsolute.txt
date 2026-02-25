@@ -375,3 +375,9 @@ C:\hops\hOps.web.Tests\bin\Debug\net8.0\appsettings.Production.json
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\Npgsql.dll
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\Npgsql.EntityFrameworkCore.PostgreSQL.dll
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\hOps.db
+C:\hops\hOps.web.Tests\bin\Debug\net8.0\Microsoft.AspNetCore.DataProtection.dll
+C:\hops\hOps.web.Tests\bin\Debug\net8.0\Microsoft.AspNetCore.DataProtection.Abstractions.dll
+C:\hops\hOps.web.Tests\bin\Debug\net8.0\Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.dll
+C:\hops\hOps.web.Tests\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.Abstractions.dll
+C:\hops\hOps.web.Tests\bin\Debug\net8.0\Microsoft.Extensions.Hosting.Abstractions.dll
+C:\hops\hOps.web.Tests\bin\Debug\net8.0\System.Security.Cryptography.Xml.dll

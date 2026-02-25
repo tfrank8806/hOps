@@ -97,4 +97,9 @@ namespace hOps.web.ViewModels.Maintenance
 
         public Dictionary<string, string?> Values { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     }
+
+    public class MaintenanceLogTemplateReorderRequest
+    {
+        public List<int> TemplateIds { get; set; } = new();
+    }
 }

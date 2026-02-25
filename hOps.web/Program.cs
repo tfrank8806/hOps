@@ -20,6 +20,7 @@ using System.Text;
 using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 var forceSqlite = ShouldForceSqlite(builder.Configuration);
@@ -32,9 +33,17 @@ var supabaseStorageOptions = SupabaseStorageOptions.FromConfiguration(builder.Co
 var dataProtectionKeysPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys");
 Directory.CreateDirectory(dataProtectionKeysPath);
 
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
+var dataProtectionBuilder = builder.Services.AddDataProtection()
     .SetApplicationName("hOps.web");
+
+if (builder.Environment.IsDevelopment())
+{
+    dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+}
+else
+{
+    dataProtectionBuilder.PersistKeysToDbContext<ApplicationDbContext>();
+}
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {

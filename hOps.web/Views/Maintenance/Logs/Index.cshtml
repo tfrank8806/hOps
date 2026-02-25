@@ -12,7 +12,27 @@
             <h2 class="mb-0">Maintenance Logs</h2>
             <p class="text-muted mb-0">@Model.PropertyName</p>
         </div>
-        <a asp-action="Create" class="btn btn-primary btn-sm">Create Template</a>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            @if (Model.CanManage)
+            {
+                var canReorder = Model.Templates.Count > 1;
+                <div class="btn-group btn-group-sm" id="reorderControls">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            id="startReorderBtn"
+                            @(canReorder ? null : "disabled")>
+                        Reorder
+                    </button>
+                    <button type="button" class="btn btn-primary d-none" id="saveReorderBtn">Save Order</button>
+                    <button type="button" class="btn btn-outline-secondary d-none" id="cancelReorderBtn">Cancel</button>
+                </div>
+                <a asp-action="Create" class="btn btn-primary btn-sm">Create Template</a>
+            }
+            else
+            {
+                <a asp-action="Create" class="btn btn-primary btn-sm disabled" aria-disabled="true">Create Template</a>
+            }
+        </div>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(message))
@@ -22,6 +42,14 @@
     @if (!string.IsNullOrWhiteSpace(error))
     {
         <div class="alert alert-danger">@error</div>
+    }
+
+    @if (Model.CanManage && Model.Templates.Count > 1)
+    {
+        <div class="alert alert-info d-none" id="reorderHelp">
+            Drag rows to set the display order, then click <strong>Save Order</strong>.
+        </div>
+        <div class="small text-muted d-none mb-3" id="reorderStatus"></div>
     }
 
     @if (!Model.Templates.Any())
@@ -34,7 +62,7 @@
     }
     else
     {
-        <div class="card shadow-sm">
+        <div class="card shadow-sm" id="maintenanceLogTemplatesCard">
             <div class="table-responsive">
                 <table class="table table-striped align-middle mb-0">
                     <thead class="table-light">
@@ -47,11 +75,17 @@
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="templatesTableBody" data-reorder-url="@Url.Action("Reorder", "MaintenanceLogs")">
                         @foreach (var template in Model.Templates)
                         {
-                            <tr>
-                                <td>@template.Name</td>
+                            <tr data-template-id="@template.Id">
+                                <td>
+                                    @if (Model.CanManage)
+                                    {
+                                        <span class="reorder-handle me-2 text-muted d-none" title="Drag to reorder">&#x2630;</span>
+                                    }
+                                    @template.Name
+                                </td>
                                 <td>@template.ScheduleSummary</td>
                                 <td>
                                     @if (template.IsActive)
@@ -64,7 +98,7 @@
                                     }
                                 </td>
                                 <td>@template.EntryCount</td>
-                                <td>@(template.LastEntryDate?.ToString("MMM d, yyyy") ?? "—")</td>
+                                <td>@(template.LastEntryDate?.ToString("MMM d, yyyy") ?? "&mdash;")</td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
                                         <a asp-action="Detail" asp-route-id="@template.Id" class="btn btn-outline-secondary">Open</a>
@@ -82,3 +116,194 @@
         </div>
     }
 </div>
+
+<form id="maintenanceLogsAntiforgeryForm" class="d-none">
+    @Html.AntiForgeryToken()
+</form>
+
+@section Scripts {
+    <style>
+        #maintenanceLogTemplatesCard.reorder-mode .reorder-handle {
+            display: inline-flex !important;
+            cursor: grab;
+        }
+
+        #maintenanceLogTemplatesCard.reorder-mode tbody tr {
+            cursor: grab;
+        }
+
+        #maintenanceLogTemplatesCard.reorder-mode tbody tr.dragging {
+            opacity: 0.7;
+        }
+    </style>
+    <script>
+        (() => {
+            const tableBody = document.getElementById('templatesTableBody');
+            const startBtn = document.getElementById('startReorderBtn');
+            const saveBtn = document.getElementById('saveReorderBtn');
+            const cancelBtn = document.getElementById('cancelReorderBtn');
+            const helpAlert = document.getElementById('reorderHelp');
+            const statusEl = document.getElementById('reorderStatus');
+            const card = document.getElementById('maintenanceLogTemplatesCard');
+
+            if (!tableBody || !startBtn || !card) {
+                return;
+            }
+
+            const toggleButtons = (isReordering) => {
+                startBtn.classList.toggle('d-none', isReordering);
+                saveBtn?.classList.toggle('d-none', !isReordering);
+                cancelBtn?.classList.toggle('d-none', !isReordering);
+                card.classList.toggle('reorder-mode', isReordering);
+                helpAlert?.classList.toggle('d-none', !isReordering);
+            };
+
+            const setDraggable = (enabled) => {
+                tableBody.querySelectorAll('tr[data-template-id]').forEach(row => {
+                    row.setAttribute('draggable', enabled ? 'true' : 'false');
+                    if (!enabled) {
+                        row.classList.remove('dragging');
+                    }
+                });
+            };
+
+            const setStatus = (message, state) => {
+                if (!statusEl) {
+                    return;
+                }
+
+                statusEl.textContent = message || '';
+                statusEl.classList.toggle('d-none', !message);
+                statusEl.classList.remove('text-danger', 'text-success', 'text-muted');
+                if (!message) {
+                    return;
+                }
+
+                if (state === 'error') {
+                    statusEl.classList.add('text-danger');
+                } else if (state === 'muted') {
+                    statusEl.classList.add('text-muted');
+                } else {
+                    statusEl.classList.add('text-success');
+                }
+            };
+
+            let dragSource = null;
+
+            const enableDragAndDrop = () => {
+                tableBody.addEventListener('dragstart', (event) => {
+                    dragSource = event.target?.closest('tr[data-template-id]');
+                    if (!dragSource) {
+                        return;
+                    }
+                    dragSource.classList.add('dragging');
+                    event.dataTransfer.effectAllowed = 'move';
+                });
+
+                tableBody.addEventListener('dragend', () => {
+                    if (dragSource) {
+                        dragSource.classList.remove('dragging');
+                        dragSource = null;
+                    }
+                });
+
+                tableBody.addEventListener('dragover', (event) => {
+                    if (!dragSource) {
+                        return;
+                    }
+                    event.preventDefault();
+
+                    const targetRow = event.target?.closest('tr[data-template-id]');
+                    if (!targetRow || targetRow === dragSource) {
+                        return;
+                    }
+
+                    const targetBounds = targetRow.getBoundingClientRect();
+                    const shouldPlaceBefore = event.clientY - targetBounds.top < targetBounds.height / 2;
+                    tableBody.insertBefore(dragSource, shouldPlaceBefore ? targetRow : targetRow.nextSibling);
+                });
+            };
+
+            enableDragAndDrop();
+            setDraggable(false);
+
+            const getAntiforgeryToken = () => {
+                const formToken = document.querySelector('#maintenanceLogsAntiforgeryForm input[name="__RequestVerificationToken"]');
+                if (formToken?.value) {
+                    return formToken.value;
+                }
+
+                return document.querySelector('#globalAntiforgeryForm input[name="__RequestVerificationToken"]')?.value ?? '';
+            };
+
+            const resetReorderState = () => {
+                setDraggable(false);
+                toggleButtons(false);
+            };
+
+            startBtn.addEventListener('click', () => {
+                if (startBtn.disabled) {
+                    return;
+                }
+                setStatus('');
+                toggleButtons(true);
+                setDraggable(true);
+            });
+
+            cancelBtn?.addEventListener('click', () => {
+                setStatus('Reorder cancelled.', 'muted');
+                resetReorderState();
+            });
+
+            saveBtn?.addEventListener('click', async () => {
+                const ids = Array.from(tableBody.querySelectorAll('tr[data-template-id]'))
+                    .map(row => parseInt(row.getAttribute('data-template-id') ?? '', 10))
+                    .filter(id => Number.isInteger(id) && id > 0);
+
+                if (ids.length === 0) {
+                    setStatus('No templates available to reorder.', 'error');
+                    return;
+                }
+
+                const reorderUrl = tableBody.dataset.reorderUrl;
+                if (!reorderUrl) {
+                    setStatus('Unable to save the new order.', 'error');
+                    return;
+                }
+
+                try {
+                    setStatus('Saving order...', 'muted');
+                    const response = await fetch(reorderUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': getAntiforgeryToken()
+                        },
+                        body: JSON.stringify({ templateIds: ids })
+                    });
+
+                    if (!response.ok) {
+                        let payload = null;
+                        try {
+                            payload = await response.json();
+                        } catch {
+                            payload = null;
+                        }
+                        const message = payload?.error ?? 'Unable to save the new order.';
+                        throw new Error(message);
+                    }
+
+                    setStatus('Template order updated.');
+                    resetReorderState();
+                }
+                catch (error) {
+                    setStatus(error.message ?? 'Unable to save the new order.', 'error');
+                }
+            });
+        })();
+    </script>
+}
+
+
+
+

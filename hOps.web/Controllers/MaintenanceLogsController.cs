@@ -60,8 +60,8 @@ namespace hOps.web.Controllers
 
             var templates = await _db.MaintenanceLogTemplates
                 .Where(t => t.PropertyId == property.Id)
-                .OrderByDescending(t => t.IsActive)
-                .ThenBy(t => t.Name)
+                .OrderBy(t => t.DisplayOrder)
+                .ThenBy(t => t.Id)
                 .ToListAsync();
 
             var templateIds = templates.Select(t => t.Id).ToList();
@@ -168,6 +168,12 @@ namespace hOps.web.Controllers
                 return View(LogsEditorView, viewModel);
             }
 
+            var maxDisplayOrder = await _db.MaintenanceLogTemplates
+                .Where(t => t.PropertyId == property.Id)
+                .Select(t => (int?)t.DisplayOrder)
+                .DefaultIfEmpty(-1)
+                .MaxAsync();
+
             var template = new MaintenanceLogTemplate
             {
                 Name = viewModel.Name.Trim(),
@@ -179,6 +185,7 @@ namespace hOps.web.Controllers
                 DayOfMonth = RequiresDayOfMonth(viewModel.ScheduleType) ? viewModel.DayOfMonth : null,
                 DueTimeLocal = viewModel.DueTimeLocal,
                 IsActive = viewModel.IsActive,
+                DisplayOrder = (maxDisplayOrder ?? -1) + 1,
                 ColumnsJson = MaintenanceLogTemplateHelper.BuildColumnsJson(sanitizedColumns),
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
@@ -556,6 +563,74 @@ namespace hOps.web.Controllers
             var fileName = $"{safeProperty}-{safeTemplate}-logs-{DateTime.UtcNow:yyyyMMdd}.csv";
             var bytes = Encoding.UTF8.GetBytes(builder.ToString());
             return File(bytes, "text/csv", fileName);
+        }
+
+        [HttpPost("Reorder")]
+        public async Task<IActionResult> Reorder([FromBody] MaintenanceLogTemplateReorderRequest? request)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                return BadRequest(new { error = "Select a property before reordering templates." });
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!UserCanManage(roles))
+            {
+                return Forbid();
+            }
+
+            if (request?.TemplateIds == null || request.TemplateIds.Count == 0)
+            {
+                return BadRequest(new { error = "Provide at least one template when reordering." });
+            }
+
+            var templates = await _db.MaintenanceLogTemplates
+                .Where(t => t.PropertyId == property.Id)
+                .OrderBy(t => t.DisplayOrder)
+                .ThenBy(t => t.Id)
+                .ToListAsync();
+
+            if (!templates.Any())
+            {
+                return BadRequest(new { error = "No templates exist for this property." });
+            }
+
+            var propertyTemplateIds = templates.Select(t => t.Id).ToHashSet();
+            var invalidIds = request.TemplateIds.Where(id => !propertyTemplateIds.Contains(id)).ToList();
+            if (invalidIds.Any())
+            {
+                return BadRequest(new { error = "One or more templates are invalid or belong to another property." });
+            }
+
+            var orderLookup = request.TemplateIds
+                .Select((id, index) => (id, index))
+                .GroupBy(item => item.id)
+                .ToDictionary(group => group.Key, group => group.First().index);
+
+            var nextOrder = orderLookup.Count;
+            foreach (var template in templates)
+            {
+                if (orderLookup.TryGetValue(template.Id, out var order))
+                {
+                    template.DisplayOrder = order;
+                }
+                else
+                {
+                    template.DisplayOrder = nextOrder++;
+                }
+
+                template.UpdatedAtUtc = DateTime.UtcNow;
+            }
+
+            await _db.SaveChangesAsync();
+            return Json(new { success = true });
         }
 
         [HttpGet("Template/Download.csv")]
