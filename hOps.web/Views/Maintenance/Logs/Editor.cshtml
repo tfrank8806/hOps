@@ -16,7 +16,7 @@
 
     <div class="card shadow-sm">
         <div class="card-body">
-            <form asp-action="@formAction" asp-route-id="@Model.Id" method="post">
+            <form asp-action="@formAction" asp-route-id="@Model.Id" method="post" id="logTemplateForm">
                 @Html.AntiForgeryToken()
                 <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
@@ -71,10 +71,24 @@
                     </div>
                 </div>
 
-                <div class="mb-3 d-flex justify-content-between align-items-center">
+                <div class="mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h5 class="mb-0">Columns</h5>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="addColumnBtn">Add Column</button>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="addColumnBtn">Add Column</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="uploadColumnsBtn">Upload CSV</button>
+                        <a asp-action="DownloadTemplateCsv" class="btn btn-outline-secondary btn-sm">Download Blank CSV</a>
+                    </div>
                 </div>
+
+                <input type="file"
+                       id="columnCsvInput"
+                       class="d-none"
+                       accept=".csv,text/csv"
+                       data-import-url="@Url.Action("PreviewTemplateCsv", "MaintenanceLogs")">
+                <div class="text-muted small mb-3">
+                    CSV columns should be ordered as: Label, Key, Type (text, number, checkbox, select), Required, Options (comma or line break separated).
+                </div>
+                <div class="small mb-3 d-none" id="columnCsvStatus"></div>
 
                 <div id="columnsContainer">
                     @{
@@ -117,7 +131,11 @@
                                         <textarea name="Columns[@i].OptionsText" class="form-control" rows="3">@column.OptionsText</textarea>
                                     </div>
                                 </div>
-                                <div class="text-end mt-2">
+                                <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-secondary move-up-btn" title="Move column up">Move Up</button>
+                                        <button type="button" class="btn btn-outline-secondary move-down-btn" title="Move column down">Move Down</button>
+                                    </div>
                                     <button type="button" class="btn btn-link text-danger p-0 remove-column-btn" @(columns.Count == 1 ? "disabled" : null)>Remove</button>
                                 </div>
                             </div>
@@ -157,7 +175,11 @@
                                 <textarea class="form-control" rows="3" data-name-template="Columns[__index__].OptionsText"></textarea>
                             </div>
                         </div>
-                        <div class="text-end mt-2">
+                        <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary move-up-btn" title="Move column up">Move Up</button>
+                                <button type="button" class="btn btn-outline-secondary move-down-btn" title="Move column down">Move Down</button>
+                            </div>
                             <button type="button" class="btn btn-link text-danger p-0 remove-column-btn">Remove</button>
                         </div>
                     </div>
@@ -165,7 +187,12 @@
 
                 <div class="d-flex justify-content-between mt-4">
                     <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
-                    <button type="submit" class="btn btn-primary">@(Model.IsEditMode ? "Save Changes" : "Create Template")</button>
+                    <button type="submit"
+                            class="btn btn-primary"
+                            data-submit-btn="true"
+                            data-loading-text="@(Model.IsEditMode ? "Saving..." : "Creating...")">
+                        @(Model.IsEditMode ? "Save Changes" : "Create Template")
+                    </button>
                 </div>
             </form>
         </div>
@@ -180,21 +207,73 @@
             const monthlyFieldset = document.getElementById('monthlyDayFieldset');
             const monthlyTypes = new Set(['Monthly', 'Quarterly', 'Yearly']);
             const updateScheduleVisibility = () => {
-                const value = scheduleTypeSelect.value;
-                weeklyFieldset.classList.toggle('d-none', value !== 'Weekly');
-                monthlyFieldset.classList.toggle('d-none', !monthlyTypes.has(value));
+                const value = scheduleTypeSelect?.value ?? 'None';
+                if (weeklyFieldset) {
+                    weeklyFieldset.classList.toggle('d-none', value !== 'Weekly');
+                }
+                if (monthlyFieldset) {
+                    monthlyFieldset.classList.toggle('d-none', !monthlyTypes.has(value));
+                }
             };
-            scheduleTypeSelect.addEventListener('change', updateScheduleVisibility);
-            updateScheduleVisibility();
+            if (scheduleTypeSelect) {
+                scheduleTypeSelect.addEventListener('change', updateScheduleVisibility);
+                updateScheduleVisibility();
+            }
+
+            const formEl = document.getElementById('logTemplateForm');
+            const submitBtn = formEl?.querySelector('[data-submit-btn="true"]');
+            if (formEl && submitBtn) {
+                const originalHtml = submitBtn.innerHTML;
+                formEl.addEventListener('submit', () => {
+                    if (submitBtn.disabled) {
+                        return;
+                    }
+                    submitBtn.disabled = true;
+                    const loadingText = submitBtn.dataset.loadingText || 'Saving...';
+                    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${loadingText}`;
+                    submitBtn.dataset.originalHtml = originalHtml;
+                });
+            }
 
             const container = document.getElementById('columnsContainer');
             const template = document.getElementById('columnTemplate');
             const addBtn = document.getElementById('addColumnBtn');
+            if (!container || !template || !addBtn) {
+                return;
+            }
+
+            const refreshColumnState = () => {
+                const rows = Array.from(container.children);
+                rows.forEach((row, index) => {
+                    row.dataset.index = String(index);
+                    row.querySelectorAll('input[name], select[name], textarea[name]').forEach(input => {
+                        if (!input.name) {
+                            return;
+                        }
+                        input.name = input.name.replace(/Columns\[\d+\]/, `Columns[${index}]`);
+                    });
+
+                    const removeBtn = row.querySelector('.remove-column-btn');
+                    if (removeBtn) {
+                        removeBtn.disabled = rows.length <= 1;
+                    }
+
+                    const upBtn = row.querySelector('.move-up-btn');
+                    if (upBtn) {
+                        upBtn.disabled = index === 0;
+                    }
+
+                    const downBtn = row.querySelector('.move-down-btn');
+                    if (downBtn) {
+                        downBtn.disabled = index === rows.length - 1;
+                    }
+                });
+            };
 
             const bindColumnRow = (row) => {
                 row.querySelectorAll('.column-type-select').forEach(select => {
                     select.addEventListener('change', event => {
-                        const optionsGroup = event.target.closest('.column-editor').querySelector('.column-options-group');
+                        const optionsGroup = event.target.closest('.column-editor')?.querySelector('.column-options-group');
                         if (!optionsGroup) {
                             return;
                         }
@@ -203,45 +282,201 @@
                     select.dispatchEvent(new Event('change'));
                 });
 
-                row.querySelectorAll('.remove-column-btn').forEach(button => {
-                    button.addEventListener('click', () => {
+                const removeBtn = row.querySelector('.remove-column-btn');
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', () => {
                         if (container.children.length <= 1) {
                             return;
                         }
                         row.remove();
-                        renumberColumns();
+                        refreshColumnState();
                     });
-                });
+                }
+
+                const moveUpBtn = row.querySelector('.move-up-btn');
+                if (moveUpBtn) {
+                    moveUpBtn.addEventListener('click', () => {
+                        const previous = row.previousElementSibling;
+                        if (previous) {
+                            container.insertBefore(row, previous);
+                            refreshColumnState();
+                        }
+                    });
+                }
+
+                const moveDownBtn = row.querySelector('.move-down-btn');
+                if (moveDownBtn) {
+                    moveDownBtn.addEventListener('click', () => {
+                        const next = row.nextElementSibling;
+                        if (next) {
+                            container.insertBefore(next, row);
+                            refreshColumnState();
+                        }
+                    });
+                }
             };
 
-            const renumberColumns = () => {
-                Array.from(container.children).forEach((row, index) => {
-                    row.querySelectorAll('input[name], select[name], textarea[name]').forEach(input => {
-                        const name = input.name;
-                        const updated = name.replace(/Columns\[\d+\]/, `Columns[${index}]`);
-                        input.name = updated;
-                    });
-                });
+            const setColumnValues = (row, data = {}) => {
+                if ('label' in data) {
+                    const input = row.querySelector('input[name$=".Label"]');
+                    if (input) {
+                        input.value = data.label ?? '';
+                    }
+                }
+
+                if ('key' in data) {
+                    const keyInput = row.querySelector('input[name$=".Key"]');
+                    if (keyInput) {
+                        keyInput.value = data.key ?? '';
+                    }
+                }
+
+                const typeSelect = row.querySelector('.column-type-select');
+                if (typeSelect) {
+                    if ('type' in data && data.type) {
+                        typeSelect.value = data.type;
+                    }
+                    typeSelect.dispatchEvent(new Event('change'));
+                }
+
+                if ('required' in data) {
+                    const requiredInput = row.querySelector('input[type="checkbox"][name$=".Required"]');
+                    if (requiredInput) {
+                        requiredInput.checked = Boolean(data.required);
+                    }
+                }
+
+                if ('optionsText' in data) {
+                    const optionsArea = row.querySelector('textarea[name$=".OptionsText"]');
+                    if (optionsArea) {
+                        optionsArea.value = data.optionsText ?? '';
+                    }
+                }
             };
 
-            addBtn.addEventListener('click', () => {
+            const createColumnFromTemplate = (data = {}) => {
                 const fragment = template.content.cloneNode(true);
+                const nextIndex = container.children.length;
                 fragment.querySelectorAll('[data-name-template]').forEach(element => {
                     const templateName = element.dataset.nameTemplate;
-                    const nextIndex = container.children.length;
-                    const actualName = templateName.replace(/__index__/g, nextIndex);
-                    element.name = actualName;
+                    if (!templateName) {
+                        return;
+                    }
+                    element.name = templateName.replace(/__index__/g, nextIndex);
                     if (element.dataset.hiddenMarker === 'true') {
                         element.value = 'false';
+                    } else if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+                        if (element.type === 'checkbox') {
+                            element.checked = false;
+                        } else {
+                            element.value = '';
+                        }
                     }
                 });
 
-                const row = fragment.querySelector('.column-editor');
                 container.appendChild(fragment);
-                bindColumnRow(container.lastElementChild);
-            });
+                const newRow = container.lastElementChild;
+                if (!newRow) {
+                    return;
+                }
+                bindColumnRow(newRow);
+                setColumnValues(newRow, data);
+                refreshColumnState();
+            };
+
+            addBtn.addEventListener('click', () => createColumnFromTemplate());
 
             Array.from(container.children).forEach(row => bindColumnRow(row));
+            refreshColumnState();
+
+            const csvInput = document.getElementById('columnCsvInput');
+            const uploadBtn = document.getElementById('uploadColumnsBtn');
+            const statusEl = document.getElementById('columnCsvStatus');
+            const showCsvStatus = (message, state = 'success') => {
+                if (!statusEl) {
+                    return;
+                }
+                statusEl.classList.remove('d-none', 'text-danger', 'text-success', 'text-muted');
+                if (state === 'error') {
+                    statusEl.classList.add('text-danger');
+                } else if (state === 'muted') {
+                    statusEl.classList.add('text-muted');
+                } else {
+                    statusEl.classList.add('text-success');
+                }
+                statusEl.textContent = message;
+            };
+
+            const getAntiforgeryToken = () => formEl?.querySelector('input[name="__RequestVerificationToken"]')?.value
+                ?? document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                ?? '';
+
+            const importColumns = async (file) => {
+                if (!csvInput) {
+                    return;
+                }
+
+                const importUrl = csvInput.dataset.importUrl;
+                if (!importUrl) {
+                    showCsvStatus('Import endpoint is unavailable.', 'error');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('csvFile', file);
+
+                const headers = {};
+                const token = getAntiforgeryToken();
+                if (token) {
+                    headers['RequestVerificationToken'] = token;
+                }
+
+                try {
+                    showCsvStatus('Importing columns...', 'muted');
+                    const response = await fetch(importUrl, {
+                        method: 'POST',
+                        headers,
+                        body: formData
+                    });
+
+                    let payload = null;
+                    try {
+                        payload = await response.json();
+                    } catch {
+                        payload = null;
+                    }
+
+                    if (!response.ok) {
+                        const errorMessage = payload?.error ?? 'Unable to import the CSV file.';
+                        throw new Error(errorMessage);
+                    }
+
+                    const imported = Array.isArray(payload?.columns) ? payload.columns : [];
+                    if (imported.length === 0) {
+                        throw new Error('The CSV file did not include any columns.');
+                    }
+
+                    container.innerHTML = '';
+                    imported.forEach(column => createColumnFromTemplate(column));
+                    refreshColumnState();
+                    showCsvStatus(`Imported ${imported.length} column${imported.length === 1 ? '' : 's'}.`);
+                } catch (error) {
+                    showCsvStatus(error.message ?? 'Unable to import the CSV file.', 'error');
+                } finally {
+                    csvInput.value = '';
+                }
+            };
+
+            if (uploadBtn && csvInput) {
+                uploadBtn.addEventListener('click', () => csvInput.click());
+                csvInput.addEventListener('change', () => {
+                    const file = csvInput.files && csvInput.files[0];
+                    if (!file) {
+                        return;
+                    }
+                    importColumns(file);
+                });
+            }
         })();
     </script>
 }

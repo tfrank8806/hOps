@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -11,6 +12,7 @@ using hOps.web.Models;
 using hOps.web.Utilities;
 using hOps.web.ViewModels.Maintenance;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +25,7 @@ namespace hOps.web.Controllers
     public class MaintenanceLogsController : BaseController
     {
         private const int MaxEntryDisplayCount = 500;
+        private const int TemplateColumnImportLimit = 40;
         private const string LogsIndexView = "~/Views/Maintenance/Logs/Index.cshtml";
         private const string LogsEditorView = "~/Views/Maintenance/Logs/Editor.cshtml";
         private const string LogsDetailView = "~/Views/Maintenance/Logs/Detail.cshtml";
@@ -553,6 +556,213 @@ namespace hOps.web.Controllers
             var fileName = $"{safeProperty}-{safeTemplate}-logs-{DateTime.UtcNow:yyyyMMdd}.csv";
             var bytes = Encoding.UTF8.GetBytes(builder.ToString());
             return File(bytes, "text/csv", fileName);
+        }
+
+        [HttpGet("Template/Download.csv")]
+        public IActionResult DownloadTemplateCsv()
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("Label,Key,Type,Required,Options");
+            builder.AppendLine("\"Area\",\"area\",\"text\",\"Yes\",");
+            builder.AppendLine("\"Status\",\"status\",\"select\",\"Yes\",\"Operational,Out of Service\"");
+            builder.AppendLine("\"Notes\",\"notes\",\"text\",\"No\",");
+
+            var bytes = Encoding.UTF8.GetBytes(builder.ToString());
+            return File(bytes, "text/csv", "maintenance-log-template.csv");
+        }
+
+        [HttpPost("Template/Columns/Preview")]
+        public async Task<IActionResult> PreviewTemplateCsv(IFormFile? csvFile)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                return BadRequest(new { error = "Select a property before importing columns." });
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            if (csvFile == null || csvFile.Length == 0)
+            {
+                return BadRequest(new { error = "Choose a CSV file to import." });
+            }
+
+            try
+            {
+                var columns = await ParseTemplateColumnsAsync(csvFile);
+                if (!columns.Any())
+                {
+                    return BadRequest(new { error = "No columns were found in the uploaded template." });
+                }
+
+                return Json(new
+                {
+                    columns = columns.Select(column => new
+                    {
+                        key = column.Key,
+                        label = column.Label,
+                        type = column.Type,
+                        required = column.Required,
+                        optionsText = column.OptionsText
+                    })
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        private async Task<List<MaintenanceLogColumnEditorViewModel>> ParseTemplateColumnsAsync(IFormFile csvFile)
+        {
+            var rows = new List<MaintenanceLogColumnEditorViewModel>();
+            using var stream = csvFile.OpenReadStream();
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+
+            string? line;
+            var lineNumber = 0;
+            while ((line = await reader.ReadLineAsync()) != null)
+            {
+                lineNumber++;
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                if (rows.Count >= TemplateColumnImportLimit)
+                {
+                    throw new InvalidOperationException($"Templates can include up to {TemplateColumnImportLimit} columns.");
+                }
+
+                var cells = SplitCsvLine(line);
+                if (lineNumber == 1 && cells.Count > 0 && cells[0].Trim().Equals("label", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var label = cells.Count > 0 ? cells[0].Trim() : string.Empty;
+                var key = cells.Count > 1 ? cells[1].Trim() : string.Empty;
+                var typeCell = cells.Count > 2 ? cells[2].Trim() : string.Empty;
+                var requiredCell = cells.Count > 3 ? cells[3].Trim() : string.Empty;
+                var optionsCell = cells.Count > 4 ? cells[4] : string.Empty;
+
+                if (string.IsNullOrWhiteSpace(label) && string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(label) && label.Length > 160)
+                {
+                    label = label[..160];
+                }
+
+                if (!string.IsNullOrWhiteSpace(key) && key.Length > 64)
+                {
+                    key = key[..64];
+                }
+
+                var normalizedType = string.IsNullOrWhiteSpace(typeCell)
+                    ? MaintenanceLogColumnDefinition.DefaultColumnType
+                    : typeCell.ToLowerInvariant();
+
+                if (!MaintenanceLogColumnDefinition.AllowedTypes.Contains(normalizedType))
+                {
+                    throw new InvalidOperationException($"\"{typeCell}\" is not a supported column type (row {lineNumber}).");
+                }
+
+                var optionsText = string.Empty;
+                if (normalizedType == "select")
+                {
+                    optionsText = string.Join(
+                        Environment.NewLine,
+                        MaintenanceLogTemplateHelper.ParseOptions(NormalizeOptionsCell(optionsCell)));
+                }
+
+                rows.Add(new MaintenanceLogColumnEditorViewModel
+                {
+                    Label = label,
+                    Key = key,
+                    Type = normalizedType,
+                    Required = ParseBooleanCell(requiredCell),
+                    OptionsText = optionsText
+                });
+            }
+
+            return rows;
+        }
+
+        private static bool ParseBooleanCell(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            var normalized = value.Trim();
+            return normalized.Equals("true", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("yes", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("y", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("1", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("required", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeOptionsCell(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            return text
+                .Replace('|', '\n')
+                .Replace(';', '\n');
+        }
+
+        private static List<string> SplitCsvLine(string line)
+        {
+            var values = new List<string>();
+            if (line == null)
+            {
+                return values;
+            }
+
+            var builder = new StringBuilder();
+            var inQuotes = false;
+
+            for (var i = 0; i < line.Length; i++)
+            {
+                var ch = line[i];
+                if (ch == '"')
+                {
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        builder.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes;
+                    }
+
+                    continue;
+                }
+
+                if (ch == ',' && !inQuotes)
+                {
+                    values.Add(builder.ToString());
+                    builder.Clear();
+                    continue;
+                }
+
+                builder.Append(ch);
+            }
+
+            values.Add(builder.ToString());
+            return values;
         }
 
         private async Task<bool> UserCanManageAsync(ApplicationUser user)
