@@ -5,6 +5,7 @@ using hOps.web.Services;
 using hOps.web.Options;
 using hOps.web.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using System;
 using Microsoft.AspNetCore.Identity.UI.Services;
@@ -300,6 +301,10 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+builder.Services.Configure<MvcOptions>(options =>
+{
+    options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+});
 builder.Services.AddSignalR();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Authentication:Jwt"));
 builder.Services.Configure<CaptchaOptions>(builder.Configuration.GetSection("Captcha"));
