@@ -56,15 +56,23 @@ namespace hOps.web.Utilities
 
         public static string BuildColumnsJson(IEnumerable<MaintenanceLogColumnDefinition> columns)
         {
-            var sanitized = columns
-                .Select(SanitizeColumn)
-                .Where(column => column != null)
-                .Select(column => column!)
-                .GroupBy(column => column.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(group => group.First())
-                .ToList();
+            var results = new List<MaintenanceLogColumnDefinition>();
+            var usedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            return JsonSerializer.Serialize(sanitized, SerializerOptions);
+            foreach (var column in columns)
+            {
+                var sanitized = SanitizeColumn(column);
+                if (sanitized == null)
+                {
+                    continue;
+                }
+
+                sanitized.Key = EnsureUniqueKey(sanitized.Key, usedKeys);
+                usedKeys.Add(sanitized.Key);
+                results.Add(sanitized);
+            }
+
+            return JsonSerializer.Serialize(results, SerializerOptions);
         }
 
         public static int BuildWeeklyBitmask(IEnumerable<DayOfWeek> days)
@@ -216,6 +224,37 @@ namespace hOps.web.Utilities
                 Required = column.Required,
                 Options = options
             };
+        }
+
+        private static string EnsureUniqueKey(string key, HashSet<string> usedKeys)
+        {
+            if (!usedKeys.Contains(key))
+            {
+                return key;
+            }
+
+            var baseKey = key;
+            var suffix = 2;
+            while (suffix < 1000)
+            {
+                var candidate = BuildCandidate(baseKey, suffix);
+                if (!usedKeys.Contains(candidate))
+                {
+                    return candidate;
+                }
+
+                suffix++;
+            }
+
+            return $"{baseKey}_{Guid.NewGuid():N}"[..Math.Min(32, baseKey.Length + 9)];
+
+            static string BuildCandidate(string original, int suffix)
+            {
+                var suffixText = $"_{suffix}";
+                var maxBaseLength = Math.Max(1, 32 - suffixText.Length);
+                var trimmedBase = original.Length > maxBaseLength ? original[..maxBaseLength] : original;
+                return $"{trimmedBase}{suffixText}";
+            }
         }
 
         private static string GetOrdinal(int number)
