@@ -138,7 +138,9 @@ namespace hOps.web.Controllers
         }
 
         [HttpPost("Create")]
-        public async Task<IActionResult> Create(MaintenanceLogTemplateEditorViewModel viewModel)
+        public async Task<IActionResult> Create(
+            MaintenanceLogTemplateEditorViewModel viewModel,
+            IFormFile? templateCsvFile = null)
         {
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
@@ -156,6 +158,22 @@ namespace hOps.web.Controllers
             viewModel.PropertyId = property.Id;
             viewModel.PropertyName = property.Name;
             viewModel.CanManage = true;
+
+            if (templateCsvFile is { Length: > 0 } && (viewModel.Columns == null || !viewModel.Columns.Any()))
+            {
+                try
+                {
+                    viewModel.Columns = await ParseTemplateColumnsAsync(templateCsvFile);
+                    if (!viewModel.Columns.Any())
+                    {
+                        ModelState.AddModelError("TemplateCsvFile", "The CSV file did not include any columns.");
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    ModelState.AddModelError("TemplateCsvFile", ex.Message);
+                }
+            }
 
             var sanitizedColumns = BuildColumnDefinitions(viewModel);
             if (!sanitizedColumns.Any())
@@ -247,7 +265,10 @@ namespace hOps.web.Controllers
         }
 
         [HttpPost("{id:int}/Edit")]
-        public async Task<IActionResult> Edit(int id, MaintenanceLogTemplateEditorViewModel viewModel)
+        public async Task<IActionResult> Edit(
+            int id,
+            MaintenanceLogTemplateEditorViewModel viewModel,
+            IFormFile? templateCsvFile = null)
         {
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
@@ -279,6 +300,22 @@ namespace hOps.web.Controllers
             viewModel.PropertyId = property.Id;
             viewModel.PropertyName = property.Name;
             viewModel.CanManage = true;
+
+            if (templateCsvFile is { Length: > 0 } && (viewModel.Columns == null || !viewModel.Columns.Any()))
+            {
+                try
+                {
+                    viewModel.Columns = await ParseTemplateColumnsAsync(templateCsvFile);
+                    if (!viewModel.Columns.Any())
+                    {
+                        ModelState.AddModelError("TemplateCsvFile", "The CSV file did not include any columns.");
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    ModelState.AddModelError("TemplateCsvFile", ex.Message);
+                }
+            }
 
             var sanitizedColumns = BuildColumnDefinitions(viewModel);
             if (!sanitizedColumns.Any())

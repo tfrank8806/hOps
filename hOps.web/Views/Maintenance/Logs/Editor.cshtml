@@ -16,7 +16,7 @@
 
     <div class="card shadow-sm">
         <div class="card-body">
-            <form asp-action="@formAction" asp-route-id="@Model.Id" method="post" id="logTemplateForm">
+            <form asp-action="@formAction" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" id="logTemplateForm">
                 @Html.AntiForgeryToken()
                 <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
@@ -82,6 +82,7 @@
 
                 <input type="file"
                        id="columnCsvInput"
+                       name="TemplateCsvFile"
                        class="d-none"
                        accept=".csv,text/csv"
                        data-import-url="@Url.Action("PreviewTemplateCsv", "MaintenanceLogs")">
@@ -89,6 +90,7 @@
                     CSV columns should be ordered as: Label, Key, Type (text, number, checkbox, select), Required, Options (comma or line break separated).
                 </div>
                 <div class="small mb-3 d-none" id="columnCsvStatus"></div>
+                @Html.ValidationMessage("TemplateCsvFile", null, new { @class = "text-danger small d-block" })
 
                 <div id="columnsContainer">
                     @{
@@ -462,13 +464,14 @@
                     showCsvStatus(`Imported ${imported.length} column${imported.length === 1 ? '' : 's'}.`);
                 } catch (error) {
                     showCsvStatus(error.message ?? 'Unable to import the CSV file.', 'error');
-                } finally {
-                    csvInput.value = '';
                 }
             };
 
             if (uploadBtn && csvInput) {
-                uploadBtn.addEventListener('click', () => csvInput.click());
+                uploadBtn.addEventListener('click', () => {
+                    csvInput.value = '';
+                    csvInput.click();
+                });
                 csvInput.addEventListener('change', () => {
                     const file = csvInput.files && csvInput.files[0];
                     if (!file) {
