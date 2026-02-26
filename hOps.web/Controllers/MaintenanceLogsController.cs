@@ -188,9 +188,9 @@ namespace hOps.web.Controllers
 
             var maxDisplayOrder = await _db.MaintenanceLogTemplates
                 .Where(t => t.PropertyId == property.Id)
+                .OrderByDescending(t => t.DisplayOrder)
                 .Select(t => (int?)t.DisplayOrder)
-                .DefaultIfEmpty(-1)
-                .MaxAsync();
+                .FirstOrDefaultAsync() ?? -1;
 
             var template = new MaintenanceLogTemplate
             {
@@ -203,7 +203,7 @@ namespace hOps.web.Controllers
                 DayOfMonth = RequiresDayOfMonth(viewModel.ScheduleType) ? viewModel.DayOfMonth : null,
                 DueTimeLocal = viewModel.DueTimeLocal,
                 IsActive = viewModel.IsActive,
-                DisplayOrder = (maxDisplayOrder ?? -1) + 1,
+                DisplayOrder = maxDisplayOrder + 1,
                 ColumnsJson = MaintenanceLogTemplateHelper.BuildColumnsJson(sanitizedColumns),
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
