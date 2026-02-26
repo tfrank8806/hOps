@@ -138,6 +138,7 @@ namespace hOps.web.Controllers
             logsQuery = logsQuery.Include(log => log.Properties).ThenInclude(lp => lp.Property);
             logsQuery = logsQuery.Include(log => log.Comments);
             logsQuery = logsQuery.Include(log => log.Views);
+            logsQuery = logsQuery.AsSplitQuery();
 
             if (filters.StartDate.HasValue)
             {
@@ -670,6 +671,7 @@ namespace hOps.web.Controllers
             }
 
             var log = await _context.PassOnLogs
+                .AsSplitQuery()
                 .Include(l => l.CreatedBy)
                 .Include(l => l.Properties).ThenInclude(lp => lp.Property)
                 .Include(l => l.Comments).ThenInclude(c => c.CreatedBy)
@@ -733,6 +735,7 @@ namespace hOps.web.Controllers
             }
 
             var log = await _context.PassOnLogs
+                .AsSplitQuery()
                 .Include(l => l.CreatedBy)
                 .Include(l => l.Properties).ThenInclude(lp => lp.Property)
                 .Include(l => l.Comments).ThenInclude(c => c.CreatedBy)
@@ -821,6 +824,7 @@ namespace hOps.web.Controllers
             }
 
             var log = await _context.PassOnLogs
+                .AsSplitQuery()
                 .Include(l => l.Properties)
                 .Include(l => l.Attachments)
                 .Include(l => l.Comments)

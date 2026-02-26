@@ -58,6 +58,7 @@ namespace hOps.web.Controllers.Api
 
             var query = _context.PassOnLogs
                 .AsNoTracking()
+                .AsSplitQuery()
                 .Include(l => l.CreatedBy)
                 .Include(l => l.Properties).ThenInclude(lp => lp.Property)
                 .Include(l => l.Views)
@@ -95,6 +96,7 @@ namespace hOps.web.Controllers.Api
 
             var log = await _context.PassOnLogs
                 .AsNoTracking()
+                .AsSplitQuery()
                 .Include(l => l.CreatedBy)
                 .Include(l => l.Properties).ThenInclude(lp => lp.Property)
                 .Include(l => l.Attachments)
@@ -174,6 +176,7 @@ namespace hOps.web.Controllers.Api
             }
 
             var savedLog = await _context.PassOnLogs
+                .AsSplitQuery()
                 .Include(l => l.CreatedBy)
                 .Include(l => l.Properties).ThenInclude(lp => lp.Property)
                 .Include(l => l.Attachments)
