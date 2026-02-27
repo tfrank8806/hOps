@@ -222,7 +222,8 @@ namespace hOps.web.Utilities
                 Label = label,
                 Type = type,
                 Required = column.Required,
-                Options = options
+                Options = options,
+                IncludeNotes = column.IncludeNotes
             };
         }
 
@@ -281,6 +282,13 @@ namespace hOps.web.Utilities
             var dateTime = DateTime.Today.Add(time);
             return dateTime.ToString("h:mm tt");
         }
+
+        public static string BuildNotesKey(string key)
+        {
+            return string.IsNullOrWhiteSpace(key)
+                ? string.Empty
+                : $"{key}__notes";
+        }
     }
 
     public sealed class MaintenanceLogColumnDefinition
@@ -300,5 +308,6 @@ namespace hOps.web.Utilities
         public string Type { get; set; } = DefaultColumnType;
         public bool Required { get; set; }
         public List<string> Options { get; set; } = new();
+        public bool IncludeNotes { get; set; }
     }
 }

@@ -445,32 +445,45 @@ namespace hOps.web.Controllers
                     }
 
                     normalizedValues[column.Key] = normalized;
-                    continue;
                 }
-
-                if (column.Type == "select" && column.Options.Any())
+                else
                 {
-                    if (string.IsNullOrWhiteSpace(normalized))
+                    if (column.Type == "select" && column.Options.Any())
                     {
-                        normalized = null;
+                        if (string.IsNullOrWhiteSpace(normalized))
+                        {
+                            normalized = null;
+                        }
+                        else if (!column.Options.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+                        {
+                            ModelState.AddModelError($"Values[{column.Key}]", $"Select a value from the available options for {column.Label}.");
+                        }
                     }
-                    else if (!column.Options.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+
+                    if (column.Type == "number" && !string.IsNullOrWhiteSpace(normalized) && !decimal.TryParse(normalized, out _))
                     {
-                        ModelState.AddModelError($"Values[{column.Key}]", $"Select a value from the available options for {column.Label}.");
+                        ModelState.AddModelError($"Values[{column.Key}]", $"{column.Label} must be a number.");
+                    }
+
+                    if (column.Required && string.IsNullOrWhiteSpace(normalized))
+                    {
+                        ModelState.AddModelError($"Values[{column.Key}]", $"{column.Label} is required.");
+                    }
+
+                    normalizedValues[column.Key] = normalized;
+                }
+
+                if (column.IncludeNotes)
+                {
+                    input.Notes ??= new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                    input.Notes.TryGetValue(column.Key, out var rawNote);
+                    var normalizedNote = NormalizeValue(rawNote);
+                    var noteKey = MaintenanceLogTemplateHelper.BuildNotesKey(column.Key);
+                    if (!string.IsNullOrWhiteSpace(normalizedNote) && !string.IsNullOrWhiteSpace(noteKey))
+                    {
+                        normalizedValues[noteKey] = normalizedNote;
                     }
                 }
-
-                if (column.Type == "number" && !string.IsNullOrWhiteSpace(normalized) && !decimal.TryParse(normalized, out _))
-                {
-                    ModelState.AddModelError($"Values[{column.Key}]", $"{column.Label} must be a number.");
-                }
-
-                if (column.Required && string.IsNullOrWhiteSpace(normalized))
-                {
-                    ModelState.AddModelError($"Values[{column.Key}]", $"{column.Label} is required.");
-                }
-
-                normalizedValues[column.Key] = normalized;
             }
 
             if (!ModelState.IsValid)
@@ -593,7 +606,14 @@ namespace hOps.web.Controllers
                 "Created By",
                 "Created At"
             };
-            header.AddRange(columns.Select(column => column.Label));
+            foreach (var column in columns)
+            {
+                header.Add(column.Label);
+                if (column.IncludeNotes)
+                {
+                    header.Add($"{column.Label} Notes");
+                }
+            }
 
             var builder = new StringBuilder();
             builder.AppendLine(string.Join(",", header.Select(Csv)));
@@ -612,6 +632,13 @@ namespace hOps.web.Controllers
                 {
                     values.TryGetValue(column.Key, out var value);
                     row.Add(Csv(value));
+
+                    if (column.IncludeNotes)
+                    {
+                        var noteKey = MaintenanceLogTemplateHelper.BuildNotesKey(column.Key);
+                        values.TryGetValue(noteKey, out var noteValue);
+                        row.Add(Csv(noteValue));
+                    }
                 }
 
                 builder.AppendLine(string.Join(",", row));
@@ -696,10 +723,10 @@ namespace hOps.web.Controllers
         public IActionResult DownloadTemplateCsv()
         {
             var builder = new StringBuilder();
-            builder.AppendLine("Label,Key,Type,Required,Options");
-            builder.AppendLine("\"Area\",\"area\",\"text\",\"Yes\",");
-            builder.AppendLine("\"Status\",\"status\",\"select\",\"Yes\",\"Operational,Out of Service\"");
-            builder.AppendLine("\"Notes\",\"notes\",\"text\",\"No\",");
+            builder.AppendLine("Label,Key,Type,Required,Options,Notes");
+            builder.AppendLine("\"Area\",\"area\",\"text\",\"Yes\",,\"No\"");
+            builder.AppendLine("\"Status\",\"status\",\"select\",\"Yes\",\"Operational,Out of Service\",\"No\"");
+            builder.AppendLine("\"Notes\",\"notes\",\"text\",\"No\",,\"Yes\"");
 
             var bytes = Encoding.UTF8.GetBytes(builder.ToString());
             return File(bytes, "text/csv", "maintenance-log-template.csv");
@@ -741,7 +768,8 @@ namespace hOps.web.Controllers
                         label = column.Label,
                         type = column.Type,
                         required = column.Required,
-                        optionsText = column.OptionsText
+                        optionsText = column.OptionsText,
+                        includeNotes = column.IncludeNotes
                     })
                 });
             }
@@ -783,6 +811,7 @@ namespace hOps.web.Controllers
                 var typeCell = cells.Count > 2 ? cells[2].Trim() : string.Empty;
                 var requiredCell = cells.Count > 3 ? cells[3].Trim() : string.Empty;
                 var optionsCell = cells.Count > 4 ? cells[4] : string.Empty;
+                var notesCell = cells.Count > 5 ? cells[5].Trim() : string.Empty;
 
                 if (string.IsNullOrWhiteSpace(label) && string.IsNullOrWhiteSpace(key))
                 {
@@ -822,7 +851,8 @@ namespace hOps.web.Controllers
                     Key = key,
                     Type = normalizedType,
                     Required = ParseBooleanCell(requiredCell),
-                    OptionsText = optionsText
+                    OptionsText = optionsText,
+                    IncludeNotes = ParseBooleanCell(notesCell)
                 });
             }
 
@@ -963,7 +993,8 @@ namespace hOps.web.Controllers
                     Label = column.Label,
                     Type = column.Type,
                     Required = column.Required,
-                    OptionsText = string.Join(Environment.NewLine, column.Options)
+                    OptionsText = string.Join(Environment.NewLine, column.Options),
+                    IncludeNotes = column.IncludeNotes
                 })
                 .ToList();
         }
@@ -998,7 +1029,8 @@ namespace hOps.web.Controllers
                     Label = string.IsNullOrWhiteSpace(editor.Label) ? key : editor.Label,
                     Type = string.IsNullOrWhiteSpace(editor.Type) ? MaintenanceLogColumnDefinition.DefaultColumnType : editor.Type,
                     Required = editor.Required,
-                    Options = MaintenanceLogTemplateHelper.ParseOptions(editor.OptionsText)
+                    Options = MaintenanceLogTemplateHelper.ParseOptions(editor.OptionsText),
+                    IncludeNotes = editor.IncludeNotes
                 });
             }
 
@@ -1035,13 +1067,18 @@ namespace hOps.web.Controllers
                 .Take(MaxEntryDisplayCount)
                 .ToListAsync();
 
-            var entryModels = entries.Select(entry => new MaintenanceLogEntryViewModel
+            var entryModels = entries.Select(entry =>
             {
-                Id = entry.Id,
-                EntryDate = entry.EntryDate,
-                CreatedAtUtc = entry.CreatedAtUtc,
-                CreatedByName = BuildUserName(entry.CreatedByUser),
-                Values = BuildEntryValueDictionary(entry.ValuesJson, columns)
+                var (valueDict, noteDict) = BuildEntryValueDictionaries(entry.ValuesJson, columns);
+                return new MaintenanceLogEntryViewModel
+                {
+                    Id = entry.Id,
+                    EntryDate = entry.EntryDate,
+                    CreatedAtUtc = entry.CreatedAtUtc,
+                    CreatedByName = BuildUserName(entry.CreatedByUser),
+                    Values = valueDict,
+                    Notes = noteDict
+                };
             }).ToList();
 
             return new MaintenanceLogTemplateDetailViewModel
@@ -1061,19 +1098,33 @@ namespace hOps.web.Controllers
             };
         }
 
-        private static IReadOnlyDictionary<string, string?> BuildEntryValueDictionary(
+        private static (IReadOnlyDictionary<string, string?> Values, IReadOnlyDictionary<string, string?> Notes) BuildEntryValueDictionaries(
             string? json,
             IReadOnlyList<MaintenanceLogColumnDefinition> columns)
         {
-            var values = ParseEntryValues(json);
+            var raw = ParseEntryValues(json);
             var ordered = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            var notes = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             foreach (var column in columns)
             {
-                values.TryGetValue(column.Key, out var value);
+                raw.TryGetValue(column.Key, out var value);
                 ordered[column.Key] = value;
+
+                if (column.IncludeNotes)
+                {
+                    var noteKey = MaintenanceLogTemplateHelper.BuildNotesKey(column.Key);
+                    if (!string.IsNullOrWhiteSpace(noteKey) && raw.TryGetValue(noteKey, out var noteValue))
+                    {
+                        notes[column.Key] = noteValue;
+                    }
+                    else
+                    {
+                        notes[column.Key] = null;
+                    }
+                }
             }
 
-            return ordered;
+            return (ordered, notes);
         }
 
         private static Dictionary<string, string?> ParseEntryValues(string? json)

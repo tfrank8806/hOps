@@ -63,6 +63,7 @@ namespace hOps.web.ViewModels.Maintenance
         public string Type { get; set; } = MaintenanceLogColumnDefinition.DefaultColumnType;
         public bool Required { get; set; }
         public string OptionsText { get; set; } = string.Empty;
+        public bool IncludeNotes { get; set; }
     }
 
     public class MaintenanceLogTemplateDetailViewModel
@@ -88,6 +89,7 @@ namespace hOps.web.ViewModels.Maintenance
         public string? CreatedByName { get; set; }
         public DateTime CreatedAtUtc { get; set; }
         public IReadOnlyDictionary<string, string?> Values { get; set; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyDictionary<string, string?> Notes { get; set; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
     }
 
     public class MaintenanceLogEntryInputModel
@@ -96,6 +98,7 @@ namespace hOps.web.ViewModels.Maintenance
         public DateTime EntryDate { get; set; } = DateTime.UtcNow.Date;
 
         public Dictionary<string, string?> Values { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string?> Notes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
     public class MaintenanceLogTemplateReorderRequest
