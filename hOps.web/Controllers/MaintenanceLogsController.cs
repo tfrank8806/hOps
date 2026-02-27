@@ -438,6 +438,14 @@ namespace hOps.web.Controllers
                 if (column.Type == "checkbox")
                 {
                     normalized = raw?.Equals("true", StringComparison.OrdinalIgnoreCase) == true ? "true" : "false";
+                    if (normalizedValues.TryGetValue(column.Key, out var existing) &&
+                        string.Equals(existing, "true", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    normalizedValues[column.Key] = normalized;
+                    continue;
                 }
 
                 if (column.Type == "select" && column.Options.Any())
