@@ -13,6 +13,7 @@
                             string.Equals(currentController, "MaintenanceEquipment", StringComparison.OrdinalIgnoreCase) ||
                             string.Equals(currentController, "MaintenanceLogs", StringComparison.OrdinalIgnoreCase);
     var siteVisitActive = string.Equals(currentController, "SiteVisit", StringComparison.OrdinalIgnoreCase);
+    var supportActive = string.Equals(currentController, "Support", StringComparison.OrdinalIgnoreCase);
     var mainContainerClass = ViewData["MainContainerClass"] as string ?? string.Empty;
     var contentSurfaceClass = ViewData["ContentSurfaceClass"] as string ?? string.Empty;
     var unreadDirectMessageCount = ViewBag.UnreadDirectMessageCount is int count ? count : 0;
@@ -391,15 +392,14 @@
                                     <span class="sidebar-text">Sales Lead</span>
                                 </a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link @((currentController == "Support" && string.Equals(currentAction, "Tips", System.StringComparison.OrdinalIgnoreCase)) ? "active" : string.Empty)" asp-controller="Support" asp-action="Tips">
-                                    <span class="sidebar-text">FAQs</span>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link @((currentController == "Support" && string.Equals(currentAction, "Index", System.StringComparison.OrdinalIgnoreCase)) ? "active" : string.Empty)" asp-controller="Support" asp-action="Index">
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle @(supportActive ? "active" : string.Empty)" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     <span class="sidebar-text">Support</span>
                                 </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" asp-controller="Support" asp-action="Index">Open Ticket</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Support" asp-action="Tips">FAQs</a></li>
+                                </ul>
                             </li>
 
                             if (roles.Contains("Manager") || roles.Contains("Admin"))
