@@ -13,6 +13,7 @@
             <p class="text-muted mb-0">@Model.PropertyName</p>
         </div>
         <div class="d-flex flex-wrap gap-2 align-items-center">
+            <a asp-action="EmergencyExitLights" class="btn btn-outline-primary btn-sm">Emergency/Exit Light Log</a>
             @if (Model.CanManage)
             {
                 var canReorder = Model.Templates.Count > 1;

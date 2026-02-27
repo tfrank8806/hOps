@@ -6,6 +6,7 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using hOps.web.Models;
 using hOps.web.Utilities;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace hOps.web.ViewModels.Maintenance
 {
@@ -115,5 +116,50 @@ namespace hOps.web.ViewModels.Maintenance
         public string FilePath { get; set; } = string.Empty;
         public string FileName => System.IO.Path.GetFileName(FilePath);
         public DateTime UploadedAtUtc { get; set; }
+    }
+
+    public class EmergencyLightTestingIndexViewModel
+    {
+        public int PropertyId { get; set; }
+        public string PropertyName { get; set; } = string.Empty;
+        public bool CanRecord { get; set; }
+        public IReadOnlyList<SelectListItem> RoomOptions { get; set; } = Array.Empty<SelectListItem>();
+        public IReadOnlyList<EmergencyLightTestLocationStatusViewModel> LocationStatuses { get; set; }
+            = Array.Empty<EmergencyLightTestLocationStatusViewModel>();
+        public IReadOnlyList<EmergencyLightTestEntryViewModel> RecentEntries { get; set; }
+            = Array.Empty<EmergencyLightTestEntryViewModel>();
+    }
+
+    public class EmergencyLightTestLocationStatusViewModel
+    {
+        public string Location { get; set; } = string.Empty;
+        public DateTime? LastTestDate { get; set; }
+        public string? LastTestedBy { get; set; }
+        public DateTime? NextDueDate { get; set; }
+        public bool IsOverdue { get; set; }
+        public bool IsDueSoon { get; set; }
+    }
+
+    public class EmergencyLightTestEntryViewModel
+    {
+        public int Id { get; set; }
+        public string Location { get; set; } = string.Empty;
+        public DateTime TestDate { get; set; }
+        public string? CreatedByName { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+    }
+
+    public class EmergencyLightTestEntryInputModel
+    {
+        [StringLength(160)]
+        public string? SelectedRoomNumber { get; set; }
+
+        [Required]
+        [StringLength(160)]
+        public string Location { get; set; } = string.Empty;
+
+        [DataType(DataType.Date)]
+        [Required]
+        public DateTime? TestDate { get; set; }
     }
 }

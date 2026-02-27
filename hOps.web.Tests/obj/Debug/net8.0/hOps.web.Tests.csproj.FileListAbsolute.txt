@@ -381,3 +381,4 @@ C:\hops\hOps.web.Tests\bin\Debug\net8.0\Microsoft.AspNetCore.DataProtection.Enti
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.Abstractions.dll
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\Microsoft.Extensions.Hosting.Abstractions.dll
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\System.Security.Cryptography.Xml.dll
+C:\hops\hOps.web.Tests\bin\Debug\net8.0\test.json

@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
+using hOps.web.Services;
 using hOps.web.Utilities;
 using hOps.web.ViewModels.Maintenance;
 using Microsoft.AspNetCore.Authorization;
@@ -17,6 +18,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace hOps.web.Controllers
 {
@@ -30,18 +32,25 @@ namespace hOps.web.Controllers
         private const string LogsIndexView = "~/Views/Maintenance/Logs/Index.cshtml";
         private const string LogsEditorView = "~/Views/Maintenance/Logs/Editor.cshtml";
         private const string LogsDetailView = "~/Views/Maintenance/Logs/Detail.cshtml";
+        private const string EmergencyLightLogView = "~/Views/Maintenance/Logs/EmergencyExitLights.cshtml";
         private static readonly string[] AllowedPhotoExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp" };
         private const string PhotoUploadFolder = "uploads/maintenance-logs";
 
         private readonly ApplicationDbContext _db;
         private readonly IWebHostEnvironment _environment;
+        private readonly IUserTimeZoneService _timeZoneService;
         private static readonly JsonSerializerOptions EntrySerializerOptions = new(JsonSerializerDefaults.Web);
 
-        public MaintenanceLogsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IWebHostEnvironment environment)
+        public MaintenanceLogsController(
+            ApplicationDbContext context,
+            UserManager<ApplicationUser> userManager,
+            IWebHostEnvironment environment,
+            IUserTimeZoneService timeZoneService)
             : base(context, userManager)
         {
             _db = context;
             _environment = environment;
+            _timeZoneService = timeZoneService;
         }
 
         [HttpGet("")]
@@ -109,6 +118,100 @@ namespace hOps.web.Controllers
             ViewBag.MaintenanceLogError = TempData["MaintenanceLogError"];
 
             return View(LogsIndexView, viewModel);
+        }
+
+        [HttpGet("EmergencyExitLights")]
+        public async Task<IActionResult> EmergencyExitLights()
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["MaintenanceLogError"] = "Select a property to view maintenance logs.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var canManage = UserCanManage(roles);
+            ViewBag.LocalNow = _timeZoneService.ConvertToUserTime(DateTime.UtcNow);
+            ViewBag.EmergencyLightLogMessage = TempData["EmergencyLightLogMessage"];
+            ViewBag.EmergencyLightLogError = TempData["EmergencyLightLogError"];
+
+            var viewModel = await BuildEmergencyLightLogViewModelAsync(property, canManage);
+            return View(EmergencyLightLogView, viewModel);
+        }
+
+        [HttpPost("EmergencyExitLights/Record")]
+        public async Task<IActionResult> RecordEmergencyExitLightTest(EmergencyLightTestEntryInputModel input)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["EmergencyLightLogError"] = "Select a property before recording light testing.";
+                return RedirectToAction(nameof(EmergencyExitLights));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!UserCanManage(roles))
+            {
+                TempData["EmergencyLightLogError"] = "You do not have permission to record testing.";
+                return RedirectToAction(nameof(EmergencyExitLights));
+            }
+
+            var resolvedLocation = string.IsNullOrWhiteSpace(input.Location)
+                ? input.SelectedRoomNumber
+                : input.Location;
+
+            resolvedLocation = resolvedLocation?.Trim();
+            if (string.IsNullOrWhiteSpace(resolvedLocation))
+            {
+                TempData["EmergencyLightLogError"] = "Enter a location before recording testing.";
+                return RedirectToAction(nameof(EmergencyExitLights));
+            }
+
+            if (resolvedLocation.Length > 160)
+            {
+                resolvedLocation = resolvedLocation[..160];
+            }
+
+            if (!input.TestDate.HasValue)
+            {
+                TempData["EmergencyLightLogError"] = "Select the testing date.";
+                return RedirectToAction(nameof(EmergencyExitLights));
+            }
+
+            var localDate = input.TestDate.Value.Date;
+            var userTimeZone = _timeZoneService.GetTimeZone();
+            var localDateTime = DateTime.SpecifyKind(localDate, DateTimeKind.Unspecified);
+            var testedAtUtc = TimeZoneInfo.ConvertTimeToUtc(localDateTime, userTimeZone);
+
+            var entry = new EmergencyLightTestEntry
+            {
+                PropertyId = property.Id,
+                Location = resolvedLocation,
+                TestedAtUtc = testedAtUtc,
+                CreatedAtUtc = DateTime.UtcNow,
+                CreatedByUserId = user.Id
+            };
+
+            _db.EmergencyLightTestEntries.Add(entry);
+            await _db.SaveChangesAsync();
+
+            var localDisplayDate = _timeZoneService.ConvertToUserTime(entry.TestedAtUtc).ToString("MMM d, yyyy");
+            TempData["EmergencyLightLogMessage"] = $"Logged Emergency/Exit Light testing for {resolvedLocation} on {localDisplayDate}.";
+
+            return RedirectToAction(nameof(EmergencyExitLights));
         }
 
         [HttpGet("Create")]
@@ -991,6 +1094,128 @@ namespace hOps.web.Controllers
         {
             var roles = await _userManager.GetRolesAsync(user);
             return UserCanManage(roles);
+        }
+
+        private async Task<EmergencyLightTestingIndexViewModel> BuildEmergencyLightLogViewModelAsync(Property property, bool canRecord)
+        {
+            var roomOptions = await _db.Rooms
+                .Where(r => r.PropertyId == property.Id)
+                .OrderBy(r => r.RoomNumber)
+                .Select(r => new SelectListItem
+                {
+                    Value = r.RoomNumber,
+                    Text = string.IsNullOrWhiteSpace(r.Description)
+                        ? r.RoomNumber
+                        : $"{r.RoomNumber} — {r.Description}"
+                })
+                .ToListAsync();
+
+            var localToday = _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
+
+            var lastEntryIdResults = await _db.EmergencyLightTestEntries
+                .Where(e => e.PropertyId == property.Id)
+                .GroupBy(e => e.Location)
+                .Select(group => new
+                {
+                    Location = group.Key,
+                    EntryId = group
+                        .OrderByDescending(item => item.TestedAtUtc)
+                        .ThenByDescending(item => item.CreatedAtUtc)
+                        .Select(item => item.Id)
+                        .FirstOrDefault()
+                })
+                .ToListAsync();
+
+            var entryIds = lastEntryIdResults
+                .Select(result => result.EntryId)
+                .Where(id => id > 0)
+                .ToList();
+
+            var lastEntries = entryIds.Count > 0
+                ? await _db.EmergencyLightTestEntries
+                    .Where(e => entryIds.Contains(e.Id))
+                    .Include(e => e.CreatedByUser)
+                    .ToListAsync()
+                : new List<EmergencyLightTestEntry>();
+
+            var lastEntryLookup = new Dictionary<string, EmergencyLightTestEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in lastEntries)
+            {
+                var key = entry.Location?.Trim();
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+                lastEntryLookup[key] = entry;
+            }
+
+            var statuses = new List<EmergencyLightTestLocationStatusViewModel>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var option in roomOptions)
+            {
+                if (string.IsNullOrWhiteSpace(option.Value))
+                {
+                    continue;
+                }
+
+                var key = option.Value.Trim();
+                seen.Add(key);
+                lastEntryLookup.TryGetValue(key, out var entry);
+                statuses.Add(BuildEmergencyLightLocationStatus(key, entry, localToday));
+            }
+
+            var additionalStatuses = lastEntryLookup
+                .Where(kvp => !seen.Contains(kvp.Key))
+                .Select(kvp => BuildEmergencyLightLocationStatus(kvp.Key, kvp.Value, localToday))
+                .OrderBy(status => status.Location, StringComparer.OrdinalIgnoreCase);
+
+            statuses.AddRange(additionalStatuses);
+
+            var recentEntries = await _db.EmergencyLightTestEntries
+                .Where(e => e.PropertyId == property.Id)
+                .OrderByDescending(e => e.TestedAtUtc)
+                .ThenByDescending(e => e.CreatedAtUtc)
+                .Take(50)
+                .Include(e => e.CreatedByUser)
+                .ToListAsync();
+
+            var recentEntryModels = recentEntries.Select(e => new EmergencyLightTestEntryViewModel
+            {
+                Id = e.Id,
+                Location = e.Location,
+                TestDate = e.TestedAtUtc,
+                CreatedAtUtc = e.CreatedAtUtc,
+                CreatedByName = BuildUserName(e.CreatedByUser)
+            }).ToList();
+
+            return new EmergencyLightTestingIndexViewModel
+            {
+                PropertyId = property.Id,
+                PropertyName = property.Name,
+                CanRecord = canRecord,
+                RoomOptions = roomOptions,
+                LocationStatuses = statuses,
+                RecentEntries = recentEntryModels
+            };
+        }
+
+        private EmergencyLightTestLocationStatusViewModel BuildEmergencyLightLocationStatus(string location, EmergencyLightTestEntry? entry, DateTime todayLocal)
+        {
+            DateTime? lastLocal = entry != null ? _timeZoneService.ConvertToUserTime(entry.TestedAtUtc).Date : null;
+            DateTime? nextDueLocal = lastLocal?.AddMonths(1);
+            var isOverdue = !nextDueLocal.HasValue || nextDueLocal.Value < todayLocal;
+            var isDueSoon = nextDueLocal.HasValue && !isOverdue && nextDueLocal.Value <= todayLocal.AddDays(7);
+
+            return new EmergencyLightTestLocationStatusViewModel
+            {
+                Location = location,
+                LastTestDate = lastLocal,
+                NextDueDate = nextDueLocal,
+                IsOverdue = isOverdue,
+                IsDueSoon = isDueSoon,
+                LastTestedBy = entry != null ? BuildUserName(entry.CreatedByUser) : null
+            };
         }
 
         private static bool UserCanManage(IList<string> roles)

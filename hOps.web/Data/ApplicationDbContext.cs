@@ -85,6 +85,7 @@ namespace hOps.web.Data
         public DbSet<EquipmentItem> EquipmentItems { get; set; }
         public DbSet<MaintenanceLogTemplate> MaintenanceLogTemplates { get; set; }
         public DbSet<MaintenanceLogEntry> MaintenanceLogEntries { get; set; }
+        public DbSet<EmergencyLightTestEntry> EmergencyLightTestEntries { get; set; }
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
         public DbSet<SiteVisitReport> SiteVisitReports { get; set; }
         public DbSet<SiteVisitReportItem> SiteVisitReportItems { get; set; }
@@ -929,6 +930,25 @@ namespace hOps.web.Data
 
             builder.Entity<MaintenanceLogEntry>()
                 .HasIndex(e => new { e.TemplateId, e.EntryDate });
+
+            builder.Entity<EmergencyLightTestEntry>()
+                .Property(e => e.Location)
+                .HasMaxLength(160);
+
+            builder.Entity<EmergencyLightTestEntry>()
+                .HasOne(e => e.Property)
+                .WithMany(p => p.EmergencyLightTestEntries)
+                .HasForeignKey(e => e.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<EmergencyLightTestEntry>()
+                .HasOne(e => e.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<EmergencyLightTestEntry>()
+                .HasIndex(e => new { e.PropertyId, e.Location });
 
             builder.Entity<SiteVisitReport>()
                 .HasOne(r => r.Property)
