@@ -18,7 +18,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace hOps.web.Controllers
 {
@@ -169,11 +168,7 @@ namespace hOps.web.Controllers
                 return RedirectToAction(nameof(EmergencyExitLights));
             }
 
-            var resolvedLocation = string.IsNullOrWhiteSpace(input.Location)
-                ? input.SelectedRoomNumber
-                : input.Location;
-
-            resolvedLocation = resolvedLocation?.Trim();
+            var resolvedLocation = input.Location?.Trim();
             if (string.IsNullOrWhiteSpace(resolvedLocation))
             {
                 TempData["EmergencyLightLogError"] = "Enter a location before recording testing.";
@@ -1098,18 +1093,6 @@ namespace hOps.web.Controllers
 
         private async Task<EmergencyLightTestingIndexViewModel> BuildEmergencyLightLogViewModelAsync(Property property, bool canRecord)
         {
-            var roomOptions = await _db.Rooms
-                .Where(r => r.PropertyId == property.Id)
-                .OrderBy(r => r.RoomNumber)
-                .Select(r => new SelectListItem
-                {
-                    Value = r.RoomNumber,
-                    Text = string.IsNullOrWhiteSpace(r.Description)
-                        ? r.RoomNumber
-                        : $"{r.RoomNumber} — {r.Description}"
-                })
-                .ToListAsync();
-
             var localToday = _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
 
             var lastEntryIdResults = await _db.EmergencyLightTestEntries
@@ -1149,28 +1132,17 @@ namespace hOps.web.Controllers
                 lastEntryLookup[key] = entry;
             }
 
-            var statuses = new List<EmergencyLightTestLocationStatusViewModel>();
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var option in roomOptions)
-            {
-                if (string.IsNullOrWhiteSpace(option.Value))
-                {
-                    continue;
-                }
-
-                var key = option.Value.Trim();
-                seen.Add(key);
-                lastEntryLookup.TryGetValue(key, out var entry);
-                statuses.Add(BuildEmergencyLightLocationStatus(key, entry, localToday));
-            }
-
-            var additionalStatuses = lastEntryLookup
-                .Where(kvp => !seen.Contains(kvp.Key))
+            var statuses = lastEntryLookup
                 .Select(kvp => BuildEmergencyLightLocationStatus(kvp.Key, kvp.Value, localToday))
-                .OrderBy(status => status.Location, StringComparer.OrdinalIgnoreCase);
+                .OrderBy(status => status.Location, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-            statuses.AddRange(additionalStatuses);
+            var savedLocations = statuses
+                .Select(status => status.Location)
+                .Where(location => !string.IsNullOrWhiteSpace(location))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(location => location, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
             var recentEntries = await _db.EmergencyLightTestEntries
                 .Where(e => e.PropertyId == property.Id)
@@ -1194,9 +1166,9 @@ namespace hOps.web.Controllers
                 PropertyId = property.Id,
                 PropertyName = property.Name,
                 CanRecord = canRecord,
-                RoomOptions = roomOptions,
                 LocationStatuses = statuses,
-                RecentEntries = recentEntryModels
+                RecentEntries = recentEntryModels,
+                SavedLocations = savedLocations
             };
         }
 

@@ -6,7 +6,6 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using hOps.web.Models;
 using hOps.web.Utilities;
-using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace hOps.web.ViewModels.Maintenance
 {
@@ -123,11 +122,11 @@ namespace hOps.web.ViewModels.Maintenance
         public int PropertyId { get; set; }
         public string PropertyName { get; set; } = string.Empty;
         public bool CanRecord { get; set; }
-        public IReadOnlyList<SelectListItem> RoomOptions { get; set; } = Array.Empty<SelectListItem>();
         public IReadOnlyList<EmergencyLightTestLocationStatusViewModel> LocationStatuses { get; set; }
             = Array.Empty<EmergencyLightTestLocationStatusViewModel>();
         public IReadOnlyList<EmergencyLightTestEntryViewModel> RecentEntries { get; set; }
             = Array.Empty<EmergencyLightTestEntryViewModel>();
+        public IReadOnlyList<string> SavedLocations { get; set; } = Array.Empty<string>();
     }
 
     public class EmergencyLightTestLocationStatusViewModel
@@ -151,9 +150,6 @@ namespace hOps.web.ViewModels.Maintenance
 
     public class EmergencyLightTestEntryInputModel
     {
-        [StringLength(160)]
-        public string? SelectedRoomNumber { get; set; }
-
         [Required]
         [StringLength(160)]
         public string Location { get; set; } = string.Empty;

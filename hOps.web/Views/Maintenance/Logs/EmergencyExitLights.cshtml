@@ -38,28 +38,28 @@
                 @Html.AntiForgeryToken()
                 <fieldset @(Model.CanRecord ? null : "disabled")>
                     <div class="row g-3">
-                        <div class="col-md-4">
-                            <label for="emergencyRoomSelect" class="form-label">Room shortcut</label>
-                            <select id="emergencyRoomSelect" name="SelectedRoomNumber" class="form-select">
-                                <option value="">-- Optional: select room --</option>
-                                @foreach (var option in Model.RoomOptions)
-                                {
-                                    <option value="@option.Value">@option.Text</option>
-                                }
-                            </select>
-                            <div class="form-text">Selecting a room fills in the location field.</div>
-                        </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label for="emergencyLocation" class="form-label">Location *</label>
                             <input type="text"
                                    class="form-control"
                                    id="emergencyLocation"
                                    name="Location"
+                                   list="emergencyLocationOptions"
                                    maxlength="160"
                                    required />
-                            <div class="form-text">Enter the exact location that was tested.</div>
+                            <div class="form-text">Enter the public-area location that was tested (lobby, corridor, stairwell, etc.).</div>
+                            @if (Model.SavedLocations.Count > 0)
+                            {
+                                <datalist id="emergencyLocationOptions">
+                                    @foreach (var savedLocation in Model.SavedLocations)
+                                    {
+                                        <option value="@savedLocation"></option>
+                                    }
+                                </datalist>
+                                <div class="form-text">Previously logged locations appear as suggestions.</div>
+                            }
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3 col-xl-2">
                             <label for="emergencyTestDate" class="form-label">Testing date *</label>
                             <input type="date"
                                    class="form-control"
@@ -195,22 +195,3 @@
         </div>
     </div>
 </div>
-
-@section Scripts {
-    <script>
-        (() => {
-            const select = document.getElementById('emergencyRoomSelect');
-            const input = document.getElementById('emergencyLocation');
-            if (!select || !input) {
-                return;
-            }
-
-            select.addEventListener('change', () => {
-                if (select.value && (!input.value || input.value.trim().length === 0)) {
-                    input.value = select.value;
-                    input.focus();
-                }
-            });
-        })();
-    </script>
-}
