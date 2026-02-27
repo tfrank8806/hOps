@@ -161,7 +161,7 @@ namespace hOps.web.Utilities
                 trimmed = $"column{Guid.NewGuid():N}".Substring(0, 8);
             }
 
-            return trimmed.Length > 32 ? trimmed[..32] : trimmed;
+            return trimmed.Length > 64 ? trimmed[..64] : trimmed;
         }
 
         public static List<string> ParseOptions(string? text)
@@ -246,12 +246,12 @@ namespace hOps.web.Utilities
                 suffix++;
             }
 
-            return $"{baseKey}_{Guid.NewGuid():N}"[..Math.Min(32, baseKey.Length + 9)];
+            return $"{baseKey}_{Guid.NewGuid():N}"[..Math.Min(64, baseKey.Length + 9)];
 
             static string BuildCandidate(string original, int suffix)
             {
                 var suffixText = $"_{suffix}";
-                var maxBaseLength = Math.Max(1, 32 - suffixText.Length);
+                var maxBaseLength = Math.Max(1, 64 - suffixText.Length);
                 var trimmedBase = original.Length > maxBaseLength ? original[..maxBaseLength] : original;
                 return $"{trimmedBase}{suffixText}";
             }
