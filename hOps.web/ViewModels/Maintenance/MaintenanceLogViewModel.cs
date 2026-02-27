@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 using hOps.web.Models;
 using hOps.web.Utilities;
 
@@ -64,6 +65,7 @@ namespace hOps.web.ViewModels.Maintenance
         public bool Required { get; set; }
         public string OptionsText { get; set; } = string.Empty;
         public bool IncludeNotes { get; set; }
+        public bool IncludePhotos { get; set; }
     }
 
     public class MaintenanceLogTemplateDetailViewModel
@@ -90,6 +92,8 @@ namespace hOps.web.ViewModels.Maintenance
         public DateTime CreatedAtUtc { get; set; }
         public IReadOnlyDictionary<string, string?> Values { get; set; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         public IReadOnlyDictionary<string, string?> Notes { get; set; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyDictionary<string, IReadOnlyList<MaintenanceLogEntryPhotoViewModel>> Photos { get; set; }
+            = new Dictionary<string, IReadOnlyList<MaintenanceLogEntryPhotoViewModel>>(StringComparer.OrdinalIgnoreCase);
     }
 
     public class MaintenanceLogEntryInputModel
@@ -104,5 +108,12 @@ namespace hOps.web.ViewModels.Maintenance
     public class MaintenanceLogTemplateReorderRequest
     {
         public List<int> TemplateIds { get; set; } = new();
+    }
+
+    public class MaintenanceLogEntryPhotoViewModel
+    {
+        public string FilePath { get; set; } = string.Empty;
+        public string FileName => System.IO.Path.GetFileName(FilePath);
+        public DateTime UploadedAtUtc { get; set; }
     }
 }

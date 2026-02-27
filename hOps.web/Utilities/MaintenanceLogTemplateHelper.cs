@@ -223,7 +223,8 @@ namespace hOps.web.Utilities
                 Type = type,
                 Required = column.Required,
                 Options = options,
-                IncludeNotes = column.IncludeNotes
+                IncludeNotes = column.IncludeNotes,
+                IncludePhotos = column.IncludePhotos
             };
         }
 
@@ -289,6 +290,13 @@ namespace hOps.web.Utilities
                 ? string.Empty
                 : $"{key}__notes";
         }
+
+        public static string BuildPhotosKey(string key)
+        {
+            return string.IsNullOrWhiteSpace(key)
+                ? string.Empty
+                : $"{key}__photos";
+        }
     }
 
     public sealed class MaintenanceLogColumnDefinition
@@ -309,5 +317,6 @@ namespace hOps.web.Utilities
         public bool Required { get; set; }
         public List<string> Options { get; set; } = new();
         public bool IncludeNotes { get; set; }
+        public bool IncludePhotos { get; set; }
     }
 }

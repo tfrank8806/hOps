@@ -87,7 +87,7 @@
                        accept=".csv,text/csv"
                        data-import-url="@Url.Action("PreviewTemplateCsv", "MaintenanceLogs")">
                 <div class="text-muted small mb-3">
-                    CSV columns should be ordered as: Label, Key (optional), Type (text, number, checkbox, select), Required, Options (comma or line break separated), Notes (yes/no).
+                    CSV columns should be ordered as: Label, Key (optional), Type (text, number, checkbox, select), Required, Options (comma or line break separated), Notes (yes/no), Photos (yes/no).
                 </div>
                 <div class="small mb-3 d-none" id="columnCsvStatus"></div>
                 @Html.ValidationMessage("TemplateCsvFile", null, new { @class = "text-danger small d-block" })
@@ -130,6 +130,13 @@
                                             <input class="form-check-input" type="checkbox" name="Columns[@i].IncludeNotes" value="true" @(column.IncludeNotes ? "checked" : null) id="column-notes-@i" />
                                             <label class="form-check-label" for="column-notes-@i">Add Notes Field</label>
                                             <input type="hidden" name="Columns[@i].IncludeNotes" value="false" />
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-center">
+                                        <div class="form-check mt-4 pt-2">
+                                            <input class="form-check-input" type="checkbox" name="Columns[@i].IncludePhotos" value="true" @(column.IncludePhotos ? "checked" : null) id="column-photos-@i" />
+                                            <label class="form-check-label" for="column-photos-@i">Allow Photos</label>
+                                            <input type="hidden" name="Columns[@i].IncludePhotos" value="false" />
                                         </div>
                                     </div>
                                     <div class="col-md-12 column-options-group @(column.Type == "select" ? string.Empty : "d-none")">
@@ -183,6 +190,13 @@
                             <div class="col-md-12 column-options-group d-none">
                                 <label class="form-label">Dropdown Options (one per line)</label>
                                 <textarea class="form-control" rows="3" data-name-template="Columns[__index__].OptionsText"></textarea>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" value="true" data-name-template="Columns[__index__].IncludePhotos" />
+                                    <label class="form-check-label">Allow Photos</label>
+                                    <input type="hidden" value="false" data-name-template="Columns[__index__].IncludePhotos" data-hidden-marker="true" />
+                                </div>
                             </div>
                         </div>
                         <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
@@ -360,6 +374,13 @@
                     const notesInput = row.querySelector('input[type="checkbox"][name$=".IncludeNotes"]');
                     if (notesInput) {
                         notesInput.checked = Boolean(data.includeNotes);
+                    }
+                }
+
+                if ('includePhotos' in data) {
+                    const photosInput = row.querySelector('input[type="checkbox"][name$=".IncludePhotos"]');
+                    if (photosInput) {
+                        photosInput.checked = Boolean(data.includePhotos);
                     }
                 }
 

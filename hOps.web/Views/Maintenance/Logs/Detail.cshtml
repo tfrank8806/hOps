@@ -67,7 +67,7 @@
             <div class="card shadow-sm">
                 <div class="card-body">
                     <h5 class="card-title">Add Entry</h5>
-                    <form asp-action="CreateEntry" asp-route-id="@Model.TemplateId" method="post" class="row g-3">
+                    <form asp-action="CreateEntry" asp-route-id="@Model.TemplateId" method="post" class="row g-3" enctype="multipart/form-data">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="start" value="@(Model.FilterStart?.ToString("yyyy-MM-dd") ?? string.Empty)" />
                         <input type="hidden" name="end" value="@(Model.FilterEnd?.ToString("yyyy-MM-dd") ?? string.Empty)" />
@@ -115,6 +115,19 @@
                                         : string.Empty;
                                     <label class="form-label mt-2">Notes</label>
                                     <textarea class="form-control" name="Notes[@column.Key]" rows="2">@noteValue</textarea>
+                                    @Html.ValidationMessage($"Notes[{column.Key}]", null, new { @class = "text-danger" })
+                                }
+
+                                @if (column.IncludePhotos)
+                                {
+                                    <label class="form-label mt-2">Photos</label>
+                                    <input type="file"
+                                           class="form-control"
+                                           name="Photos[@column.Key]"
+                                           accept="image/*"
+                                           multiple />
+                                    <div class="form-text">Optional photos (JPG, PNG, GIF, BMP, or WebP).</div>
+                                    @Html.ValidationMessage($"Photos[{column.Key}]", null, new { @class = "text-danger" })
                                 }
                             </div>
                         }
@@ -182,6 +195,21 @@
                                                         if (!string.IsNullOrWhiteSpace(noteValue))
                                                         {
                                                             <div class="text-muted small mt-1">Notes: @noteValue</div>
+                                                        }
+                                                    }
+                                                    @if (column.IncludePhotos)
+                                                    {
+                                                        entry.Photos.TryGetValue(column.Key, out var photoList);
+                                                        if (photoList != null && photoList.Count > 0)
+                                                        {
+                                                            <div class="mt-2 d-flex flex-wrap gap-2">
+                                                                @foreach (var photo in photoList)
+                                                                {
+                                                                    <a href="@photo.FilePath" target="_blank" rel="noopener" class="maintenance-photo-thumb">
+                                                                        <img src="@photo.FilePath" alt="Photo for @column.Label" class="img-thumbnail" style="max-width: 120px; max-height: 120px;" />
+                                                                    </a>
+                                                                }
+                                                            </div>
                                                         }
                                                     }
                                                 </td>

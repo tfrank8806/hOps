@@ -12,6 +12,7 @@ using hOps.web.Models;
 using hOps.web.Utilities;
 using hOps.web.ViewModels.Maintenance;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -29,14 +30,18 @@ namespace hOps.web.Controllers
         private const string LogsIndexView = "~/Views/Maintenance/Logs/Index.cshtml";
         private const string LogsEditorView = "~/Views/Maintenance/Logs/Editor.cshtml";
         private const string LogsDetailView = "~/Views/Maintenance/Logs/Detail.cshtml";
+        private static readonly string[] AllowedPhotoExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp" };
+        private const string PhotoUploadFolder = "uploads/maintenance-logs";
 
         private readonly ApplicationDbContext _db;
+        private readonly IWebHostEnvironment _environment;
         private static readonly JsonSerializerOptions EntrySerializerOptions = new(JsonSerializerDefaults.Web);
 
-        public MaintenanceLogsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public MaintenanceLogsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IWebHostEnvironment environment)
             : base(context, userManager)
         {
             _db = context;
+            _environment = environment;
         }
 
         [HttpGet("")]
@@ -428,10 +433,14 @@ namespace hOps.web.Controllers
                 ModelState.AddModelError(nameof(input.EntryDate), "Select a date for this entry.");
             }
 
+            input.Values ??= new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            input.Notes ??= new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
+            var photoUploads = CollectPhotoUploads(Request.Form.Files, columns);
+
             var normalizedValues = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             foreach (var column in columns)
             {
-                input.Values ??= new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
                 input.Values.TryGetValue(column.Key, out var raw);
 
                 var normalized = NormalizeValue(raw);
@@ -475,7 +484,6 @@ namespace hOps.web.Controllers
 
                 if (column.IncludeNotes)
                 {
-                    input.Notes ??= new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
                     input.Notes.TryGetValue(column.Key, out var rawNote);
                     var normalizedNote = NormalizeValue(rawNote);
                     var noteKey = MaintenanceLogTemplateHelper.BuildNotesKey(column.Key);
@@ -491,6 +499,25 @@ namespace hOps.web.Controllers
                 var detailModel = await BuildDetailViewModelAsync(template, await UserCanManageAsync(user), start, end);
                 ViewBag.EntryInput = input;
                 return View(LogsDetailView, detailModel);
+            }
+
+            var savedPhotoPaths = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kvp in photoUploads)
+            {
+                var paths = await SavePhotoFilesAsync(kvp.Value);
+                if (paths.Count > 0)
+                {
+                    savedPhotoPaths[kvp.Key] = paths;
+                }
+            }
+
+            foreach (var kvp in savedPhotoPaths)
+            {
+                var photoKey = MaintenanceLogTemplateHelper.BuildPhotosKey(kvp.Key);
+                if (!string.IsNullOrWhiteSpace(photoKey))
+                {
+                    normalizedValues[photoKey] = JsonSerializer.Serialize(kvp.Value, EntrySerializerOptions);
+                }
             }
 
             var normalizedEntryDate = DateTime.SpecifyKind(input.EntryDate.Date, DateTimeKind.Utc);
@@ -548,6 +575,7 @@ namespace hOps.web.Controllers
                 return RedirectToAction(nameof(Detail), new { id = templateId });
             }
 
+            DeletePhotoFilesFromJson(entry.ValuesJson);
             _db.MaintenanceLogEntries.Remove(entry);
             await _db.SaveChangesAsync();
 
@@ -613,6 +641,11 @@ namespace hOps.web.Controllers
                 {
                     header.Add($"{column.Label} Notes");
                 }
+
+                if (column.IncludePhotos)
+                {
+                    header.Add($"{column.Label} Photos");
+                }
             }
 
             var builder = new StringBuilder();
@@ -620,7 +653,7 @@ namespace hOps.web.Controllers
 
             foreach (var entry in entries)
             {
-                var values = ParseEntryValues(entry.ValuesJson);
+                var (valueDict, noteDict, photoDict) = BuildEntryDataDictionaries(entry.ValuesJson, columns);
                 var row = new List<string>
                 {
                     Csv(entry.EntryDate.ToString("yyyy-MM-dd")),
@@ -630,14 +663,22 @@ namespace hOps.web.Controllers
 
                 foreach (var column in columns)
                 {
-                    values.TryGetValue(column.Key, out var value);
+                    valueDict.TryGetValue(column.Key, out var value);
                     row.Add(Csv(value));
 
                     if (column.IncludeNotes)
                     {
-                        var noteKey = MaintenanceLogTemplateHelper.BuildNotesKey(column.Key);
-                        values.TryGetValue(noteKey, out var noteValue);
+                        noteDict.TryGetValue(column.Key, out var noteValue);
                         row.Add(Csv(noteValue));
+                    }
+
+                    if (column.IncludePhotos)
+                    {
+                        photoDict.TryGetValue(column.Key, out var photosForColumn);
+                        var joinedPhotos = photosForColumn != null && photosForColumn.Count > 0
+                            ? string.Join(" ", photosForColumn)
+                            : null;
+                        row.Add(Csv(joinedPhotos));
                     }
                 }
 
@@ -723,10 +764,10 @@ namespace hOps.web.Controllers
         public IActionResult DownloadTemplateCsv()
         {
             var builder = new StringBuilder();
-            builder.AppendLine("Label,Key,Type,Required,Options,Notes");
-            builder.AppendLine("\"Area\",\"area\",\"text\",\"Yes\",,\"No\"");
-            builder.AppendLine("\"Status\",\"status\",\"select\",\"Yes\",\"Operational,Out of Service\",\"No\"");
-            builder.AppendLine("\"Notes\",\"notes\",\"text\",\"No\",,\"Yes\"");
+            builder.AppendLine("Label,Key,Type,Required,Options,Notes,Photos");
+            builder.AppendLine("\"Area\",\"area\",\"text\",\"Yes\",,\"No\",\"No\"");
+            builder.AppendLine("\"Status\",\"status\",\"select\",\"Yes\",\"Operational,Out of Service\",\"No\",\"No\"");
+            builder.AppendLine("\"Notes\",\"notes\",\"text\",\"No\",,\"Yes\",\"Yes\"");
 
             var bytes = Encoding.UTF8.GetBytes(builder.ToString());
             return File(bytes, "text/csv", "maintenance-log-template.csv");
@@ -769,7 +810,8 @@ namespace hOps.web.Controllers
                         type = column.Type,
                         required = column.Required,
                         optionsText = column.OptionsText,
-                        includeNotes = column.IncludeNotes
+                        includeNotes = column.IncludeNotes,
+                        includePhotos = column.IncludePhotos
                     })
                 });
             }
@@ -812,6 +854,7 @@ namespace hOps.web.Controllers
                 var requiredCell = cells.Count > 3 ? cells[3].Trim() : string.Empty;
                 var optionsCell = cells.Count > 4 ? cells[4] : string.Empty;
                 var notesCell = cells.Count > 5 ? cells[5].Trim() : string.Empty;
+                var photosCell = cells.Count > 6 ? cells[6].Trim() : string.Empty;
 
                 if (string.IsNullOrWhiteSpace(label) && string.IsNullOrWhiteSpace(key))
                 {
@@ -852,7 +895,8 @@ namespace hOps.web.Controllers
                     Type = normalizedType,
                     Required = ParseBooleanCell(requiredCell),
                     OptionsText = optionsText,
-                    IncludeNotes = ParseBooleanCell(notesCell)
+                    IncludeNotes = ParseBooleanCell(notesCell),
+                    IncludePhotos = ParseBooleanCell(photosCell)
                 });
             }
 
@@ -994,7 +1038,8 @@ namespace hOps.web.Controllers
                     Type = column.Type,
                     Required = column.Required,
                     OptionsText = string.Join(Environment.NewLine, column.Options),
-                    IncludeNotes = column.IncludeNotes
+                    IncludeNotes = column.IncludeNotes,
+                    IncludePhotos = column.IncludePhotos
                 })
                 .ToList();
         }
@@ -1030,7 +1075,8 @@ namespace hOps.web.Controllers
                     Type = string.IsNullOrWhiteSpace(editor.Type) ? MaintenanceLogColumnDefinition.DefaultColumnType : editor.Type,
                     Required = editor.Required,
                     Options = MaintenanceLogTemplateHelper.ParseOptions(editor.OptionsText),
-                    IncludeNotes = editor.IncludeNotes
+                    IncludeNotes = editor.IncludeNotes,
+                    IncludePhotos = editor.IncludePhotos
                 });
             }
 
@@ -1069,7 +1115,18 @@ namespace hOps.web.Controllers
 
             var entryModels = entries.Select(entry =>
             {
-                var (valueDict, noteDict) = BuildEntryValueDictionaries(entry.ValuesJson, columns);
+                var (valueDict, noteDict, photoDict) = BuildEntryDataDictionaries(entry.ValuesJson, columns);
+                var photoViewModels = photoDict.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => (IReadOnlyList<MaintenanceLogEntryPhotoViewModel>)kvp.Value
+                        .Select(path => new MaintenanceLogEntryPhotoViewModel
+                        {
+                            FilePath = path,
+                            UploadedAtUtc = entry.CreatedAtUtc
+                        })
+                        .ToList(),
+                    StringComparer.OrdinalIgnoreCase);
+
                 return new MaintenanceLogEntryViewModel
                 {
                     Id = entry.Id,
@@ -1077,7 +1134,8 @@ namespace hOps.web.Controllers
                     CreatedAtUtc = entry.CreatedAtUtc,
                     CreatedByName = BuildUserName(entry.CreatedByUser),
                     Values = valueDict,
-                    Notes = noteDict
+                    Notes = noteDict,
+                    Photos = photoViewModels
                 };
             }).ToList();
 
@@ -1098,13 +1156,163 @@ namespace hOps.web.Controllers
             };
         }
 
-        private static (IReadOnlyDictionary<string, string?> Values, IReadOnlyDictionary<string, string?> Notes) BuildEntryValueDictionaries(
-            string? json,
-            IReadOnlyList<MaintenanceLogColumnDefinition> columns)
+        private Dictionary<string, List<IFormFile>> CollectPhotoUploads(IFormFileCollection files, IReadOnlyList<MaintenanceLogColumnDefinition> columns)
+        {
+            var uploads = new Dictionary<string, List<IFormFile>>(StringComparer.OrdinalIgnoreCase);
+            if (files == null || files.Count == 0)
+            {
+                return uploads;
+            }
+
+            var allowedKeys = columns
+                .Where(column => column.IncludePhotos)
+                .Select(column => column.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (!allowedKeys.Any())
+            {
+                return uploads;
+            }
+
+            foreach (var file in files)
+            {
+                var columnKey = ExtractPhotoColumnKey(file.Name);
+                if (columnKey == null || !allowedKeys.Contains(columnKey))
+                {
+                    continue;
+                }
+
+                if (file.Length <= 0)
+                {
+                    continue;
+                }
+
+                var extension = Path.GetExtension(file.FileName);
+                if (string.IsNullOrWhiteSpace(extension) ||
+                    !AllowedPhotoExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+                {
+                    ModelState.AddModelError($"Photos[{columnKey}]", "Upload JPG, PNG, GIF, BMP, or WebP images.");
+                    continue;
+                }
+
+                if (!uploads.TryGetValue(columnKey, out var list))
+                {
+                    list = new List<IFormFile>();
+                    uploads[columnKey] = list;
+                }
+
+                list.Add(file);
+            }
+
+            return uploads;
+        }
+
+        private async Task<List<string>> SavePhotoFilesAsync(IEnumerable<IFormFile> files)
+        {
+            var saved = new List<string>();
+            var uploadRoot = Path.Combine(_environment.WebRootPath, PhotoUploadFolder.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(uploadRoot);
+
+            foreach (var file in files)
+            {
+                if (file.Length <= 0)
+                {
+                    continue;
+                }
+
+                var extension = Path.GetExtension(file.FileName);
+                if (string.IsNullOrWhiteSpace(extension))
+                {
+                    extension = ".jpg";
+                }
+
+                var sanitizedExtension = extension.StartsWith(".") ? extension : $".{extension}";
+                var uniqueName = $"{Guid.NewGuid():N}{sanitizedExtension}";
+                var physicalPath = Path.Combine(uploadRoot, uniqueName);
+
+                using (var stream = System.IO.File.Create(physicalPath))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                var relativePath = $"/{PhotoUploadFolder.Replace('\\', '/')}/{uniqueName}";
+                saved.Add(relativePath);
+            }
+
+            return saved;
+        }
+
+        private void DeletePhotoFilesFromJson(string? json)
+        {
+            var values = ParseEntryValues(json);
+            foreach (var kvp in values)
+            {
+                if (!kvp.Key.EndsWith("__photos", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var paths = ParsePhotoList(kvp.Value);
+                foreach (var path in paths)
+                {
+                    DeletePhotoFile(path);
+                }
+            }
+        }
+
+        private void DeletePhotoFile(string? relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                return;
+            }
+
+            var trimmed = relativePath.TrimStart('~').TrimStart('/');
+            var physicalPath = Path.Combine(_environment.WebRootPath, trimmed.Replace('/', Path.DirectorySeparatorChar));
+            if (System.IO.File.Exists(physicalPath))
+            {
+                try
+                {
+                    System.IO.File.Delete(physicalPath);
+                }
+                catch
+                {
+                    // ignore
+                }
+            }
+        }
+
+        private static string? ExtractPhotoColumnKey(string? fieldName)
+        {
+            if (string.IsNullOrWhiteSpace(fieldName))
+            {
+                return null;
+            }
+
+            const string prefix = "Photos[";
+            if (!fieldName.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            if (!fieldName.EndsWith("]", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            return fieldName.Substring(prefix.Length, fieldName.Length - prefix.Length - 1);
+        }
+
+        private static (IReadOnlyDictionary<string, string?> Values,
+            IReadOnlyDictionary<string, string?> Notes,
+            IReadOnlyDictionary<string, IReadOnlyList<string>> Photos) BuildEntryDataDictionaries(
+                string? json,
+                IReadOnlyList<MaintenanceLogColumnDefinition> columns)
         {
             var raw = ParseEntryValues(json);
             var ordered = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             var notes = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            var photos = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var column in columns)
             {
                 raw.TryGetValue(column.Key, out var value);
@@ -1122,9 +1330,44 @@ namespace hOps.web.Controllers
                         notes[column.Key] = null;
                     }
                 }
+
+                if (column.IncludePhotos)
+                {
+                    var photoKey = MaintenanceLogTemplateHelper.BuildPhotosKey(column.Key);
+                    if (!string.IsNullOrWhiteSpace(photoKey) && raw.TryGetValue(photoKey, out var photoValue))
+                    {
+                        photos[column.Key] = ParsePhotoList(photoValue);
+                    }
+                    else
+                    {
+                        photos[column.Key] = Array.Empty<string>();
+                    }
+                }
             }
 
-            return (ordered, notes);
+            return (ordered, notes, photos);
+        }
+
+        private static IReadOnlyList<string> ParsePhotoList(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return Array.Empty<string>();
+            }
+
+            try
+            {
+                var paths = JsonSerializer.Deserialize<List<string>>(json, EntrySerializerOptions);
+                var cleaned = paths?
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .Select(path => path.Replace('\\', '/'))
+                    .ToList();
+                return cleaned ?? new List<string>();
+            }
+            catch
+            {
+                return Array.Empty<string>();
+            }
         }
 
         private static Dictionary<string, string?> ParseEntryValues(string? json)
