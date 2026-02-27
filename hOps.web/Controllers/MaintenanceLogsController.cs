@@ -122,6 +122,12 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!UserCanManage(roles))
+            {
+                return Forbid();
+            }
+
             var viewModel = new MaintenanceLogTemplateEditorViewModel
             {
                 PropertyId = property.Id,
@@ -153,6 +159,12 @@ namespace hOps.web.Controllers
             if (user == null)
             {
                 return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!UserCanManage(roles))
+            {
+                return Forbid();
             }
 
             viewModel.PropertyId = property.Id;
