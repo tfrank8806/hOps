@@ -87,7 +87,7 @@
                        accept=".csv,text/csv"
                        data-import-url="@Url.Action("PreviewTemplateCsv", "MaintenanceLogs")">
                 <div class="text-muted small mb-3">
-                    CSV columns should be ordered as: Label, Key, Type (text, number, checkbox, select), Required, Options (comma or line break separated).
+                    CSV columns should be ordered as: Label, Type (text, number, checkbox, select), Required, Options (comma or line break separated).
                 </div>
                 <div class="small mb-3 d-none" id="columnCsvStatus"></div>
                 @Html.ValidationMessage("TemplateCsvFile", null, new { @class = "text-danger small d-block" })
@@ -104,15 +104,12 @@
                             var column = columns[i];
                             <div class="border rounded p-3 mb-3 column-editor" data-index="@i">
                                 <div class="row g-3">
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <label class="form-label">Label</label>
                                         <input type="text" name="Columns[@i].Label" value="@column.Label" class="form-control" />
+                                        <input type="hidden" name="Columns[@i].Key" value="@column.Key" data-key-input="true" />
                                     </div>
                                     <div class="col-md-3">
-                                        <label class="form-label">Key</label>
-                                        <input type="text" name="Columns[@i].Key" value="@column.Key" class="form-control" />
-                                    </div>
-                                    <div class="col-md-2">
                                         <label class="form-label">Type</label>
                                         <select name="Columns[@i].Type" class="form-select column-type-select">
                                             <option value="text" selected="@(column.Type == "text" ? "selected" : null)">Text</option>
@@ -121,7 +118,7 @@
                                             <option value="select" selected="@(column.Type == "select" ? "selected" : null)">Dropdown</option>
                                         </select>
                                     </div>
-                                    <div class="col-md-2 d-flex align-items-center">
+                                    <div class="col-md-3 d-flex align-items-center">
                                         <div class="form-check mt-4 pt-2">
                                             <input class="form-check-input" type="checkbox" name="Columns[@i].Required" value="true" @(column.Required ? "checked" : null) id="column-required-@i" />
                                             <label class="form-check-label" for="column-required-@i">Required</label>
@@ -148,15 +145,12 @@
                 <template id="columnTemplate">
                     <div class="border rounded p-3 mb-3 column-editor" data-index="__index__">
                         <div class="row g-3">
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                                 <label class="form-label">Label</label>
                                 <input type="text" class="form-control" data-name-template="Columns[__index__].Label" />
+                                <input type="hidden" data-name-template="Columns[__index__].Key" data-key-input="true" />
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label">Key</label>
-                                <input type="text" class="form-control" data-name-template="Columns[__index__].Key" />
-                            </div>
-                            <div class="col-md-2">
                                 <label class="form-label">Type</label>
                                 <select class="form-select column-type-select" data-name-template="Columns[__index__].Type">
                                     <option value="text" selected>Text</option>
@@ -165,7 +159,7 @@
                                     <option value="select">Dropdown</option>
                                 </select>
                             </div>
-                            <div class="col-md-2 d-flex align-items-center">
+                            <div class="col-md-3 d-flex align-items-center">
                                 <div class="form-check mt-4 pt-2">
                                     <input class="form-check-input" type="checkbox" value="true" data-name-template="Columns[__index__].Required" />
                                     <label class="form-check-label">Required</label>
@@ -327,7 +321,7 @@
                 }
 
                 if ('key' in data) {
-                    const keyInput = row.querySelector('input[name$=".Key"]');
+                    const keyInput = row.querySelector('[data-key-input]');
                     if (keyInput) {
                         keyInput.value = data.key ?? '';
                     }

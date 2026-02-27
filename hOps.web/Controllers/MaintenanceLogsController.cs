@@ -961,10 +961,19 @@ namespace hOps.web.Controllers
                     continue;
                 }
 
+                var key = string.IsNullOrWhiteSpace(editor.Key)
+                    ? MaintenanceLogTemplateHelper.NormalizeColumnKey(editor.Label)
+                    : editor.Key.Trim();
+
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    key = MaintenanceLogTemplateHelper.NormalizeColumnKey($"column{results.Count + 1}");
+                }
+
                 results.Add(new MaintenanceLogColumnDefinition
                 {
-                    Key = string.IsNullOrWhiteSpace(editor.Key) ? editor.Label : editor.Key,
-                    Label = string.IsNullOrWhiteSpace(editor.Label) ? editor.Key : editor.Label,
+                    Key = key,
+                    Label = string.IsNullOrWhiteSpace(editor.Label) ? key : editor.Label,
                     Type = string.IsNullOrWhiteSpace(editor.Type) ? MaintenanceLogColumnDefinition.DefaultColumnType : editor.Type,
                     Required = editor.Required,
                     Options = MaintenanceLogTemplateHelper.ParseOptions(editor.OptionsText)
