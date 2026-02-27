@@ -40,19 +40,22 @@ namespace hOps.web.Controllers
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                var trimmedSearch = search.Trim();
-                var likeTerm = $"%{trimmedSearch}%";
+                var normalizedSearch = search.Trim().ToLowerInvariant();
+                var likeTerm = $"%{normalizedSearch}%";
 
                 contactsQuery = contactsQuery.Where(c =>
-                    (c.FirstName != null && EF.Functions.Like(c.FirstName, likeTerm)) ||
-                    (c.LastName != null && EF.Functions.Like(c.LastName, likeTerm)) ||
-                    (c.Company != null && EF.Functions.Like(c.Company, likeTerm)) ||
-                    (c.Title != null && EF.Functions.Like(c.Title, likeTerm)) ||
-                    (c.PhoneNumber != null && EF.Functions.Like(c.PhoneNumber, likeTerm)) ||
-                    (c.Email != null && EF.Functions.Like(c.Email, likeTerm)) ||
-                    (c.Address != null && EF.Functions.Like(c.Address, likeTerm)) ||
-                    (c.Notes != null && EF.Functions.Like(c.Notes, likeTerm)) ||
-                    (c.TypeName != null && EF.Functions.Like(c.TypeName, likeTerm))
+                    (c.FirstName != null && EF.Functions.Like(c.FirstName.ToLower(), likeTerm)) ||
+                    (c.LastName != null && EF.Functions.Like(c.LastName.ToLower(), likeTerm)) ||
+                    (c.Company != null && EF.Functions.Like(c.Company.ToLower(), likeTerm)) ||
+                    (c.Title != null && EF.Functions.Like(c.Title.ToLower(), likeTerm)) ||
+                    (c.PhoneNumber != null && EF.Functions.Like(c.PhoneNumber.ToLower(), likeTerm)) ||
+                    (c.PhoneNumberTypes != null && EF.Functions.Like(c.PhoneNumberTypes.ToLower(), likeTerm)) ||
+                    (c.Email != null && EF.Functions.Like(c.Email.ToLower(), likeTerm)) ||
+                    (c.Fax != null && EF.Functions.Like(c.Fax.ToLower(), likeTerm)) ||
+                    (c.Website != null && EF.Functions.Like(c.Website.ToLower(), likeTerm)) ||
+                    (c.Address != null && EF.Functions.Like(c.Address.ToLower(), likeTerm)) ||
+                    (c.Notes != null && EF.Functions.Like(c.Notes.ToLower(), likeTerm)) ||
+                    (c.TypeName != null && EF.Functions.Like(c.TypeName.ToLower(), likeTerm))
                 );
             }
 
