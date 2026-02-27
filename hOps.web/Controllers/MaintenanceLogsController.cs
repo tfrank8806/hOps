@@ -472,10 +472,12 @@ namespace hOps.web.Controllers
                 return View(LogsDetailView, detailModel);
             }
 
+            var normalizedEntryDate = DateTime.SpecifyKind(input.EntryDate.Date, DateTimeKind.Utc);
+
             var entry = new MaintenanceLogEntry
             {
                 TemplateId = template.Id,
-                EntryDate = input.EntryDate.Date,
+                EntryDate = normalizedEntryDate,
                 ValuesJson = JsonSerializer.Serialize(normalizedValues, EntrySerializerOptions),
                 CreatedByUserId = user.Id,
                 CreatedAtUtc = DateTime.UtcNow
