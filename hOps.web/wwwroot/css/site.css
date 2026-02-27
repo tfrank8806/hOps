@@ -339,7 +339,7 @@ body.sidebar-collapsed button.sidebar-toggle {
 .brand-lockup__subtitle {
     font-size: 0.72rem;
     letter-spacing: 0.14em;
-    text-transform: uppercase;
+    text-transform: none;
     color: var(--brand-muted);
 }
 
