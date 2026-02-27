@@ -87,7 +87,7 @@
                        accept=".csv,text/csv"
                        data-import-url="@Url.Action("PreviewTemplateCsv", "MaintenanceLogs")">
                 <div class="text-muted small mb-3">
-                    CSV columns should be ordered as: Label, Key (optional), Type (text, number, checkbox, select), Required, Options (comma or line break separated), Notes (yes/no), Photos (yes/no).
+                    CSV columns should be ordered as: Label, Type (text, number, checkbox, select), Required, Options (comma or line break separated), Notes (yes/no), Photos (yes/no).
                 </div>
                 <div class="small mb-3 d-none" id="columnCsvStatus"></div>
                 @Html.ValidationMessage("TemplateCsvFile", null, new { @class = "text-danger small d-block" })

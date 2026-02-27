@@ -764,10 +764,10 @@ namespace hOps.web.Controllers
         public IActionResult DownloadTemplateCsv()
         {
             var builder = new StringBuilder();
-            builder.AppendLine("Label,Key,Type,Required,Options,Notes,Photos");
-            builder.AppendLine("\"Area\",\"area\",\"text\",\"Yes\",,\"No\",\"No\"");
-            builder.AppendLine("\"Status\",\"status\",\"select\",\"Yes\",\"Operational,Out of Service\",\"No\",\"No\"");
-            builder.AppendLine("\"Notes\",\"notes\",\"text\",\"No\",,\"Yes\",\"Yes\"");
+            builder.AppendLine("Label,Type,Required,Options,Notes,Photos");
+            builder.AppendLine("\"Area\",\"text\",\"Yes\",,\"No\",\"No\"");
+            builder.AppendLine("\"Status\",\"select\",\"Yes\",\"Operational,Out of Service\",\"No\",\"No\"");
+            builder.AppendLine("\"Notes\",\"text\",\"No\",,\"Yes\",\"Yes\"");
 
             var bytes = Encoding.UTF8.GetBytes(builder.ToString());
             return File(bytes, "text/csv", "maintenance-log-template.csv");
@@ -849,12 +849,26 @@ namespace hOps.web.Controllers
                 }
 
                 var label = cells.Count > 0 ? cells[0].Trim() : string.Empty;
-                var key = cells.Count > 1 ? cells[1].Trim() : string.Empty;
-                var typeCell = cells.Count > 2 ? cells[2].Trim() : string.Empty;
-                var requiredCell = cells.Count > 3 ? cells[3].Trim() : string.Empty;
-                var optionsCell = cells.Count > 4 ? cells[4] : string.Empty;
-                var notesCell = cells.Count > 5 ? cells[5].Trim() : string.Empty;
-                var photosCell = cells.Count > 6 ? cells[6].Trim() : string.Empty;
+                var key = string.Empty;
+                var index = 1;
+
+                if (cells.Count > index)
+                {
+                    var candidate = cells[index].Trim();
+                    var normalizedCandidate = candidate.ToLowerInvariant();
+                    if (!string.IsNullOrWhiteSpace(candidate) &&
+                        !MaintenanceLogColumnDefinition.AllowedTypes.Contains(normalizedCandidate))
+                    {
+                        key = candidate;
+                        index++;
+                    }
+                }
+
+                var typeCell = cells.Count > index ? cells[index++].Trim() : string.Empty;
+                var requiredCell = cells.Count > index ? cells[index++].Trim() : string.Empty;
+                var optionsCell = cells.Count > index ? cells[index++] : string.Empty;
+                var notesCell = cells.Count > index ? cells[index++].Trim() : string.Empty;
+                var photosCell = cells.Count > index ? cells[index++].Trim() : string.Empty;
 
                 if (string.IsNullOrWhiteSpace(label) && string.IsNullOrWhiteSpace(key))
                 {
