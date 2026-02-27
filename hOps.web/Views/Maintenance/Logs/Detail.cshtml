@@ -88,9 +88,9 @@
                                         break;
                                     case "checkbox":
                                         <div class="form-check">
-                                            <input type="hidden" name="Values[@column.Key]" value="false" />
                                             <input type="checkbox" class="form-check-input" name="Values[@column.Key]" value="true" @(string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ? "checked" : null) id="entry-checkbox-@column.Key" />
                                             <label class="form-check-label" for="entry-checkbox-@column.Key">Completed</label>
+                                            <input type="hidden" name="Values[@column.Key]" value="false" />
                                         </div>
                                         break;
                                     case "select":
