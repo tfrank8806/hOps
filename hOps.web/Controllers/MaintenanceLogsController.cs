@@ -26,7 +26,7 @@ namespace hOps.web.Controllers
     public class MaintenanceLogsController : BaseController
     {
         private const int MaxEntryDisplayCount = 500;
-        private const int TemplateColumnImportLimit = 40;
+        private const int TemplateColumnImportLimit = 120;
         private const string LogsIndexView = "~/Views/Maintenance/Logs/Index.cshtml";
         private const string LogsEditorView = "~/Views/Maintenance/Logs/Editor.cshtml";
         private const string LogsDetailView = "~/Views/Maintenance/Logs/Detail.cshtml";
