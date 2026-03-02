@@ -757,6 +757,8 @@ namespace hOps.web.Controllers
         }
         private async Task PopulateBulletinAsync(HomeIndexViewModel viewModel, int propertyId, ApplicationUser currentUser, HashSet<string> roleSet)
         {
+            await CleanupExpiredBulletinPostsAsync(propertyId);
+
             var posts = await _context.BulletinPosts
                 .Where(p => p.PropertyId == propertyId)
                 .Include(p => p.CreatedBy)
@@ -789,6 +791,35 @@ namespace hOps.web.Controllers
                         .ToList(),
                 })
                 .ToList();
+        }
+
+        private async Task CleanupExpiredBulletinPostsAsync(int propertyId)
+        {
+            var cutoffUtc = DateTime.UtcNow.AddDays(-5);
+
+            var expiredPosts = await _context.BulletinPosts
+                .Where(p => p.PropertyId == propertyId && (p.UpdatedAt ?? p.CreatedAt) < cutoffUtc)
+                .Include(p => p.Attachments)
+                .ToListAsync();
+
+            if (expiredPosts.Count == 0)
+            {
+                return;
+            }
+
+            var attachmentPaths = expiredPosts
+                .SelectMany(p => p.Attachments)
+                .Select(a => ResolvePhysicalPath(a.FilePath))
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .ToList();
+
+            _context.BulletinPosts.RemoveRange(expiredPosts);
+            await _context.SaveChangesAsync();
+
+            foreach (var path in attachmentPaths)
+            {
+                DeleteFileIfExists(path);
+            }
         }
 
         private async Task<HomeIndexViewModel> BuildHotelLayoutViewModelAsync(Property? property)
