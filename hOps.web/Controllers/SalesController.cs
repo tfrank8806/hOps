@@ -452,10 +452,7 @@ namespace hOps.web.Controllers
         private async Task<List<string>> BuildRecipientListAsync(int propertyId, string? salesContactEmail)
         {
             var recipients = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (!string.IsNullOrWhiteSpace(salesContactEmail))
-            {
-                recipients.Add(salesContactEmail);
-            }
+            TryAddRecipient(recipients, salesContactEmail);
 
             var managementEmails = await (from upa in _context.UserPropertyAccesses
                                           join user in _context.Users on upa.ApplicationUserId equals user.Id
@@ -470,13 +467,26 @@ namespace hOps.web.Controllers
 
             foreach (var email in managementEmails)
             {
-                if (!string.IsNullOrWhiteSpace(email))
-                {
-                    recipients.Add(email);
-                }
+                TryAddRecipient(recipients, email);
             }
 
             return recipients.ToList();
+        }
+
+        private static void TryAddRecipient(HashSet<string> recipients, string? email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return;
+            }
+
+            var normalized = email.Trim();
+            if (normalized.Length == 0)
+            {
+                return;
+            }
+
+            recipients.Add(normalized);
         }
 
         private static string? BuildDisplayName(ApplicationUser? user)
