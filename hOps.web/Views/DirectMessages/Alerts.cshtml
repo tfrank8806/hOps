@@ -4,6 +4,8 @@
     ViewData["MainContainerClass"] = "main-inner--wide";
     ViewData["ContentSurfaceClass"] = "content-surface--flush";
     var hasAlerts = Model.Alerts.Any();
+    var unreadAlerts = Model.Alerts.Where(a => !a.IsRead).ToList();
+    var readAlerts = Model.Alerts.Where(a => a.IsRead).ToList();
 }
 
 @await Html.PartialAsync("_MessagesNav")
@@ -44,51 +46,130 @@
         }
         else
         {
-            <div class="list-group list-group-flush">
-                @foreach (var alert in Model.Alerts)
-                {
-                    var badgeClass = alert.IsRead ? "bg-secondary-subtle text-secondary" : "bg-primary text-white";
-                    <div class="list-group-item px-0">
-                        <div class="d-flex justify-content-between flex-wrap gap-2">
-                            <div>
-                                <div class="fw-semibold">@alert.Title</div>
-                                <div class="text-muted small">@alert.CreatedAt.ToString("g")</div>
-                            </div>
-                            <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                                <span class="badge rounded-pill @badgeClass">@((alert.Type ?? "alert").ToUpperInvariant())</span>
-                                @if (!alert.IsRead)
-                                {
-                                    <span class="badge bg-warning text-dark">Unread</span>
-                                }
-                                <div class="d-flex align-items-center gap-2">
-                                    @if (!string.IsNullOrWhiteSpace(alert.LinkUrl))
+            <div class="accordion" id="alertsAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="alertsUnreadHeading">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#alertsUnreadCollapse"
+                                aria-expanded="true" aria-controls="alertsUnreadCollapse">
+                            Unread (@unreadAlerts.Count)
+                        </button>
+                    </h2>
+                    <div id="alertsUnreadCollapse" class="accordion-collapse collapse show" data-bs-parent="#alertsAccordion">
+                        <div class="accordion-body p-0">
+                            @if (unreadAlerts.Count == 0)
+                            {
+                                <div class="text-muted small px-3 py-3">No unread alerts.</div>
+                            }
+                            else
+                            {
+                                <div class="list-group list-group-flush">
+                                    @foreach (var alert in unreadAlerts)
                                     {
-                                        <form asp-controller="Notifications"
-                                              asp-action="Open"
-                                              asp-route-id="@alert.Id"
-                                              method="post"
-                                              class="d-inline">
-                                            @Html.AntiForgeryToken()
-                                            <button type="submit" class="btn btn-outline-primary btn-sm">Open</button>
-                                        </form>
+                                        var badgeClass = "bg-primary text-white";
+                                        <div class="list-group-item px-0">
+                                            <div class="d-flex justify-content-between flex-wrap gap-2">
+                                                <div>
+                                                    <div class="fw-semibold">@alert.Title</div>
+                                                    <div class="text-muted small">@alert.CreatedAt.ToString("g")</div>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                                                    <span class="badge rounded-pill @badgeClass">@((alert.Type ?? "alert").ToUpperInvariant())</span>
+                                                    <span class="badge bg-warning text-dark">Unread</span>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        @if (!string.IsNullOrWhiteSpace(alert.LinkUrl))
+                                                        {
+                                                            <form asp-controller="Notifications"
+                                                                  asp-action="Open"
+                                                                  asp-route-id="@alert.Id"
+                                                                  method="post"
+                                                                  class="d-inline">
+                                                                @Html.AntiForgeryToken()
+                                                                <button type="submit" class="btn btn-outline-primary btn-sm">Open</button>
+                                                            </form>
+                                                        }
+                                                        <form asp-controller="Notifications"
+                                                              asp-action="Delete"
+                                                              asp-route-id="@alert.Id"
+                                                              method="post"
+                                                              class="d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(alert.Content))
+                                            {
+                                                <p class="text-muted mb-0 mt-2">@alert.Content</p>
+                                            }
+                                        </div>
                                     }
-                                    <form asp-controller="Notifications"
-                                          asp-action="Delete"
-                                          asp-route-id="@alert.Id"
-                                          method="post"
-                                          class="d-inline">
-                                        @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
-                                    </form>
                                 </div>
-                            </div>
+                            }
                         </div>
-                        @if (!string.IsNullOrWhiteSpace(alert.Content))
-                        {
-                            <p class="text-muted mb-0 mt-2">@alert.Content</p>
-                        }
                     </div>
-                }
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="alertsReadHeading">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#alertsReadCollapse"
+                                aria-expanded="false" aria-controls="alertsReadCollapse">
+                            Read (@readAlerts.Count)
+                        </button>
+                    </h2>
+                    <div id="alertsReadCollapse" class="accordion-collapse collapse" data-bs-parent="#alertsAccordion">
+                        <div class="accordion-body p-0">
+                            @if (readAlerts.Count == 0)
+                            {
+                                <div class="text-muted small px-3 py-3">No read alerts yet.</div>
+                            }
+                            else
+                            {
+                                <div class="list-group list-group-flush">
+                                    @foreach (var alert in readAlerts)
+                                    {
+                                        var badgeClass = "bg-secondary-subtle text-secondary";
+                                        <div class="list-group-item px-0">
+                                            <div class="d-flex justify-content-between flex-wrap gap-2">
+                                                <div>
+                                                    <div class="fw-semibold">@alert.Title</div>
+                                                    <div class="text-muted small">@alert.CreatedAt.ToString("g")</div>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                                                    <span class="badge rounded-pill @badgeClass">@((alert.Type ?? "alert").ToUpperInvariant())</span>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        @if (!string.IsNullOrWhiteSpace(alert.LinkUrl))
+                                                        {
+                                                            <form asp-controller="Notifications"
+                                                                  asp-action="Open"
+                                                                  asp-route-id="@alert.Id"
+                                                                  method="post"
+                                                                  class="d-inline">
+                                                                @Html.AntiForgeryToken()
+                                                                <button type="submit" class="btn btn-outline-primary btn-sm">Open</button>
+                                                            </form>
+                                                        }
+                                                        <form asp-controller="Notifications"
+                                                              asp-action="Delete"
+                                                              asp-route-id="@alert.Id"
+                                                              method="post"
+                                                              class="d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(alert.Content))
+                                            {
+                                                <p class="text-muted mb-0 mt-2">@alert.Content</p>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
             </div>
         }
     </div>
