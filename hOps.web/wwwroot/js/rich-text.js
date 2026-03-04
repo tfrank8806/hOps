@@ -30,6 +30,21 @@
         gray: '#334155'
     };
 
+    const emojiGroups = [
+        {
+            label: 'Smileys & People',
+            emojis: ['😀', '😃', '😄', '😁', '😆', '😂', '😊', '🙂', '🙃', '😉', '😍', '🤩']
+        },
+        {
+            label: 'Gestures',
+            emojis: ['👍', '🙌', '👏', '🙏', '🤝', '💪', '🤗', '🤞', '🤙', '✌️']
+        },
+        {
+            label: 'Symbols',
+            emojis: ['🔥', '🎉', '✅', '⚠️', '❗', '❓', '⭐', '❤️', '💡', '📝', '📌']
+        }
+    ];
+
     const MENTION_START = '\u200D';
     const MENTION_END = '\u200E';
     const ZERO_WIDTH_ZERO = '\u200B';
@@ -161,6 +176,7 @@
         });
 
         createColorPicker(toolbar, context);
+        createEmojiPicker(toolbar, context);
 
         return toolbar;
     }
@@ -310,6 +326,102 @@
             const hex = colorHexMap[value];
             document.execCommand('foreColor', false, hex);
         }
+        syncToTextarea(context);
+    }
+
+    function createEmojiPicker(toolbar, context) {
+        const emojiGroup = createGroup(toolbar);
+        emojiGroup.classList.add('rich-text-toolbar__emoji-group');
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'btn btn-outline-secondary rich-text-emoji-toggle';
+        toggle.textContent = '😊';
+        toggle.title = 'Insert emoji';
+        toggle.setAttribute('aria-haspopup', 'true');
+        toggle.setAttribute('aria-expanded', 'false');
+        emojiGroup.appendChild(toggle);
+
+        const menu = document.createElement('div');
+        menu.className = 'rich-text-emoji-menu';
+        emojiGroup.appendChild(menu);
+
+        emojiGroups.forEach(group => {
+            const section = document.createElement('div');
+            section.className = 'rich-text-emoji-menu__section';
+
+            const label = document.createElement('div');
+            label.className = 'rich-text-emoji-menu__label';
+            label.textContent = group.label;
+            section.appendChild(label);
+
+            const grid = document.createElement('div');
+            grid.className = 'rich-text-emoji-menu__grid';
+            section.appendChild(grid);
+
+            group.emojis.forEach(emoji => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'rich-text-emoji-menu__emoji';
+                item.textContent = emoji;
+                item.setAttribute('aria-label', `Insert ${emoji}`);
+                item.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    insertEmoji(context, emoji);
+                    hideMenu();
+                });
+                grid.appendChild(item);
+            });
+
+            menu.appendChild(section);
+        });
+
+        toggle.addEventListener('click', (event) => {
+            event.preventDefault();
+            const willOpen = !menu.classList.contains('show');
+            closeOtherEmojiMenus(menu);
+            if (willOpen) {
+                menu.classList.add('show');
+                toggle.setAttribute('aria-expanded', 'true');
+            } else {
+                hideMenu();
+            }
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!menu.classList.contains('show')) {
+                return;
+            }
+            if (emojiGroup.contains(event.target)) {
+                return;
+            }
+            hideMenu();
+        });
+
+        function hideMenu() {
+            menu.classList.remove('show');
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    function closeOtherEmojiMenus(currentMenu) {
+        document
+            .querySelectorAll('.rich-text-emoji-menu.show')
+            .forEach(menu => {
+                if (menu === currentMenu) {
+                    return;
+                }
+                menu.classList.remove('show');
+                const toggle = menu.previousElementSibling;
+                if (toggle && toggle.classList.contains('rich-text-emoji-toggle')) {
+                    toggle.setAttribute('aria-expanded', 'false');
+                }
+            });
+    }
+
+    function insertEmoji(context, emoji) {
+        focusEditor(context);
+        document.execCommand('insertText', false, emoji);
         syncToTextarea(context);
     }
 
