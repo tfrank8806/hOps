@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Reflection;
@@ -71,6 +72,7 @@ namespace hOps.web.ViewModels
         public DateTime CreatedAtUtc { get; set; }
         public List<string> PropertyNames { get; set; } = new();
         public List<CalendarEventAttachmentViewModel> Attachments { get; set; } = new();
+        public HashSet<DateTime> DeletedOccurrenceDates { get; set; } = new();
         public bool IsContinuationSegment { get; set; }
 
         public DateTime StartDateTime => StartDate.Date.Add(StartTime ?? TimeSpan.Zero);
@@ -174,7 +176,8 @@ namespace hOps.web.ViewModels
                 CreatedByName = CreatedByName,
                 CreatedAtUtc = CreatedAtUtc,
                 PropertyNames = new List<string>(PropertyNames),
-                Attachments = Attachments.Select(a => a.Clone()).ToList()
+                Attachments = Attachments.Select(a => a.Clone()).ToList(),
+                DeletedOccurrenceDates = new HashSet<DateTime>(DeletedOccurrenceDates)
             };
         }
 

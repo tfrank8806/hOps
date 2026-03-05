@@ -39,5 +39,7 @@ namespace hOps.web.Models
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
         public ICollection<CalendarEventProperty> EventProperties { get; set; } = new List<CalendarEventProperty>();
+
+        public ICollection<CalendarEventException> Exceptions { get; set; } = new List<CalendarEventException>();
     }
 }

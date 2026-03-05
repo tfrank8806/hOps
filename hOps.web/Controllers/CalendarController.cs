@@ -436,6 +436,85 @@ namespace hOps.web.Controllers
             return RedirectToAction(nameof(Index), new { month = calendarEvent.StartDate.Month, year = calendarEvent.StartDate.Year });
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id, CalendarEventDeleteScope scope, DateTime? occurrenceDate, int? month, int? year)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var accessibleProperties = await GetAccessiblePropertiesAsync(user.Id);
+            if (!accessibleProperties.Any())
+            {
+                return NotFound();
+            }
+
+            var accessiblePropertyIds = accessibleProperties
+                .Select(p => p.Id)
+                .ToHashSet();
+
+            var calendarEvent = await _context.CalendarEvents
+                .Include(e => e.EventProperties)
+                .Include(e => e.Exceptions)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (calendarEvent == null)
+            {
+                return NotFound();
+            }
+
+            if (!calendarEvent.EventProperties.Any(ep => accessiblePropertyIds.Contains(ep.PropertyId)))
+            {
+                return NotFound();
+            }
+
+            if (calendarEvent.Recurrence == CalendarRecurrenceType.None)
+            {
+                scope = CalendarEventDeleteScope.EntireSeries;
+            }
+
+            var fallbackDate = occurrenceDate?.Date ?? calendarEvent.StartDate;
+            var redirectTarget = ResolveTargetMonth(month, year, fallbackDate);
+
+            if (scope == CalendarEventDeleteScope.SingleOccurrence)
+            {
+                if (!occurrenceDate.HasValue)
+                {
+                    return BadRequest();
+                }
+
+                var normalizedOccurrence = NormalizeCalendarDate(occurrenceDate.Value);
+                var alreadyDeleted = calendarEvent.Exceptions
+                    .Any(ex => ex.Type == CalendarEventExceptionType.DeletedOccurrence
+                               && ex.OccurrenceDate.Date == normalizedOccurrence.Date);
+
+                if (!alreadyDeleted)
+                {
+                    var exception = new CalendarEventException
+                    {
+                        CalendarEventId = calendarEvent.Id,
+                        OccurrenceDate = normalizedOccurrence,
+                        Type = CalendarEventExceptionType.DeletedOccurrence
+                    };
+                    _context.CalendarEventExceptions.Add(exception);
+                    await _context.SaveChangesAsync();
+                }
+
+                TempData["SuccessMessage"] = "Event occurrence deleted.";
+                return RedirectToAction(nameof(Index), new { month = redirectTarget.Month, year = redirectTarget.Year });
+            }
+
+            _context.CalendarEvents.Remove(calendarEvent);
+            await _context.SaveChangesAsync();
+            DeleteAllAttachments(calendarEvent.Id);
+
+            TempData["SuccessMessage"] = "Event deleted successfully.";
+            return RedirectToAction(nameof(Index), new { month = redirectTarget.Month, year = redirectTarget.Year });
+        }
+
         private async Task<CalendarViewModel> BuildViewModelAsync(ApplicationUser user, DateTime targetMonth, CalendarEventFormViewModel? formOverride = null)
         {
             var accessibleProperties = await GetAccessiblePropertiesAsync(user.Id);
@@ -482,7 +561,8 @@ namespace hOps.web.Controllers
             IQueryable<CalendarEvent> eventsQuery = _context.CalendarEvents
                 .Include(e => e.Category)
                 .Include(e => e.EventProperties).ThenInclude(ep => ep.Property)
-                .Include(e => e.CreatedBy);
+                .Include(e => e.CreatedBy)
+                .Include(e => e.Exceptions);
 
             if (propertyIds.Any())
             {
@@ -617,6 +697,11 @@ namespace hOps.web.Controllers
 
         private static CalendarEventDisplayViewModel MapToDisplayModel(CalendarEvent calendarEvent, List<CalendarEventAttachmentViewModel> attachments)
         {
+            var deletedOccurrenceDates = calendarEvent.Exceptions?
+                .Where(ex => ex.Type == CalendarEventExceptionType.DeletedOccurrence)
+                .Select(ex => NormalizeCalendarDate(ex.OccurrenceDate).Date)
+                .ToHashSet() ?? new HashSet<DateTime>();
+
             var createdByName = string.Empty;
             if (calendarEvent.CreatedBy != null)
             {
@@ -657,7 +742,8 @@ namespace hOps.web.Controllers
                     .Distinct()
                     .OrderBy(name => name)
                     .ToList(),
-                Attachments = attachments.Select(a => a.Clone()).ToList()
+                Attachments = attachments.Select(a => a.Clone()).ToList(),
+                DeletedOccurrenceDates = deletedOccurrenceDates
             };
         }
 
@@ -682,11 +768,14 @@ namespace hOps.web.Controllers
 
             var occurrenceStart = AlignOccurrenceStart(calendarEvent, rangeStart, duration);
             var safetyCounter = 0;
+            var deletedDates = calendarEvent.DeletedOccurrenceDates ?? new HashSet<DateTime>();
 
             while (occurrenceStart <= rangeEnd && safetyCounter < 1000)
             {
                 var occurrenceEnd = occurrenceStart.Add(duration);
-                if (occurrenceEnd >= rangeStart && occurrenceStart <= rangeEnd)
+                var isDeletedOccurrence = deletedDates.Contains(occurrenceStart.Date);
+
+                if (!isDeletedOccurrence && occurrenceEnd >= rangeStart && occurrenceStart <= rangeEnd)
                 {
                     yield return calendarEvent.CloneWithDates(occurrenceStart, occurrenceEnd);
                 }
@@ -876,6 +965,24 @@ namespace hOps.web.Controllers
                 {
                     _logger.LogWarning(ex, "Calendar: failed to delete attachment '{File}' for event {EventId}", safeName.Replace("\r", "").Replace("\n", ""), eventId);
                 }
+            }
+        }
+
+        private void DeleteAllAttachments(int eventId)
+        {
+            var directory = GetAttachmentDirectoryPath(eventId);
+            if (!Directory.Exists(directory))
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.Delete(directory, true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Calendar: failed to delete attachment directory for event {EventId}", eventId);
             }
         }
 

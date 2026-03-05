@@ -1,3 +1,4 @@
+using System;
 using hOps.web.Models;
 using hOps.web.Models.SiteVisit;
 using hOps.web.Utilities;
@@ -31,6 +32,7 @@ namespace hOps.web.Data
         public DbSet<RoomLayout> RoomLayouts { get; set; }
         public DbSet<CalendarEvent> CalendarEvents { get; set; }
         public DbSet<CalendarEventProperty> CalendarEventProperties { get; set; }
+        public DbSet<CalendarEventException> CalendarEventExceptions { get; set; }
         public DbSet<LostFoundEntry> LostFoundEntries { get; set; }
 
         public DbSet<ManagerAnnouncement> ManagerAnnouncements { get; set; }
@@ -246,6 +248,26 @@ namespace hOps.web.Data
                 .WithMany(u => u.CreatedCalendarEvents)
                 .HasForeignKey(e => e.CreatedById)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<CalendarEventException>()
+                .HasOne(e => e.CalendarEvent)
+                .WithMany(ev => ev.Exceptions)
+                .HasForeignKey(e => e.CalendarEventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<CalendarEventException>()
+                .Property(e => e.Type)
+                .HasConversion<int>();
+
+            builder.Entity<CalendarEventException>()
+                .Property(e => e.OccurrenceDate)
+                .HasConversion(
+                    v => DateTime.SpecifyKind(v, DateTimeKind.Utc),
+                    v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            builder.Entity<CalendarEventException>()
+                .HasIndex(e => new { e.CalendarEventId, e.OccurrenceDate })
+                .IsUnique();
 
             // Similarly declare keys/relations for other models (if needed)
             // e.g., UserAccessRequest, RoomLayout etc.
