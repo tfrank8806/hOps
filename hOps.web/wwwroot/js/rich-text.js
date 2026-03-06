@@ -30,37 +30,53 @@
         gray: '#334155'
     };
 
-    const emojiGroups = [
+        const EMOJI_LIBRARY_URL = '/js/emoji-data.json';
+    const RECENT_EMOJI_STORAGE_KEY = 'hops.richText.recentEmojis';
+    const MAX_RECENT_EMOJIS = 18;
+    const MAX_SEARCH_RESULTS = 80;
+
+    const emojiLibraryState = {
+        library: null,
+        promise: null
+    };
+
+    const fallbackEmojiData = [
         {
-            label: 'Smileys & People',
-            emojis: ['😀', '😃', '😄', '😁', '😆', '😂', '😊', '🙂', '🙃', '😉', '😍', '🤩']
-        },
-        {
-            label: 'Gestures',
-            emojis: ['👍', '🙌', '👏', '🙏', '🤝', '💪', '🤗', '🤞', '🤙', '✌️']
-        },
-        {
-            label: 'Symbols',
+            label: 'Smileys & Emotion',
             emojis: [
-                '🔥',
-                '🎉',
-                '✅',
-                '⚠️',
-                '❗',
-                '❓',
-                '⭐',
-                '❤️',
-                '💡',
-                '📝',
-                '📌',
-                '↗️',
-                '↘️',
-                '→',
-                '⬆️',
-                '⬇️'
+                { char: '😀', shortcode: ':grinning_face:' },
+                { char: '😃', shortcode: ':grinning_face_with_big_eyes:' },
+                { char: '😂', shortcode: ':joy:' },
+                { char: '😊', shortcode: ':smiling_face_with_smiling_eyes:' },
+                { char: '😍', shortcode: ':heart_eyes:' },
+                { char: '😎', shortcode: ':sunglasses:' }
+            ]
+        },
+        {
+            label: 'Gestures & People',
+            emojis: [
+                { char: '👍', shortcode: ':thumbs_up:' },
+                { char: '👏', shortcode: ':clap:' },
+                { char: '🙏', shortcode: ':folded_hands:' },
+                { char: '💪', shortcode: ':flexed_bicep:' },
+                { char: '🤝', shortcode: ':handshake:' },
+                { char: '👋', shortcode: ':waving_hand:' }
+            ]
+        },
+        {
+            label: 'Symbols & Celebration',
+            emojis: [
+                { char: '🎉', shortcode: ':party_popper:' },
+                { char: '🎊', shortcode: ':confetti_ball:' },
+                { char: '🔥', shortcode: ':fire:' },
+                { char: '✨', shortcode: ':sparkles:' },
+                { char: '✅', shortcode: ':check_mark_button:' },
+                { char: '💡', shortcode: ':light_bulb:' }
             ]
         }
     ];
+
+    const recentEmojiCache = loadRecentEmojiList();
 
     const MENTION_START = '\u200D';
     const MENTION_END = '\u200E';
@@ -346,6 +362,7 @@
         syncToTextarea(context);
     }
 
+
     function createEmojiPicker(toolbar, context) {
         const emojiGroup = createGroup(toolbar);
         emojiGroup.classList.add('rich-text-toolbar__emoji-group');
@@ -363,46 +380,177 @@
         menu.className = 'rich-text-emoji-menu';
         emojiGroup.appendChild(menu);
 
-        emojiGroups.forEach(group => {
+        let library = null;
+        let sectionsContainer = null;
+        let searchInput = null;
+        let currentQuery = '';
+
+        function showEmojiStatus(message) {
+            menu.innerHTML = '';
+            const status = document.createElement('div');
+            status.className = 'rich-text-emoji-menu__status';
+            status.textContent = message;
+            menu.appendChild(status);
+        }
+
+        function buildMenuStructure() {
+            menu.innerHTML = '';
+
+            const searchWrapper = document.createElement('div');
+            searchWrapper.className = 'rich-text-emoji-menu__search';
+
+            searchInput = document.createElement('input');
+            searchInput.type = 'search';
+            searchInput.className = 'rich-text-emoji-menu__search-input';
+            searchInput.placeholder = 'Search emoji';
+            searchInput.setAttribute('aria-label', 'Search emoji');
+            searchInput.addEventListener('input', () => {
+                currentQuery = searchInput.value || '';
+                renderEmojiSections();
+            });
+
+            searchWrapper.appendChild(searchInput);
+            menu.appendChild(searchWrapper);
+
+            sectionsContainer = document.createElement('div');
+            sectionsContainer.className = 'rich-text-emoji-menu__sections';
+            menu.appendChild(sectionsContainer);
+
+            renderEmojiSections();
+        }
+
+        function renderEmojiSections() {
+            if (!sectionsContainer || !library) {
+                return;
+            }
+
+            sectionsContainer.innerHTML = '';
+            const query = (currentQuery || '').trim().toLowerCase();
+
+            if (query) {
+                const matches = searchEmojiLibrary(library, query);
+                if (!matches.length) {
+                    sectionsContainer.appendChild(createEmojiEmptyState('No emojis match your search.'));
+                    return;
+                }
+
+                const section = createEmojiSection(`Search results (${matches.length})`, matches);
+                if (section) {
+                    sectionsContainer.appendChild(section);
+                }
+                return;
+            }
+
+            const sections = [];
+            const recentEntries = getRecentEmojiEntries(library);
+            if (recentEntries.length) {
+                const recentSection = createEmojiSection('Recently used', recentEntries);
+                if (recentSection) {
+                    sections.push(recentSection);
+                }
+            }
+
+            library.categories.forEach(category => {
+                const section = createEmojiSection(category.label, category.emojis);
+                if (section) {
+                    sections.push(section);
+                }
+            });
+
+            if (!sections.length) {
+                sectionsContainer.appendChild(createEmojiEmptyState('No emojis available.'));
+                return;
+            }
+
+            sections.forEach(section => sectionsContainer.appendChild(section));
+        }
+
+        function createEmojiSection(label, emojis) {
+            if (!emojis || !emojis.length) {
+                return null;
+            }
+
             const section = document.createElement('div');
             section.className = 'rich-text-emoji-menu__section';
 
-            const label = document.createElement('div');
-            label.className = 'rich-text-emoji-menu__label';
-            label.textContent = group.label;
-            section.appendChild(label);
+            const heading = document.createElement('div');
+            heading.className = 'rich-text-emoji-menu__label';
+            heading.textContent = label;
+            section.appendChild(heading);
 
             const grid = document.createElement('div');
             grid.className = 'rich-text-emoji-menu__grid';
             section.appendChild(grid);
 
-            group.emojis.forEach(emoji => {
+            emojis.forEach(entry => {
                 const item = document.createElement('button');
                 item.type = 'button';
                 item.className = 'rich-text-emoji-menu__emoji';
-                item.textContent = emoji;
-                item.setAttribute('aria-label', `Insert ${emoji}`);
+                item.textContent = entry.char;
+                const ariaLabel = entry.displayLabel || entry.shortcode || entry.char;
+                item.setAttribute('aria-label', `Insert ${ariaLabel}`);
                 item.addEventListener('click', (event) => {
                     event.preventDefault();
-                    insertEmoji(context, emoji);
+                    insertEmoji(context, entry.char);
+                    rememberRecentEmoji(entry.char);
+                    if (searchInput) {
+                        searchInput.value = '';
+                        currentQuery = '';
+                    }
+                    renderEmojiSections();
                     hideMenu();
                 });
                 grid.appendChild(item);
             });
 
-            menu.appendChild(section);
-        });
+            return section;
+        }
+
+        function createEmojiEmptyState(message) {
+            const empty = document.createElement('div');
+            empty.className = 'rich-text-emoji-menu__empty';
+            empty.textContent = message;
+            return empty;
+        }
+
+        function ensureLibraryLoaded() {
+            if (library && sectionsContainer) {
+                return Promise.resolve();
+            }
+
+            showEmojiStatus('Loading emojis…');
+            return getEmojiLibrary().then(result => {
+                library = result;
+                buildMenuStructure();
+            });
+        }
+
+        function hideMenu() {
+            menu.classList.remove('show');
+            toggle.setAttribute('aria-expanded', 'false');
+        }
 
         toggle.addEventListener('click', (event) => {
             event.preventDefault();
             const willOpen = !menu.classList.contains('show');
+            if (!willOpen) {
+                hideMenu();
+                return;
+            }
+
             closeOtherEmojiMenus(menu);
-            if (willOpen) {
+            ensureLibraryLoaded().then(() => {
                 menu.classList.add('show');
                 toggle.setAttribute('aria-expanded', 'true');
-            } else {
-                hideMenu();
-            }
+                renderEmojiSections();
+                if (searchInput) {
+                    try {
+                        searchInput.focus({ preventScroll: true });
+                    } catch {
+                        searchInput.focus();
+                    }
+                }
+            });
         });
 
         document.addEventListener('click', (event) => {
@@ -414,11 +562,6 @@
             }
             hideMenu();
         });
-
-        function hideMenu() {
-            menu.classList.remove('show');
-            toggle.setAttribute('aria-expanded', 'false');
-        }
     }
 
     function closeOtherEmojiMenus(currentMenu) {
@@ -434,6 +577,239 @@
                     toggle.setAttribute('aria-expanded', 'false');
                 }
             });
+    }
+
+    function getEmojiLibrary() {
+        if (emojiLibraryState.library) {
+            return Promise.resolve(emojiLibraryState.library);
+        }
+
+        if (emojiLibraryState.promise) {
+            return emojiLibraryState.promise;
+        }
+
+        emojiLibraryState.promise = fetch(EMOJI_LIBRARY_URL, { cache: 'force-cache' })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to load emoji dataset.');
+                }
+                return response.json();
+            })
+            .then(payload => {
+                const parsed = parseEmojiPayload(payload);
+                let library = createEmojiLibrary(parsed);
+                if (!library.flat.length) {
+                    library = createEmojiLibrary(fallbackEmojiData);
+                }
+                return library;
+            })
+            .catch(error => {
+                console.warn('Rich text editor: loading fallback emoji set.', error);
+                return createEmojiLibrary(fallbackEmojiData);
+            })
+            .then(library => {
+                emojiLibraryState.library = library;
+                return library;
+            })
+            .finally(() => {
+                emojiLibraryState.promise = null;
+            });
+
+        return emojiLibraryState.promise;
+    }
+
+    function parseEmojiPayload(payload) {
+        if (!payload) {
+            return [];
+        }
+
+        if (Array.isArray(payload)) {
+            return payload;
+        }
+
+        if (Array.isArray(payload.categories)) {
+            return payload.categories;
+        }
+
+        return [];
+    }
+
+    function createEmojiLibrary(rawCategories) {
+        const categories = [];
+        const flat = [];
+        const map = new Map();
+
+        (rawCategories || []).forEach(rawCategory => {
+            if (!rawCategory || !Array.isArray(rawCategory.emojis)) {
+                return;
+            }
+
+            const label = rawCategory.label || 'Emoji';
+            const normalizedEmojis = [];
+
+            rawCategory.emojis.forEach(rawEmoji => {
+                const entry = normalizeEmojiEntry(rawEmoji, label);
+                if (!entry) {
+                    return;
+                }
+
+                normalizedEmojis.push(entry);
+                if (!map.has(entry.char)) {
+                    map.set(entry.char, entry);
+                }
+                flat.push(entry);
+            });
+
+            if (normalizedEmojis.length) {
+                categories.push({
+                    label,
+                    emojis: normalizedEmojis
+                });
+            }
+        });
+
+        return {
+            categories,
+            flat,
+            map
+        };
+    }
+
+    function normalizeEmojiEntry(rawEmoji, categoryLabel) {
+        if (!rawEmoji && rawEmoji !== 0) {
+            return null;
+        }
+
+        let char = '';
+        let shortcode = '';
+        let description = '';
+        let keywords = [];
+
+        if (typeof rawEmoji === 'string') {
+            char = rawEmoji;
+        } else if (typeof rawEmoji === 'object') {
+            char = rawEmoji.char || rawEmoji.character || rawEmoji.emoji || '';
+            shortcode = rawEmoji.shortcode || rawEmoji.short_name || rawEmoji.shortName || rawEmoji.name || '';
+            description = rawEmoji.name || rawEmoji.description || '';
+            if (Array.isArray(rawEmoji.keywords)) {
+                keywords = rawEmoji.keywords
+                    .map(value => (value ? value.toString() : ''))
+                    .filter(Boolean);
+            } else if (typeof rawEmoji.keywords === 'string') {
+                keywords = rawEmoji.keywords
+                    .split(/[,\s]+/)
+                    .map(value => value.trim())
+                    .filter(Boolean);
+            }
+        }
+
+        if (!char) {
+            return null;
+        }
+
+        const searchParts = [char, shortcode, description, categoryLabel]
+            .concat(keywords)
+            .filter(Boolean)
+            .map(value => value.toString().toLowerCase());
+
+        return {
+            char,
+            shortcode,
+            keywords,
+            description,
+            category: categoryLabel,
+            searchText: searchParts.join(' '),
+            displayLabel: description || shortcode || ''
+        };
+    }
+
+    function searchEmojiLibrary(library, query) {
+        if (!library || !library.flat) {
+            return [];
+        }
+
+        const normalized = (query || '').trim().toLowerCase();
+        if (!normalized) {
+            return library.flat.slice(0, MAX_SEARCH_RESULTS);
+        }
+
+        const results = [];
+        for (let index = 0; index < library.flat.length; index += 1) {
+            const entry = library.flat[index];
+            if (entry.searchText.includes(normalized)) {
+                results.push(entry);
+            }
+            if (results.length >= MAX_SEARCH_RESULTS) {
+                break;
+            }
+        }
+
+        return results;
+    }
+
+    function getRecentEmojiEntries(library) {
+        if (!library || !library.map) {
+            return [];
+        }
+
+        return recentEmojiCache
+            .map(char => library.map.get(char))
+            .filter(Boolean);
+    }
+
+    function rememberRecentEmoji(char) {
+        if (!char) {
+            return;
+        }
+
+        const existingIndex = recentEmojiCache.indexOf(char);
+        if (existingIndex >= 0) {
+            recentEmojiCache.splice(existingIndex, 1);
+        }
+
+        recentEmojiCache.unshift(char);
+        if (recentEmojiCache.length > MAX_RECENT_EMOJIS) {
+            recentEmojiCache.length = MAX_RECENT_EMOJIS;
+        }
+
+        persistRecentEmojiList();
+    }
+
+    function persistRecentEmojiList() {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return;
+        }
+
+        try {
+            window.localStorage.setItem(RECENT_EMOJI_STORAGE_KEY, JSON.stringify(recentEmojiCache));
+        } catch (error) {
+            console.debug('Rich text editor: unable to save recent emojis.', error);
+        }
+    }
+
+    function loadRecentEmojiList() {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return [];
+        }
+
+        try {
+            const raw = window.localStorage.getItem(RECENT_EMOJI_STORAGE_KEY);
+            if (!raw) {
+                return [];
+            }
+
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+
+            return parsed
+                .map(entry => (entry && entry.toString ? entry.toString() : ''))
+                .filter(Boolean)
+                .slice(0, MAX_RECENT_EMOJIS);
+        } catch {
+            return [];
+        }
     }
 
     function insertEmoji(context, emoji) {
