@@ -652,13 +652,13 @@
             const editButton = modalElement.querySelector('[data-details="edit-link"]');
             const deleteButton = modalElement.querySelector('[data-details="delete-button"]');
             const deleteForm = document.getElementById('calendarDeleteForm');
-            const deleteFormIdInput = deleteForm?.querySelector('input[name="id"]');
-            const deleteFormScopeInput = deleteForm?.querySelector('input[name="scope"]');
-            const deleteFormOccurrenceInput = deleteForm?.querySelector('input[name="occurrenceDate"]');
+            const deleteFormIdInput = deleteForm ? deleteForm.querySelector('input[name="id"]') : null;
+            const deleteFormScopeInput = deleteForm ? deleteForm.querySelector('input[name="scope"]') : null;
+            const deleteFormOccurrenceInput = deleteForm ? deleteForm.querySelector('input[name="occurrenceDate"]') : null;
             const deleteModalElement = document.getElementById('eventDeleteConfirmModal');
-            const deleteModalTitleTarget = deleteModalElement?.querySelector('[data-delete="title"]');
-            const deleteOccurrenceButton = deleteModalElement?.querySelector('[data-delete-scope="occurrence"]');
-            const deleteSeriesButton = deleteModalElement?.querySelector('[data-delete-scope="series"]');
+            const deleteModalTitleTarget = deleteModalElement ? deleteModalElement.querySelector('[data-delete="title"]') : null;
+            const deleteOccurrenceButton = deleteModalElement ? deleteModalElement.querySelector('[data-delete-scope="occurrence"]') : null;
+            const deleteSeriesButton = deleteModalElement ? deleteModalElement.querySelector('[data-delete-scope="series"]') : null;
 
             const getModalInstance = () => {
                 if (window.bootstrap && window.bootstrap.Modal) {
@@ -849,14 +849,21 @@
                 deleteButton.addEventListener('click', handleDeleteAction);
             }
 
-            deleteOccurrenceButton?.addEventListener('click', () => handleDeleteScopeSelection('SingleOccurrence'));
-            deleteSeriesButton?.addEventListener('click', () => handleDeleteScopeSelection('EntireSeries'));
+            if (deleteOccurrenceButton) {
+                deleteOccurrenceButton.addEventListener('click', () => handleDeleteScopeSelection('SingleOccurrence'));
+            }
+
+            if (deleteSeriesButton) {
+                deleteSeriesButton.addEventListener('click', () => handleDeleteScopeSelection('EntireSeries'));
+            }
 
             if (deleteModalElement) {
                 deleteModalElement.addEventListener('hidden.bs.modal', () => {
                     if (!deleteActionPendingSubmit && activeEventDataset) {
                         const modal = getModalInstance();
-                        modal?.show();
+                        if (modal) {
+                            modal.show();
+                        }
                     }
 
                     pendingDeleteDataset = null;
