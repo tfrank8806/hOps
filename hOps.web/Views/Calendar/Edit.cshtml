@@ -63,11 +63,15 @@
                 <span asp-validation-for="Form.Recurrence" class="text-danger"></span>
             </div>
 
-            <div class="mb-3">
-                <label asp-for="Form.Details" class="form-label"></label>
-                <textarea asp-for="Form.Details" class="form-control" rows="3" data-enable-mentions="true"></textarea>
-                <span asp-validation-for="Form.Details" class="text-danger"></span>
-            </div>
+        <div class="mb-3">
+            <label asp-for="Form.Details" class="form-label"></label>
+            <textarea asp-for="Form.Details"
+                      class="form-control"
+                      rows="3"
+                      data-enable-mentions="true"
+                      data-clipboard-upload-target="#Form_Attachments"></textarea>
+            <span asp-validation-for="Form.Details" class="text-danger"></span>
+        </div>
 
             @if (Model.Form.ExistingAttachments.Any())
             {

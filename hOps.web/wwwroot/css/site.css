@@ -1790,6 +1790,16 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     padding: 0.6rem 0.3rem;
 }
 
+.clipboard-upload-feedback {
+    margin-top: 0.35rem;
+    font-size: 0.85rem;
+}
+
+.clipboard-upload-target--highlight {
+    border-color: rgba(25, 135, 84, 0.75) !important;
+    box-shadow: 0 0 0 calc(3px * var(--ui-scale)) rgba(25, 135, 84, 0.25);
+}
+
 .rich-text-emoji-menu__section + .rich-text-emoji-menu__section {
     margin-top: 0.35rem;
     padding-top: 0.35rem;

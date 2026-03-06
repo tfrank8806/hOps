@@ -121,6 +121,11 @@
             editor.dataset.mentionsSource = textarea.id;
         }
 
+        const clipboardTargetSelector = textarea.dataset.clipboardUploadTarget;
+        if (clipboardTargetSelector) {
+            editor.dataset.clipboardUploadTarget = clipboardTargetSelector;
+        }
+
         if (textarea.placeholder) {
             editor.dataset.placeholder = textarea.placeholder;
         }
@@ -819,10 +824,21 @@
     }
 
     function handlePaste(event, context) {
+        if (window.ClipboardUploads && typeof window.ClipboardUploads.tryHandlePaste === 'function') {
+            try {
+                window.ClipboardUploads.tryHandlePaste(event, context.editor);
+            } catch (error) {
+                console.warn('Rich text editor: clipboard upload handler failed.', error);
+            }
+        }
+
         event.preventDefault();
-        const text = (event.clipboardData || window.clipboardData).getData('text/plain');
+        const clipboardData = event.clipboardData || window.clipboardData;
+        const text = clipboardData ? clipboardData.getData('text/plain') : '';
         focusEditor(context);
-        document.execCommand('insertText', false, text);
+        if (text) {
+            document.execCommand('insertText', false, text);
+        }
         syncToTextarea(context);
     }
 

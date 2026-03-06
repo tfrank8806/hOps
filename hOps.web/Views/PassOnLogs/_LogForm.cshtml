@@ -15,7 +15,13 @@
 
 <div class="mb-3">
     <label asp-for="Body" class="form-label"></label>
-    <textarea id="Body" name="Body" class="form-control" rows="8" data-enable-mentions="true" data-rich-text="true">@Html.Raw(EscapeTextareaValue(Model.Body))</textarea>
+    <textarea id="Body"
+              name="Body"
+              class="form-control"
+              rows="8"
+              data-enable-mentions="true"
+              data-rich-text="true"
+              data-clipboard-upload-target="#passOnLogFiles">@Html.Raw(EscapeTextareaValue(Model.Body))</textarea>
     <div class="form-text">Add emphasis, lists, and quotes with the toolbar to make your update easier to scan.</div>
     <span asp-validation-for="Body" class="text-danger"></span>
 </div>
@@ -71,7 +77,7 @@ else if (Model.PropertyOptions.Count == 1)
 
 <div class="mb-3">
     <label asp-for="Files" class="form-label"></label>
-    <input asp-for="Files" class="form-control" type="file" multiple />
+    <input asp-for="Files" class="form-control" type="file" multiple id="passOnLogFiles" />
     <div class="form-text">Attach supporting files like photos or documents. You can select multiple files at once.</div>
     <span asp-validation-for="Files" class="text-danger"></span>
 </div>
