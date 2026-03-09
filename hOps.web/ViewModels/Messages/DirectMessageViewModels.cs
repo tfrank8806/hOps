@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 
 namespace hOps.web.ViewModels.Messages
 {
@@ -54,6 +55,7 @@ namespace hOps.web.ViewModels.Messages
     {
         public List<NotificationListItemViewModel> Alerts { get; set; } = new();
         public int UnreadAlertCount { get; set; }
+        public List<AlertCategoryViewModel> Categories { get; set; } = new();
     }
 
     public class DirectMessageForm
@@ -93,5 +95,17 @@ namespace hOps.web.ViewModels.Messages
         public bool IsRead { get; set; }
         public DateTime CreatedAt { get; set; }
         public string Type { get; set; } = string.Empty;
+    }
+
+    public class AlertCategoryViewModel
+    {
+        public string Key { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public int SortOrder { get; set; }
+        public List<NotificationListItemViewModel> Alerts { get; set; } = new();
+
+        public int TotalCount => Alerts.Count;
+        public int UnreadCount => Alerts.Count(alert => !alert.IsRead);
+        public bool HasUnread => UnreadCount > 0;
     }
 }
