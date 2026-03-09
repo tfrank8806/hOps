@@ -133,7 +133,8 @@
         const context = {
             textarea,
             editor,
-            wrapper
+            wrapper,
+            selectionState: null
         };
 
         const toolbar = buildToolbar(context);
@@ -152,8 +153,19 @@
         populateEditorFromMarkup(context);
         syncToTextarea(context);
 
-        editor.addEventListener('input', () => syncToTextarea(context));
-        editor.addEventListener('blur', () => syncToTextarea(context));
+        const recordSelection = () => captureEditorSelection(context);
+        editor.addEventListener('input', () => {
+            captureEditorSelection(context);
+            syncToTextarea(context);
+        });
+        editor.addEventListener('blur', () => {
+            captureEditorSelection(context);
+            syncToTextarea(context);
+        });
+        editor.addEventListener('keyup', recordSelection);
+        editor.addEventListener('mouseup', recordSelection);
+        editor.addEventListener('touchend', recordSelection);
+        editor.addEventListener('focus', recordSelection);
         editor.addEventListener('paste', (event) => handlePaste(event, context));
         editor.addEventListener('keydown', (event) => handleKeydown(event, context));
 
@@ -537,6 +549,7 @@
 
         toggle.addEventListener('click', (event) => {
             event.preventDefault();
+            captureEditorSelection(context);
             const willOpen = !menu.classList.contains('show');
             if (!willOpen) {
                 hideMenu();
@@ -906,6 +919,7 @@
         if (document.activeElement !== editor) {
             editor.focus();
         }
+        restoreEditorSelection(context);
     }
 
     function populateEditorFromMarkup(context) {
@@ -1000,10 +1014,30 @@
         ensureEditorHasContent(editor);
         if (shouldRestoreSelection) {
             restoreSelectionState(editor, selectionState);
+            if (selectionState) {
+                context.selectionState = selectionState;
+            }
         }
         const markup = htmlToMarkup(editor);
         textarea.value = markup;
         triggerInput(textarea);
+    }
+
+    function captureEditorSelection(context) {
+        if (!context || !context.editor) {
+            return;
+        }
+        const state = saveSelectionState(context.editor);
+        if (state) {
+            context.selectionState = state;
+        }
+    }
+
+    function restoreEditorSelection(context) {
+        if (!context || !context.editor || !context.selectionState) {
+            return;
+        }
+        restoreSelectionState(context.editor, context.selectionState);
     }
 
     function normalizeEditorDom(root) {
