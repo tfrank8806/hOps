@@ -65,8 +65,8 @@
     <form asp-action="Submit" method="post" class="site-visit-form" novalidate>
         @Html.AntiForgeryToken()
         <div class="row g-4">
-            <div class="col-lg-4">
-                <div class="card site-visit-card h-100">
+            <div class="col-12 col-xl-8 col-xxl-6 mx-auto">
+                <div class="card site-visit-card site-visit-overview-card h-100">
                     <div class="card-body">
                         <h2 class="h5 mb-4">Visit overview</h2>
                         <div class="mb-3">
@@ -95,8 +95,11 @@
                     </div>
                 </div>
             </div>
-            <div class="col-lg-8">
-                <div class="card site-visit-card mb-4 mb-lg-0">
+        </div>
+
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="card site-visit-card site-visit-checklist-card">
                     <div class="card-body d-flex flex-column gap-3">
                         @if (Model.HasTemplateOptions)
                         {

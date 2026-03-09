@@ -18,6 +18,14 @@
     box-shadow: none;
 }
 
+.site-visit-overview-card {
+    max-width: 48rem;
+}
+
+.site-visit-checklist-card {
+    width: 100%;
+}
+
 .site-visit-card .card-header {
     border-bottom: none;
     background-color: transparent;
@@ -32,6 +40,13 @@
     font-size: 0.75rem;
     letter-spacing: 0.05em;
     color: #6c757d;
+}
+
+.site-visit-table th,
+.site-visit-table td {
+    white-space: normal;
+    vertical-align: top;
+    word-break: break-word;
 }
 
 .site-visit-status {

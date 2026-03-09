@@ -77,14 +77,12 @@
                 <div class="d-flex flex-wrap gap-3 mb-4">
                     @foreach (var summary in categorySummaries)
                     {
-                        @{
-                            var summaryBadgeClass = summary.UnreadCount > 0
-                                ? "badge bg-warning text-dark"
-                                : "badge bg-secondary-subtle text-secondary";
-                            var summaryStatus = summary.UnreadCount > 0
-                                ? $"{summary.UnreadCount} unread"
-                                : "All read";
-                        }
+                        var summaryBadgeClass = summary.UnreadCount > 0
+                            ? "badge bg-warning text-dark"
+                            : "badge bg-secondary-subtle text-secondary";
+                        var summaryStatus = summary.UnreadCount > 0
+                            ? $"{summary.UnreadCount} unread"
+                            : "All read";
                         <div class="border rounded px-3 py-2 small" data-alert-category="@summary.Key">
                             <div class="fw-semibold">@summary.Label</div>
                             <div class="d-flex align-items-center gap-2 mt-1">
