@@ -2348,3 +2348,56 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     margin-top: calc(var(--main-header-height, 72px) + 3rem);
 }
 
+.issue-report-fab {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    pointer-events: none;
+}
+
+.issue-report-fab__button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    box-shadow: 0 20px 35px rgba(15, 23, 42, 0.25);
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    pointer-events: auto;
+}
+
+.issue-report-fab__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.2);
+    font-weight: 700;
+}
+
+.issue-report-fab__label {
+    white-space: nowrap;
+}
+
+@media (max-width: 575.98px) {
+    .issue-report-fab {
+        right: 1rem;
+        bottom: 1rem;
+    }
+
+    .issue-report-fab__button {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    .issue-report-fab__label {
+        font-size: 0.85rem;
+    }
+}
+
