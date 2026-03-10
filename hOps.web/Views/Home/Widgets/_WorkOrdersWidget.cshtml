@@ -43,6 +43,50 @@
         }
         else
         {
+    <style>
+        .home-workorder-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .home-workorder-summary-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #e9ecef;
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            background-color: #fff;
+        }
+
+        .home-workorder-summary-item .department-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .home-workorder-summary-item .department-dot {
+            width: 0.65rem;
+            height: 0.65rem;
+            border-radius: 999px;
+            background-color: var(--dept-color, #0d6efd);
+        }
+
+        .home-workorder-summary-item .department-count {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        @media (max-width: 575.98px) {
+            .home-workorder-summary-grid {
+                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            }
+        }
+    </style>
             if (departmentSummaries.Any())
             {
                 <div class="mb-3">
@@ -50,19 +94,18 @@
                         <span class="fw-semibold">Open work orders by department</span>
                         <span class="text-muted small">Includes New, In Progress, and Escalated</span>
                     </div>
-                    <div class="workorder-department-summary-grid">
+                    <div class="home-workorder-summary-grid">
                         @foreach (var summary in departmentSummaries)
                         {
                             var deptColor = string.IsNullOrWhiteSpace(summary.DepartmentColor)
                                 ? "#0d6efd"
                                 : summary.DepartmentColor!;
-                            <div class="workorder-department-summary" style="--dept-color:@deptColor">
-                                <div class="d-flex align-items-center gap-2 mb-2 text-muted text-uppercase small">
-                                    <span class="workorder-department-summary__dot"></span>
+                            <div class="home-workorder-summary-item" style="--dept-color:@deptColor">
+                                <div class="department-info">
+                                    <span class="department-dot" aria-hidden="true"></span>
                                     <span>@summary.DepartmentName</span>
                                 </div>
-                                <div class="workorder-department-summary__count">@summary.OpenCount</div>
-                                <div class="text-muted small">Open work orders</div>
+                                <div class="department-count">@summary.OpenCount</div>
                             </div>
                         }
                     </div>
