@@ -879,18 +879,18 @@ body.sidebar-collapsed .sidebar-inner {
     padding-top: 0.85rem;
 }
 
-.main-header .btn-outline-primary,
-.main-header .btn-outline-secondary {
+.main-header__actions .btn-outline-primary,
+.main-header__actions .btn-outline-secondary {
     color: #ffffff;
     border-color: rgba(255, 255, 255, 0.4);
     background-color: rgba(255, 255, 255, 0.08);
     box-shadow: none;
 }
 
-.main-header .btn-outline-primary:hover,
-.main-header .btn-outline-primary:focus,
-.main-header .btn-outline-secondary:hover,
-.main-header .btn-outline-secondary:focus {
+.main-header__actions .btn-outline-primary:hover,
+.main-header__actions .btn-outline-primary:focus,
+.main-header__actions .btn-outline-secondary:hover,
+.main-header__actions .btn-outline-secondary:focus {
     background-color: rgba(255, 255, 255, 0.18);
     border-color: rgba(255, 255, 255, 0.65);
     color: #ffffff;
