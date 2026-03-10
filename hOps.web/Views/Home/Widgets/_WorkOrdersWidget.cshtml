@@ -1,0 +1,125 @@
+@model hOps.web.ViewModels.Home.HomeIndexViewModel
+
+@{
+    var workOrders = Model.WorkOrders ?? new List<hOps.web.ViewModels.Home.WorkOrderSummaryViewModel>();
+    var departmentSummaries = Model.WorkOrderDepartmentSummaries ?? new List<hOps.web.ViewModels.Home.WorkOrderDepartmentSummaryViewModel>();
+
+    string GetDateColor(DateTime dateTime)
+    {
+        var localDate = TimeZoneService.ConvertToUserTime(dateTime).Date;
+        var today = TimeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
+
+        if (localDate >= today)
+        {
+            return "#198754";
+        }
+
+        if (localDate == today.AddDays(-1))
+        {
+            return "#fd7e14";
+        }
+
+        return "#dc3545";
+    }
+}
+
+<div class="card shadow-sm h-100 home-widget-card home-widget-card--fill">
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2 home-widget-card__header">
+        <h2 class="h6 mb-0">Work Orders</h2>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a class="btn btn-sm btn-primary"
+               asp-controller="WorkOrders"
+               asp-action="Index"
+               asp-fragment="workOrdersForm">
+                + New Work Order
+            </a>
+            <a class="btn btn-sm btn-outline-primary" asp-controller="WorkOrders" asp-action="Index">View All</a>
+        </div>
+    </div>
+    <div class="card-body home-widget-card__body">
+        @if (!workOrders.Any())
+        {
+            <p class="text-muted mb-0">No work orders are currently assigned to this property.</p>
+        }
+        else
+        {
+            if (departmentSummaries.Any())
+            {
+                <div class="mb-3">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                        <span class="fw-semibold">Open work orders by department</span>
+                        <span class="text-muted small">Includes New, In Progress, and Escalated</span>
+                    </div>
+                    <div class="workorder-department-summary-grid">
+                        @foreach (var summary in departmentSummaries)
+                        {
+                            var deptColor = string.IsNullOrWhiteSpace(summary.DepartmentColor)
+                                ? "#0d6efd"
+                                : summary.DepartmentColor!;
+                            <div class="workorder-department-summary" style="--dept-color:@deptColor">
+                                <div class="d-flex align-items-center gap-2 mb-2 text-muted text-uppercase small">
+                                    <span class="workorder-department-summary__dot"></span>
+                                    <span>@summary.DepartmentName</span>
+                                </div>
+                                <div class="workorder-department-summary__count">@summary.OpenCount</div>
+                                <div class="text-muted small">Open work orders</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <ul class="list-unstyled mb-0 widget-list">
+                @foreach (var order in workOrders)
+                {
+                    var hasLink = !string.IsNullOrWhiteSpace(order.DetailUrl);
+                    <li class="widget-item">
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div class="flex-grow-1">
+                                @if (hasLink)
+                                {
+                                    <a class="fw-semibold" href="@order.DetailUrl">@order.Issue</a>
+                                }
+                                else
+                                {
+                                    <span class="fw-semibold">@order.Issue</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(order.Location))
+                                {
+                                    <div class="text-muted small">@order.Location</div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(order.DepartmentName))
+                                {
+                                    var deptColor = string.IsNullOrWhiteSpace(order.DepartmentColor)
+                                        ? "#0d6efd"
+                                        : order.DepartmentColor;
+                                    <div class="text-muted small d-flex align-items-center gap-2 mt-1">
+                                        <span class="widget-dept-dot" style="--dept-color:@deptColor" aria-hidden="true"></span>
+                                        <span>@order.DepartmentName</span>
+                                    </div>
+                                }
+                                <div class="@order.SlaStatusClass mt-1">
+                                    <span class="fw-semibold">@order.SlaStatus</span>
+                                    <span class="ms-1 text-muted">@order.SlaSummary</span>
+                                </div>
+                            </div>
+                            @{
+                                var statusColor = hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetColor(order.Status);
+                                var statusLabel = hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetLabel(order.Status);
+                            }
+                            <div class="d-flex flex-column align-items-end gap-1 text-end flex-shrink-0">
+                                <span class="badge" style="background-color:@statusColor">@statusLabel</span>
+                                <span class="@order.PriorityClass">@order.PriorityLabel</span>
+                                <small class="text-muted">@order.DueDate.ToString("MM-dd-yy")</small>
+                            </div>
+                        </div>
+                        @{
+                            var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
+                        }
+                        <div class="small mt-1" style="color:@GetDateColor(order.CreatedAt);">Opened @createdLocal.ToString("g")</div>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>

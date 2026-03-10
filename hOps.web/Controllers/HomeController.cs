@@ -1058,6 +1058,22 @@ namespace hOps.web.Controllers
                     DetailUrl = entry.DetailUrl
                 };
             }).ToList();
+
+            viewModel.WorkOrderDepartmentSummaries = viewModel.WorkOrders
+                .GroupBy(wo => new
+                {
+                    Name = string.IsNullOrWhiteSpace(wo.DepartmentName) ? "Unassigned" : wo.DepartmentName,
+                    Color = string.IsNullOrWhiteSpace(wo.DepartmentColor) ? null : wo.DepartmentColor
+                })
+                .Select(group => new WorkOrderDepartmentSummaryViewModel
+                {
+                    DepartmentName = group.Key.Name ?? "Unassigned",
+                    DepartmentColor = group.Key.Color,
+                    OpenCount = group.Count()
+                })
+                .OrderByDescending(summary => summary.OpenCount)
+                .ThenBy(summary => summary.DepartmentName)
+                .ToList();
         }
 
         private async Task PopulateLostFoundAsync(HomeIndexViewModel viewModel, int propertyId)

@@ -17,6 +17,7 @@ namespace hOps.web.ViewModels.Home
         public List<RoomLayoutTileViewModel> RoomTiles { get; set; } = new();
 
         public List<WorkOrderSummaryViewModel> WorkOrders { get; set; } = new();
+        public List<WorkOrderDepartmentSummaryViewModel> WorkOrderDepartmentSummaries { get; set; } = new();
         public List<ActivityFeedItemViewModel> ActivityFeed { get; set; } = new();
         public List<LayoutPersonaViewModel> LayoutPersonas { get; set; } = new();
         public string SelectedPersona { get; set; } = "default";
@@ -113,6 +114,13 @@ namespace hOps.web.ViewModels.Home
         public string SlaSummary { get; set; } = string.Empty;
         public bool IsOverdue { get; set; }
         public string DetailUrl { get; set; } = string.Empty;
+    }
+
+    public class WorkOrderDepartmentSummaryViewModel
+    {
+        public string DepartmentName { get; set; } = string.Empty;
+        public string? DepartmentColor { get; set; }
+        public int OpenCount { get; set; }
     }
 
     public class LostFoundSummaryViewModel

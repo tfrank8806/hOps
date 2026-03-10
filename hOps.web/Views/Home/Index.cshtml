@@ -245,16 +245,7 @@
                                 createFragment: "calendarCreateForm"))
                             break;
                         case HomeWidgetIds.WorkOrders:
-                            @await Html.PartialAsync("_HomeWidgetCard", new HomeWidgetViewModel(
-                                "Work Orders",
-                                Model.WorkOrders.Cast<object>().ToList(),
-                                "WorkOrders",
-                                "Index",
-                                createControllerName: "WorkOrders",
-                                createActionName: "Index",
-                                createButtonText: "+ New Work Order",
-                                createFragment: "workOrdersForm",
-                                cardCssClass: "home-widget-card--fill"))
+                            @await Html.PartialAsync("~/Views/Home/Widgets/_WorkOrdersWidget.cshtml", Model)
                             break;
                         case HomeWidgetIds.OpsFeed:
                             @await Html.PartialAsync("~/Views/Home/Widgets/_OpsFeedWidget.cshtml", Model)
