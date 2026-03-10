@@ -822,7 +822,7 @@ body.sidebar-collapsed .sidebar-inner {
 .main-header {
     position: sticky;
     top: 0;
-    z-index: 1200;
+    z-index: 1020;
     background: linear-gradient(180deg, #0b3f6b 0%, #062749 100%);
     border-bottom: calc(1px * var(--ui-scale)) solid rgba(255, 255, 255, 0.15);
     box-shadow: 0 calc(18px * var(--ui-scale)) calc(36px * var(--ui-scale)) rgba(4, 22, 46, 0.6);
