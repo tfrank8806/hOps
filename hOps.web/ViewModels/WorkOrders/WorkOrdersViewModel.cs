@@ -20,5 +20,13 @@ namespace hOps.web.ViewModels.WorkOrders
         public int? EditingWorkOrderId { get; set; }
         public bool IsEditing => EditingWorkOrderId.HasValue;
         public bool CanManageWorkOrders { get; set; }
+        public List<DepartmentWorkOrderSummaryViewModel> DepartmentSummaries { get; set; } = new();
+    }
+
+    public class DepartmentWorkOrderSummaryViewModel
+    {
+        public string DepartmentName { get; set; } = string.Empty;
+        public string? DepartmentColor { get; set; }
+        public int OpenCount { get; set; }
     }
 }

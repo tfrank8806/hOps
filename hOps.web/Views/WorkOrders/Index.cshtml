@@ -342,6 +342,41 @@
             white-space: normal;
         }
 
+        .workorder-department-summary-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .workorder-department-summary {
+            flex: 1 1 180px;
+            border: 1px solid #e9ecef;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            background-color: #fff;
+        }
+
+        .workorder-department-summary__label {
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            color: #6c757d;
+        }
+
+        .workorder-department-summary__count {
+            font-size: 1.75rem;
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .workorder-department-summary__dot {
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 999px;
+            background-color: var(--dept-color, #0d6efd);
+            display: inline-flex;
+        }
+
         .workorder-row[data-workorder] {
             cursor: pointer;
         }
@@ -543,6 +578,33 @@
             </div>
         </div>
         <div id="workorders-print-area">
+            @if (Model.DepartmentSummaries.Any())
+            {
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <h5 class="mb-0">Open work orders by department</h5>
+                            <span class="text-muted small">Status excludes completed &amp; cancelled</span>
+                        </div>
+                        <div class="workorder-department-summary-grid">
+                            @foreach (var summary in Model.DepartmentSummaries)
+                            {
+                                var deptColor = string.IsNullOrWhiteSpace(summary.DepartmentColor)
+                                    ? "#0d6efd"
+                                    : summary.DepartmentColor;
+                                <div class="workorder-department-summary" style="--dept-color:@deptColor">
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <span class="workorder-department-summary__dot"></span>
+                                        <span class="workorder-department-summary__label">@summary.DepartmentName</span>
+                                    </div>
+                                    <div class="workorder-department-summary__count">@summary.OpenCount</div>
+                                    <div class="text-muted small">Open work orders</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
             <div class="card shadow-sm">
                 <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-3">

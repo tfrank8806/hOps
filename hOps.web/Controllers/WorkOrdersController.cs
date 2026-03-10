@@ -1234,6 +1234,26 @@ namespace hOps.web.Controllers
                 };
             }).ToList();
 
+            var departmentSummaries = listItems
+                .Where(wo =>
+                    string.IsNullOrWhiteSpace(wo.Status) ||
+                    (!string.Equals(wo.Status, "Completed", StringComparison.OrdinalIgnoreCase) &&
+                     !string.Equals(wo.Status, "Cancelled", StringComparison.OrdinalIgnoreCase)))
+                .GroupBy(wo => new
+                {
+                    Name = string.IsNullOrWhiteSpace(wo.Department) ? "Unassigned" : wo.Department,
+                    Color = string.IsNullOrWhiteSpace(wo.DepartmentColor) ? null : wo.DepartmentColor
+                })
+                .Select(group => new DepartmentWorkOrderSummaryViewModel
+                {
+                    DepartmentName = group.Key.Name ?? "Unassigned",
+                    DepartmentColor = group.Key.Color,
+                    OpenCount = group.Count()
+                })
+                .OrderByDescending(summary => summary.OpenCount)
+                .ThenBy(summary => summary.DepartmentName)
+                .ToList();
+
             var departmentQuery = _context.Departments.AsQueryable();
             var workOrderTypeQuery = _context.WorkOrderTypes.AsQueryable();
 
@@ -1354,7 +1374,8 @@ namespace hOps.web.Controllers
                 LocationSuggestions = locationSuggestions.OrderBy(x => x).ToList(),
                 StatusColorMap = statusColorMap,
                 EditingWorkOrderId = form?.Id,
-                CanManageWorkOrders = canManage
+                CanManageWorkOrders = canManage,
+                DepartmentSummaries = departmentSummaries
             };
 
             return viewModel;
