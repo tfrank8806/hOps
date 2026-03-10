@@ -1151,7 +1151,7 @@ namespace hOps.web.Controllers
                     ItemType = "bulletin",
                     Title = "Bulletin Update",
                     Preview = TruncatePreview(RichTextRenderer.ToPlainText(post.Content)),
-                    Meta = $"by {author}",
+                    CreatorName = author,
                     BadgeText = "Bulletin",
                     BadgeClass = "badge bg-primary",
                     OccurredAt = post.UpdatedAt ?? post.CreatedAt,
@@ -1167,7 +1167,7 @@ namespace hOps.web.Controllers
                     ItemType = "passon",
                     Title = log.Title,
                     Preview = log.Preview,
-                    Meta = $"by {log.CreatorName}",
+                    CreatorName = log.CreatorName,
                     BadgeText = "Pass On",
                     BadgeClass = "badge bg-success text-white",
                     OccurredAt = log.CreatedAt,
@@ -1213,17 +1213,20 @@ namespace hOps.web.Controllers
                     }
                     : null;
 
+                var creatorName = BuildDisplayName(creator);
+
                 feedItems.Add(new ActivityFeedItemViewModel
                 {
                     ItemType = "workorder",
                     Title = $"Work Order #{order.Id}",
                     Preview = order.Issue,
+                    CreatorName = creatorName,
                     Meta = order.Location,
                     BadgeText = order.Status,
                     BadgeClass = "badge bg-secondary",
                     OccurredAt = order.CreatedAt,
                     LinkUrl = Url.Action("Edit", "WorkOrders", new { id = order.Id }),
-                    Avatar = UserAvatarHelper.BuildFromUser(creator, BuildDisplayName(creator), "sm")
+                    Avatar = UserAvatarHelper.BuildFromUser(creator, creatorName, "sm")
                 });
             }
 

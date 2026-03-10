@@ -34,14 +34,20 @@
                                     var badgeClass = string.IsNullOrWhiteSpace(item.BadgeClass) ? "badge bg-secondary" : item.BadgeClass;
                                     <span class="@badgeClass">@item.BadgeText</span>
                                 }
-                            </div>
-                            <div class="text-muted small">
-                                @TimeZoneService.ConvertToUserTime(item.OccurredAt).ToString("g")
-                                @if (!string.IsNullOrWhiteSpace(item.Meta))
-                                {
-                                    <span class="ms-1">· @item.Meta</span>
-                                }
-                            </div>
+                    </div>
+                    <div class="text-muted small d-flex flex-wrap align-items-center gap-1">
+                        @if (!string.IsNullOrWhiteSpace(item.CreatorName))
+                        {
+                            <span class="fw-semibold text-body">@item.CreatorName</span>
+                            <span aria-hidden="true" class="text-muted mx-1">•</span>
+                        }
+                        <span>@TimeZoneService.ConvertToUserTime(item.OccurredAt).ToString("g")</span>
+                        @if (!string.IsNullOrWhiteSpace(item.Meta))
+                        {
+                            <span class="text-muted mx-1" aria-hidden="true">•</span>
+                            <span>@item.Meta</span>
+                        }
+                    </div>
                             @if (!string.IsNullOrWhiteSpace(item.Preview))
                             {
                                 <p class="mb-2 text-body-secondary ops-feed__preview">@item.Preview</p>
