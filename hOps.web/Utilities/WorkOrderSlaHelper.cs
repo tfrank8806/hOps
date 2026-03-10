@@ -9,7 +9,7 @@ namespace hOps.web.Utilities
 
         public static WorkOrderSlaInfo Calculate(DateTime dueDate, DateTime utcNow)
         {
-            var dueUtc = DateTime.SpecifyKind(dueDate, DateTimeKind.Utc);
+            var dueUtc = NormalizeDueDate(dueDate);
             var remaining = dueUtc - utcNow;
             var isOverdue = remaining.TotalMinutes < 0;
 
@@ -32,6 +32,23 @@ namespace hOps.web.Utilities
             return info.IsOverdue
                 ? $"Overdue by {formatted}"
                 : $"Due in {formatted}";
+        }
+
+        private static DateTime NormalizeDueDate(DateTime dueDate)
+        {
+            DateTime dueUtc = dueDate.Kind switch
+            {
+                DateTimeKind.Utc => dueDate,
+                DateTimeKind.Local => dueDate.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(dueDate, DateTimeKind.Utc)
+            };
+
+            if (dueUtc.TimeOfDay == TimeSpan.Zero)
+            {
+                return dueUtc.Date.AddDays(1);
+            }
+
+            return dueUtc;
         }
 
         private static (string Label, string CssClass) GetPriority(TimeSpan remaining)
