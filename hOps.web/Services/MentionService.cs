@@ -32,7 +32,7 @@ namespace hOps.web.Services
             _logger = logger;
         }
 
-        public async Task<List<MentionSuggestion>> SearchUsersAsync(string term, int maxResults = 8)
+        public async Task<List<MentionSuggestion>> SearchEntitiesAsync(ApplicationUser? actor, string term, int maxResults = 8)
         {
             if (string.IsNullOrWhiteSpace(term))
             {
@@ -48,7 +48,9 @@ namespace hOps.web.Services
             normalizedTerm = normalizedTerm.ToLowerInvariant();
             var likePattern = $"%{normalizedTerm}%";
 
-            return await _userManager.Users
+            var suggestions = new List<MentionSuggestion>();
+
+            var users = await _userManager.Users
                 .Where(u =>
                     (!string.IsNullOrEmpty(u.FirstName) && EF.Functions.Like(u.FirstName.ToLower(), likePattern)) ||
                     (!string.IsNullOrEmpty(u.LastName) && EF.Functions.Like(u.LastName.ToLower(), likePattern)) ||
@@ -60,8 +62,68 @@ namespace hOps.web.Services
                 .Select(u => new MentionSuggestion(
                     u.Id,
                     BuildDisplayName(u),
-                    string.Empty))
+                    string.IsNullOrWhiteSpace(u.Email) ? (u.UserName ?? string.Empty) : u.Email!,
+                    "user"))
                 .ToListAsync();
+
+            if (actor != null)
+            {
+                users = users
+                    .Where(s => !string.Equals(s.Id, actor.Id, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            suggestions.AddRange(users);
+
+            var accessiblePropertyIds = actor == null
+                ? new List<int>()
+                : await _context.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == actor.Id)
+                    .Select(upa => upa.PropertyId)
+                    .Distinct()
+                    .ToListAsync();
+
+            var departmentQuery = _context.Departments.AsQueryable();
+            if (accessiblePropertyIds.Any())
+            {
+                departmentQuery = departmentQuery.Where(d => !d.PropertyId.HasValue || accessiblePropertyIds.Contains(d.PropertyId.Value));
+            }
+            else
+            {
+                departmentQuery = departmentQuery.Where(d => !d.PropertyId.HasValue);
+            }
+
+            departmentQuery = departmentQuery
+                .Where(d => d.Name != null && EF.Functions.Like(d.Name!.ToLower(), likePattern))
+                .OrderBy(d => d.Name)
+                .Take(maxResults);
+
+            var departmentResults = await departmentQuery
+                .Select(d => new
+                {
+                    d.Id,
+                    d.Name,
+                    PropertyName = d.Property != null
+                        ? (string.IsNullOrWhiteSpace(d.Property.Code)
+                            ? d.Property.Name
+                            : $"{d.Property.Name} ({d.Property.Code})")
+                        : null
+                })
+                .ToListAsync();
+
+            foreach (var department in departmentResults)
+            {
+                var displayName = string.IsNullOrWhiteSpace(department.Name)
+                    ? $"Department #{department.Id}"
+                    : department.Name!;
+                suggestions.Add(new MentionSuggestion(
+                    $"department:{department.Id}",
+                    displayName,
+                    department.PropertyName ?? "All properties",
+                    "department"));
+            }
+
+            return suggestions;
         }
 
         public IEnumerable<MentionMarkupFormatter.MentionReference> ExtractMentions(string? content)
@@ -82,22 +144,59 @@ namespace hOps.web.Services
                 return;
             }
 
-            var userIds = mentions
-                .Select(m => m.UserId)
-                .Where(id => !string.IsNullOrWhiteSpace(id) && !string.Equals(id, actor.Id, StringComparison.OrdinalIgnoreCase))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            var directUserIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var departmentIds = new HashSet<int>();
 
-            if (!userIds.Any())
+            foreach (var mention in mentions)
             {
-                return;
+                if (string.IsNullOrWhiteSpace(mention.UserId))
+                {
+                    continue;
+                }
+
+                if (TryParseDepartmentIdentifier(mention.UserId, out var deptId))
+                {
+                    departmentIds.Add(deptId);
+                    continue;
+                }
+
+                if (!string.Equals(mention.UserId, actor.Id, StringComparison.OrdinalIgnoreCase))
+                {
+                    directUserIds.Add(mention.UserId);
+                }
             }
 
-            var mentionedUsers = await _userManager.Users
-                .Where(u => userIds.Contains(u.Id))
-                .ToListAsync();
+            var mentionedUsers = directUserIds.Any()
+                ? await _userManager.Users
+                    .Where(u => directUserIds.Contains(u.Id))
+                    .ToListAsync()
+                : new List<ApplicationUser>();
 
-            if (!mentionedUsers.Any())
+            var departmentUsers = new List<ApplicationUser>();
+            if (departmentIds.Any())
+            {
+                var departmentUserIds = await _context.UserDepartmentSubscriptions
+                    .Where(s => departmentIds.Contains(s.DepartmentId))
+                    .Select(s => s.UserId)
+                    .Where(userId => !string.Equals(userId, actor.Id, StringComparison.OrdinalIgnoreCase))
+                    .Distinct()
+                    .ToListAsync();
+
+                if (departmentUserIds.Any())
+                {
+                    departmentUsers = await _userManager.Users
+                        .Where(u => departmentUserIds.Contains(u.Id))
+                        .ToListAsync();
+                }
+            }
+
+            var allRecipients = mentionedUsers
+                .Concat(departmentUsers)
+                .GroupBy(u => u.Id)
+                .Select(g => g.First())
+                .ToList();
+
+            if (!allRecipients.Any())
             {
                 return;
             }
@@ -113,7 +212,7 @@ namespace hOps.web.Services
 
             var actorName = BuildDisplayName(actor);
 
-            foreach (var user in mentionedUsers)
+            foreach (var user in allRecipients)
             {
                 try
                 {
@@ -136,7 +235,7 @@ namespace hOps.web.Services
 
             await _context.SaveChangesAsync();
 
-            foreach (var user in mentionedUsers)
+            foreach (var user in allRecipients)
             {
                 await SendMentionEmailAsync(user, actor, contextTitle, linkUrl, preview);
             }
@@ -208,7 +307,25 @@ namespace hOps.web.Services
 
             return user.UserName ?? "User";
         }
+
+        private static bool TryParseDepartmentIdentifier(string identifier, out int departmentId)
+        {
+            departmentId = 0;
+            if (string.IsNullOrWhiteSpace(identifier))
+            {
+                return false;
+            }
+
+            const string prefix = "department:";
+            if (!identifier.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var numericPart = identifier.Substring(prefix.Length);
+            return int.TryParse(numericPart, out departmentId);
+        }
     }
 
-    public readonly record struct MentionSuggestion(string Id, string DisplayName, string Email);
+    public readonly record struct MentionSuggestion(string Id, string DisplayName, string? Description, string Type);
 }

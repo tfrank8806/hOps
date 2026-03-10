@@ -28,15 +28,7 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> Search(string term)
         {
             var currentUser = await _userManager.GetUserAsync(User);
-            var suggestions = await _mentionService.SearchUsersAsync(term);
-
-            if (currentUser != null)
-            {
-                suggestions = suggestions
-                    .Where(s => !string.Equals(s.Id, currentUser.Id, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-            }
-
+            var suggestions = await _mentionService.SearchEntitiesAsync(currentUser, term);
             return Json(suggestions);
         }
     }

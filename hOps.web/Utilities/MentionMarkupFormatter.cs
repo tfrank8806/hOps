@@ -76,7 +76,13 @@ namespace hOps.web.Utilities
             return MentionRegex.Replace(content, match =>
             {
                 var name = System.Net.WebUtility.HtmlEncode(GetGroupValue(match, "name", "plainName"));
-                var userId = System.Net.WebUtility.UrlEncode(DecodeIdentifier(GetGroupValue(match, "id", "plainId")));
+                var identifier = DecodeIdentifier(GetGroupValue(match, "id", "plainId"));
+                if (identifier.StartsWith("department:", StringComparison.OrdinalIgnoreCase))
+                {
+                    return $"<span class=\"mention mention-department\">@{name}</span>";
+                }
+
+                var userId = System.Net.WebUtility.UrlEncode(identifier);
                 return $"<a class=\"mention\" href=\"/DirectMessages?userId={userId}\">@{name}</a>";
             });
         }

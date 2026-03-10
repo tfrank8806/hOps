@@ -223,7 +223,32 @@
             }
             item.dataset.mentionUser = user.id;
             item.dataset.mentionDisplay = user.displayName;
-            item.textContent = user.displayName;
+            item.dataset.mentionType = user.type || 'user';
+
+            const titleRow = document.createElement('div');
+            titleRow.className = 'd-flex align-items-center justify-content-between gap-2';
+
+            const titleText = document.createElement('span');
+            titleText.className = 'fw-semibold';
+            titleText.textContent = user.displayName;
+            titleRow.appendChild(titleText);
+
+            const typeBadge = document.createElement('span');
+            typeBadge.className =
+                user.type === 'department'
+                    ? 'badge bg-info text-dark'
+                    : 'badge bg-secondary-subtle text-secondary';
+            typeBadge.textContent = user.type === 'department' ? 'Department' : 'User';
+            titleRow.appendChild(typeBadge);
+
+            item.appendChild(titleRow);
+
+            if (user.description) {
+                const description = document.createElement('div');
+                description.className = 'text-muted small';
+                description.textContent = user.description;
+                item.appendChild(description);
+            }
 
             item.addEventListener('mousedown', (event) => {
                 event.preventDefault();
