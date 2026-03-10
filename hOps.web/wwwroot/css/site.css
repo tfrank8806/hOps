@@ -231,19 +231,19 @@ body.sidebar-collapsed button.sidebar-toggle {
 }
 
 .main-header .sidebar-toggle {
-    border-color: rgba(255, 255, 255, 0.6);
-    background: rgba(255, 255, 255, 0.72);
-    color: var(--brand-primary-strong);
+    border-color: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
 }
 
 .main-header .sidebar-toggle-icon {
-    color: var(--brand-primary-strong);
+    color: currentColor;
 }
 
 .main-header .sidebar-toggle:hover,
 .main-header .sidebar-toggle:focus {
-    background: rgba(255, 255, 255, 0.92);
-    border-color: rgba(9, 118, 179, 0.35);
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.45);
 }
 
 .sidebar-toggle-text {
@@ -253,14 +253,34 @@ body.sidebar-collapsed button.sidebar-toggle {
 }
 
 .main-header .nav-link {
-    border-radius: 0.75rem;
+    border-radius: 0.4rem;
+    color: #eef5ff;
+    font-weight: 600;
+    padding: 0.35rem 0.85rem;
+    text-transform: none;
+    border: 1px solid transparent;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.main-header .nav-link:hover,
+.main-header .nav-link:focus {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
 }
 
 .main-header .nav-link:focus-visible,
 .main-header .nav-link.dropdown-toggle:focus-visible {
     outline: 0;
-    box-shadow: 0 0 0 0.2rem rgba(9, 118, 179, 0.2);
-    background-color: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 0 0 0.15rem rgba(255, 255, 255, 0.35);
+}
+
+.main-header .nav-link.active,
+.main-header .nav-link.show {
+    background-color: #0f6fb7;
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 calc(6px * var(--ui-scale)) calc(12px * var(--ui-scale)) rgba(2, 13, 32, 0.35);
+    color: #fff;
 }
 
 .bookmark-toggle-icon {
@@ -277,6 +297,7 @@ body.sidebar-collapsed button.sidebar-toggle {
     height: 2.25rem;
     border-radius: calc(999px * var(--ui-scale));
     transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    color: inherit;
 }
 
 .bookmark-toggle:hover {
@@ -287,6 +308,11 @@ body.sidebar-collapsed button.sidebar-toggle {
     outline: 0;
     background-color: rgba(255, 255, 255, 0.3);
     box-shadow: 0 0 0 0.2rem rgba(9, 118, 179, 0.3);
+}
+
+.main-header .bookmark-toggle,
+.main-header .bookmark-toggle-icon {
+    color: #f4f9ff;
 }
 
 .bookmark-dropdown-menu {
@@ -797,10 +823,77 @@ body.sidebar-collapsed .sidebar-inner {
     position: sticky;
     top: 0;
     z-index: 1200;
-    background: linear-gradient(135deg, rgba(9, 118, 179, 0.15), rgba(255, 255, 255, 0.94));
-    border-bottom: calc(1px * var(--ui-scale)) solid rgba(9, 118, 179, 0.25);
-    box-shadow: 0 calc(20px * var(--ui-scale)) calc(40px * var(--ui-scale)) rgba(2, 8, 20, 0.08);
-    backdrop-filter: blur(calc(14px * var(--ui-scale)));
+    background: linear-gradient(180deg, #0b3f6b 0%, #062749 100%);
+    border-bottom: calc(1px * var(--ui-scale)) solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 calc(18px * var(--ui-scale)) calc(36px * var(--ui-scale)) rgba(4, 22, 46, 0.6);
+    color: #f2f7fc;
+}
+
+.main-header .container-fluid {
+    color: inherit;
+}
+
+.main-header .brand-lockup__title {
+    color: #ffffff;
+}
+
+.main-header .brand-lockup__subtitle,
+.main-header .page-title span.text-muted {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.main-header .page-title h1 {
+    color: #ffffff;
+}
+
+.main-header .btn-link {
+    color: #f0f6ff;
+}
+
+.main-header .btn-link:hover,
+.main-header .btn-link:focus {
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.main-header .dropdown-menu {
+    border-radius: 0.65rem;
+    border: 1px solid rgba(5, 31, 59, 0.16);
+    box-shadow: 0 calc(18px * var(--ui-scale)) calc(40px * var(--ui-scale)) rgba(6, 18, 42, 0.35);
+    background: linear-gradient(180deg, #f9fcff 0%, #edf3fb 100%);
+    color: #0b284b;
+}
+
+.main-header .dropdown-item:hover,
+.main-header .dropdown-item:focus {
+    background-color: #dceffc;
+    color: #052245;
+}
+
+.main-header .nav .text-muted {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.main-header__actions {
+    border-top: calc(1px * var(--ui-scale)) solid rgba(255, 255, 255, 0.1);
+    padding-top: 0.85rem;
+}
+
+.main-header .btn-outline-primary,
+.main-header .btn-outline-secondary {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.4);
+    background-color: rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+}
+
+.main-header .btn-outline-primary:hover,
+.main-header .btn-outline-primary:focus,
+.main-header .btn-outline-secondary:hover,
+.main-header .btn-outline-secondary:focus {
+    background-color: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.65);
+    color: #ffffff;
 }
 
 .hotel-layout-panel {
