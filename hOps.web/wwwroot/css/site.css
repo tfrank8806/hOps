@@ -2469,24 +2469,31 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 .issue-report-fab {
     position: fixed;
-    bottom: 1.5rem;
+    bottom: 0;
     right: 1.5rem;
     z-index: 1050;
     display: flex;
     align-items: center;
     justify-content: flex-end;
     pointer-events: none;
+    padding-bottom: 0.5rem;
 }
 
 .issue-report-fab__button {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
+    gap: 0.4rem;
     border-radius: 999px;
     box-shadow: 0 20px 35px rgba(15, 23, 42, 0.25);
-    padding: 0.75rem 1.5rem;
+    padding: 0.65rem;
     font-weight: 600;
     pointer-events: auto;
+    min-width: 3rem;
+    background: linear-gradient(135deg, var(--brand-accent), var(--brand-primary));
+    color: #fff;
+    transition: padding 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+    opacity: 0.85;
 }
 
 .issue-report-fab__icon {
@@ -2502,16 +2509,36 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 .issue-report-fab__label {
     white-space: nowrap;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    margin-left: 0;
+    transition: max-width 0.2s ease, opacity 0.2s ease, margin-left 0.2s ease;
+}
+
+.issue-report-fab:hover .issue-report-fab__button,
+.issue-report-fab__button:focus-visible {
+    padding: 0.65rem 1.25rem;
+    opacity: 1;
+    outline: 0;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.35);
+}
+
+.issue-report-fab:hover .issue-report-fab__label,
+.issue-report-fab__button:focus-visible .issue-report-fab__label {
+    max-width: 200px;
+    opacity: 1;
+    margin-left: 0.35rem;
 }
 
 @media (max-width: 575.98px) {
     .issue-report-fab {
         right: 1rem;
-        bottom: 1rem;
+        bottom: 0;
     }
 
     .issue-report-fab__button {
-        padding: 0.6rem 1rem;
+        padding: 0.55rem;
         font-size: 0.9rem;
     }
 
