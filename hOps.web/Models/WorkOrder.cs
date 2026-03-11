@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace hOps.web.Models
 {
@@ -33,6 +34,11 @@ namespace hOps.web.Models
 
         public string? CreatedById { get; set; }
         public ApplicationUser? CreatedBy { get; set; }
+
+        public string? AssignedToUserId { get; set; }
+
+        [ForeignKey(nameof(AssignedToUserId))]
+        public ApplicationUser? AssignedTo { get; set; }
 
         public int? DepartmentId { get; set; }
         public Department? Department { get; set; }

@@ -16,6 +16,8 @@ namespace hOps.web.ViewModels.WorkOrders
         public DateTime CreatedAt { get; set; }
         public string? Department { get; set; }
         public string? DepartmentColor { get; set; }
+        public string? AssignedToName { get; set; }
+        public string? AssignedToId { get; set; }
         public string? Creator { get; set; }
         public string PriorityLabel { get; set; } = string.Empty;
         public string PriorityClass { get; set; } = "badge bg-light text-dark border";

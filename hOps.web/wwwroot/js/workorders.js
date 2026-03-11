@@ -11,19 +11,20 @@
     const attachmentsModalBody = attachmentsModalEl?.querySelector('[data-attachments-modal-body]');
     const attachmentsModalEmpty = attachmentsModalEl?.querySelector('[data-attachments-modal-empty]');
     const attachmentsModalTitle = attachmentsModalEl?.querySelector('[data-attachments-modal-title]');
-    const fields = {
-        title: modalEl.querySelector('[data-workorder-field="title"]'),
-        meta: modalEl.querySelector('[data-workorder-field="meta"]'),
-        issue: modalEl.querySelector('[data-workorder-field="issue"]'),
-        details: modalEl.querySelector('[data-workorder-field="details"]'),
-        completionNotes: modalEl.querySelector('[data-workorder-field="completionNotes"]'),
-        location: modalEl.querySelector('[data-workorder-field="location"]'),
-        department: modalEl.querySelector('[data-workorder-field="department"]'),
-        dueDate: modalEl.querySelector('[data-workorder-field="dueDate"]'),
-        created: modalEl.querySelector('[data-workorder-field="created"]'),
-        creator: modalEl.querySelector('[data-workorder-field="creator"]'),
-        properties: modalEl.querySelector('[data-workorder-field="properties"]'),
-        status: modalEl.querySelector('[data-workorder-field="status"]'),
+        const fields = {
+            title: modalEl.querySelector('[data-workorder-field="title"]'),
+            meta: modalEl.querySelector('[data-workorder-field="meta"]'),
+            issue: modalEl.querySelector('[data-workorder-field="issue"]'),
+            details: modalEl.querySelector('[data-workorder-field="details"]'),
+            completionNotes: modalEl.querySelector('[data-workorder-field="completionNotes"]'),
+            location: modalEl.querySelector('[data-workorder-field="location"]'),
+            department: modalEl.querySelector('[data-workorder-field="department"]'),
+            assignee: modalEl.querySelector('[data-workorder-field="assignee"]'),
+            dueDate: modalEl.querySelector('[data-workorder-field="dueDate"]'),
+            created: modalEl.querySelector('[data-workorder-field="created"]'),
+            creator: modalEl.querySelector('[data-workorder-field="creator"]'),
+            properties: modalEl.querySelector('[data-workorder-field="properties"]'),
+            status: modalEl.querySelector('[data-workorder-field="status"]'),
         type: modalEl.querySelector('[data-workorder-field="type"]')
     };
     const attachmentsSection = modalEl.querySelector('[data-workorder-attachments-section]');
@@ -130,7 +131,8 @@
         }
 
         setText(fields.location, data.location);
-        setText(fields.department, data.department);
+        setText(fields.department, data.department, 'Unassigned');
+        setText(fields.assignee, data.assignedTo, 'Unassigned');
         setText(fields.dueDate, data.dueDateText);
         setText(fields.created, data.createdAtText);
         setText(fields.creator, data.creator, 'Unknown');
@@ -370,6 +372,54 @@
 
         return `<div class="workorder-details-popover-content">${html}</div>`;
     }
+})();
+
+(() => {
+    const containers = document.querySelectorAll('[data-searchable-select]');
+    if (!containers.length) {
+        return;
+    }
+
+    containers.forEach(container => {
+        const input = container.querySelector('[data-searchable-select-input]');
+        const select = container.querySelector('[data-searchable-select-target]');
+        if (!input || !select) {
+            return;
+        }
+
+        const options = Array.from(select.options).filter(option => option.value);
+
+        const resetVisibility = () => {
+            options.forEach(option => {
+                option.hidden = false;
+            });
+        };
+
+        const handleInput = () => {
+            const term = (input.value || '').trim().toLowerCase();
+            if (!term) {
+                resetVisibility();
+                return;
+            }
+
+            options.forEach(option => {
+                option.hidden = !option.text.toLowerCase().includes(term);
+            });
+        };
+
+        input.addEventListener('input', handleInput);
+        input.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                input.value = '';
+                resetVisibility();
+            }
+        });
+        input.addEventListener('blur', () => {
+            if (!input.value) {
+                resetVisibility();
+            }
+        });
+    });
 })();
 
 (() => {

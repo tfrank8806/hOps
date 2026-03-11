@@ -98,6 +98,7 @@ namespace hOps.web.Controllers
                 Details = workOrder.Details,
                 DueDate = workOrder.DueDate,
                 DepartmentId = workOrder.DepartmentId,
+                AssignedUserId = workOrder.AssignedToUserId,
                 SelectedPropertyIds = workOrder.Properties.Select(p => p.PropertyId).ToList()
             };
 
@@ -120,6 +121,7 @@ namespace hOps.web.Controllers
                 "Status",
                 "Location",
                 "Department",
+                "Assigned To",
                 "Type",
                 "Issue",
                 "Details",
@@ -147,18 +149,19 @@ namespace hOps.web.Controllers
                 worksheet.Cell(rowNumber, 1).Value = order.Status;
                 worksheet.Cell(rowNumber, 2).Value = order.Location;
                 worksheet.Cell(rowNumber, 3).Value = order.Department ?? "Unassigned";
-                worksheet.Cell(rowNumber, 4).Value = order.WorkOrderType ?? string.Empty;
-                worksheet.Cell(rowNumber, 5).Value = order.Issue;
-                worksheet.Cell(rowNumber, 6).Value = string.IsNullOrWhiteSpace(order.Details) ? string.Empty : order.Details;
-                worksheet.Cell(rowNumber, 7).Value = order.DueDate;
+                worksheet.Cell(rowNumber, 4).Value = string.IsNullOrWhiteSpace(order.AssignedToName) ? "Unassigned" : order.AssignedToName;
+                worksheet.Cell(rowNumber, 5).Value = order.WorkOrderType ?? string.Empty;
+                worksheet.Cell(rowNumber, 6).Value = order.Issue;
+                worksheet.Cell(rowNumber, 7).Value = string.IsNullOrWhiteSpace(order.Details) ? string.Empty : order.Details;
+                worksheet.Cell(rowNumber, 8).Value = order.DueDate;
                 var createdLocal = _timeZoneService.ConvertToUserTime(order.CreatedAt);
-                worksheet.Cell(rowNumber, 8).Value = createdLocal;
-                worksheet.Cell(rowNumber, 9).Value = string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator;
-                worksheet.Cell(rowNumber, 10).Value = string.Join(Environment.NewLine, order.Properties);
-                worksheet.Cell(rowNumber, 11).Value = string.Join(Environment.NewLine, order.Attachments.Select(a => a.FileName));
+                worksheet.Cell(rowNumber, 9).Value = createdLocal;
+                worksheet.Cell(rowNumber, 10).Value = string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator;
+                worksheet.Cell(rowNumber, 11).Value = string.Join(Environment.NewLine, order.Properties);
+                worksheet.Cell(rowNumber, 12).Value = string.Join(Environment.NewLine, order.Attachments.Select(a => a.FileName));
 
-                worksheet.Cell(rowNumber, 7).Style.DateFormat.Format = "MMM dd, yyyy";
                 worksheet.Cell(rowNumber, 8).Style.DateFormat.Format = "MMM dd, yyyy";
+                worksheet.Cell(rowNumber, 9).Style.DateFormat.Format = "MMM dd, yyyy";
                 worksheet.Row(rowNumber).Style.Alignment.SetVertical(XLAlignmentVerticalValues.Top);
             }
 
@@ -206,6 +209,25 @@ namespace hOps.web.Controllers
             }
 
             form.SelectedPropertyIds = selectedPropertyIds;
+
+            var assignableUsers = await GetAssignableUsersAsync(selectedPropertyIds);
+            var assignableUserIds = new HashSet<string>(assignableUsers.Select(u => u.UserId), StringComparer.OrdinalIgnoreCase);
+            var trimmedAssignee = string.IsNullOrWhiteSpace(form.AssignedUserId)
+                ? null
+                : form.AssignedUserId!.Trim();
+            form.AssignedUserId = trimmedAssignee;
+
+            if (!form.DepartmentId.HasValue && string.IsNullOrWhiteSpace(trimmedAssignee))
+            {
+                var assignmentError = "Select a department or an individual to assign this work order.";
+                ModelState.AddModelError("Form.DepartmentId", assignmentError);
+                ModelState.AddModelError("Form.AssignedUserId", assignmentError);
+            }
+
+            if (!string.IsNullOrWhiteSpace(trimmedAssignee) && !assignableUserIds.Contains(trimmedAssignee))
+            {
+                ModelState.AddModelError("Form.AssignedUserId", "Selected user does not have access to the selected properties.");
+            }
 
             if (!ModelState.IsValid)
             {
@@ -377,6 +399,25 @@ namespace hOps.web.Controllers
 
             form.SelectedPropertyIds = selectedPropertyIds;
 
+            var assignableUsers = await GetAssignableUsersAsync(selectedPropertyIds);
+            var assignableUserIds = new HashSet<string>(assignableUsers.Select(u => u.UserId), StringComparer.OrdinalIgnoreCase);
+            var trimmedAssignee = string.IsNullOrWhiteSpace(form.AssignedUserId)
+                ? null
+                : form.AssignedUserId!.Trim();
+            form.AssignedUserId = trimmedAssignee;
+
+            if (!form.DepartmentId.HasValue && string.IsNullOrWhiteSpace(trimmedAssignee))
+            {
+                var assignmentError = "Select a department or an individual to assign this work order.";
+                ModelState.AddModelError("Form.DepartmentId", assignmentError);
+                ModelState.AddModelError("Form.AssignedUserId", assignmentError);
+            }
+
+            if (!string.IsNullOrWhiteSpace(trimmedAssignee) && !assignableUserIds.Contains(trimmedAssignee))
+            {
+                ModelState.AddModelError("Form.AssignedUserId", "Selected user does not have access to the selected properties.");
+            }
+
             if (!ModelState.IsValid)
             {
                 var invalidModel = await BuildViewModelAsync(filters, form);
@@ -391,6 +432,7 @@ namespace hOps.web.Controllers
             workOrder.Details = form.Details;
             workOrder.DueDate = NormalizeUtcDate(form.DueDate);
             workOrder.DepartmentId = form.DepartmentId;
+            workOrder.AssignedToUserId = string.IsNullOrWhiteSpace(form.AssignedUserId) ? null : form.AssignedUserId;
 
             var accessiblePropertySet = new HashSet<int>(accessiblePropertyIds);
             var toRemove = workOrder.Properties
@@ -754,6 +796,7 @@ namespace hOps.web.Controllers
                 Details = form.Details,
                 DueDate = NormalizeUtcDate(form.DueDate),
                 DepartmentId = form.DepartmentId,
+                AssignedToUserId = string.IsNullOrWhiteSpace(form.AssignedUserId) ? null : form.AssignedUserId,
                 CreatedAt = DateTime.UtcNow,
                 CreatedById = user.Id
             };
@@ -812,6 +855,10 @@ namespace hOps.web.Controllers
             if (form.DepartmentId.HasValue)
             {
                 _logger.LogInformation("Work order {WorkOrderId} assigned to department {DepartmentId}", workOrder.Id, form.DepartmentId);
+            }
+            if (!string.IsNullOrWhiteSpace(form.AssignedUserId))
+            {
+                _logger.LogInformation("Work order {WorkOrderId} assigned to user {UserId}", workOrder.Id, form.AssignedUserId);
             }
 
             return workOrder;
@@ -1076,6 +1123,50 @@ namespace hOps.web.Controllers
                 .Distinct()
                 .ToListAsync();
         }
+
+        private async Task<List<AssignableUserOption>> GetAssignableUsersAsync(IEnumerable<int> propertyIds)
+        {
+            var targetIds = propertyIds?
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList() ?? new List<int>();
+
+            if (!targetIds.Any())
+            {
+                return new List<AssignableUserOption>();
+            }
+
+            var candidates = await _context.UserPropertyAccesses
+                .Where(upa => targetIds.Contains(upa.PropertyId))
+                .Select(upa => new
+                {
+                    upa.ApplicationUserId,
+                    upa.ApplicationUser.FirstName,
+                    upa.ApplicationUser.LastName,
+                    upa.ApplicationUser.Email
+                })
+                .Where(x => x.ApplicationUserId != null)
+                .ToListAsync();
+
+            return candidates
+                .GroupBy(x => x.ApplicationUserId)
+                .Select(group =>
+                {
+                    var user = group.First();
+                    var displayName = string.Join(" ", new[] { user.FirstName, user.LastName }.Where(part => !string.IsNullOrWhiteSpace(part)));
+                    if (string.IsNullOrWhiteSpace(displayName))
+                    {
+                        displayName = user.Email ?? "Team Member";
+                    }
+                    return new AssignableUserOption
+                    {
+                        UserId = user.ApplicationUserId!,
+                        DisplayName = displayName
+                    };
+                })
+                .OrderBy(option => option.DisplayName)
+                .ToList();
+        }
         private async Task<WorkOrdersViewModel> BuildViewModelAsync(WorkOrderFilterInput? filters, WorkOrderFormViewModel? form)
         {
             filters ??= new WorkOrderFilterInput();
@@ -1113,6 +1204,7 @@ namespace hOps.web.Controllers
                 .Include(w => w.WorkOrderType)
                 .Include(w => w.Department)
                 .Include(w => w.CreatedBy)
+                .Include(w => w.AssignedTo)
                 .Include(w => w.Properties).ThenInclude(p => p.Property)
                 .Include(w => w.Attachments)
                 .AsQueryable();
@@ -1216,6 +1308,8 @@ namespace hOps.web.Controllers
                     CreatedAt = wo.CreatedAt,
                     Department = wo.Department?.Name,
                     DepartmentColor = wo.Department?.Color,
+                    AssignedToId = wo.AssignedToUserId,
+                    AssignedToName = BuildDisplayName(wo.AssignedTo),
                     Creator = wo.CreatedBy != null
                         ? string.Join(" ", new[] { wo.CreatedBy.FirstName, wo.CreatedBy.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)))
                         : null,
@@ -1360,6 +1454,48 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
+            var assignableUsersForProperties = await GetAssignableUsersAsync(targetPropertySet);
+            var assigneeOptions = assignableUsersForProperties
+                .Select(user => new SelectListItem
+                {
+                    Value = user.UserId,
+                    Text = user.DisplayName,
+                    Selected = !string.IsNullOrWhiteSpace(effectiveForm.AssignedUserId) &&
+                               string.Equals(effectiveForm.AssignedUserId, user.UserId, StringComparison.Ordinal)
+                })
+                .ToList();
+
+            if (!string.IsNullOrWhiteSpace(effectiveForm.AssignedUserId) &&
+                assigneeOptions.All(option => !option.Selected))
+            {
+                var fallbackUser = await _context.Users
+                    .Where(u => u.Id == effectiveForm.AssignedUserId)
+                    .Select(u => new AssignableUserOption
+                    {
+                        UserId = u.Id,
+                        DisplayName = BuildDisplayName(u)
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (fallbackUser != null)
+                {
+                    assigneeOptions.Add(new SelectListItem
+                    {
+                        Value = fallbackUser.UserId,
+                        Text = fallbackUser.DisplayName,
+                        Selected = true
+                    });
+
+                    assigneeOptions = assigneeOptions
+                        .OrderBy(option => option.Text)
+                        .ToList();
+                }
+                else
+                {
+                    effectiveForm.AssignedUserId = null;
+                }
+            }
+
             var viewModel = new WorkOrdersViewModel
             {
                 WorkOrders = listItems,
@@ -1371,6 +1507,7 @@ namespace hOps.web.Controllers
                 PropertyOptions = propertyFormOptions,
                 PropertyFilterOptions = propertyFilterOptions,
                 CreatorOptions = creatorOptions,
+                AssigneeOptions = assigneeOptions,
                 LocationSuggestions = locationSuggestions.OrderBy(x => x).ToList(),
                 StatusColorMap = statusColorMap,
                 EditingWorkOrderId = form?.Id,
@@ -1494,6 +1631,27 @@ namespace hOps.web.Controllers
 
             return trimmedLocation.Contains(trimmedRoom, StringComparison.OrdinalIgnoreCase) ||
                 trimmedRoom.Contains(trimmedLocation, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string BuildDisplayName(ApplicationUser? user)
+        {
+            if (user == null)
+            {
+                return string.Empty;
+            }
+
+            if (!string.IsNullOrWhiteSpace(user.FirstName) || !string.IsNullOrWhiteSpace(user.LastName))
+            {
+                return string.Join(" ", new[] { user.FirstName, user.LastName }.Where(part => !string.IsNullOrWhiteSpace(part)));
+            }
+
+            return string.IsNullOrWhiteSpace(user.Email) ? user.UserName ?? "Teammate" : user.Email!;
+        }
+
+        private sealed class AssignableUserOption
+        {
+            public string UserId { get; set; } = string.Empty;
+            public string DisplayName { get; set; } = string.Empty;
         }
     }
 }

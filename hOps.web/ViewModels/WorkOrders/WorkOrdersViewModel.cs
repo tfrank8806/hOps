@@ -15,6 +15,7 @@ namespace hOps.web.ViewModels.WorkOrders
         public List<PropertyOptionViewModel> PropertyFilterOptions { get; set; } = new();
         public List<PropertyOptionViewModel> PropertyOptions { get; set; } = new();
         public List<SelectListItem> CreatorOptions { get; set; } = new();
+        public List<SelectListItem> AssigneeOptions { get; set; } = new();
         public List<string> LocationSuggestions { get; set; } = new();
         public Dictionary<string, string> StatusColorMap { get; set; } = new();
         public int? EditingWorkOrderId { get; set; }

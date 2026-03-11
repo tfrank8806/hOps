@@ -33,6 +33,9 @@ namespace hOps.web.ViewModels.WorkOrders
         [Display(Name = "Assign To")]
         public int? DepartmentId { get; set; }
 
+        [Display(Name = "Assign Individual")]
+        public string? AssignedUserId { get; set; }
+
         [Display(Name = "Photo Upload")]
         public List<IFormFile>? Photos { get; set; }
 

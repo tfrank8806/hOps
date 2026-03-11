@@ -66,6 +66,7 @@
     var filterQueryString = filterQuery.ToQueryString().ToString();
     var exportUrl = $"{Url.Action("Export")}{filterQueryString}";
     var indexUrlWithFilters = $"{Url.Action("Index")}{filterQueryString}";
+    var hasAssigneeOptions = Model.AssigneeOptions != null && Model.AssigneeOptions.Count > 0;
 }
 
 @functions {
@@ -277,6 +278,11 @@
         .workorders-table .col-department {
             width: 11%;
             min-width: 110px;
+        }
+
+        .workorders-table .col-assigned {
+            width: 12%;
+            min-width: 140px;
         }
 
         .workorders-table .col-type {
@@ -678,10 +684,11 @@
                 <thead class="table-light">
                             <tr>
                                 <th scope="col" class="text-center">Actions</th>
-                                <th scope="col">@SortableHeader("Status", "status")</th>
-                                <th scope="col">@SortableHeader("Location", "location")</th>
-                                <th scope="col">@SortableHeader("Department", "department")</th>
-                                <th scope="col">@SortableHeader("Type", "type")</th>
+                            <th scope="col">@SortableHeader("Status", "status")</th>
+                            <th scope="col">@SortableHeader("Location", "location")</th>
+                            <th scope="col">@SortableHeader("Department", "department")</th>
+                            <th scope="col">Assigned</th>
+                            <th scope="col">@SortableHeader("Type", "type")</th>
                                 <th scope="col">@SortableHeader("Issue", "issue")</th>
                                 <th scope="col">@SortableHeader("Details", "details")</th>
                                 <th scope="col">@SortableHeader("Due", "due")</th>
@@ -749,6 +756,8 @@
                                         workOrderType = order.WorkOrderType ?? "Unspecified",
                                         department = departmentDisplay,
                                         departmentColor = order.DepartmentColor,
+                                        assignedTo = string.IsNullOrWhiteSpace(order.AssignedToName) ? "Unassigned" : order.AssignedToName,
+                                        assignedToId = order.AssignedToId,
                                         dueDateText = order.DueDate.ToString("MM-dd-yy"),
                                         createdAtText = createdLocal.ToString("MM-dd-yy h:mm tt"),
                                         creator = string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator,
@@ -807,6 +816,17 @@
                         @if (!string.IsNullOrWhiteSpace(order.Department))
                         {
                             <span class="badge" style="background-color:@order.DepartmentColor;">@order.Department</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Unassigned</span>
+                        }
+                    </td>
+                    <td class="col-assigned">
+                        <div class="fw-semibold text-uppercase small text-muted">Assigned To</div>
+                        @if (!string.IsNullOrWhiteSpace(order.AssignedToName))
+                        {
+                            <div>@order.AssignedToName</div>
                         }
                         else
                         {
@@ -953,6 +973,35 @@
                                 <span asp-validation-for="Form.DepartmentId" class="text-danger"></span>
                             </div>
                         </div>
+                        <div class="mb-3" data-searchable-select>
+                            <label asp-for="Form.AssignedUserId" class="form-label"></label>
+                            <input type="search"
+                                   class="form-control form-control-sm mb-2"
+                                   placeholder="Type to search teammates"
+                                   data-searchable-select-input
+                                   @(hasAssigneeOptions ? null : "disabled") />
+                            <select asp-for="Form.AssignedUserId"
+                                    class="form-select"
+                                    data-searchable-select-target>
+                                <option value="">-- Not assigned --</option>
+                                @if (Model.AssigneeOptions != null)
+                                {
+                                    foreach (var option in Model.AssigneeOptions)
+                                    {
+                                        <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
+                                    }
+                                }
+                            </select>
+                            @if (!hasAssigneeOptions)
+                            {
+                                <span class="form-text">No eligible teammates found for the selected property.</span>
+                            }
+                            else
+                            {
+                                <span class="form-text">Start typing above to filter the list.</span>
+                            }
+                            <span asp-validation-for="Form.AssignedUserId" class="text-danger"></span>
+                        </div>
                         <div class="mb-3 mt-3">
                             <label asp-for="Form.Photos" class="form-label"></label>
                             <input asp-for="Form.Photos" class="form-control" type="file" accept="image/*" multiple />
@@ -1020,6 +1069,10 @@
                     <div class="col-md-6">
                         <div class="fw-semibold text-uppercase small text-muted">Department</div>
                         <div data-workorder-field="department"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="fw-semibold text-uppercase small text-muted">Assigned To</div>
+                        <div data-workorder-field="assignee"></div>
                     </div>
                     <div class="col-md-6">
                         <div class="fw-semibold text-uppercase small text-muted">Due Date</div>
