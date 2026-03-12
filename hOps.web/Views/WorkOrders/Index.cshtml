@@ -429,6 +429,18 @@
         .workorders-form-wrapper {
             position: static;
             width: 100%;
+            max-height: none;
+        }
+
+        .workorders-form-card {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .workorders-form-card .card-body {
+            flex: 1 1 auto;
+            overflow: visible;
         }
 
         .workorders-form-column {
@@ -451,6 +463,17 @@
             .workorders-form-wrapper {
                 position: sticky;
                 top: calc(var(--main-header-height) + 1.5rem);
+                max-height: calc(100vh - var(--main-header-height) - 2rem);
+                overflow: hidden;
+            }
+
+            .workorders-form-card {
+                max-height: 100%;
+            }
+
+            .workorders-form-card .card-body {
+                overflow-y: auto;
+                padding-right: 0.5rem;
             }
         }
     </style>
