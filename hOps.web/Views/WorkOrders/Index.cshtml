@@ -1035,9 +1035,6 @@
                         {
                             var soleProperty = Model.PropertyOptions[0];
                             <input type="hidden" name="Form.SelectedPropertyIds" value="@soleProperty.Id" />
-                            <div class="alert alert-info">
-                                Work order will be created for <strong>@soleProperty.Name (@soleProperty.Code)</strong>.
-                            </div>
                         }
                         <button type="submit" class="btn btn-primary w-100">@submitLabel</button>
                     </form>
