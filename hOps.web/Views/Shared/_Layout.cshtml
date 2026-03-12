@@ -12,7 +12,9 @@
                             string.Equals(currentController, "Maintenance", StringComparison.OrdinalIgnoreCase) ||
                             string.Equals(currentController, "MaintenanceEquipment", StringComparison.OrdinalIgnoreCase) ||
                             string.Equals(currentController, "MaintenanceLogs", StringComparison.OrdinalIgnoreCase);
-    var housekeepingActive = string.Equals(currentController, "DeepCleans", StringComparison.OrdinalIgnoreCase);
+    var housekeepingActive =
+        string.Equals(currentController, "DeepCleans", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(currentController, "Housekeeping", StringComparison.OrdinalIgnoreCase);
     var siteVisitActive = string.Equals(currentController, "SiteVisit", StringComparison.OrdinalIgnoreCase);
     var supportActive = string.Equals(currentController, "Support", StringComparison.OrdinalIgnoreCase);
     var mainContainerClass = ViewData["MainContainerClass"] as string ?? string.Empty;
@@ -330,6 +332,7 @@
                                 </a>
                                 <ul class="dropdown-menu">
                                     <li><a class="dropdown-item" asp-controller="DeepCleans" asp-action="Index">Deep Cleans</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Housekeeping" asp-action="DailyRecap">Daily Recap</a></li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">

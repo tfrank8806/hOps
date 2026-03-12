@@ -1,0 +1,625 @@
+@model hOps.web.ViewModels.Housekeeping.DailyRecapViewModel
+@{
+    ViewData["Title"] = "Daily Recap";
+    var property = ViewBag.CurrentProperty as hOps.web.Models.Property;
+    var createdLogId = TempData["DailyRecapCreatedLogId"] as int?;
+    var createdLogTitle = TempData["DailyRecapCreatedTitle"] as string;
+    var dayOfWeekText = Model.ReportDate?.ToString("dddd");
+    var successLink = createdLogId.HasValue
+        ? Url.Action("Details", "PassOnLogs", new { id = createdLogId.Value })
+        : null;
+}
+
+<div class="daily-recap-page">
+    <div class="daily-recap-header card shadow-sm mb-4">
+        <div class="card-body d-flex flex-column flex-lg-row justify-content-between gap-4">
+            <div>
+                <p class="text-uppercase text-muted fw-semibold small mb-1">Housekeeping log</p>
+                <h1 class="h3 mb-2">Daily Recap</h1>
+                <p class="mb-0 text-muted">
+                    Capture the housekeeping performance for the day. When you submit this form we'll automatically post the recap in <a asp-controller="PassOnLogs" asp-action="Index">Pass On Logs</a>.
+                </p>
+            </div>
+            <div class="text-lg-end">
+                @if (property != null)
+                {
+                    <div class="text-muted small text-uppercase mb-1">Posting to</div>
+                    <div class="h5 mb-0">@property.Name</div>
+                    @if (!string.IsNullOrWhiteSpace(property.Code))
+                    {
+                        <div class="text-muted">@property.Code</div>
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-warning mb-0">
+                        Select a property from the header to unlock the daily recap form.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (createdLogId.HasValue)
+    {
+        <div class="alert alert-success d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-4" role="status">
+            <div>
+                <strong>Success!</strong>
+                <span>@(string.IsNullOrWhiteSpace(createdLogTitle) ? "Daily recap posted to Pass On Logs." : $"{createdLogTitle} was posted to Pass On Logs.")</span>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(successLink))
+            {
+                <a class="btn btn-outline-success btn-sm" href="@successLink">View log</a>
+            }
+        </div>
+    }
+
+    @if (property == null)
+    {
+        <div class="alert alert-info">
+            Choose a property from the selector above to start tracking your daily housekeeping recap.
+        </div>
+    }
+    else
+    {
+        <form asp-action="DailyRecap" method="post" class="daily-recap-form">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+            <div class="card daily-recap-card mb-4">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Daily overview</h2>
+                    <div class="row g-4">
+                        <div class="col-md-4">
+                            <label asp-for="ReportDate" class="form-label"></label>
+                            <input asp-for="ReportDate" type="date" class="form-control" data-day-source />
+                            <span asp-validation-for="ReportDate" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Day of Week</label>
+                            <input type="text" class="form-control" value="@dayOfWeekText" readonly data-day-target />
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="ManagerName" class="form-label"></label>
+                            <input asp-for="ManagerName" class="form-control" placeholder="Name of manager or supervisor" />
+                            <span asp-validation-for="ManagerName" class="text-danger small"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card daily-recap-card mb-4">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Daily metrics</h2>
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="daily-recap-section-label">Start of Day</div>
+                            <div class="row g-3">
+                                <div class="col-sm-6">
+                                    <label asp-for="OccupancyPercent" class="form-label small"></label>
+                                    <input asp-for="OccupancyPercent" class="form-control form-control-sm" placeholder="e.g. 88%" />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label asp-for="CheckOuts" class="form-label small"></label>
+                                    <input asp-for="CheckOuts" class="form-control form-control-sm" placeholder="Number of check-outs" />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label asp-for="Stayovers" class="form-label small"></label>
+                                    <input asp-for="Stayovers" class="form-control form-control-sm" />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label asp-for="RoomsOutOfOrderStart" class="form-label small"></label>
+                                    <input asp-for="RoomsOutOfOrderStart" class="form-control form-control-sm" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="daily-recap-section-label">End of Day</div>
+                            <div class="row g-3">
+                                <div class="col-sm-6">
+                                    <label asp-for="VacantClean" class="form-label small"></label>
+                                    <input asp-for="VacantClean" class="form-control form-control-sm" />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label asp-for="VacantDirty" class="form-label small"></label>
+                                    <input asp-for="VacantDirty" class="form-control form-control-sm" />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label asp-for="DeepCleansCompleted" class="form-label small"></label>
+                                    <input asp-for="DeepCleansCompleted" class="form-control form-control-sm" />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label asp-for="RoomsOutOfOrderEnd" class="form-label small"></label>
+                                    <input asp-for="RoomsOutOfOrderEnd" class="form-control form-control-sm" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card daily-recap-card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <h2 class="h5 mb-0">1. Staffing Overview</h2>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="Staffing">Add row</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Area</th>
+                                    <th>Scheduled</th>
+                                    <th>Call-Offs</th>
+                                    <th>Tardies</th>
+                                    <th>Notes</th>
+                                    <th class="text-center">Remove</th>
+                                </tr>
+                            </thead>
+                            <tbody data-collection="Staffing" data-next-index="@Model.Staffing.Count">
+                                @for (var i = 0; i < Model.Staffing.Count; i++)
+                                {
+                                    <tr data-collection-row>
+                                        <td>
+                                            <input type="hidden" name="Staffing.Index" value="@i" />
+                                            <input asp-for="Staffing[i].Area" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="Staffing[i].Scheduled" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="Staffing[i].CallOffs" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="Staffing[i].Tardies" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="Staffing[i].Notes" class="form-control form-control-sm" />
+                                        </td>
+                                        <td class="text-center align-middle">
+                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="Remove row">&times;</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="card daily-recap-card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <h2 class="h5 mb-0">2. Out of Order / Out of Service Rooms</h2>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="OutOfOrderRooms">Add row</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Room Number</th>
+                                    <th>OOO / OOS</th>
+                                    <th>Issue</th>
+                                    <th>Clean or Dirty</th>
+                                    <th>If dirty, why left dirty?</th>
+                                    <th class="text-center">Remove</th>
+                                </tr>
+                            </thead>
+                            <tbody data-collection="OutOfOrderRooms" data-next-index="@Model.OutOfOrderRooms.Count">
+                                @for (var i = 0; i < Model.OutOfOrderRooms.Count; i++)
+                                {
+                                    <tr data-collection-row>
+                                        <td>
+                                            <input type="hidden" name="OutOfOrderRooms.Index" value="@i" />
+                                            <input asp-for="OutOfOrderRooms[i].RoomNumber" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="OutOfOrderRooms[i].Status" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="OutOfOrderRooms[i].Issue" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="OutOfOrderRooms[i].CleanStatus" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="OutOfOrderRooms[i].ReasonLeftDirty" class="form-control form-control-sm" />
+                                        </td>
+                                        <td class="text-center align-middle">
+                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card daily-recap-card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <h2 class="h5 mb-0">3. Rooms Not Cleaned / Rolled Over / DND</h2>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="RoomsNotCleaned">Add row</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Room Number</th>
+                                    <th>Room Status</th>
+                                    <th>Reason Not Cleaned</th>
+                                    <th>Assigned To</th>
+                                    <th>Action Plan / Next Step</th>
+                                    <th class="text-center">Remove</th>
+                                </tr>
+                            </thead>
+                            <tbody data-collection="RoomsNotCleaned" data-next-index="@Model.RoomsNotCleaned.Count">
+                                @for (var i = 0; i < Model.RoomsNotCleaned.Count; i++)
+                                {
+                                    <tr data-collection-row>
+                                        <td>
+                                            <input type="hidden" name="RoomsNotCleaned.Index" value="@i" />
+                                            <input asp-for="RoomsNotCleaned[i].RoomNumber" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="RoomsNotCleaned[i].Status" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="RoomsNotCleaned[i].Reason" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="RoomsNotCleaned[i].AssignedTo" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="RoomsNotCleaned[i].ActionPlan" class="form-control form-control-sm" />
+                                        </td>
+                                        <td class="text-center align-middle">
+                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card daily-recap-card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <h2 class="h5 mb-0">4. Maintenance Issues Found by Housekeeping</h2>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="MaintenanceIssues">Add row</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Room / Area</th>
+                                    <th>Issue Found</th>
+                                    <th>Work Order Submitted?</th>
+                                    <th>Room Status</th>
+                                    <th>Notes</th>
+                                    <th class="text-center">Remove</th>
+                                </tr>
+                            </thead>
+                            <tbody data-collection="MaintenanceIssues" data-next-index="@Model.MaintenanceIssues.Count">
+                                @for (var i = 0; i < Model.MaintenanceIssues.Count; i++)
+                                {
+                                    <tr data-collection-row>
+                                        <td>
+                                            <input type="hidden" name="MaintenanceIssues.Index" value="@i" />
+                                            <input asp-for="MaintenanceIssues[i].Area" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="MaintenanceIssues[i].Issue" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="MaintenanceIssues[i].WorkOrderSubmitted" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="MaintenanceIssues[i].RoomStatus" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="MaintenanceIssues[i].Notes" class="form-control form-control-sm" />
+                                        </td>
+                                        <td class="text-center align-middle">
+                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card daily-recap-card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <h2 class="h5 mb-0">5. Cleanliness / Inspection Failures</h2>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="InspectionFailures">Add row</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Room / Area</th>
+                                    <th>Issue</th>
+                                    <th>Associate Responsible</th>
+                                    <th>Coaching Given?</th>
+                                    <th>Notes</th>
+                                    <th class="text-center">Remove</th>
+                                </tr>
+                            </thead>
+                            <tbody data-collection="InspectionFailures" data-next-index="@Model.InspectionFailures.Count">
+                                @for (var i = 0; i < Model.InspectionFailures.Count; i++)
+                                {
+                                    <tr data-collection-row>
+                                        <td>
+                                            <input type="hidden" name="InspectionFailures.Index" value="@i" />
+                                            <input asp-for="InspectionFailures[i].Area" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="InspectionFailures[i].Issue" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="InspectionFailures[i].ResponsibleAssociate" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="InspectionFailures[i].CoachingGiven" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="InspectionFailures[i].Notes" class="form-control form-control-sm" />
+                                        </td>
+                                        <td class="text-center align-middle">
+                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card daily-recap-card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <div>
+                            <h2 class="h5 mb-1">6. Public Areas / Laundry / Supplies</h2>
+                            <p class="text-muted small mb-0">Attach the signed Houseman/Public Area Attendant checklist in Pass On Logs if needed.</p>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="PublicAreas">Add row</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Area / Item</th>
+                                    <th>Completed?</th>
+                                    <th>Issue / Shortage</th>
+                                    <th>Items Need Order</th>
+                                    <th>Notes</th>
+                                    <th class="text-center">Remove</th>
+                                </tr>
+                            </thead>
+                            <tbody data-collection="PublicAreas" data-next-index="@Model.PublicAreas.Count">
+                                @for (var i = 0; i < Model.PublicAreas.Count; i++)
+                                {
+                                    <tr data-collection-row>
+                                        <td>
+                                            <input type="hidden" name="PublicAreas.Index" value="@i" />
+                                            <input asp-for="PublicAreas[i].Area" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="PublicAreas[i].Completed" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="PublicAreas[i].Issues" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="PublicAreas[i].ItemsToOrder" class="form-control form-control-sm" />
+                                        </td>
+                                        <td>
+                                            <input asp-for="PublicAreas[i].Notes" class="form-control form-control-sm" />
+                                        </td>
+                                        <td class="text-center align-middle">
+                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="card daily-recap-card mb-4">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">8. Associate Performance Notes & End-of-Day Summary</h2>
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label asp-for="PerformanceHighlights" class="form-label small"></label>
+                            <textarea asp-for="PerformanceHighlights" rows="3" class="form-control" placeholder="Recognize standout team members, wins, or shout-outs."></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="PerformanceCoaching" class="form-label small"></label>
+                            <textarea asp-for="PerformanceCoaching" rows="3" class="form-control" placeholder="Document coaching or accountability items."></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="OperationalChallenges" class="form-label small"></label>
+                            <textarea asp-for="OperationalChallenges" rows="3" class="form-control" placeholder="What slowed the team down or needs help?"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="TomorrowPlan" class="form-label small"></label>
+                            <textarea asp-for="TomorrowPlan" rows="3" class="form-control" placeholder="Outline follow-up tasks or tomorrow's focus."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card daily-recap-card mb-4">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">@Html.DisplayNameFor(m => m.AdditionalNotes)</h2>
+                    <textarea asp-for="AdditionalNotes" rows="4" class="form-control" placeholder="Any other updates worth sharing with the next shift?"></textarea>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2">
+                <a asp-controller="PassOnLogs" asp-action="Index" class="btn btn-outline-secondary">View Pass On Logs</a>
+                <button type="submit" class="btn btn-primary">Post Daily Recap</button>
+            </div>
+        </form>
+    }
+</div>
+<template id="dailyRecapStaffingTemplate" data-collection-template="Staffing">
+    <tr data-collection-row>
+        <td>
+            <input type="hidden" name="Staffing.Index" value="__index__" />
+            <input class="form-control form-control-sm" name="Staffing[__index__].Area" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="Staffing[__index__].Scheduled" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="Staffing[__index__].CallOffs" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="Staffing[__index__].Tardies" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="Staffing[__index__].Notes" />
+        </td>
+        <td class="text-center align-middle">
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+        </td>
+    </tr>
+</template>
+
+<template id="dailyRecapOutOfOrderRoomsTemplate" data-collection-template="OutOfOrderRooms">
+    <tr data-collection-row>
+        <td>
+            <input type="hidden" name="OutOfOrderRooms.Index" value="__index__" />
+            <input class="form-control form-control-sm" name="OutOfOrderRooms[__index__].RoomNumber" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="OutOfOrderRooms[__index__].Status" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="OutOfOrderRooms[__index__].Issue" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="OutOfOrderRooms[__index__].CleanStatus" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="OutOfOrderRooms[__index__].ReasonLeftDirty" />
+        </td>
+        <td class="text-center align-middle">
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+        </td>
+    </tr>
+</template>
+
+<template id="dailyRecapRoomsNotCleanedTemplate" data-collection-template="RoomsNotCleaned">
+    <tr data-collection-row>
+        <td>
+            <input type="hidden" name="RoomsNotCleaned.Index" value="__index__" />
+            <input class="form-control form-control-sm" name="RoomsNotCleaned[__index__].RoomNumber" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="RoomsNotCleaned[__index__].Status" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="RoomsNotCleaned[__index__].Reason" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="RoomsNotCleaned[__index__].AssignedTo" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="RoomsNotCleaned[__index__].ActionPlan" />
+        </td>
+        <td class="text-center align-middle">
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+        </td>
+    </tr>
+</template>
+
+<template id="dailyRecapMaintenanceIssuesTemplate" data-collection-template="MaintenanceIssues">
+    <tr data-collection-row>
+        <td>
+            <input type="hidden" name="MaintenanceIssues.Index" value="__index__" />
+            <input class="form-control form-control-sm" name="MaintenanceIssues[__index__].Area" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="MaintenanceIssues[__index__].Issue" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="MaintenanceIssues[__index__].WorkOrderSubmitted" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="MaintenanceIssues[__index__].RoomStatus" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="MaintenanceIssues[__index__].Notes" />
+        </td>
+        <td class="text-center align-middle">
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+        </td>
+    </tr>
+</template>
+
+<template id="dailyRecapInspectionFailuresTemplate" data-collection-template="InspectionFailures">
+    <tr data-collection-row>
+        <td>
+            <input type="hidden" name="InspectionFailures.Index" value="__index__" />
+            <input class="form-control form-control-sm" name="InspectionFailures[__index__].Area" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="InspectionFailures[__index__].Issue" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="InspectionFailures[__index__].ResponsibleAssociate" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="InspectionFailures[__index__].CoachingGiven" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="InspectionFailures[__index__].Notes" />
+        </td>
+        <td class="text-center align-middle">
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+        </td>
+    </tr>
+</template>
+
+<template id="dailyRecapPublicAreasTemplate" data-collection-template="PublicAreas">
+    <tr data-collection-row>
+        <td>
+            <input type="hidden" name="PublicAreas.Index" value="__index__" />
+            <input class="form-control form-control-sm" name="PublicAreas[__index__].Area" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="PublicAreas[__index__].Completed" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="PublicAreas[__index__].Issues" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="PublicAreas[__index__].ItemsToOrder" />
+        </td>
+        <td>
+            <input class="form-control form-control-sm" name="PublicAreas[__index__].Notes" />
+        </td>
+        <td class="text-center align-middle">
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+        </td>
+    </tr>
+</template>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/daily-recap.css" asp-append-version="true" />
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/daily-recap.js" asp-append-version="true"></script>
+}

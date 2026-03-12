@@ -7,14 +7,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
-using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -27,26 +25,23 @@ namespace hOps.web.Controllers
         private const string SortOldest = "oldest";
 
         private readonly MentionService _mentionService;
-        private readonly IEmailSender _emailSender;
+        private readonly IPassOnLogNotificationService _notificationService;
         private readonly ILogger<PassOnLogsController> _logger;
         private readonly IWebHostEnvironment _environment;
-        private readonly IRealtimeNotificationService _realtimeNotifications;
 
         public PassOnLogsController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             MentionService mentionService,
-            IEmailSender emailSender,
+            IPassOnLogNotificationService notificationService,
             ILogger<PassOnLogsController> logger,
-            IWebHostEnvironment environment,
-            IRealtimeNotificationService realtimeNotifications)
+            IWebHostEnvironment environment)
             : base(context, userManager)
         {
             _mentionService = mentionService;
-            _emailSender = emailSender;
+            _notificationService = notificationService;
             _logger = logger;
             _environment = environment;
-            _realtimeNotifications = realtimeNotifications;
         }
 
         public async Task<IActionResult> Index([FromQuery] PassOnLogFiltersViewModel? filters)
@@ -301,179 +296,14 @@ namespace hOps.web.Controllers
                 link,
                 log.Body);
 
-            var logAlertRecipients = await GetLogEntryAlertRecipientsAsync(log, currentUser);
-            await NotifyLogSubscribersAsync(log, currentUser, link, logAlertRecipients);
-            await SendLogEntryEmailsAsync(log, currentUser, link, logAlertRecipients);
+            var logAlertRecipients = await _notificationService.GetLogEntryAlertRecipientsAsync(log, currentUser);
+            await _notificationService.NotifyLogSubscribersAsync(log, currentUser, link, logAlertRecipients);
+            await _notificationService.SendLogEntryEmailsAsync(log, currentUser, link, logAlertRecipients);
 
             return RedirectToAction(nameof(Details), new { id = log.Id });
         }
 
 
-        private async Task<List<ApplicationUser>> GetLogEntryAlertRecipientsAsync(PassOnLog log, ApplicationUser actor)
-        {
-            await _context.Entry(log)
-                .Collection(l => l.Properties)
-                .Query()
-                .Include(lp => lp.Property)
-                .LoadAsync();
-
-            var propertyIds = log.Properties.Select(lp => lp.PropertyId).Distinct().ToList();
-
-            var candidateUsers = await _context.Users
-                .Where(u => !string.Equals(u.Id, actor.Id))
-                .Select(u => new
-                {
-                    User = u,
-                    PropertyPreferences = u.EmailPropertySubscriptions.Select(s => new { s.PropertyId, s.IncludeInLogAlerts }),
-                    AccessIds = u.UserPropertyAccesses!.Select(upa => upa.PropertyId)
-                })
-                .ToListAsync();
-
-            return candidateUsers
-                .Where(candidate =>
-                {
-                    var allowedProperties = candidate.PropertyPreferences
-                        .Where(p => p.IncludeInLogAlerts)
-                        .Select(p => p.PropertyId)
-                        .ToHashSet();
-
-                    if (!allowedProperties.Any())
-                    {
-                        allowedProperties = candidate.AccessIds.ToHashSet();
-                    }
-
-                    if (!allowedProperties.Any())
-                    {
-                        return false;
-                    }
-
-                    if (!propertyIds.Any())
-                    {
-                        return true;
-                    }
-
-                    return propertyIds.Any(pid => allowedProperties.Contains(pid));
-                })
-                .Select(candidate => candidate.User)
-                .ToList();
-        }
-
-        private async Task NotifyLogSubscribersAsync(
-            PassOnLog log,
-            ApplicationUser actor,
-            string linkUrl,
-            List<ApplicationUser> recipients)
-        {
-            if (!recipients.Any())
-            {
-                return;
-            }
-
-            var actorName = PassOnLogEmailHelper.FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
-            var now = DateTime.UtcNow;
-
-            foreach (var recipient in recipients)
-            {
-                _context.UserNotifications.Add(new UserNotification
-                {
-                    UserId = recipient.Id,
-                    Type = "passon-log",
-                    Title = "New pass-on log",
-                    Content = $"{actorName} posted \"{log.Title}\"",
-                    LinkUrl = linkUrl,
-                    PassOnLogId = log.Id,
-                    CreatedAt = now,
-                    IsRead = false
-                });
-            }
-
-            await _context.SaveChangesAsync();
-
-            var payload = new RealtimeNotificationPayload(
-                "New pass-on log",
-                $"{actorName} posted \"{log.Title}\"",
-                linkUrl,
-                "log");
-
-            await _realtimeNotifications.NotifyUsersAsync(recipients.Select(r => r.Id), payload);
-        }
-
-        private async Task SendLogEntryEmailsAsync(
-            PassOnLog log,
-            ApplicationUser actor,
-            string linkUrl,
-            List<ApplicationUser> recipients)
-        {
-            var emailRecipients = recipients
-                .Where(r => r.EmailOnLogEntry && !string.IsNullOrWhiteSpace(r.Email))
-                .ToList();
-
-            if (!emailRecipients.Any())
-            {
-                return;
-            }
-
-            var propertyNames = log.Properties
-                .Select(lp => lp.Property?.Name ?? $"Property #{lp.PropertyId}")
-                .Distinct()
-                .ToList();
-
-            var actorName = PassOnLogEmailHelper.FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
-            var subject = $"New log: {log.Title}";
-            var introHtml = $@"<p>{WebUtility.HtmlEncode(actorName)} posted a new log titled <strong>{WebUtility.HtmlEncode(log.Title)}</strong>.</p>";
-            foreach (var recipient in emailRecipients)
-            {
-                try
-                {
-                    var recipientTimeZone = ResolveUserTimeZone(recipient);
-                    var htmlBody = introHtml + PassOnLogEmailHelper.BuildLogEmailBody(log, linkUrl, propertyNames, log.Comments, recipientTimeZone);
-                    await _emailSender.SendEmailAsync(recipient.Email!, subject, htmlBody);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unable to send log email notification to user {UserId}", recipient.Id);
-                }
-            }
-        }
-
-        private async Task SendLogCommentEmailsAsync(
-            PassOnLog log,
-            PassOnLogComment comment,
-            ApplicationUser actor,
-            string linkUrl,
-            List<ApplicationUser> recipients)
-        {
-            var emailRecipients = recipients
-                .Where(r => r.EmailOnLogEntry && !string.IsNullOrWhiteSpace(r.Email))
-                .ToList();
-
-            if (!emailRecipients.Any())
-            {
-                return;
-            }
-
-            var propertyNames = log.Properties
-                .Select(lp => lp.Property?.Name ?? $"Property #{lp.PropertyId}")
-                .Distinct()
-                .ToList();
-
-            var actorName = PassOnLogEmailHelper.FormatUserName(actor.FirstName, actor.LastName, actor.Email ?? string.Empty);
-            var subject = $"New comment on: {log.Title}";
-            var introHtml = $@"<p>{WebUtility.HtmlEncode(actorName)} added a new comment on <strong>{WebUtility.HtmlEncode(log.Title)}</strong>.</p>";
-            foreach (var recipient in emailRecipients)
-            {
-                try
-                {
-                    var recipientTimeZone = ResolveUserTimeZone(recipient);
-                    var htmlBody = introHtml + PassOnLogEmailHelper.BuildLogEmailBody(log, linkUrl, propertyNames, log.Comments, recipientTimeZone);
-                    await _emailSender.SendEmailAsync(recipient.Email!, subject, htmlBody);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unable to send log comment email notification to user {UserId}", recipient.Id);
-                }
-            }
-        }
 
         [HttpGet]
         public async Task<IActionResult> Edit(int id)
@@ -796,8 +626,8 @@ namespace hOps.web.Controllers
                 link,
                 comment.Body);
 
-            var logAlertRecipients = await GetLogEntryAlertRecipientsAsync(log, currentUser);
-            await SendLogCommentEmailsAsync(log, comment, currentUser, link, logAlertRecipients);
+            var logAlertRecipients = await _notificationService.GetLogEntryAlertRecipientsAsync(log, currentUser);
+            await _notificationService.SendLogCommentEmailsAsync(log, comment, currentUser, link, logAlertRecipients);
 
             if (!string.IsNullOrWhiteSpace(input.ReturnUrl) && Url.IsLocalUrl(input.ReturnUrl))
             {
@@ -1246,23 +1076,6 @@ namespace hOps.web.Controllers
             }
 
             return !log.Views.Any(v => v.ViewerId == userId);
-        }
-
-        private static TimeZoneInfo ResolveUserTimeZone(ApplicationUser? user)
-        {
-            var normalized = DefaultTimeZoneProvider.NormalizeForStorage(user?.TimeZoneId);
-            try
-            {
-                return TimeZoneInfo.FindSystemTimeZoneById(normalized);
-            }
-            catch (TimeZoneNotFoundException)
-            {
-                return TimeZoneInfo.Utc;
-            }
-            catch (InvalidTimeZoneException)
-            {
-                return TimeZoneInfo.Utc;
-            }
         }
 
     }

@@ -1,0 +1,43 @@
+.daily-recap-page {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.daily-recap-header {
+    border: none;
+}
+
+.daily-recap-card {
+    border-radius: 1rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.daily-recap-section-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    margin-bottom: 0.75rem;
+}
+
+.daily-recap-form table th,
+.daily-recap-form table td {
+    vertical-align: middle;
+}
+
+.daily-recap-form table button[data-collection-remove] {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+@media (max-width: 767px) {
+    .daily-recap-header .card-body {
+        padding: 1.5rem;
+    }
+
+    .daily-recap-card {
+        border-radius: 0.75rem;
+    }
+}

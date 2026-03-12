@@ -337,6 +337,7 @@ builder.Services.AddTransient<IEmailSender>(sp => sp.GetRequiredService<EmailSen
 builder.Services.AddTransient<IExtendedEmailSender>(sp => sp.GetRequiredService<EmailSender>());
 builder.Services.AddScoped<DirectMessageService>();
 builder.Services.AddScoped<MentionService>();
+builder.Services.AddScoped<IPassOnLogNotificationService, PassOnLogNotificationService>();
 builder.Services.AddScoped<IRealtimeNotificationService, RealtimeNotificationService>();
 builder.Services.AddScoped<IPropertyAccessService, PropertyAccessService>();
 builder.Services.AddSingleton<SchedulePdfRenderer>();
