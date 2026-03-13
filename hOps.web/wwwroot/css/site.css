@@ -2542,8 +2542,56 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
         font-size: 0.9rem;
     }
 
-    .issue-report-fab__label {
+.issue-report-fab__label {
         font-size: 0.85rem;
     }
+}
+
+.linen-inventory-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.linen-inventory-page .linen-section {
+    padding: 1.5rem;
+    border-radius: 1.25rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 5px 18px rgba(15, 23, 42, 0.05);
+    background: #fdfcf6;
+}
+
+.linen-inventory-page .linen-section:nth-of-type(even) {
+    background: #f5f8ff;
+}
+
+.linen-inventory-page .linen-section--hero {
+    margin-bottom: 0.25rem;
+}
+
+.linen-inventory-page .linen-section > .card,
+.linen-inventory-page .linen-section > form.card {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.linen-inventory-page .linen-section > .card .card-header,
+.linen-inventory-page .linen-section > form.card .card-header {
+    background-color: transparent;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.linen-inventory-page .linen-section > .card .card-body,
+.linen-inventory-page .linen-section > form.card .card-body {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.linen-inventory-page .linen-section .alert {
+    margin-bottom: 0;
 }
 

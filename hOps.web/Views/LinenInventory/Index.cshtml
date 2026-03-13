@@ -3,46 +3,50 @@
     ViewData["Title"] = "Linen Inventory";
 }
 
-<div class="d-flex justify-content-between align-items-start flex-wrap mb-4">
-    <div class="mb-3 mb-md-0">
-        <h1 class="h3 mb-1">Linen Inventory</h1>
-        <p class="text-muted mb-0">@Model.PropertyName</p>
-    </div>
-    <div class="text-md-end">
-        <div class="text-muted small">Last saved</div>
-        @if (Model.LastInventoryDate.HasValue)
+<div class="linen-inventory-page">
+    <section class="linen-section linen-section--hero">
+        <div class="d-flex justify-content-between align-items-start flex-wrap">
+            <div class="mb-3 mb-md-0">
+                <h1 class="h3 mb-1">Linen Inventory</h1>
+                <p class="text-muted mb-0">@Model.PropertyName</p>
+            </div>
+            <div class="text-md-end">
+                <div class="text-muted small">Last saved</div>
+                @if (Model.LastInventoryDate.HasValue)
+                {
+                    <div class="fw-semibold">@Model.LastInventoryDate.Value.ToString("MMMM d, yyyy")</div>
+                }
+                else
+                {
+                    <div class="text-muted">No history yet</div>
+                }
+                @if (Model.LastSessionTotalCost.HasValue)
+                {
+                    <div class="small mt-1">
+                        Last Spend: <span class="fw-semibold">$@Model.LastSessionTotalCost.Value.ToString("N2")</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.FlashMessage))
         {
-            <div class="fw-semibold">@Model.LastInventoryDate.Value.ToString("MMMM d, yyyy")</div>
-        }
-        else
-        {
-            <div class="text-muted">No history yet</div>
-        }
-        @if (Model.LastSessionTotalCost.HasValue)
-        {
-            <div class="small mt-1">
-                Last Spend: <span class="fw-semibold">$@Model.LastSessionTotalCost.Value.ToString("N2")</span>
+            <div class="alert alert-success alert-dismissible fade show mt-3 mb-0" role="alert">
+                @Model.FlashMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         }
-    </div>
-</div>
 
-@if (!string.IsNullOrWhiteSpace(Model.FlashMessage))
-{
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        @Model.FlashMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show mt-3 mb-0" role="alert">
+                @Model.ErrorMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+    </section>
 
-@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
-{
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        @Model.ErrorMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
-
+    <section class="linen-section">
 @if (Model.InventoryRows.Any())
 {
     <form asp-action="SaveInventory" method="post" class="card mb-4">
@@ -220,7 +224,9 @@ else
         Configure your linen items in the setup section below to unlock the inventory worksheet.
     </div>
 }
+    </section>
 
+    <section class="linen-section">
 <div class="card" id="linen-setup">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
@@ -407,9 +413,10 @@ else
             </form>
         }
     </div>
-</div>
+          </div>
+    </section>
 
-<template id="room-type-template">
+    <template id="room-type-template">
     <tr data-collection-item>
         <td>
             <input type="hidden" data-name-template="RoomTypes[__index__].Id" value="" />
@@ -475,6 +482,8 @@ else
         </tbody>
     </template>
 }
+
+</div>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
