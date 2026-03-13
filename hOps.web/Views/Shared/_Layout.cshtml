@@ -2401,21 +2401,35 @@
         </script>
         <script>
             (function () {
+                const collapseElement = document.getElementById('housekeepingInventoryMenu');
+                const toggleButton = document.querySelector('[data-bs-target="#housekeepingInventoryMenu"]');
+
+                if (!collapseElement || !toggleButton || typeof bootstrap === 'undefined') {
+                    return;
+                }
+
                 const updateInventoryIcon = (expanded) => {
-                    const icon = document.querySelector('[data-bs-target="#housekeepingInventoryMenu"] [data-collapse-icon]');
+                    const icon = toggleButton.querySelector('[data-collapse-icon]');
                     if (!icon) {
                         return;
                     }
                     icon.textContent = expanded ? '−' : '+';
                 };
 
-                const inventoryCollapse = document.getElementById('housekeepingInventoryMenu');
-                if (!inventoryCollapse) {
-                    return;
-                }
+                const collapseInstance = bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false });
 
-                inventoryCollapse.addEventListener('show.bs.collapse', () => updateInventoryIcon(true));
-                inventoryCollapse.addEventListener('hide.bs.collapse', () => updateInventoryIcon(false));
+                toggleButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    collapseInstance.toggle();
+                });
+
+                collapseElement.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                });
+
+                collapseElement.addEventListener('show.bs.collapse', () => updateInventoryIcon(true));
+                collapseElement.addEventListener('hide.bs.collapse', () => updateInventoryIcon(false));
             })();
         </script>
     }
