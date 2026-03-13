@@ -29,6 +29,8 @@ namespace hOps.web.ViewModels.Housekeeping.LinenInventory
         public string? FlashMessage { get; set; }
 
         public string? ErrorMessage { get; set; }
+
+        public List<LinenInventoryHistoryEntryViewModel> HistoryEntries { get; set; } = new();
     }
 
     public class LinenInventoryItemRowViewModel
@@ -168,5 +170,58 @@ namespace hOps.web.ViewModels.Housekeeping.LinenInventory
     public class LinenInventoryItemCollectionInput
     {
         public List<LinenInventoryItemForm> Items { get; set; } = new();
+    }
+
+    public class LinenInventoryHistoryEntryViewModel
+    {
+        public int SessionId { get; set; }
+
+        public DateTime InventoryDate { get; set; }
+
+        public string DisplayLabel => InventoryDate.ToString("MMMM d, yyyy");
+
+        public string? PerformedBy { get; set; }
+
+        public decimal TotalCost { get; set; }
+
+        public decimal ProjectedNeedCost { get; set; }
+
+        public decimal MonthlyBudget { get; set; }
+    }
+
+    public class LinenInventoryHistoryDetailViewModel
+    {
+        public int SessionId { get; set; }
+        public string PropertyName { get; set; } = string.Empty;
+
+        public DateTime InventoryDate { get; set; }
+
+        public string? PerformedBy { get; set; }
+
+        public decimal MonthlyBudget { get; set; }
+
+        public decimal TotalCost { get; set; }
+
+        public decimal ProjectedNeedCost { get; set; }
+
+        public List<LinenInventoryHistoryDetailRow> Items { get; set; } = new();
+    }
+
+    public class LinenInventoryHistoryDetailRow
+    {
+        public string ItemName { get; set; } = string.Empty;
+        public string? ItemNumber { get; set; }
+        public decimal LaundryClean { get; set; }
+        public decimal LaundryDirty { get; set; }
+        public decimal InStorage { get; set; }
+        public decimal OnCarts { get; set; }
+        public decimal TotalOnHand { get; set; }
+        public decimal LastMonthActuals { get; set; }
+        public decimal BudgetedPar { get; set; }
+        public decimal OrderRecommendation { get; set; }
+        public decimal CasesToOrder { get; set; }
+        public decimal NeedCost { get; set; }
+        public decimal CasesPurchased { get; set; }
+        public decimal OrderCost { get; set; }
     }
 }

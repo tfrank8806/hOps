@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using ClosedXML.Excel;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
@@ -222,6 +223,150 @@ namespace hOps.web.Controllers
                 ? $"Updated the {inventoryDate:MMMM yyyy} linen inventory snapshot."
                 : "Saved the linen inventory snapshot.";
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> History(int id)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["LinenInventoryError"] = "Select a property before viewing the history.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var session = await _context.LinenInventorySessions
+                .AsNoTracking()
+                .Include(s => s.Items)
+                .ThenInclude(i => i.InventoryItem)
+                .FirstOrDefaultAsync(s => s.PropertyId == property.Id && s.Id == id);
+
+            if (session == null)
+            {
+                TempData["LinenInventoryError"] = "We could not find that inventory snapshot.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var viewModel = new LinenInventoryHistoryDetailViewModel
+            {
+                SessionId = session.Id,
+                PropertyName = property.Name,
+                InventoryDate = session.InventoryDate,
+                MonthlyBudget = session.MonthlyBudget,
+                TotalCost = session.TotalCost,
+                ProjectedNeedCost = session.ProjectedNeedCost,
+                PerformedBy = session.PerformedBy,
+                Items = session.Items
+                    .OrderBy(i => i.InventoryItem?.SortOrder ?? 0)
+                    .ThenBy(i => i.InventoryItem?.Name)
+                    .Select(item => new LinenInventoryHistoryDetailRow
+                    {
+                        ItemName = item.InventoryItem?.Name ?? $"Item #{item.InventoryItemId}",
+                        ItemNumber = item.InventoryItem?.OrderItemNumber,
+                        LaundryClean = item.LaundryClean,
+                        LaundryDirty = item.LaundryDirty,
+                        InStorage = item.InStorage,
+                        OnCarts = item.OnCarts,
+                        TotalOnHand = item.TotalOnHand,
+                        LastMonthActuals = item.LastMonthActuals,
+                        BudgetedPar = item.BudgetedPar,
+                        OrderRecommendation = item.OrderRecommendation,
+                        CasesToOrder = item.CasesToOrder,
+                        NeedCost = item.NeedCost,
+                        CasesPurchased = item.CasesPurchased,
+                        OrderCost = item.OrderCost
+                    })
+                    .ToList()
+            };
+
+            return View(viewModel);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadHistory(int id)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["LinenInventoryError"] = "Select a property before downloading an inventory.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var session = await _context.LinenInventorySessions
+                .AsNoTracking()
+                .Include(s => s.Items)
+                .ThenInclude(i => i.InventoryItem)
+                .FirstOrDefaultAsync(s => s.PropertyId == property.Id && s.Id == id);
+
+            if (session == null)
+            {
+                TempData["LinenInventoryError"] = "We could not find that inventory snapshot.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            using var workbook = new XLWorkbook();
+            var sheet = workbook.Worksheets.Add("Inventory");
+
+            sheet.Cell("A1").Value = "Property";
+            sheet.Cell("B1").Value = property.Name;
+            sheet.Cell("A2").Value = "Inventory Date";
+            sheet.Cell("B2").Value = session.InventoryDate.ToString("MMMM d, yyyy");
+            sheet.Cell("A3").Value = "Performed By";
+            sheet.Cell("B3").Value = session.PerformedBy ?? "N/A";
+            sheet.Cell("A4").Value = "Monthly Budget";
+            sheet.Cell("A5").Value = "Projected Need";
+            sheet.Cell("A6").Value = "Total Cost";
+            sheet.Cell("B4").Value = session.MonthlyBudget;
+            sheet.Cell("B5").Value = session.ProjectedNeedCost;
+            sheet.Cell("B6").Value = session.TotalCost;
+            sheet.Range("B4:B6").Style.NumberFormat.Format = "$#,##0.00";
+
+            var headers = new[]
+            {
+                "Item","Item #","Laundry Clean","Laundry Dirty","In Storage","On Carts",
+                "Total On Hand","Last Month","Budgeted PAR","Order Need","Cases To Order",
+                "Need Cost","Cases Purchased","Order Cost"
+            };
+
+            var headerRow = 8;
+            for (var i = 0; i < headers.Length; i++)
+            {
+                sheet.Cell(headerRow, i + 1).Value = headers[i];
+            }
+
+            sheet.Range(headerRow, 1, headerRow, headers.Length)
+                .Style
+                .Font.SetBold()
+                .Fill.SetBackgroundColor(XLColor.LightGray);
+
+            var currentRow = headerRow + 1;
+            foreach (var item in session.Items
+                .OrderBy(i => i.InventoryItem?.SortOrder ?? 0)
+                .ThenBy(i => i.InventoryItem?.Name))
+            {
+                sheet.Cell(currentRow, 1).Value = item.InventoryItem?.Name ?? $"Item #{item.InventoryItemId}";
+                sheet.Cell(currentRow, 2).Value = item.InventoryItem?.OrderItemNumber ?? string.Empty;
+                sheet.Cell(currentRow, 3).Value = item.LaundryClean;
+                sheet.Cell(currentRow, 4).Value = item.LaundryDirty;
+                sheet.Cell(currentRow, 5).Value = item.InStorage;
+                sheet.Cell(currentRow, 6).Value = item.OnCarts;
+                sheet.Cell(currentRow, 7).Value = item.TotalOnHand;
+                sheet.Cell(currentRow, 8).Value = item.LastMonthActuals;
+                sheet.Cell(currentRow, 9).Value = item.BudgetedPar;
+                sheet.Cell(currentRow, 10).Value = item.OrderRecommendation;
+                sheet.Cell(currentRow, 11).Value = item.CasesToOrder;
+                sheet.Cell(currentRow, 12).Value = item.NeedCost;
+                sheet.Cell(currentRow, 13).Value = item.CasesPurchased;
+                sheet.Cell(currentRow, 14).Value = item.OrderCost;
+                currentRow++;
+            }
+
+            sheet.Columns().AdjustToContents();
+
+            await using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            var fileName = $"linen_inventory_{property.Code}_{session.InventoryDate:yyyyMMdd}.xlsx";
+            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
 
         [HttpPost]
@@ -812,13 +957,15 @@ namespace hOps.web.Controllers
                 .ThenBy(i => i.Name)
                 .ToListAsync();
 
-            var lastSession = await _context.LinenInventorySessions
+            var sessions = await _context.LinenInventorySessions
                 .AsNoTracking()
                 .Include(s => s.Items)
                 .Where(s => s.PropertyId == property.Id)
                 .OrderByDescending(s => s.InventoryDate)
                 .ThenByDescending(s => s.CreatedAtUtc)
-                .FirstOrDefaultAsync();
+                .ToListAsync();
+
+            var lastSession = sessions.FirstOrDefault();
 
             var lastTotals = lastSession?.Items.ToDictionary(i => i.InventoryItemId, i => i.TotalOnHand) ?? new Dictionary<int, decimal>();
 
@@ -879,7 +1026,20 @@ namespace hOps.web.Controllers
                 Setup = setupViewModel,
                 LastInventoryDate = lastSession?.InventoryDate,
                 LastSessionProjectedNeed = lastSession?.ProjectedNeedCost,
-                LastSessionTotalCost = lastSession?.TotalCost
+                LastSessionTotalCost = lastSession?.TotalCost,
+                HistoryEntries = sessions
+                    .Where(s => s.Items.Any())
+                    .Select(s => new LinenInventoryHistoryEntryViewModel
+                    {
+                        SessionId = s.Id,
+                        InventoryDate = s.InventoryDate,
+                        PerformedBy = s.PerformedBy,
+                        TotalCost = s.TotalCost,
+                        ProjectedNeedCost = s.ProjectedNeedCost,
+                        MonthlyBudget = s.MonthlyBudget
+                    })
+                    .Take(12)
+                    .ToList()
             };
         }
 
