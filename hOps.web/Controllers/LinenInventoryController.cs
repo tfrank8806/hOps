@@ -193,6 +193,17 @@ namespace hOps.web.Controllers
             session.ProjectedNeedCost = session.Items.Sum(i => i.NeedCost);
             session.TotalCost = session.Items.Sum(i => i.OrderCost);
 
+            var existingSession = await _context.LinenInventorySessions
+                .Include(s => s.Items)
+                .Where(s => s.PropertyId == property.Id && s.Year == session.Year && s.Month == session.Month)
+                .FirstOrDefaultAsync();
+
+            if (existingSession != null)
+            {
+                _context.LinenInventorySessionItems.RemoveRange(existingSession.Items);
+                _context.LinenInventorySessions.Remove(existingSession);
+            }
+
             _context.LinenInventorySessions.Add(session);
 
             try
@@ -207,7 +218,9 @@ namespace hOps.web.Controllers
                 return View(nameof(Index), invalidViewModel);
             }
 
-            TempData["LinenInventoryMessage"] = "Saved the linen inventory snapshot.";
+            TempData["LinenInventoryMessage"] = existingSession != null
+                ? $"Updated the {inventoryDate:MMMM yyyy} linen inventory snapshot."
+                : "Saved the linen inventory snapshot.";
             return RedirectToAction(nameof(Index));
         }
 
