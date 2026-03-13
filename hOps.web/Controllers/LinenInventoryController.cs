@@ -66,6 +66,29 @@ namespace hOps.web.Controllers
             return View(viewModel);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> Setup()
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["LinenInventoryError"] = "Select a property before opening the linen setup.";
+                return RedirectToAction("Index", "Home");
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var viewModel = await BuildPageViewModelAsync(property, user, null);
+            viewModel.FlashMessage = TempData["LinenInventoryMessage"] as string ?? viewModel.FlashMessage;
+            viewModel.ErrorMessage = TempData["LinenInventoryError"] as string ?? viewModel.ErrorMessage;
+
+            return View(viewModel);
+        }
+
         [HttpPost]
         public async Task<IActionResult> SaveInventory(LinenInventoryEntryForm entry)
         {
@@ -195,7 +218,7 @@ namespace hOps.web.Controllers
             if (property == null)
             {
                 TempData["LinenInventoryError"] = "Select a property before adjusting the setup information.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             var user = await _userManager.GetUserAsync(User);
@@ -283,11 +306,11 @@ namespace hOps.web.Controllers
             {
                 _logger.LogError(ex, "Failed to update linen setup for property {PropertyId}", property.Id);
                 TempData["LinenInventoryError"] = "We could not save the setup information. Please try again.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             TempData["LinenInventoryMessage"] = "Updated the setup information.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Setup));
         }
 
         [HttpPost]
@@ -297,7 +320,7 @@ namespace hOps.web.Controllers
             if (property == null)
             {
                 TempData["LinenInventoryError"] = "Select a property before editing the linen items.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             var user = await _userManager.GetUserAsync(User);
@@ -320,7 +343,7 @@ namespace hOps.web.Controllers
             if (roomTypes.Count == 0)
             {
                 TempData["LinenInventoryError"] = "Add at least one room type before configuring items.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             var roomTypeLookup = roomTypes.ToDictionary(rt => rt.Id);
@@ -416,11 +439,11 @@ namespace hOps.web.Controllers
             {
                 _logger.LogError(ex, "Failed to update linen items for property {PropertyId}", property.Id);
                 TempData["LinenInventoryError"] = "We could not save the updated items. Please try again.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             TempData["LinenInventoryMessage"] = "Updated the linen items.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Setup));
         }
 
         [HttpPost]
@@ -430,7 +453,7 @@ namespace hOps.web.Controllers
             if (property == null)
             {
                 TempData["LinenInventoryError"] = "Select a property before loading the defaults.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             var user = await _userManager.GetUserAsync(User);
@@ -449,7 +472,7 @@ namespace hOps.web.Controllers
             if (hasAnyRoomTypes || hasAnyItems)
             {
                 TempData["LinenInventoryError"] = "Clear the existing setup before loading the template.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             var template = LinenInventorySeedData.Template;
@@ -538,7 +561,7 @@ namespace hOps.web.Controllers
             }
 
             TempData["LinenInventoryMessage"] = "Loaded the Aimbridge template items.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Setup));
         }
 
         [HttpGet]
@@ -575,7 +598,7 @@ namespace hOps.web.Controllers
             if (property == null)
             {
                 TempData["LinenInventoryError"] = "Select a property before importing a setup.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             var user = await _userManager.GetUserAsync(User);
@@ -592,7 +615,7 @@ namespace hOps.web.Controllers
             if (csvFile == null || csvFile.Length == 0)
             {
                 TempData["LinenInventoryError"] = "Select a CSV file to upload.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             List<SetupCsvRoomType> roomTypes;
@@ -605,19 +628,19 @@ namespace hOps.web.Controllers
             {
                 _logger.LogError(ex, "Failed to parse linen setup CSV for property {PropertyId}", property.Id);
                 TempData["LinenInventoryError"] = ex.Message;
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             if (!roomTypes.Any())
             {
                 TempData["LinenInventoryError"] = "Add at least one room type row to the CSV.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             if (!items.Any())
             {
                 TempData["LinenInventoryError"] = "Add at least one linen item row to the CSV.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             var existingItems = await _context.LinenInventoryItems
@@ -672,7 +695,7 @@ namespace hOps.web.Controllers
             if (roomTypeEntities.Count == 0)
             {
                 TempData["LinenInventoryError"] = "The CSV file did not include any valid room type rows.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Setup));
             }
 
             await _context.SaveChangesAsync();
@@ -721,7 +744,7 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
 
             TempData["LinenInventoryMessage"] = $"Imported {roomTypes.Count} room type{(roomTypes.Count == 1 ? string.Empty : "s")} and {items.Count} item{(items.Count == 1 ? string.Empty : "s")} from the CSV template.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Setup));
         }
 
         [HttpGet]

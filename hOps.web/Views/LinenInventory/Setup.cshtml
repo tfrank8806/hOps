@@ -1,0 +1,298 @@
+@model hOps.web.ViewModels.Housekeeping.LinenInventory.LinenInventoryPageViewModel
+@{
+    ViewData["Title"] = "Linen Setup";
+}
+
+<div class="linen-inventory-page">
+    <section class="linen-section linen-section--hero">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+                <h1 class="h3 mb-1">Linen Setup</h1>
+                <p class="text-muted mb-0">@Model.PropertyName</p>
+            </div>
+            <div class="text-md-end">
+                <a asp-action="Index" class="btn btn-outline-secondary btn-sm mb-3">Back to Inventory</a>
+                <div class="text-muted small">Need access?</div>
+                <div class="small">Only managers and admins can edit this setup.</div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.FlashMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show mt-3 mb-0" role="alert">
+                @Model.FlashMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show mt-3 mb-0" role="alert">
+                @Model.ErrorMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+    </section>
+
+    <section class="linen-section">
+        <div class="card" id="linen-setup">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h2 class="h5 mb-0">Room Types &amp; Linen Items</h2>
+                    <small class="text-muted">Room types, items, and requirements feed the inventory page.</small>
+                </div>
+                @if (Model.CanEditSetup)
+                {
+                    <form asp-action="LoadDefaults" method="post" class="d-flex">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm" onclick="return confirm('Replace the current setup with the Aimbridge defaults?')">
+                            Load Defaults
+                        </button>
+                    </form>
+                }
+            </div>
+            <div class="card-body">
+                @if (!Model.CanEditSetup)
+                {
+                    <div class="alert alert-warning">
+                        Only managers and admins can edit the setup. Contact your property leader if you need changes.
+                    </div>
+                }
+                else
+                {
+                    <div class="border rounded p-3 mb-4 bg-light">
+                        <form asp-action="ImportSetupCsv" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+                            <div class="col-md-7">
+                                <label for="linenSetupCsv" class="form-label fw-semibold">Upload Setup CSV</label>
+                                <input type="file" id="linenSetupCsv" name="csvFile" class="form-control form-control-sm" accept=".csv" />
+                                <div class="form-text">Download the template, update the rows, then upload to replace the setup.</div>
+                            </div>
+                            <div class="col-md-5 d-flex flex-wrap gap-2">
+                                <button type="submit" class="btn btn-primary btn-sm">Upload CSV</button>
+                                <a asp-action="DownloadSetupTemplate" class="btn btn-outline-secondary btn-sm">
+                                    Download Template
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                    <form asp-action="SaveRoomTypes" method="post" class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                            <div>
+                                <h3 class="h6 mb-0">Room Type Breakdown</h3>
+                                <small class="text-muted">Matches the first table on the Excel tab.</small>
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-primary btn-sm">Save Room Types</button>
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Displayed Hotel Name</label>
+                                <input type="text" name="PropertyLabel" class="form-control" value="@Model.Setup.PropertyLabel" maxlength="200" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Default Monthly Budget</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" name="DefaultMonthlyBudget" min="0" step="0.01" value="@Model.Setup.DefaultMonthlyBudget.ToString("0.##")" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Room Type</th>
+                                        <th style="width:160px;">Total Rooms</th>
+                                        <th style="width:140px;">Sort Order</th>
+                                        <th style="width:80px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="roomTypesBody">
+                                    @for (var i = 0; i < Model.Setup.RoomTypes.Count; i++)
+                                    {
+                                        var roomType = Model.Setup.RoomTypes[i];
+                                        <tr data-collection-item>
+                                            <td>
+                                                <input type="hidden" name="RoomTypes[@i].Id" value="@roomType.Id" data-role="existing-id" />
+                                                <input type="hidden" name="RoomTypes[@i].IsDeleted" value="false" data-role="mark-deleted" />
+                                                <input type="text" name="RoomTypes[@i].Name" class="form-control form-control-sm" value="@roomType.Name" maxlength="200" />
+                                            </td>
+                                            <td>
+                                                <input type="number" name="RoomTypes[@i].TotalRooms" class="form-control form-control-sm" min="0" step="1" value="@roomType.TotalRooms" />
+                                            </td>
+                                            <td>
+                                                <input type="number" name="RoomTypes[@i].SortOrder" class="form-control form-control-sm" value="@roomType.SortOrder" />
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-link text-danger p-0" data-collection-remove="room-types">Remove</button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add data-collection-target="#roomTypesBody" data-collection-template="room-type-template">
+                            Add Room Type
+                        </button>
+                    </form>
+
+                    <form asp-action="SaveItems" method="post">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                            <div>
+                                <h3 class="h6 mb-0">Item Requirements &amp; Order Details</h3>
+                                <small class="text-muted">Matches the Brand Requirement grid and order cells.</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">Save Items</button>
+                        </div>
+                        @if (!Model.Setup.RoomTypes.Any())
+                        {
+                            <div class="alert alert-info">
+                                Add room types before managing the linen items.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="min-width:220px;">Item</th>
+                                            <th style="width:120px;">Item #</th>
+                                            <th style="width:140px;">Case Count</th>
+                                            <th style="width:140px;">Case Price</th>
+                                            <th style="width:140px;">PAR Target</th>
+                                            <th style="width:140px;">Sort Order</th>
+                                            <th style="width:80px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="linenItemsBody">
+                                        @for (var i = 0; i < Model.Setup.Items.Count; i++)
+                                        {
+                                            var item = Model.Setup.Items[i];
+                                            <tr data-collection-item>
+                                                <td>
+                                                    <input type="hidden" name="Items[@i].Id" value="@item.Id" data-role="existing-id" />
+                                                    <input type="hidden" name="Items[@i].IsDeleted" value="false" data-role="mark-deleted" />
+                                                    <input type="text" name="Items[@i].Name" class="form-control form-control-sm" value="@item.Name" maxlength="200" />
+                                                </td>
+                                                <td>
+                                                    <input type="text" name="Items[@i].OrderItemNumber" class="form-control form-control-sm" value="@item.OrderItemNumber" maxlength="50" />
+                                                </td>
+                                                <td>
+                                                    <input type="number" name="Items[@i].OrderCaseCount" class="form-control form-control-sm" min="0" step="0.01" value="@item.OrderCaseCount.ToString("0.##")" />
+                                                </td>
+                                                <td>
+                                                    <input type="number" name="Items[@i].OrderCasePrice" class="form-control form-control-sm" min="0" step="0.01" value="@item.OrderCasePrice.ToString("0.##")" />
+                                                </td>
+                                                <td>
+                                                    <input type="number" name="Items[@i].ParLevelTarget" class="form-control form-control-sm" min="0" step="0.1" value="@item.ParLevelTarget.ToString("0.##")" />
+                                                </td>
+                                                <td>
+                                                    <input type="number" name="Items[@i].SortOrder" class="form-control form-control-sm" value="@item.SortOrder" />
+                                                </td>
+                                                <td class="text-center">
+                                                    <button type="button" class="btn btn-link text-danger p-0" data-collection-remove="linen-items">Remove</button>
+                                                </td>
+                                            </tr>
+                                            <tr class="bg-light" data-collection-item-child>
+                                                <td colspan="7">
+                                                    <div class="row g-2">
+                                                        @for (var j = 0; j < item.Requirements.Count; j++)
+                                                        {
+                                                            var requirement = item.Requirements[j];
+                                                            var roomType = Model.Setup.RoomTypes.FirstOrDefault(rt => rt.Id == requirement.RoomTypeId);
+                                                            <div class="col-md-3 col-sm-6">
+                                                                <label class="form-label form-label-sm">@roomType?.Name</label>
+                                                                <input type="hidden" name="Items[@i].Requirements[@j].RoomTypeId" value="@requirement.RoomTypeId" />
+                                                                <input type="number" name="Items[@i].Requirements[@j].UnitsPerRoom" class="form-control form-control-sm" min="0" step="0.1" value="@requirement.UnitsPerRoom.ToString("0.##")" />
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add data-collection-target="#linenItemsBody" data-collection-template="linen-item-template">
+                                Add Item
+                            </button>
+                        }
+                    </form>
+                }
+            </div>
+        </div>
+    </section>
+</div>
+
+<template id="room-type-template">
+    <tr data-collection-item>
+        <td>
+            <input type="hidden" data-name-template="RoomTypes[__index__].Id" value="" />
+            <input type="hidden" data-name-template="RoomTypes[__index__].IsDeleted" value="false" data-role="mark-deleted" />
+            <input type="text" class="form-control form-control-sm" data-name-template="RoomTypes[__index__].Name" maxlength="200" />
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" min="0" step="1" data-name-template="RoomTypes[__index__].TotalRooms" value="0" />
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" data-name-template="RoomTypes[__index__].SortOrder" value="0" />
+        </td>
+        <td class="text-center">
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove="room-types">Remove</button>
+        </td>
+    </tr>
+</template>
+
+@if (Model.Setup.RoomTypes.Any())
+{
+    <template id="linen-item-template">
+        <tbody data-collection-item-group>
+            <tr data-collection-item>
+                <td>
+                    <input type="hidden" data-name-template="Items[__index__].Id" value="" />
+                    <input type="hidden" data-name-template="Items[__index__].IsDeleted" value="false" data-role="mark-deleted" />
+                    <input type="text" class="form-control form-control-sm" data-name-template="Items[__index__].Name" maxlength="200" />
+                </td>
+                <td>
+                    <input type="text" class="form-control form-control-sm" data-name-template="Items[__index__].OrderItemNumber" maxlength="50" />
+                </td>
+                <td>
+                    <input type="number" class="form-control form-control-sm" min="0" step="0.01" data-name-template="Items[__index__].OrderCaseCount" value="1" />
+                </td>
+                <td>
+                    <input type="number" class="form-control form-control-sm" min="0" step="0.01" data-name-template="Items[__index__].OrderCasePrice" value="0" />
+                </td>
+                <td>
+                    <input type="number" class="form-control form-control-sm" min="0" step="0.1" data-name-template="Items[__index__].ParLevelTarget" value="1" />
+                </td>
+                <td>
+                    <input type="number" class="form-control form-control-sm" data-name-template="Items[__index__].SortOrder" value="0" />
+                </td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-link text-danger p-0" data-collection-remove="linen-items">Remove</button>
+                </td>
+            </tr>
+            <tr class="bg-light" data-collection-item-child>
+                <td colspan="7">
+                    <div class="row g-2">
+                        @for (var roomIndex = 0; roomIndex < Model.Setup.RoomTypes.Count; roomIndex++)
+                        {
+                            var roomType = Model.Setup.RoomTypes[roomIndex];
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label form-label-sm">@roomType.Name</label>
+                                <input type="hidden" data-name-template="Items[__index__].Requirements[@roomIndex].RoomTypeId" value="@roomType.Id" />
+                                <input type="number" min="0" step="0.1" class="form-control form-control-sm" data-name-template="Items[__index__].Requirements[@roomIndex].UnitsPerRoom" value="0" />
+                            </div>
+                        }
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </template>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/linen-inventory.js" asp-append-version="true"></script>
+}
