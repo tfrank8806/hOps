@@ -19,16 +19,6 @@ namespace hOps.web.Controllers
     {
         private readonly DirectMessageService _messageService;
         private readonly IUserTimeZoneService _timeZoneService;
-        private static readonly Dictionary<string, (string Label, int Order)> AlertCategoryDefinitions = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["workorder"] = ("Work Orders", 0),
-            ["passon-log"] = ("Pass-on Logs", 1),
-            ["log"] = ("Mail Logs", 2),
-            ["schedule"] = ("Schedules & Time Off", 3),
-            ["mention"] = ("Mentions", 4),
-            ["other"] = ("Other Alerts", 99)
-        };
-
         public DirectMessagesController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
@@ -522,7 +512,7 @@ namespace hOps.web.Controllers
 
             foreach (var alert in alerts)
             {
-                var metadata = ResolveAlertCategory(alert.Type);
+                var metadata = AlertCategoryHelper.Resolve(alert.Type);
                 if (!categories.TryGetValue(metadata.Key, out var category))
                 {
                     category = new AlertCategoryViewModel
@@ -541,24 +531,6 @@ namespace hOps.web.Controllers
                 .OrderBy(c => c.SortOrder)
                 .ThenBy(c => c.Label)
                 .ToList();
-        }
-
-        private static (string Key, string Label, int Order) ResolveAlertCategory(string? rawType)
-        {
-            if (string.IsNullOrWhiteSpace(rawType))
-            {
-                var fallback = AlertCategoryDefinitions["other"];
-                return ("other", fallback.Label, fallback.Order);
-            }
-
-            var normalized = rawType.Trim().ToLowerInvariant();
-            if (AlertCategoryDefinitions.TryGetValue(normalized, out var definition))
-            {
-                return (normalized, definition.Label, definition.Order);
-            }
-
-            var fallbackDefinition = AlertCategoryDefinitions["other"];
-            return ("other", fallbackDefinition.Label, fallbackDefinition.Order);
         }
 
         private static string BuildDisplayName(ApplicationUser user)

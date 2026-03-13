@@ -7,6 +7,7 @@ using hOps.web.ViewModels.Messages;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using hOps.web.Utilities;
 
 namespace hOps.web.Controllers
 {
@@ -95,6 +96,21 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MarkCategoryRead(string categoryKey)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            var normalizedKey = AlertCategoryHelper.NormalizeKey(categoryKey);
+            await _messageService.MarkAlertsReadByCategoryAsync(currentUser.Id, normalizedKey);
+            return RedirectToAction("Alerts", "DirectMessages");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
         {
             var currentUser = await _userManager.GetUserAsync(User);
@@ -118,6 +134,21 @@ namespace hOps.web.Controllers
             }
 
             await _messageService.DeleteAllAlertsAsync(currentUser.Id);
+            return RedirectToAction("Alerts", "DirectMessages");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteCategory(string categoryKey)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            var normalizedKey = AlertCategoryHelper.NormalizeKey(categoryKey);
+            await _messageService.DeleteAlertsByCategoryAsync(currentUser.Id, normalizedKey);
             return RedirectToAction("Alerts", "DirectMessages");
         }
 

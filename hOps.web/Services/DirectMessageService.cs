@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Net;
+using hOps.web.Utilities;
 
 namespace hOps.web.Services
 {
@@ -282,6 +283,21 @@ namespace hOps.web.Services
             await _context.SaveChangesAsync();
         }
 
+        public async Task DeleteAlertsByCategoryAsync(string userId, string categoryKey)
+        {
+            var normalizedKey = AlertCategoryHelper.NormalizeKey(categoryKey);
+            var alerts = await BuildAlertCategoryQuery(userId, normalizedKey)
+                .ToListAsync();
+
+            if (alerts.Count == 0)
+            {
+                return;
+            }
+
+            _context.UserNotifications.RemoveRange(alerts);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task ArchiveConversationForUserAsync(int conversationId, string userId)
         {
             var conversation = await _context.DirectMessageConversations
@@ -327,6 +343,55 @@ namespace hOps.web.Services
         {
             var notifications = await _context.UserNotifications
                 .Where(n => n.UserId == userId && !n.IsRead && n.Type != "message")
+                .ToListAsync();
+
+            if (notifications.Count == 0)
+            {
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            foreach (var notification in notifications)
+            {
+                notification.IsRead = true;
+                notification.ReadAt = now;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        private IQueryable<UserNotification> BuildAlertCategoryQuery(string userId, string normalizedCategoryKey)
+        {
+            var query = _context.UserNotifications
+                .Where(n => n.UserId == userId && n.Type != "message");
+
+            if (normalizedCategoryKey.Equals(AlertCategoryHelper.OtherKey, StringComparison.OrdinalIgnoreCase))
+            {
+                var knownKeys = AlertCategoryHelper.KnownNonOtherKeys;
+                if (knownKeys.Count > 0)
+                {
+                    query = query.Where(n =>
+                        n.Type == null ||
+                        !knownKeys.Contains(n.Type!.ToLower()));
+                }
+                else
+                {
+                    query = query.Where(n => n.Type == null);
+                }
+            }
+            else
+            {
+                query = query.Where(n => n.Type != null && n.Type.ToLower() == normalizedCategoryKey);
+            }
+
+            return query;
+        }
+
+        public async Task MarkAlertsReadByCategoryAsync(string userId, string categoryKey)
+        {
+            var normalizedKey = AlertCategoryHelper.NormalizeKey(categoryKey);
+            var notifications = await BuildAlertCategoryQuery(userId, normalizedKey)
+                .Where(n => !n.IsRead)
                 .ToListAsync();
 
             if (notifications.Count == 0)
