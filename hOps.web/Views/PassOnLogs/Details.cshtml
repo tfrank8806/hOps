@@ -113,14 +113,31 @@
                     <p class="text-muted">No comments yet.</p>
                 }
 
-                <form asp-action="AddComment" method="post" class="card">
+                <form asp-action="AddComment" method="post" class="card" enctype="multipart/form-data">
                     <div class="card-body">
                         <input type="hidden" asp-for="NewComment.LogId" />
                         <div class="mb-3">
                             <label asp-for="NewComment.Body" class="form-label"></label>
-                            <textarea asp-for="NewComment.Body" class="form-control" rows="3" placeholder="Share an update or clarification..." data-enable-mentions="true" data-rich-text="true"></textarea>
-                            <div class="form-text">Basic formatting works here too for quick emphasis.</div>
+                            <textarea asp-for="NewComment.Body"
+                                      class="form-control"
+                                      rows="3"
+                                      placeholder="Share an update or clarification..."
+                                      data-enable-mentions="true"
+                                      data-rich-text="true"
+                                      data-clipboard-upload-target="#passOnLogCommentFiles"></textarea>
+                            <div class="form-text">Basic formatting works here too for quick emphasis. Paste images and they'll be attached below.</div>
                             <span asp-validation-for="NewComment.Body" class="text-danger"></span>
+                        </div>
+                        <div class="mb-3">
+                            <label for="passOnLogCommentFiles" class="form-label">Add images</label>
+                            <input asp-for="NewComment.Files"
+                                   type="file"
+                                   id="passOnLogCommentFiles"
+                                   class="form-control"
+                                   accept="image/*"
+                                   multiple />
+                            <div class="form-text">Attach screenshots or photos. You can also paste them directly into the comment box.</div>
+                            <span asp-validation-for="NewComment.Files" class="text-danger"></span>
                         </div>
                         <button type="submit" class="btn btn-primary">Post Comment</button>
                     </div>

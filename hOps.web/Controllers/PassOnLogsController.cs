@@ -568,6 +568,7 @@ namespace hOps.web.Controllers
                 .AsSplitQuery()
                 .Include(l => l.CreatedBy)
                 .Include(l => l.Properties).ThenInclude(lp => lp.Property)
+                .Include(l => l.Attachments)
                 .Include(l => l.Comments).ThenInclude(c => c.CreatedBy)
                 .Include(l => l.Views).ThenInclude(v => v.Viewer)
                 .FirstOrDefaultAsync(l => l.Id == input.LogId);
@@ -614,7 +615,29 @@ namespace hOps.web.Controllers
             log.Comments.Add(comment);
             comment.CreatedBy = currentUser;
             MarkLogUnreadForUnseenCommentViewers(log, currentUser.Id, comment.CreatedAt);
-            await _context.SaveChangesAsync();
+            var uploadedAttachments = await SaveAttachmentsAsync(input.Files);
+            if (uploadedAttachments.Count > 0)
+            {
+                log.Attachments ??= new List<PassOnLogAttachment>();
+                foreach (var upload in uploadedAttachments)
+                {
+                    log.Attachments.Add(upload.Attachment);
+                }
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                foreach (var upload in uploadedAttachments)
+                {
+                    DeletePhysicalFile(upload.PhysicalPath);
+                }
+
+                throw;
+            }
 
             var link = Url.Action(nameof(Details), "PassOnLogs", new { id = log.Id }, Request.Scheme)
                 ?? Url.Action(nameof(Index), "PassOnLogs") ?? "/PassOnLogs";

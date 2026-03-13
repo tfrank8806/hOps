@@ -149,6 +149,8 @@ namespace hOps.web.ViewModels
         [Display(Name = "Comment")]
         public string Body { get; set; } = string.Empty;
         public string? ReturnUrl { get; set; }
+        [Display(Name = "Add Images")]
+        public List<IFormFile>? Files { get; set; } = new();
     }
 
     public class PassOnLogAttachmentViewModel
