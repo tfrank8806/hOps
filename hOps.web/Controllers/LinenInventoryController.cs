@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using hOps.web.Data;
@@ -10,10 +11,12 @@ using hOps.web.Services;
 using hOps.web.Utilities;
 using hOps.web.ViewModels.Housekeeping.LinenInventory;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace hOps.web.Controllers
 {
@@ -23,15 +26,18 @@ namespace hOps.web.Controllers
     {
         private readonly IUserTimeZoneService _timeZoneService;
         private readonly ILogger<LinenInventoryController> _logger;
+        private readonly IWebHostEnvironment _environment;
 
         public LinenInventoryController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             IUserTimeZoneService timeZoneService,
-            ILogger<LinenInventoryController> logger) : base(context, userManager)
+            ILogger<LinenInventoryController> logger,
+            IWebHostEnvironment environment) : base(context, userManager)
         {
             _timeZoneService = timeZoneService;
             _logger = logger;
+            _environment = environment;
         }
 
         [HttpGet]
@@ -533,7 +539,7 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public IActionResult Supply()
+        public async Task<IActionResult> Supply()
         {
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
@@ -542,8 +548,19 @@ namespace hOps.web.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
-            ViewBag.PropertyName = property.Name;
-            return View();
+            var settings = await _context.LinenInventorySettings
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.PropertyId == property.Id);
+
+            var viewModel = new SupplyInventoryPageViewModel
+            {
+                PropertyId = property.Id,
+                PropertyName = property.Name,
+                DefaultMonthlyBudget = settings?.DefaultMonthlyBudget ?? 0,
+                TemplateItems = LoadSupplyTemplate()
+            };
+
+            return View(viewModel);
         }
 
         private async Task<LinenInventoryPageViewModel> BuildPageViewModelAsync(Property property, ApplicationUser user, LinenInventoryEntryForm? entryOverride)
@@ -747,6 +764,77 @@ namespace hOps.web.Controllers
             }
 
             return user.UserName ?? "Manager";
+        }
+
+        private List<SupplyInventoryItemViewModel> LoadSupplyTemplate()
+        {
+            var items = new List<SupplyInventoryItemViewModel>();
+            try
+            {
+                var webRoot = string.IsNullOrWhiteSpace(_environment.WebRootPath)
+                    ? Path.Combine(AppContext.BaseDirectory, "wwwroot")
+                    : _environment.WebRootPath!;
+
+                var templatePath = Path.Combine(webRoot, "data", "supply-inventory-template.json");
+                if (!System.IO.File.Exists(templatePath))
+                {
+                    _logger.LogWarning("Supply inventory template not found at {TemplatePath}", templatePath);
+                    return items;
+                }
+
+                var json = System.IO.File.ReadAllText(templatePath);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    return items;
+                }
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+                var templateItems = JsonSerializer.Deserialize<List<SupplyInventoryTemplateItem>>(json, options);
+                if (templateItems == null)
+                {
+                    return items;
+                }
+
+                foreach (var entry in templateItems)
+                {
+                    if (entry == null)
+                    {
+                        continue;
+                    }
+
+                    var description = string.IsNullOrWhiteSpace(entry.Description)
+                        ? (entry.Item ?? string.Empty)
+                        : entry.Description.Trim();
+
+                    items.Add(new SupplyInventoryItemViewModel
+                    {
+                        Item = string.IsNullOrWhiteSpace(entry.Item) ? description : entry.Item.Trim(),
+                        Description = description,
+                        PartNumber = entry.PartNumber ?? string.Empty,
+                        Price = entry.Price,
+                        QuantityPerCase = entry.QuantityPerCase
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load the supply inventory template.");
+            }
+
+            return items;
+        }
+
+        private sealed class SupplyInventoryTemplateItem
+        {
+            public string? Item { get; set; }
+            public string? Description { get; set; }
+            public string? PartNumber { get; set; }
+            public decimal Price { get; set; }
+            public decimal QuantityPerCase { get; set; }
         }
     }
 }

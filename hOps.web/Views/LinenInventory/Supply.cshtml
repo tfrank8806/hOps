@@ -1,22 +1,118 @@
+@model hOps.web.ViewModels.Housekeeping.LinenInventory.SupplyInventoryPageViewModel
+@using System.Globalization
+@using System.Text.Json
+
 @{
     ViewData["Title"] = "Supply Inventory";
-    var propertyName = ViewBag.PropertyName as string ?? "Property";
+    var serializerOptions = new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+    var templateJson = JsonSerializer.Serialize(Model.TemplateItems, serializerOptions);
+    var defaultBudget = Model.DefaultMonthlyBudget.ToString("0.##", CultureInfo.InvariantCulture);
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h1 class="h3 mb-0">Supply Inventory</h1>
-        <p class="text-muted mb-0">@propertyName</p>
+<div class="d-flex justify-content-between align-items-start flex-wrap mb-4">
+    <div class="mb-3 mb-md-0">
+        <h1 class="h3 mb-1">Supply Inventory</h1>
+        <p class="text-muted mb-0">@Model.PropertyName</p>
     </div>
-    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to Linen Inventory</a>
+    <div class="text-md-end">
+        <button type="button" class="btn btn-primary btn-sm me-2" data-action="add-item">Add Item</button>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to Linen Inventory</a>
+    </div>
+</div>
+
+<div class="alert alert-info mb-4">
+    <strong>Based on the Aimbridge supply workbook.</strong>
+    <div class="mb-1">We imported the latest worksheet from Dropbox and keep it ready here so you do not have to juggle spreadsheets.</div>
+    <div class="mb-0">Changes are saved for this property in your browser. Use the reset action anytime to reload the original template.</div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h2 class="h5 mb-0">Monthly Budget Overview</h2>
+            <small class="text-muted">Same layout as the worksheet summary line</small>
+        </div>
+        <div class="text-muted small" data-role="save-status">Waiting for changes&hellip;</div>
+    </div>
+    <div class="card-body">
+        <div class="row g-4 row-cols-1 row-cols-md-2 row-cols-xl-4">
+            <div class="col">
+                <label class="form-label fw-semibold" for="monthlyBudgetInput">Monthly Budget</label>
+                <div class="input-group">
+                    <span class="input-group-text">$</span>
+                    <input type="number"
+                           id="monthlyBudgetInput"
+                           class="form-control"
+                           data-role="monthly-budget"
+                           min="0"
+                           step="0.01"
+                           value="@(Model.DefaultMonthlyBudget == 0 ? string.Empty : Model.DefaultMonthlyBudget.ToString("0.##"))" />
+                </div>
+                <div class="form-text">Auto-saves per property in this browser.</div>
+            </div>
+            <div class="col">
+                <div class="text-muted text-uppercase small mb-1">Total Inventory Value</div>
+                <div class="fw-semibold fs-3" data-role="total-inventory-value">$0.00</div>
+                <div class="text-muted small">Inventory Count multiplied by Unit Price.</div>
+            </div>
+            <div class="col">
+                <div class="text-muted text-uppercase small mb-1">Total Order Cost</div>
+                <div class="fw-semibold fs-3" data-role="total-order-cost">$0.00</div>
+                <div class="text-muted small">Sum of the Order Cost column.</div>
+            </div>
+            <div class="col">
+                <div class="text-muted text-uppercase small mb-1">Variance to Budget</div>
+                <div class="fw-semibold fs-3" data-role="budget-variance">$0.00</div>
+                <div class="text-muted small">Budget minus Total Order Cost.</div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="card">
-    <div class="card-body">
-        <p class="lead mb-2">Supply tracking is coming soon.</p>
-        <p class="mb-0 text-muted">
-            We have reserved this space for the upcoming supply inventory workflow. If you have specific requests or need to import an existing worksheet,
-            please drop the product team a note through the Support &rarr; Open Ticket page.
-        </p>
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h2 class="h5 mb-0">Supply Worksheet</h2>
+            <small class="text-muted">Columns mirror Inventory Count &rarr; Order Cost</small>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span class="text-muted small" data-role="item-count">@Model.TemplateItems.Count item(s)</span>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-action="reset-template">
+                Reset to Template
+            </button>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0 supply-inventory-table">
+            <thead class="table-light align-middle text-center">
+                <tr>
+                    <th scope="col">Inventory<br />Count</th>
+                    <th scope="col" class="text-start">Item</th>
+                    <th scope="col" class="text-start">Description</th>
+                    <th scope="col" class="text-start">Part Number</th>
+                    <th scope="col">Unit Price</th>
+                    <th scope="col">Inventory Value</th>
+                    <th scope="col">Qty / Case</th>
+                    <th scope="col">Order Case Count</th>
+                    <th scope="col">Order Cost</th>
+                    <th scope="col" class="text-start">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="supplyInventoryRows"></tbody>
+        </table>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        window.supplyInventoryConfig = {
+            propertyId: @Model.PropertyId,
+            defaultBudget: parseFloat("@defaultBudget") || 0,
+            templateItems: @Html.Raw(templateJson)
+        };
+    </script>
+    <script src="~/js/supply-inventory.js" asp-append-version="true"></script>
+}
