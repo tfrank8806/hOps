@@ -2396,6 +2396,52 @@
                 });
             })();
         </script>
+        <script>
+            document.addEventListener('DOMContentLoaded', () =>
+            {
+                document.querySelectorAll('.dropdown-submenu > .dropdown-toggle').forEach(toggle =>
+                {
+                    toggle.addEventListener('click', event =>
+                    {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        const submenu = toggle.nextElementSibling;
+                        if (!submenu)
+                        {
+                            return;
+                        }
+
+                        const parentMenu = toggle.closest('.dropdown-menu');
+                        parentMenu?.querySelectorAll('.dropdown-menu.show').forEach(menu =>
+                        {
+                            if (menu !== submenu)
+                            {
+                                menu.classList.remove('show');
+                            }
+                        });
+
+                        submenu.classList.toggle('show');
+                    });
+                });
+            });
+
+            document.addEventListener('hide.bs.dropdown', event =>
+            {
+                if (!event.target)
+                {
+                    return;
+                }
+
+                const menus = event.target.querySelectorAll?.('.dropdown-menu.show');
+                if (!menus)
+                {
+                    return;
+                }
+
+                menus.forEach(menu => menu.classList.remove('show'));
+            });
+        </script>
     }
 
     @if (SignInManager.IsSignedIn(User))
