@@ -203,6 +203,7 @@ namespace hOps.web.Controllers
             {
                 _context.LinenInventorySessionItems.RemoveRange(existingSession.Items);
                 _context.LinenInventorySessions.Remove(existingSession);
+                await _context.SaveChangesAsync();
             }
 
             _context.LinenInventorySessions.Add(session);
