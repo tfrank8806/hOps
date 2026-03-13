@@ -1,0 +1,22 @@
+@{
+    ViewData["Title"] = "Supply Inventory";
+    var propertyName = ViewBag.PropertyName as string ?? "Property";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-0">Supply Inventory</h1>
+        <p class="text-muted mb-0">@propertyName</p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to Linen Inventory</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <p class="lead mb-2">Supply tracking is coming soon.</p>
+        <p class="mb-0 text-muted">
+            We have reserved this space for the upcoming supply inventory workflow. If you have specific requests or need to import an existing worksheet,
+            please drop the product team a note through the Support &rarr; Open Ticket page.
+        </p>
+    </div>
+</div>

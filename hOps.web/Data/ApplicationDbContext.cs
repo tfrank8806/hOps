@@ -82,6 +82,13 @@ namespace hOps.web.Data
         public DbSet<DeepCleanSetting> DeepCleanSettings { get; set; }
         public DbSet<DeepCleanChecklistItem> DeepCleanChecklistItems { get; set; }
         public DbSet<DeepCleanSession> DeepCleanSessions { get; set; }
+
+        public DbSet<LinenInventorySettings> LinenInventorySettings { get; set; }
+        public DbSet<LinenInventoryRoomType> LinenInventoryRoomTypes { get; set; }
+        public DbSet<LinenInventoryItem> LinenInventoryItems { get; set; }
+        public DbSet<LinenInventoryItemRequirement> LinenInventoryItemRequirements { get; set; }
+        public DbSet<LinenInventorySession> LinenInventorySessions { get; set; }
+        public DbSet<LinenInventorySessionItem> LinenInventorySessionItems { get; set; }
         public DbSet<DeepCleanSessionTask> DeepCleanSessionTasks { get; set; }
 
         public DbSet<EquipmentItem> EquipmentItems { get; set; }
@@ -1068,6 +1075,67 @@ namespace hOps.web.Data
 
             builder.Entity<SiteVisitTemplateItem>()
                 .HasIndex(i => new { i.SiteVisitTemplateId, i.SortOrder });
+
+            builder.Entity<LinenInventorySettings>()
+                .HasOne(s => s.Property)
+                .WithOne(p => p.LinenInventorySettings)
+                .HasForeignKey<LinenInventorySettings>(s => s.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<LinenInventoryRoomType>()
+                .HasOne(rt => rt.Property)
+                .WithMany(p => p.LinenInventoryRoomTypes)
+                .HasForeignKey(rt => rt.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<LinenInventoryItem>()
+                .HasOne(i => i.Property)
+                .WithMany(p => p.LinenInventoryItems)
+                .HasForeignKey(i => i.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<LinenInventoryItemRequirement>()
+                .HasIndex(r => new { r.InventoryItemId, r.RoomTypeId })
+                .IsUnique();
+
+            builder.Entity<LinenInventoryItemRequirement>()
+                .HasOne(r => r.InventoryItem)
+                .WithMany(i => i.Requirements)
+                .HasForeignKey(r => r.InventoryItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<LinenInventoryItemRequirement>()
+                .HasOne(r => r.RoomType)
+                .WithMany(rt => rt.Requirements)
+                .HasForeignKey(r => r.RoomTypeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<LinenInventorySession>()
+                .HasOne(s => s.Property)
+                .WithMany(p => p.LinenInventorySessions)
+                .HasForeignKey(s => s.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<LinenInventorySession>()
+                .HasOne(s => s.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(s => s.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<LinenInventorySession>()
+                .HasIndex(s => new { s.PropertyId, s.Year, s.Month });
+
+            builder.Entity<LinenInventorySessionItem>()
+                .HasOne(i => i.Session)
+                .WithMany(s => s.Items)
+                .HasForeignKey(i => i.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<LinenInventorySessionItem>()
+                .HasOne(i => i.InventoryItem)
+                .WithMany()
+                .HasForeignKey(i => i.InventoryItemId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

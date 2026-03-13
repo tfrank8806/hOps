@@ -67,6 +67,11 @@ namespace hOps.web.Models
         public ICollection<DeepCleanChecklistItem> DeepCleanChecklistItems { get; set; } = new List<DeepCleanChecklistItem>();
         public ICollection<DeepCleanSession> DeepCleanSessions { get; set; } = new List<DeepCleanSession>();
 
+        public LinenInventorySettings? LinenInventorySettings { get; set; }
+        public ICollection<LinenInventoryRoomType> LinenInventoryRoomTypes { get; set; } = new List<LinenInventoryRoomType>();
+        public ICollection<LinenInventoryItem> LinenInventoryItems { get; set; } = new List<LinenInventoryItem>();
+        public ICollection<LinenInventorySession> LinenInventorySessions { get; set; } = new List<LinenInventorySession>();
+
         public ICollection<EquipmentItem> EquipmentItems { get; set; } = new List<EquipmentItem>();
         public ICollection<MaintenanceLogTemplate> MaintenanceLogTemplates { get; set; } = new List<MaintenanceLogTemplate>();
         public ICollection<EmergencyLightTestEntry> EmergencyLightTestEntries { get; set; } = new List<EmergencyLightTestEntry>();
