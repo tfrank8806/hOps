@@ -331,17 +331,20 @@
                                 <a class="nav-link dropdown-toggle @(housekeepingActive ? "active" : string.Empty)" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     <span class="sidebar-text">Housekeeping</span>
                                 </a>
-                                <ul class="dropdown-menu">
+                                <ul class="dropdown-menu" id="housekeepingMenu" data-bs-auto-close="outside">
                                     <li><a class="dropdown-item" asp-controller="DeepCleans" asp-action="Index">Deep Cleans</a></li>
                                     <li><a class="dropdown-item" asp-controller="Housekeeping" asp-action="DailyRecap">Daily Recap</a></li>
-                                    <li class="dropend dropdown-submenu">
-                                        <a class="dropdown-item dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                            Inventory
-                                        </a>
-                                        <ul class="dropdown-menu">
-                                            <li><a class="dropdown-item" asp-controller="LinenInventory" asp-action="Index">Linen Inventory</a></li>
-                                            <li><a class="dropdown-item" asp-controller="LinenInventory" asp-action="Supply">Supply Inventory</a></li>
-                                        </ul>
+                                    <li>
+                                        <button class="dropdown-item d-flex align-items-center justify-content-between" type="button" data-bs-toggle="collapse" data-bs-target="#housekeepingInventoryMenu" aria-expanded="false" aria-controls="housekeepingInventoryMenu">
+                                            <span>Inventory</span>
+                                            <span class="ms-3 small text-muted" data-collapse-icon>+</span>
+                                        </button>
+                                        <div class="collapse dropdown-submenu-collapse ps-3" id="housekeepingInventoryMenu" data-bs-parent="#housekeepingMenu">
+                                            <ul class="list-unstyled mb-0">
+                                                <li><a class="dropdown-item" asp-controller="LinenInventory" asp-action="Index">Linen Inventory</a></li>
+                                                <li><a class="dropdown-item" asp-controller="LinenInventory" asp-action="Supply">Supply Inventory</a></li>
+                                            </ul>
+                                        </div>
                                     </li>
                                 </ul>
                             </li>
@@ -2397,50 +2400,23 @@
             })();
         </script>
         <script>
-            document.addEventListener('DOMContentLoaded', () =>
-            {
-                document.querySelectorAll('.dropdown-submenu > .dropdown-toggle').forEach(toggle =>
-                {
-                    toggle.addEventListener('click', event =>
-                    {
-                        event.preventDefault();
-                        event.stopPropagation();
+            (function () {
+                const updateInventoryIcon = (expanded) => {
+                    const icon = document.querySelector('[data-bs-target="#housekeepingInventoryMenu"] [data-collapse-icon]');
+                    if (!icon) {
+                        return;
+                    }
+                    icon.textContent = expanded ? '−' : '+';
+                };
 
-                        const submenu = toggle.nextElementSibling;
-                        if (!submenu)
-                        {
-                            return;
-                        }
-
-                        const parentMenu = toggle.closest('.dropdown-menu');
-                        parentMenu?.querySelectorAll('.dropdown-menu.show').forEach(menu =>
-                        {
-                            if (menu !== submenu)
-                            {
-                                menu.classList.remove('show');
-                            }
-                        });
-
-                        submenu.classList.toggle('show');
-                    });
-                });
-            });
-
-            document.addEventListener('hide.bs.dropdown', event =>
-            {
-                if (!event.target)
-                {
+                const inventoryCollapse = document.getElementById('housekeepingInventoryMenu');
+                if (!inventoryCollapse) {
                     return;
                 }
 
-                const menus = event.target.querySelectorAll?.('.dropdown-menu.show');
-                if (!menus)
-                {
-                    return;
-                }
-
-                menus.forEach(menu => menu.classList.remove('show'));
-            });
+                inventoryCollapse.addEventListener('show.bs.collapse', () => updateInventoryIcon(true));
+                inventoryCollapse.addEventListener('hide.bs.collapse', () => updateInventoryIcon(false));
+            })();
         </script>
     }
 
