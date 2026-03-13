@@ -229,7 +229,7 @@ else
         </div>
         @if (Model.CanEditSetup)
         {
-            <form asp-action="LoadDefaults" method="post" class="d-flex gap-2">
+            <form asp-action="LoadDefaults" method="post" class="d-flex">
                 <button type="submit" class="btn btn-outline-secondary btn-sm" onclick="return confirm('Replace the current setup with the Aimbridge defaults?')">
                     Load Aimbridge Defaults
                 </button>
@@ -245,6 +245,21 @@ else
         }
         else
         {
+            <div class="border rounded p-3 mb-4 bg-light">
+                <form asp-action="ImportSetupCsv" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+                    <div class="col-md-7">
+                        <label for="linenSetupCsv" class="form-label fw-semibold">Upload Setup CSV</label>
+                        <input type="file" id="linenSetupCsv" name="csvFile" class="form-control form-control-sm" accept=".csv" />
+                        <div class="form-text">Download the template, update the rows, then upload to replace the setup.</div>
+                    </div>
+                    <div class="col-md-5 d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Upload CSV</button>
+                        <a asp-action="DownloadSetupTemplate" class="btn btn-outline-secondary btn-sm">
+                            Download Template
+                        </a>
+                    </div>
+                </form>
+            </div>
             <form asp-action="SaveRoomTypes" method="post" class="mb-4">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                     <div>

@@ -2,8 +2,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
@@ -12,6 +14,7 @@ using hOps.web.Utilities;
 using hOps.web.ViewModels.Housekeeping.LinenInventory;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -539,6 +542,189 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
+        public IActionResult DownloadSetupTemplate()
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["LinenInventoryError"] = "Select a property before downloading the template.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var builder = new StringBuilder();
+            builder.AppendLine("Section,Name,TotalRooms,ItemNumber,CaseCount,CasePrice,ParTarget,SortOrder,RequirementRoomType,RequirementUnits");
+            builder.AppendLine("RoomType,Standard King,60,,,,,,1,");
+            builder.AppendLine("RoomType,Standard Double,80,,,,,,2,");
+            builder.AppendLine("RoomType,Suites,10,,,,,,3,");
+            builder.AppendLine("Item,Bath Towels,,BT-100,50,115,3,1,Standard King,4");
+            builder.AppendLine("Item,Bath Towels,,BT-100,50,115,3,1,Standard Double,6");
+            builder.AppendLine("Item,Bath Towels,,BT-100,50,115,3,1,Suites,6");
+            builder.AppendLine("Item,Bath Mats,,BM-42,40,72,2,2,Standard King,2");
+            builder.AppendLine("Item,Bath Mats,,BM-42,40,72,2,2,Standard Double,2");
+            builder.AppendLine("Item,Pillow Cases,,PC-15,120,96.5,3,3,Standard King,4");
+            builder.AppendLine("Item,Pillow Cases,,PC-15,120,96.5,3,3,Standard Double,6");
+
+            var bytes = Encoding.UTF8.GetBytes(builder.ToString());
+            return File(bytes, "text/csv", "linen-inventory-setup-template.csv");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ImportSetupCsv(IFormFile? csvFile)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["LinenInventoryError"] = "Select a property before importing a setup.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            if (!await UserCanEditSetupAsync(user))
+            {
+                return Forbid();
+            }
+
+            if (csvFile == null || csvFile.Length == 0)
+            {
+                TempData["LinenInventoryError"] = "Select a CSV file to upload.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            List<SetupCsvRoomType> roomTypes;
+            List<SetupCsvItem> items;
+            try
+            {
+                (roomTypes, items) = await ParseSetupCsvAsync(csvFile);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to parse linen setup CSV for property {PropertyId}", property.Id);
+                TempData["LinenInventoryError"] = ex.Message;
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (!roomTypes.Any())
+            {
+                TempData["LinenInventoryError"] = "Add at least one room type row to the CSV.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (!items.Any())
+            {
+                TempData["LinenInventoryError"] = "Add at least one linen item row to the CSV.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var existingItems = await _context.LinenInventoryItems
+                .Include(i => i.Requirements)
+                .Where(i => i.PropertyId == property.Id)
+                .ToListAsync();
+
+            if (existingItems.Any())
+            {
+                var requirements = existingItems.SelectMany(i => i.Requirements).ToList();
+                if (requirements.Any())
+                {
+                    _context.LinenInventoryItemRequirements.RemoveRange(requirements);
+                }
+
+                _context.LinenInventoryItems.RemoveRange(existingItems);
+            }
+
+            var existingRoomTypes = await _context.LinenInventoryRoomTypes
+                .Where(rt => rt.PropertyId == property.Id)
+                .ToListAsync();
+
+            if (existingRoomTypes.Any())
+            {
+                _context.LinenInventoryRoomTypes.RemoveRange(existingRoomTypes);
+            }
+
+            await _context.SaveChangesAsync();
+
+            var roomTypeEntities = new List<LinenInventoryRoomType>();
+            var seenRoomTypeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in roomTypes.OrderBy(rt => rt.SortOrder).ThenBy(rt => rt.Name))
+            {
+                var trimmedName = row.Name.Trim();
+                if (string.IsNullOrWhiteSpace(trimmedName) || !seenRoomTypeNames.Add(trimmedName))
+                {
+                    continue;
+                }
+
+                var entity = new LinenInventoryRoomType
+                {
+                    PropertyId = property.Id,
+                    Name = trimmedName,
+                    TotalRooms = row.TotalRooms < 0 ? 0 : row.TotalRooms,
+                    SortOrder = row.SortOrder,
+                    IsActive = true
+                };
+                roomTypeEntities.Add(entity);
+                _context.LinenInventoryRoomTypes.Add(entity);
+            }
+
+            if (roomTypeEntities.Count == 0)
+            {
+                TempData["LinenInventoryError"] = "The CSV file did not include any valid room type rows.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            await _context.SaveChangesAsync();
+
+            var roomTypeLookup = roomTypeEntities.ToDictionary(rt => rt.Name, StringComparer.OrdinalIgnoreCase);
+            var now = DateTime.UtcNow;
+
+            foreach (var item in items.OrderBy(i => i.SortOrder).ThenBy(i => i.Name))
+            {
+                var entity = new LinenInventoryItem
+                {
+                    PropertyId = property.Id,
+                    Name = item.Name.Trim(),
+                    OrderItemNumber = string.IsNullOrWhiteSpace(item.ItemNumber) ? null : item.ItemNumber.Trim(),
+                    OrderCaseCount = item.CaseCount <= 0 ? 1 : Math.Round(item.CaseCount, 2, MidpointRounding.AwayFromZero),
+                    OrderCasePrice = item.CasePrice < 0 ? 0 : Math.Round(item.CasePrice, 2, MidpointRounding.AwayFromZero),
+                    ParLevelTarget = item.ParLevelTarget <= 0 ? 1 : Math.Round(item.ParLevelTarget, 2, MidpointRounding.AwayFromZero),
+                    SortOrder = item.SortOrder,
+                    IsArchived = false,
+                    UpdatedAtUtc = now,
+                    UpdatedByUserId = user.Id
+                };
+
+                foreach (var requirement in item.Requirements)
+                {
+                    if (requirement.UnitsPerRoom <= 0)
+                    {
+                        continue;
+                    }
+
+                    if (!roomTypeLookup.TryGetValue(requirement.RoomTypeName, out var roomType))
+                    {
+                        continue;
+                    }
+
+                    entity.Requirements.Add(new LinenInventoryItemRequirement
+                    {
+                        RoomTypeId = roomType.Id,
+                        UnitsPerRoom = Math.Round(requirement.UnitsPerRoom, 2, MidpointRounding.AwayFromZero)
+                    });
+                }
+
+                _context.LinenInventoryItems.Add(entity);
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["LinenInventoryMessage"] = $"Imported {roomTypes.Count} room type{(roomTypes.Count == 1 ? string.Empty : "s")} and {items.Count} item{(items.Count == 1 ? string.Empty : "s")} from the CSV template.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpGet]
         public async Task<IActionResult> Supply()
         {
             var property = ViewBag.CurrentProperty as Property;
@@ -764,6 +950,250 @@ namespace hOps.web.Controllers
             }
 
             return user.UserName ?? "Manager";
+        }
+
+        private async Task<(List<SetupCsvRoomType> RoomTypes, List<SetupCsvItem> Items)> ParseSetupCsvAsync(IFormFile csvFile)
+        {
+            var roomTypes = new List<SetupCsvRoomType>();
+            var items = new Dictionary<string, SetupCsvItem>(StringComparer.OrdinalIgnoreCase);
+
+            using var stream = csvFile.OpenReadStream();
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+
+            string? headerLine = await reader.ReadLineAsync();
+            if (headerLine == null)
+            {
+                throw new InvalidOperationException("The CSV file was empty.");
+            }
+
+            var headers = SplitCsvLine(headerLine);
+            var headerLookup = headers
+                .Select((name, index) => new { Name = name?.Trim(), Index = index })
+                .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+                .ToDictionary(x => x.Name!, x => x.Index, StringComparer.OrdinalIgnoreCase);
+
+            if (!headerLookup.ContainsKey("Section") || !headerLookup.ContainsKey("Name"))
+            {
+                throw new InvalidOperationException("The CSV header must include at least the Section and Name columns.");
+            }
+
+            static int ParseInt(string? text, int fallback = 0)
+            {
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    return fallback;
+                }
+
+                return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : fallback;
+            }
+
+            static decimal ParseDecimal(string? text, decimal fallback = 0)
+            {
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    return fallback;
+                }
+
+                return decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var value)
+                    ? value
+                    : fallback;
+            }
+
+            int nextRoomTypeOrder = 1;
+            int nextItemOrder = 1;
+
+            string ReadValue(List<string> cells, string header)
+            {
+                if (!headerLookup.TryGetValue(header, out var index))
+                {
+                    return string.Empty;
+                }
+
+                return index < cells.Count ? cells[index]?.Trim() ?? string.Empty : string.Empty;
+            }
+
+            while (!reader.EndOfStream)
+            {
+                var line = await reader.ReadLineAsync();
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                var cells = SplitCsvLine(line);
+                if (cells.Count == 0)
+                {
+                    continue;
+                }
+
+                var section = ReadValue(cells, "Section");
+                var name = ReadValue(cells, "Name");
+                if (string.IsNullOrWhiteSpace(section) || string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                if (section.Equals("RoomType", StringComparison.OrdinalIgnoreCase))
+                {
+                    var totalRooms = ParseInt(ReadValue(cells, "TotalRooms"));
+                    var sortOrder = ParseInt(ReadValue(cells, "SortOrder"), nextRoomTypeOrder);
+                    roomTypes.Add(new SetupCsvRoomType
+                    {
+                        Name = name.Trim(),
+                        TotalRooms = totalRooms < 0 ? 0 : totalRooms,
+                        SortOrder = sortOrder
+                    });
+                    nextRoomTypeOrder = sortOrder >= nextRoomTypeOrder ? sortOrder + 1 : nextRoomTypeOrder + 1;
+                    continue;
+                }
+
+                if (section.Equals("Item", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!items.TryGetValue(name, out var item))
+                    {
+                        item = new SetupCsvItem
+                        {
+                            Name = name.Trim()
+                        };
+                        items[name] = item;
+                    }
+
+                    var sortOrder = ParseInt(ReadValue(cells, "SortOrder"), nextItemOrder);
+                    if (item.SortOrder == 0 || sortOrder < item.SortOrder)
+                    {
+                        item.SortOrder = sortOrder;
+                    }
+
+                    var itemNumber = ReadValue(cells, "ItemNumber");
+                    if (!string.IsNullOrWhiteSpace(itemNumber))
+                    {
+                        item.ItemNumber = itemNumber.Trim();
+                    }
+
+                    var caseCount = ParseDecimal(ReadValue(cells, "CaseCount"));
+                    if (caseCount > 0)
+                    {
+                        item.CaseCount = caseCount;
+                    }
+
+                    var casePrice = ParseDecimal(ReadValue(cells, "CasePrice"));
+                    if (casePrice > 0)
+                    {
+                        item.CasePrice = casePrice;
+                    }
+
+                    var parTarget = ParseDecimal(ReadValue(cells, "ParTarget"));
+                    if (parTarget > 0)
+                    {
+                        item.ParLevelTarget = parTarget;
+                    }
+
+                    var requirementRoomType = ReadValue(cells, "RequirementRoomType");
+                    var requirementUnits = ParseDecimal(ReadValue(cells, "RequirementUnits"));
+                    if (!string.IsNullOrWhiteSpace(requirementRoomType) && requirementUnits > 0)
+                    {
+                        item.Requirements.Add(new SetupCsvRequirement
+                        {
+                            RoomTypeName = requirementRoomType.Trim(),
+                            UnitsPerRoom = requirementUnits
+                        });
+                    }
+
+                    nextItemOrder = sortOrder >= nextItemOrder ? sortOrder + 1 : nextItemOrder + 1;
+                }
+            }
+
+            var normalizedItems = items.Values.ToList();
+            foreach (var item in normalizedItems)
+            {
+                if (item.CaseCount <= 0)
+                {
+                    item.CaseCount = 1;
+                }
+
+                if (item.ParLevelTarget <= 0)
+                {
+                    item.ParLevelTarget = 1;
+                }
+
+                if (item.SortOrder <= 0)
+                {
+                    item.SortOrder = nextItemOrder++;
+                }
+            }
+
+            foreach (var roomType in roomTypes.Where(rt => rt.SortOrder <= 0))
+            {
+                roomType.SortOrder = nextRoomTypeOrder++;
+            }
+
+            return (roomTypes, normalizedItems);
+        }
+
+        private static List<string> SplitCsvLine(string line)
+        {
+            var values = new List<string>();
+            if (line == null)
+            {
+                return values;
+            }
+
+            var current = new StringBuilder();
+            var inQuotes = false;
+
+            for (var i = 0; i < line.Length; i++)
+            {
+                var character = line[i];
+
+                if (character == '"')
+                {
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        current.Append('"');
+                        i++;
+                        continue;
+                    }
+
+                    inQuotes = !inQuotes;
+                    continue;
+                }
+
+                if (character == ',' && !inQuotes)
+                {
+                    values.Add(current.ToString());
+                    current.Clear();
+                    continue;
+                }
+
+                current.Append(character);
+            }
+
+            values.Add(current.ToString());
+            return values;
+        }
+
+        private sealed class SetupCsvRoomType
+        {
+            public string Name { get; set; } = string.Empty;
+            public int TotalRooms { get; set; }
+            public int SortOrder { get; set; }
+        }
+
+        private sealed class SetupCsvItem
+        {
+            public string Name { get; set; } = string.Empty;
+            public string? ItemNumber { get; set; }
+            public decimal CaseCount { get; set; } = 1;
+            public decimal CasePrice { get; set; }
+            public decimal ParLevelTarget { get; set; } = 1;
+            public int SortOrder { get; set; }
+            public List<SetupCsvRequirement> Requirements { get; } = new();
+        }
+
+        private sealed class SetupCsvRequirement
+        {
+            public string RoomTypeName { get; set; } = string.Empty;
+            public decimal UnitsPerRoom { get; set; }
         }
 
         private List<SupplyInventoryItemViewModel> LoadSupplyTemplate()
