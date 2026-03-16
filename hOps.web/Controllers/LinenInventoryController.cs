@@ -738,7 +738,7 @@ namespace hOps.web.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            TempData["LinenInventoryMessage"] = "Loaded the Aimbridge template items.";
+            TempData["LinenInventoryMessage"] = "Loaded the default template items.";
             return RedirectToAction(nameof(Setup));
         }
 
