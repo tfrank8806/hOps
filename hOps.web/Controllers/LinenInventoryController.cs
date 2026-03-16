@@ -138,19 +138,45 @@ namespace hOps.web.Controllers
                 ? _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date
                 : entry.InventoryDate.Date;
 
-            var session = new LinenInventorySession
+            var monthlyBudget = entry.MonthlyBudget < 0 ? 0 : entry.MonthlyBudget;
+            var performedBy = string.IsNullOrWhiteSpace(entry.PerformedBy)
+                ? BuildUserDisplayName(user)
+                : entry.PerformedBy!.Trim();
+
+            var existingSession = await _context.LinenInventorySessions
+                .Include(s => s.Items)
+                .Where(s => s.PropertyId == property.Id && s.Year == inventoryDate.Year && s.Month == inventoryDate.Month)
+                .FirstOrDefaultAsync();
+
+            LinenInventorySession session;
+            if (existingSession != null)
             {
-                PropertyId = property.Id,
-                InventoryDate = inventoryDate,
-                Month = inventoryDate.Month,
-                Year = inventoryDate.Year,
-                MonthlyBudget = entry.MonthlyBudget < 0 ? 0 : entry.MonthlyBudget,
-                PerformedBy = string.IsNullOrWhiteSpace(entry.PerformedBy)
-                    ? BuildUserDisplayName(user)
-                    : entry.PerformedBy!.Trim(),
-                CreatedByUserId = user.Id,
-                CreatedAtUtc = DateTime.UtcNow
-            };
+                _context.LinenInventorySessionItems.RemoveRange(existingSession.Items);
+                existingSession.Items.Clear();
+                existingSession.InventoryDate = inventoryDate;
+                existingSession.Month = inventoryDate.Month;
+                existingSession.Year = inventoryDate.Year;
+                existingSession.MonthlyBudget = monthlyBudget;
+                existingSession.PerformedBy = performedBy;
+                existingSession.CreatedAtUtc = DateTime.UtcNow;
+                existingSession.CreatedByUserId = user.Id;
+                session = existingSession;
+            }
+            else
+            {
+                session = new LinenInventorySession
+                {
+                    PropertyId = property.Id,
+                    InventoryDate = inventoryDate,
+                    Month = inventoryDate.Month,
+                    Year = inventoryDate.Year,
+                    MonthlyBudget = monthlyBudget,
+                    PerformedBy = performedBy,
+                    CreatedByUserId = user.Id,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+                _context.LinenInventorySessions.Add(session);
+            }
 
             foreach (var row in entry.Rows)
             {
@@ -164,7 +190,7 @@ namespace hOps.web.Controllers
                 var totalOnHand = Math.Round(row.LaundryClean + row.LaundryDirty + row.InStorage + row.OnCarts, 2, MidpointRounding.AwayFromZero);
                 var orderRecommendation = Math.Round(Math.Max(0, budgetedPar - totalOnHand), 2, MidpointRounding.AwayFromZero);
                 var normalizedCaseCount = item.OrderCaseCount <= 0 ? 1 : item.OrderCaseCount;
-                var casesToOrder = Math.Round(orderRecommendation / normalizedCaseCount, 2, MidpointRounding.AwayFromZero);
+                var casesToOrder = Math.Round(normalizedCaseCount <= 0 ? 0 : orderRecommendation / normalizedCaseCount, 2, MidpointRounding.AwayFromZero);
                 var needCost = Math.Round(casesToOrder * item.OrderCasePrice, 2, MidpointRounding.AwayFromZero);
                 var orderCost = Math.Round(row.CasesPurchased * item.OrderCasePrice, 2, MidpointRounding.AwayFromZero);
                 var actToPar = budgetedPar > 0
@@ -193,20 +219,6 @@ namespace hOps.web.Controllers
 
             session.ProjectedNeedCost = session.Items.Sum(i => i.NeedCost);
             session.TotalCost = session.Items.Sum(i => i.OrderCost);
-
-            var existingSession = await _context.LinenInventorySessions
-                .Include(s => s.Items)
-                .Where(s => s.PropertyId == property.Id && s.Year == session.Year && s.Month == session.Month)
-                .FirstOrDefaultAsync();
-
-            if (existingSession != null)
-            {
-                _context.LinenInventorySessionItems.RemoveRange(existingSession.Items);
-                _context.LinenInventorySessions.Remove(existingSession);
-                await _context.SaveChangesAsync();
-            }
-
-            _context.LinenInventorySessions.Add(session);
 
             try
             {
