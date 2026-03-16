@@ -1206,7 +1206,8 @@ namespace hOps.web.Controllers
         {
             var roles = await _userManager.GetRolesAsync(user);
             return roles.Any(r => r.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
-                                  r.Equals("Admin", StringComparison.OrdinalIgnoreCase));
+                                  r.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                                  r.Equals("User", StringComparison.OrdinalIgnoreCase));
         }
 
     }

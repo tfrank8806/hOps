@@ -96,6 +96,7 @@
             <div class="card-body">
                 <form asp-action="RecordManualCompletion" method="post" class="row g-3">
                     @Html.AntiForgeryToken()
+                    <input type="hidden" name="ChecklistId" value="@Model.SelectedChecklistId" />
                     <div class="col-md-4">
                         <label for="pmManualRoomSelect" class="form-label">Select a room (optional)</label>
                         <select id="pmManualRoomSelect" name="RoomId" class="form-select">
