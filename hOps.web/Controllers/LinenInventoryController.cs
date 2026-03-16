@@ -239,7 +239,8 @@ namespace hOps.web.Controllers
             {
                 _logger.LogError(ex, "Failed to save linen inventory for property {PropertyId}", property.Id);
                 var invalidViewModel = await BuildPageViewModelAsync(property, user, entry);
-                invalidViewModel.ErrorMessage = "We could not save the linen inventory. Please try again.";
+                var reason = ex.GetBaseException().Message;
+                invalidViewModel.ErrorMessage = $"We could not save the linen inventory. {reason}";
                 return View(nameof(Index), invalidViewModel);
             }
 
