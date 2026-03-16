@@ -153,16 +153,19 @@ namespace hOps.web.Controllers
                 ? BuildUserDisplayName(user)
                 : entry.PerformedBy!.Trim();
 
-            var existingSession = await _context.LinenInventorySessions
+            var existingSessions = await _context.LinenInventorySessions
                 .Include(s => s.Items)
                 .Where(s => s.PropertyId == property.Id && s.Year == inventoryYear && s.Month == inventoryMonth)
-                .FirstOrDefaultAsync();
+                .ToListAsync();
 
-            var replacedExisting = existingSession != null;
-            if (existingSession != null)
+            var replacedExisting = existingSessions.Any();
+            if (replacedExisting)
             {
-                _context.LinenInventorySessionItems.RemoveRange(existingSession.Items);
-                _context.LinenInventorySessions.Remove(existingSession);
+                foreach (var prior in existingSessions)
+                {
+                    _context.LinenInventorySessionItems.RemoveRange(prior.Items);
+                    _context.LinenInventorySessions.Remove(prior);
+                }
                 await _context.SaveChangesAsync();
             }
 
