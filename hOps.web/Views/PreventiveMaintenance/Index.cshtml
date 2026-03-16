@@ -138,126 +138,253 @@
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <strong class="mb-0">Room PM Log</strong>
-                <span class="text-muted small">Due status is based on the property frequency.</span>
+    @if (Model.RequiresRoom)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <strong class="mb-0">Room PM Log</strong>
+                    <span class="text-muted small">Due status is based on the property frequency.</span>
+                </div>
             </div>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Room</th>
-                        <th>Last PM completed</th>
-                        <th>Duration</th>
-                        <th>Status</th>
-                        <th>Next due</th>
-                        @if (Model.CycleDefinitions.Any())
-                        {
-                            foreach (var cycle in Model.CycleDefinitions)
-                            {
-                                <th class="text-nowrap">
-                                    Cycle @cycle.Index
-                                    <div class="small text-muted">@cycle.DueDate.ToString("MMM d")</div>
-                                </th>
-                            }
-                        }
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (!Model.RoomLogs.Any())
-                    {
-                        var totalColumns = 5 + Model.CycleDefinitions.Count;
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
                         <tr>
-                            <td colspan="@totalColumns" class="text-center text-muted py-4">
-                                No rooms found for this property. Add rooms first to begin logging PMs.
-                            </td>
-                        </tr>
-                    }
-                    else
-                    {
-                        foreach (var log in Model.RoomLogs)
-                        {
-                            var statusLabel = log.IsOverdue ? "Overdue" : log.IsDue ? "Due soon" : "Current";
-                            var statusClass = log.IsOverdue ? "bg-danger" : log.IsDue ? "bg-warning text-dark" : "bg-success";
-                            string FormatDuration(double? seconds)
+                            <th>Room</th>
+                            <th>Last PM completed</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                            <th>Next due</th>
+                            @if (Model.CycleDefinitions.Any())
                             {
-                                if (!seconds.HasValue || seconds.Value <= 0)
+                                foreach (var cycle in Model.CycleDefinitions)
                                 {
-                                    return "--";
+                                    <th class="text-nowrap">
+                                        Cycle @cycle.Index
+                                        <div class="small text-muted">@cycle.DueDate.ToString("MMM d")</div>
+                                    </th>
                                 }
-
-                                var ts = TimeSpan.FromSeconds(seconds.Value);
-                                if (ts.TotalHours >= 1)
-                                {
-                                    return $"{(int)ts.TotalHours}h {ts.Minutes}m";
-                                }
-                                if (ts.TotalMinutes >= 1)
-                                {
-                                    return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
-                                }
-                                return $"{ts.Seconds}s";
                             }
-
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.RoomLogs.Any())
+                        {
+                            var totalColumns = 5 + Model.CycleDefinitions.Count;
                             <tr>
-                                <td>@log.RoomNumber</td>
-                                <td>
-                                    @if (log.LastCompletedAtUtc.HasValue)
-                                    {
-                                        var localCompleted = TimeZoneService.ConvertToUserTime(log.LastCompletedAtUtc.Value);
-                                        <div>@localCompleted.ToString("g")</div>
-                                        if (!string.IsNullOrWhiteSpace(log.CompletedByName))
-                                        {
-                                            <div class="text-muted small">by @log.CompletedByName</div>
-                                        }
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted">Never</span>
-                                    }
+                                <td colspan="@totalColumns" class="text-center text-muted py-4">
+                                    No rooms found for this property. Add rooms first to begin logging PMs.
                                 </td>
-                                <td>@FormatDuration(log.LastDurationSeconds)</td>
-                                <td>
-                                    <span class="badge @statusClass">@statusLabel</span>
-                                </td>
-                                <td>
-                                    @if (log.NextDueAtUtc.HasValue)
-                                    {
-                                        var nextDueLocal = TimeZoneService.ConvertToUserTime(log.NextDueAtUtc.Value);
-                                        @nextDueLocal.ToString("g")
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted">--</span>
-                                    }
-                                </td>
-                                @if (Model.CycleDefinitions.Any())
-                                {
-                                    foreach (var cycle in Model.CycleDefinitions)
-                                    {
-                                        var status = log.CycleStatuses.FirstOrDefault(s => s.Index == cycle.Index);
-                                        <td>
-                                            @if (status?.CompletedAt.HasValue == true)
-                                            {
-                                                var completedLocal = TimeZoneService.ConvertToUserTime(status.CompletedAt.Value);
-                                                <span>@completedLocal.ToString("MMM d")</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="text-muted">--</span>
-                                            }
-                                        </td>
-                                    }
-                                }
                             </tr>
                         }
-                    }
-                </tbody>
-            </table>
+                        else
+                        {
+                            foreach (var log in Model.RoomLogs)
+                            {
+                                var statusLabel = log.IsOverdue ? "Overdue" : log.IsDue ? "Due soon" : "Current";
+                                var statusClass = log.IsOverdue ? "bg-danger" : log.IsDue ? "bg-warning text-dark" : "bg-success";
+                                string FormatDuration(double? seconds)
+                                {
+                                    if (!seconds.HasValue || seconds.Value <= 0)
+                                    {
+                                        return "--";
+                                    }
+
+                                    var ts = TimeSpan.FromSeconds(seconds.Value);
+                                    if (ts.TotalHours >= 1)
+                                    {
+                                        return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+                                    }
+                                    if (ts.TotalMinutes >= 1)
+                                    {
+                                        return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+                                    }
+                                    return $"{ts.Seconds}s";
+                                }
+
+                                <tr>
+                                    <td>@log.RoomNumber</td>
+                                    <td>
+                                        @if (log.LastCompletedAtUtc.HasValue)
+                                        {
+                                            var localCompleted = TimeZoneService.ConvertToUserTime(log.LastCompletedAtUtc.Value);
+                                            <div>@localCompleted.ToString("g")</div>
+                                            if (!string.IsNullOrWhiteSpace(log.CompletedByName))
+                                            {
+                                                <div class="text-muted small">by @log.CompletedByName</div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Never</span>
+                                        }
+                                    </td>
+                                    <td>@FormatDuration(log.LastDurationSeconds)</td>
+                                    <td>
+                                        <span class="badge @statusClass">@statusLabel</span>
+                                    </td>
+                                    <td>
+                                        @if (log.NextDueAtUtc.HasValue)
+                                        {
+                                            var nextDueLocal = TimeZoneService.ConvertToUserTime(log.NextDueAtUtc.Value);
+                                            @nextDueLocal.ToString("g")
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">--</span>
+                                        }
+                                    </td>
+                                    @if (Model.CycleDefinitions.Any())
+                                    {
+                                        foreach (var cycle in Model.CycleDefinitions)
+                                        {
+                                            var status = log.CycleStatuses.FirstOrDefault(s => s.Index == cycle.Index);
+                                            <td>
+                                                @if (status?.CompletedAt.HasValue == true)
+                                                {
+                                                    var completedLocal = TimeZoneService.ConvertToUserTime(status.CompletedAt.Value);
+                                                    <span>@completedLocal.ToString("MMM d")</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">--</span>
+                                                }
+                                            </td>
+                                        }
+                                    }
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
+    }
+
+    @if (Model.RequiresArea)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <strong class="mb-0">Area PM Log</strong>
+                    <span class="text-muted small">Tracks the most recent PM for each configured area.</span>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Area</th>
+                            <th>Last PM completed</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                            <th>Next due</th>
+                            @if (Model.CycleDefinitions.Any())
+                            {
+                                foreach (var cycle in Model.CycleDefinitions)
+                                {
+                                    <th class="text-nowrap">
+                                        Cycle @cycle.Index
+                                        <div class="small text-muted">@cycle.DueDate.ToString("MMM d")</div>
+                                    </th>
+                                }
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.AreaLogs.Any())
+                        {
+                            var totalColumns = 5 + Model.CycleDefinitions.Count;
+                            <tr>
+                                <td colspan="@totalColumns" class="text-center text-muted py-4">
+                                    No areas configured yet. Add area options on the checklist to begin logging PMs.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            foreach (var log in Model.AreaLogs)
+                            {
+                                var statusLabel = log.IsOverdue ? "Overdue" : log.IsDue ? "Due soon" : "Current";
+                                var statusClass = log.IsOverdue ? "bg-danger" : log.IsDue ? "bg-warning text-dark" : "bg-success";
+                                string FormatDuration(double? seconds)
+                                {
+                                    if (!seconds.HasValue || seconds.Value <= 0)
+                                    {
+                                        return "--";
+                                    }
+
+                                    var ts = TimeSpan.FromSeconds(seconds.Value);
+                                    if (ts.TotalHours >= 1)
+                                    {
+                                        return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+                                    }
+                                    if (ts.TotalMinutes >= 1)
+                                    {
+                                        return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+                                    }
+                                    return $"{ts.Seconds}s";
+                                }
+
+                                <tr>
+                                    <td>@log.AreaLabel</td>
+                                    <td>
+                                        @if (log.LastCompletedAtUtc.HasValue)
+                                        {
+                                            var localCompleted = TimeZoneService.ConvertToUserTime(log.LastCompletedAtUtc.Value);
+                                            <div>@localCompleted.ToString("g")</div>
+                                            if (!string.IsNullOrWhiteSpace(log.CompletedByName))
+                                            {
+                                                <div class="text-muted small">by @log.CompletedByName</div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Never</span>
+                                        }
+                                    </td>
+                                    <td>@FormatDuration(log.LastDurationSeconds)</td>
+                                    <td>
+                                        <span class="badge @statusClass">@statusLabel</span>
+                                    </td>
+                                    <td>
+                                        @if (log.NextDueAtUtc.HasValue)
+                                        {
+                                            var nextDueLocal = TimeZoneService.ConvertToUserTime(log.NextDueAtUtc.Value);
+                                            @nextDueLocal.ToString("g")
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">--</span>
+                                        }
+                                    </td>
+                                    @if (Model.CycleDefinitions.Any())
+                                    {
+                                        foreach (var cycle in Model.CycleDefinitions)
+                                        {
+                                            var status = log.CycleStatuses.FirstOrDefault(s => s.Index == cycle.Index);
+                                            <td>
+                                                @if (status?.CompletedAt.HasValue == true)
+                                                {
+                                                    var completedLocal = TimeZoneService.ConvertToUserTime(status.CompletedAt.Value);
+                                                    <span>@completedLocal.ToString("MMM d")</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">--</span>
+                                                }
+                                            </td>
+                                        }
+                                    }
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
 </div>
 
 <script type="application/json" id="pmInitialSession">
