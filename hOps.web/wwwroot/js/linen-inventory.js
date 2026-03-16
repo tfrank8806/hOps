@@ -50,12 +50,14 @@
             const budgetedPar = Number(row.getAttribute('data-budgeted-par')) || 0;
             const caseCount = Number(row.getAttribute('data-case-count')) || 1;
             const casePrice = Number(row.getAttribute('data-case-price')) || 0;
+            const inRooms = Number(row.getAttribute('data-in-rooms')) || 0;
 
             const orderNeed = Math.max(0, budgetedPar - totalOnHand);
             const casesToOrder = caseCount <= 0 ? 0 : orderNeed / caseCount;
             const needCost = casesToOrder * casePrice;
             const orderCost = casesPurchased * casePrice;
-            const actToPar = budgetedPar > 0 ? totalOnHand / budgetedPar : 0;
+            const parDenominator = inRooms > 0 ? inRooms : 1;
+            const actToPar = totalOnHand / parDenominator;
             const variance = totalOnHand - lastMonth;
 
             setText(row, '[data-role="total-on-hand"]', totalOnHand);

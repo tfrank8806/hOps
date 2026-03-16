@@ -206,9 +206,8 @@ namespace hOps.web.Controllers
                 var casesToOrder = Math.Round(normalizedCaseCount <= 0 ? 0 : orderRecommendation / normalizedCaseCount, 2, MidpointRounding.AwayFromZero);
                 var needCost = Math.Round(casesToOrder * item.OrderCasePrice, 2, MidpointRounding.AwayFromZero);
                 var orderCost = Math.Round(casesPurchased * item.OrderCasePrice, 2, MidpointRounding.AwayFromZero);
-                var actToPar = budgetedPar > 0
-                    ? Math.Round(totalOnHand / budgetedPar, 4, MidpointRounding.AwayFromZero)
-                    : 0;
+                var parDenominator = inRooms <= 0 ? 1 : inRooms;
+                var actToPar = Math.Round(totalOnHand / parDenominator, 4, MidpointRounding.AwayFromZero);
 
                 session.Items.Add(new LinenInventorySessionItem
                 {

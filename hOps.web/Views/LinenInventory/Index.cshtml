@@ -135,7 +135,7 @@
                             var caseCount = meta?.OrderCaseCount ?? 1;
                             var casePrice = meta?.OrderCasePrice ?? 0;
                             var inRooms = meta?.InRooms ?? 0;
-                            <tr class="inventory-entry-row" data-row-index="@i" data-budgeted-par="@budgetedPar" data-case-count="@caseCount" data-case-price="@casePrice" data-last-month="@formRow.LastMonthActuals">
+                            <tr class="inventory-entry-row" data-row-index="@i" data-budgeted-par="@budgetedPar" data-case-count="@caseCount" data-case-price="@casePrice" data-last-month="@formRow.LastMonthActuals" data-in-rooms="@inRooms">
                                 <td>
                                     <div class="fw-semibold">@meta?.ItemName</div>
                                     <div class="text-muted small">
