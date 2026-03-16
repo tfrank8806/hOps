@@ -46,7 +46,7 @@
             const casesPurchased = readNumber(row, '[data-field="cases-purchased"]');
             const lastMonth = readNumber(row, '[data-field="last-month"]');
 
-            const totalOnHand = clean + dirty + storage + carts;
+            const totalOnHand = inRooms + clean + dirty + storage + carts;
             const budgetedPar = Number(row.getAttribute('data-budgeted-par')) || 0;
             const caseCount = Number(row.getAttribute('data-case-count')) || 1;
             const casePrice = Number(row.getAttribute('data-case-price')) || 0;
@@ -60,9 +60,9 @@
             const actToPar = totalOnHand / parDenominator;
             const variance = totalOnHand - lastMonth;
 
-            setText(row, '[data-role="total-on-hand"]', totalOnHand);
-            setText(row, '[data-role="variance"]', variance);
-            setText(row, '[data-role="order-need"]', orderNeed);
+            setInteger(row, '[data-role="total-on-hand"]', totalOnHand);
+            setInteger(row, '[data-role="variance"]', variance);
+            setInteger(row, '[data-role="order-need"]', orderNeed);
             row.querySelector('[data-role="act-par"]').textContent = `${actToPar.toFixed(2)}x`;
             row.querySelector('[data-role="cases-to-order"]').textContent = casesToOrder.toFixed(2);
             row.querySelector('[data-role="need-cost"]').textContent = formatCurrency(needCost);
@@ -93,6 +93,14 @@
             return;
         }
         target.textContent = Number(value).toFixed(2);
+    }
+
+    function setInteger(row, selector, value) {
+        const target = row.querySelector(selector);
+        if (!target) {
+            return;
+        }
+        target.textContent = Math.round(Number(value) || 0).toString();
     }
 
     function readNumber(row, selector) {

@@ -200,8 +200,8 @@ namespace hOps.web.Controllers
 
                 var inRooms = ComputeInRooms(item);
                 var budgetedPar = Math.Round(inRooms * (item.ParLevelTarget <= 0 ? 1 : item.ParLevelTarget), 2, MidpointRounding.AwayFromZero);
-                var totalOnHand = Math.Round(laundryClean + laundryDirty + storage + carts, 2, MidpointRounding.AwayFromZero);
-                var orderRecommendation = Math.Round(Math.Max(0, budgetedPar - totalOnHand), 2, MidpointRounding.AwayFromZero);
+                var totalOnHand = Math.Round(inRooms + laundryClean + laundryDirty + storage + carts, 2, MidpointRounding.AwayFromZero);
+                var orderRecommendation = Math.Round(Math.Max(0, budgetedPar - totalOnHand + inRooms), 2, MidpointRounding.AwayFromZero);
                 var normalizedCaseCount = item.OrderCaseCount <= 0 ? 1 : item.OrderCaseCount;
                 var casesToOrder = Math.Round(normalizedCaseCount <= 0 ? 0 : orderRecommendation / normalizedCaseCount, 2, MidpointRounding.AwayFromZero);
                 var needCost = Math.Round(casesToOrder * item.OrderCasePrice, 2, MidpointRounding.AwayFromZero);
