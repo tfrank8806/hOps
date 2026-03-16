@@ -56,6 +56,8 @@ namespace hOps.web.ViewModels.Housekeeping.LinenInventory
 
     public class LinenInventoryEntryForm
     {
+        public int? SessionId { get; set; }
+
         [DataType(DataType.Date)]
         public DateTime InventoryDate { get; set; } = DateTime.UtcNow.Date;
 

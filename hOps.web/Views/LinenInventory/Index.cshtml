@@ -11,7 +11,10 @@
                 <p class="text-muted mb-0">@Model.PropertyName</p>
             </div>
             <div class="text-md-end">
-                <a asp-action="Setup" class="btn btn-outline-primary btn-sm mb-3">Open Setup</a>
+                <div class="d-flex flex-wrap gap-2 mb-3 justify-content-end">
+                    <a asp-action="PrintSheet" class="btn btn-outline-secondary btn-sm">Print Count Sheet</a>
+                    <a asp-action="Setup" class="btn btn-outline-primary btn-sm">Open Setup</a>
+                </div>
                 <div class="text-muted small">Last saved</div>
                 @if (Model.LastInventoryDate.HasValue)
                 {
@@ -102,6 +105,8 @@
                 </div>
             </div>
 
+            <input type="hidden" asp-for="Entry.SessionId" />
+
             <div class="table-responsive">
                 <table class="table table-sm table-bordered align-middle inventory-entry-table">
                     <thead class="table-light">
@@ -168,8 +173,9 @@
                                 <td class="text-end fw-semibold">
                                     <span data-role="total-on-hand">0</span>
                                 </td>
-                                <td>
-                                    <input asp-for="Entry.Rows[i].LastMonthActuals" class="form-control form-control-sm inventory-input" type="number" min="0" step="0.01" data-field="last-month" />
+                                <td class="text-end fw-semibold">
+                                    <input asp-for="Entry.Rows[i].LastMonthActuals" type="hidden" data-field="last-month" />
+                                    @((formRow.LastMonthActuals ?? 0).ToString("0"))
                                 </td>
                                 <td class="text-end">
                                     <span data-role="variance">0</span>
@@ -287,6 +293,7 @@ else
                                 <td class="text-end">$@entry.TotalCost.ToString("N2")</td>
                                 <td class="text-nowrap">
                                     <a asp-action="History" asp-route-id="@entry.SessionId" class="btn btn-link btn-sm">View</a>
+                                    <a asp-action="Index" asp-route-sessionId="@entry.SessionId" class="btn btn-link btn-sm">Edit</a>
                                     <a asp-action="DownloadHistory" asp-route-id="@entry.SessionId" class="btn btn-outline-secondary btn-sm">Download</a>
                                 </td>
                             </tr>

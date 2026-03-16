@@ -45,7 +45,7 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int? sessionId = null)
         {
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
@@ -60,7 +60,7 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
-            var viewModel = await BuildPageViewModelAsync(property, user, null);
+            var viewModel = await BuildPageViewModelAsync(property, user, null, sessionId);
             viewModel.FlashMessage = TempData["LinenInventoryMessage"] as string ?? viewModel.FlashMessage;
             viewModel.ErrorMessage = TempData["LinenInventoryError"] as string ?? viewModel.ErrorMessage;
 
@@ -994,7 +994,11 @@ namespace hOps.web.Controllers
             return View(viewModel);
         }
 
-        private async Task<LinenInventoryPageViewModel> BuildPageViewModelAsync(Property property, ApplicationUser user, LinenInventoryEntryForm? entryOverride)
+        private async Task<LinenInventoryPageViewModel> BuildPageViewModelAsync(
+            Property property,
+            ApplicationUser user,
+            LinenInventoryEntryForm? entryOverride,
+            int? sessionId = null)
         {
             var roles = await _userManager.GetRolesAsync(user);
             var canEditSetup = roles.Any(role =>
@@ -1042,12 +1046,32 @@ namespace hOps.web.Controllers
                 .ThenByDescending(s => s.CreatedAtUtc)
                 .ToListAsync();
 
+            LinenInventorySession? sessionToEdit = null;
+            if (sessionId.HasValue)
+            {
+                sessionToEdit = sessions.FirstOrDefault(s => s.Id == sessionId.Value)
+                    ?? await _context.LinenInventorySessions
+                        .AsNoTracking()
+                        .Include(s => s.Items)
+                        .ThenInclude(i => i.InventoryItem)
+                        .FirstOrDefaultAsync(s => s.PropertyId == property.Id && s.Id == sessionId.Value);
+            }
+
             var lastSession = sessions.FirstOrDefault();
 
             var lastTotals = lastSession?.Items.ToDictionary(i => i.InventoryItemId, i => i.TotalOnHand) ?? new Dictionary<int, decimal>();
 
             var entryForm = entryOverride ?? new LinenInventoryEntryForm();
-            if (entryOverride == null)
+            if (sessionToEdit != null)
+            {
+                entryForm.SessionId = sessionToEdit.Id;
+                entryForm.InventoryDate = sessionToEdit.InventoryDate;
+                entryForm.InventoryMonth = sessionToEdit.Month;
+                entryForm.InventoryYear = sessionToEdit.Year;
+                entryForm.PerformedBy = sessionToEdit.PerformedBy;
+                entryForm.MonthlyBudget = sessionToEdit.MonthlyBudget;
+            }
+            else if (entryOverride == null)
             {
                 var localDate = _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
                 entryForm.InventoryDate = localDate;
@@ -1069,6 +1093,9 @@ namespace hOps.web.Controllers
             var inventoryRows = new List<LinenInventoryItemRowViewModel>();
             var normalizedRows = new List<LinenInventoryEntryRowInput>();
 
+            var sessionItemLookup = sessionToEdit?.Items.ToDictionary(i => i.InventoryItemId)
+                ?? new Dictionary<int, LinenInventorySessionItem>();
+
             foreach (var item in items)
             {
                 var formRow = entryForm.Rows.FirstOrDefault(r => r.ItemId == item.Id);
@@ -1079,6 +1106,16 @@ namespace hOps.web.Controllers
                         ItemId = item.Id,
                         LastMonthActuals = lastTotals.TryGetValue(item.Id, out var previous) ? previous : 0
                     };
+                }
+
+                if (sessionItemLookup.TryGetValue(item.Id, out var sessionItem))
+                {
+                    formRow.LaundryClean = sessionItem.LaundryClean;
+                    formRow.LaundryDirty = sessionItem.LaundryDirty;
+                    formRow.InStorage = sessionItem.InStorage;
+                    formRow.OnCarts = sessionItem.OnCarts;
+                    formRow.CasesPurchased = sessionItem.CasesPurchased;
+                    formRow.LastMonthActuals = sessionItem.LastMonthActuals;
                 }
 
                 normalizedRows.Add(formRow);
