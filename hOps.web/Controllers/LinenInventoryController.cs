@@ -143,9 +143,12 @@ namespace hOps.web.Controllers
             var inventoryYear = entry.InventoryYear >= 2000 && entry.InventoryYear <= 2100
                 ? entry.InventoryYear
                 : localDate.Year;
-            var inventoryDate = new DateTime(inventoryYear, inventoryMonth, localDate.Day);
+            var targetDay = Math.Min(localDate.Day, DateTime.DaysInMonth(inventoryYear, inventoryMonth));
+            var inventoryDate = new DateTime(inventoryYear, inventoryMonth, targetDay);
 
-            var monthlyBudget = entry.MonthlyBudget < 0 ? 0 : entry.MonthlyBudget;
+            var monthlyBudget = entry.MonthlyBudget.HasValue && entry.MonthlyBudget.Value > 0
+                ? entry.MonthlyBudget.Value
+                : 0;
             var performedBy = string.IsNullOrWhiteSpace(entry.PerformedBy)
                 ? BuildUserDisplayName(user)
                 : entry.PerformedBy!.Trim();
@@ -155,35 +158,26 @@ namespace hOps.web.Controllers
                 .Where(s => s.PropertyId == property.Id && s.Year == inventoryYear && s.Month == inventoryMonth)
                 .FirstOrDefaultAsync();
 
-            LinenInventorySession session;
+            var replacedExisting = existingSession != null;
             if (existingSession != null)
             {
                 _context.LinenInventorySessionItems.RemoveRange(existingSession.Items);
-                existingSession.Items.Clear();
-                existingSession.InventoryDate = inventoryDate;
-                existingSession.Month = inventoryMonth;
-                existingSession.Year = inventoryYear;
-                existingSession.MonthlyBudget = monthlyBudget;
-                existingSession.PerformedBy = performedBy;
-                existingSession.CreatedAtUtc = DateTime.UtcNow;
-                existingSession.CreatedByUserId = user.Id;
-                session = existingSession;
+                _context.LinenInventorySessions.Remove(existingSession);
+                await _context.SaveChangesAsync();
             }
-            else
+
+            var session = new LinenInventorySession
             {
-                session = new LinenInventorySession
-                {
-                    PropertyId = property.Id,
-                    InventoryDate = inventoryDate,
-                    Month = inventoryMonth,
-                    Year = inventoryYear,
-                    MonthlyBudget = monthlyBudget,
-                    PerformedBy = performedBy,
-                    CreatedByUserId = user.Id,
-                    CreatedAtUtc = DateTime.UtcNow
-                };
-                _context.LinenInventorySessions.Add(session);
-            }
+                PropertyId = property.Id,
+                InventoryDate = inventoryDate,
+                Month = inventoryMonth,
+                Year = inventoryYear,
+                MonthlyBudget = monthlyBudget,
+                PerformedBy = performedBy,
+                CreatedByUserId = user.Id,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            _context.LinenInventorySessions.Add(session);
 
             foreach (var row in entry.Rows)
             {
@@ -192,14 +186,21 @@ namespace hOps.web.Controllers
                     continue;
                 }
 
+                var laundryClean = Math.Max(0, row.LaundryClean ?? 0);
+                var laundryDirty = Math.Max(0, row.LaundryDirty ?? 0);
+                var storage = Math.Max(0, row.InStorage ?? 0);
+                var carts = Math.Max(0, row.OnCarts ?? 0);
+                var lastMonth = Math.Max(0, row.LastMonthActuals ?? 0);
+                var casesPurchased = Math.Max(0, row.CasesPurchased ?? 0);
+
                 var inRooms = ComputeInRooms(item);
                 var budgetedPar = Math.Round(inRooms * (item.ParLevelTarget <= 0 ? 1 : item.ParLevelTarget), 2, MidpointRounding.AwayFromZero);
-                var totalOnHand = Math.Round(row.LaundryClean + row.LaundryDirty + row.InStorage + row.OnCarts, 2, MidpointRounding.AwayFromZero);
+                var totalOnHand = Math.Round(laundryClean + laundryDirty + storage + carts, 2, MidpointRounding.AwayFromZero);
                 var orderRecommendation = Math.Round(Math.Max(0, budgetedPar - totalOnHand), 2, MidpointRounding.AwayFromZero);
                 var normalizedCaseCount = item.OrderCaseCount <= 0 ? 1 : item.OrderCaseCount;
                 var casesToOrder = Math.Round(normalizedCaseCount <= 0 ? 0 : orderRecommendation / normalizedCaseCount, 2, MidpointRounding.AwayFromZero);
                 var needCost = Math.Round(casesToOrder * item.OrderCasePrice, 2, MidpointRounding.AwayFromZero);
-                var orderCost = Math.Round(row.CasesPurchased * item.OrderCasePrice, 2, MidpointRounding.AwayFromZero);
+                var orderCost = Math.Round(casesPurchased * item.OrderCasePrice, 2, MidpointRounding.AwayFromZero);
                 var actToPar = budgetedPar > 0
                     ? Math.Round(totalOnHand / budgetedPar, 4, MidpointRounding.AwayFromZero)
                     : 0;
@@ -207,19 +208,19 @@ namespace hOps.web.Controllers
                 session.Items.Add(new LinenInventorySessionItem
                 {
                     InventoryItemId = item.Id,
-                    LaundryClean = row.LaundryClean,
-                    LaundryDirty = row.LaundryDirty,
-                    InStorage = row.InStorage,
-                    OnCarts = row.OnCarts,
+                    LaundryClean = laundryClean,
+                    LaundryDirty = laundryDirty,
+                    InStorage = storage,
+                    OnCarts = carts,
                     TotalOnHand = totalOnHand,
-                    LastMonthActuals = row.LastMonthActuals,
+                    LastMonthActuals = lastMonth,
                     InRoomsQuantity = inRooms,
                     BudgetedPar = budgetedPar,
                     OrderRecommendation = orderRecommendation,
                     ActToParRatio = actToPar,
                     CasesToOrder = casesToOrder,
                     NeedCost = needCost,
-                    CasesPurchased = row.CasesPurchased,
+                    CasesPurchased = casesPurchased,
                     OrderCost = orderCost
                 });
             }
@@ -239,7 +240,7 @@ namespace hOps.web.Controllers
                 return View(nameof(Index), invalidViewModel);
             }
 
-            TempData["LinenInventoryMessage"] = existingSession != null
+            TempData["LinenInventoryMessage"] = replacedExisting
                 ? $"Updated the {inventoryDate:MMMM yyyy} linen inventory snapshot."
                 : "Saved the linen inventory snapshot.";
             return RedirectToAction(nameof(Index));
@@ -1052,7 +1053,7 @@ namespace hOps.web.Controllers
                     ParLevelTarget = item.ParLevelTarget <= 0 ? 1 : item.ParLevelTarget,
                     InRooms = inRooms,
                     BudgetedPar = budgetedPar,
-                    LastMonthActuals = formRow.LastMonthActuals
+                    LastMonthActuals = formRow.LastMonthActuals ?? 0
                 });
             }
 

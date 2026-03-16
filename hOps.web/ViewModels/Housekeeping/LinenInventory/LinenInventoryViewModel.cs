@@ -68,7 +68,7 @@ namespace hOps.web.ViewModels.Housekeeping.LinenInventory
         public string? PerformedBy { get; set; }
 
         [Range(0, 500000)]
-        public decimal MonthlyBudget { get; set; }
+        public decimal? MonthlyBudget { get; set; }
 
         public List<LinenInventoryEntryRowInput> Rows { get; set; } = new();
     }
@@ -79,22 +79,22 @@ namespace hOps.web.ViewModels.Housekeeping.LinenInventory
         public int ItemId { get; set; }
 
         [Range(0, 100000)]
-        public decimal LaundryClean { get; set; }
+        public decimal? LaundryClean { get; set; }
 
         [Range(0, 100000)]
-        public decimal LaundryDirty { get; set; }
+        public decimal? LaundryDirty { get; set; }
 
         [Range(0, 100000)]
-        public decimal InStorage { get; set; }
+        public decimal? InStorage { get; set; }
 
         [Range(0, 100000)]
-        public decimal OnCarts { get; set; }
+        public decimal? OnCarts { get; set; }
 
         [Range(0, 100000)]
-        public decimal LastMonthActuals { get; set; }
+        public decimal? LastMonthActuals { get; set; }
 
         [Range(0, 100000)]
-        public decimal CasesPurchased { get; set; }
+        public decimal? CasesPurchased { get; set; }
     }
 
     public class LinenInventorySetupViewModel

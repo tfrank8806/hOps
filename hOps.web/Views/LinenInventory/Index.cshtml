@@ -234,7 +234,7 @@
                     <div class="p-3 border rounded">
                         <div class="text-muted small">Budget Variance</div>
                         <div class="h5 mb-0" data-summary="budget-variance">$0.00</div>
-                        <small class="text-muted">Monthly budget: $<span data-summary="budget-amount">@Model.Entry.MonthlyBudget.ToString("N2")</span></small>
+                        <small class="text-muted">Monthly budget: $<span data-summary="budget-amount">@((Model.Entry.MonthlyBudget ?? 0).ToString("N2"))</span></small>
                     </div>
                 </div>
             </div>
