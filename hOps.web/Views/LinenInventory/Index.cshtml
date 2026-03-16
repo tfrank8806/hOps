@@ -61,7 +61,29 @@
         <div class="card-body">
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
-                    <label asp-for="Entry.InventoryDate" class="form-label fw-semibold">Inventory Date</label>
+                    <label asp-for="Entry.InventoryMonth" class="form-label fw-semibold">Inventory Period</label>
+                    <div class="input-group">
+                        <select asp-for="Entry.InventoryMonth" class="form-select" aria-label="Inventory Month">
+                            @for (var month = 1; month <= 12; month++)
+                            {
+                                <option value="@month">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month)</option>
+                            }
+                        </select>
+                        <select asp-for="Entry.InventoryYear" class="form-select" aria-label="Inventory Year">
+                            @{
+                                var currentYear = DateTime.UtcNow.Year;
+                                for (var year = currentYear - 1; year <= currentYear + 1; year++)
+                                {
+                                    <option value="@year">@year</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <span asp-validation-for="Entry.InventoryMonth" class="text-danger small"></span>
+                    <span asp-validation-for="Entry.InventoryYear" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="Entry.InventoryDate" class="form-label fw-semibold">Inventory Date Recorded</label>
                     <input asp-for="Entry.InventoryDate" class="form-control" type="date" />
                     <span asp-validation-for="Entry.InventoryDate" class="text-danger small"></span>
                 </div>

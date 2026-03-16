@@ -134,9 +134,16 @@ namespace hOps.web.Controllers
             }
 
             var itemLookup = items.ToDictionary(i => i.Id);
-            var inventoryDate = entry.InventoryDate == default
+            var localDate = entry.InventoryDate == default
                 ? _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date
                 : entry.InventoryDate.Date;
+            var inventoryMonth = entry.InventoryMonth is >= 1 and <= 12
+                ? entry.InventoryMonth
+                : localDate.Month;
+            var inventoryYear = entry.InventoryYear >= 2000 && entry.InventoryYear <= 2100
+                ? entry.InventoryYear
+                : localDate.Year;
+            var inventoryDate = new DateTime(inventoryYear, inventoryMonth, localDate.Day);
 
             var monthlyBudget = entry.MonthlyBudget < 0 ? 0 : entry.MonthlyBudget;
             var performedBy = string.IsNullOrWhiteSpace(entry.PerformedBy)
@@ -145,7 +152,7 @@ namespace hOps.web.Controllers
 
             var existingSession = await _context.LinenInventorySessions
                 .Include(s => s.Items)
-                .Where(s => s.PropertyId == property.Id && s.Year == inventoryDate.Year && s.Month == inventoryDate.Month)
+                .Where(s => s.PropertyId == property.Id && s.Year == inventoryYear && s.Month == inventoryMonth)
                 .FirstOrDefaultAsync();
 
             LinenInventorySession session;
@@ -154,8 +161,8 @@ namespace hOps.web.Controllers
                 _context.LinenInventorySessionItems.RemoveRange(existingSession.Items);
                 existingSession.Items.Clear();
                 existingSession.InventoryDate = inventoryDate;
-                existingSession.Month = inventoryDate.Month;
-                existingSession.Year = inventoryDate.Year;
+                existingSession.Month = inventoryMonth;
+                existingSession.Year = inventoryYear;
                 existingSession.MonthlyBudget = monthlyBudget;
                 existingSession.PerformedBy = performedBy;
                 existingSession.CreatedAtUtc = DateTime.UtcNow;
@@ -168,8 +175,8 @@ namespace hOps.web.Controllers
                 {
                     PropertyId = property.Id,
                     InventoryDate = inventoryDate,
-                    Month = inventoryDate.Month,
-                    Year = inventoryDate.Year,
+                    Month = inventoryMonth,
+                    Year = inventoryYear,
                     MonthlyBudget = monthlyBudget,
                     PerformedBy = performedBy,
                     CreatedByUserId = user.Id,
@@ -970,10 +977,23 @@ namespace hOps.web.Controllers
                 .ThenBy(i => i.Name)
                 .ToListAsync();
 
-            var sessions = await _context.LinenInventorySessions
+            var sessionsQuery = _context.LinenInventorySessions
                 .AsNoTracking()
                 .Include(s => s.Items)
-                .Where(s => s.PropertyId == property.Id)
+                .Where(s => s.PropertyId == property.Id);
+
+            if (entryOverride != null)
+            {
+                var targetMonth = entryOverride.InventoryMonth is >= 1 and <= 12
+                    ? entryOverride.InventoryMonth
+                    : entryOverride.InventoryDate.Month;
+                var targetYear = entryOverride.InventoryYear >= 2000 && entryOverride.InventoryYear <= 2100
+                    ? entryOverride.InventoryYear
+                    : entryOverride.InventoryDate.Year;
+                sessionsQuery = sessionsQuery.Where(s => s.Year == targetYear && s.Month == targetMonth);
+            }
+
+            var sessions = await sessionsQuery
                 .OrderByDescending(s => s.InventoryDate)
                 .ThenByDescending(s => s.CreatedAtUtc)
                 .ToListAsync();
@@ -989,6 +1009,17 @@ namespace hOps.web.Controllers
                 entryForm.InventoryDate = localDate;
                 entryForm.PerformedBy = BuildUserDisplayName(user);
                 entryForm.MonthlyBudget = settings?.DefaultMonthlyBudget ?? lastSession?.MonthlyBudget ?? 0;
+                entryForm.InventoryMonth = localDate.Month;
+                entryForm.InventoryYear = localDate.Year;
+            }
+            else
+            {
+                entryForm.InventoryMonth = entryOverride.InventoryMonth is >= 1 and <= 12
+                    ? entryOverride.InventoryMonth
+                    : entryOverride.InventoryDate.Month;
+                entryForm.InventoryYear = entryOverride.InventoryYear >= 2000 && entryOverride.InventoryYear <= 2100
+                    ? entryOverride.InventoryYear
+                    : entryOverride.InventoryDate.Year;
             }
 
             var inventoryRows = new List<LinenInventoryItemRowViewModel>();

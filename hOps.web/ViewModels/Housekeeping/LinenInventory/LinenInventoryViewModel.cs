@@ -59,6 +59,11 @@ namespace hOps.web.ViewModels.Housekeeping.LinenInventory
         [DataType(DataType.Date)]
         public DateTime InventoryDate { get; set; } = DateTime.UtcNow.Date;
 
+        [Range(1, 12)]
+        public int InventoryMonth { get; set; } = DateTime.UtcNow.Month;
+
+        public int InventoryYear { get; set; } = DateTime.UtcNow.Year;
+
         [MaxLength(200)]
         public string? PerformedBy { get; set; }
 
