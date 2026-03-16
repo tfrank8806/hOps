@@ -144,7 +144,9 @@ namespace hOps.web.Controllers
                 ? entry.InventoryYear
                 : localDate.Year;
             var targetDay = Math.Min(localDate.Day, DateTime.DaysInMonth(inventoryYear, inventoryMonth));
-            var inventoryDate = new DateTime(inventoryYear, inventoryMonth, targetDay);
+            var inventoryDate = DateTime.SpecifyKind(
+                new DateTime(inventoryYear, inventoryMonth, targetDay),
+                DateTimeKind.Utc);
 
             var monthlyBudget = entry.MonthlyBudget.HasValue && entry.MonthlyBudget.Value > 0
                 ? entry.MonthlyBudget.Value
