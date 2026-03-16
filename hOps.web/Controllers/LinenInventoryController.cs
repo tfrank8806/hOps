@@ -252,6 +252,44 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
+        public async Task<IActionResult> PrintSheet()
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["LinenInventoryError"] = "Select a property before printing the count sheet.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var items = await _context.LinenInventoryItems
+                .AsNoTracking()
+                .Where(i => i.PropertyId == property.Id && !i.IsArchived)
+                .OrderBy(i => i.SortOrder)
+                .ThenBy(i => i.Name)
+                .Select(i => new LinenInventoryPrintItem
+                {
+                    ItemId = i.Id,
+                    ItemName = i.Name,
+                    OrderItemNumber = i.OrderItemNumber
+                })
+                .ToListAsync();
+
+            var viewModel = new LinenInventoryPrintSheetViewModel
+            {
+                PropertyName = property.Name,
+                Items = items
+            };
+
+            return View(viewModel);
+        }
+
+        [HttpGet]
         public async Task<IActionResult> History(int id)
         {
             var property = ViewBag.CurrentProperty as Property;

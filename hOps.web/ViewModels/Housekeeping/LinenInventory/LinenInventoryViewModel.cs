@@ -229,4 +229,18 @@ namespace hOps.web.ViewModels.Housekeeping.LinenInventory
         public decimal CasesPurchased { get; set; }
         public decimal OrderCost { get; set; }
     }
+
+    public class LinenInventoryPrintSheetViewModel
+    {
+        public string PropertyName { get; set; } = string.Empty;
+
+        public List<LinenInventoryPrintItem> Items { get; set; } = new();
+    }
+
+    public class LinenInventoryPrintItem
+    {
+        public int ItemId { get; set; }
+        public string ItemName { get; set; } = string.Empty;
+        public string? OrderItemNumber { get; set; }
+    }
 }

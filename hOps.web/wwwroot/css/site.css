@@ -2595,3 +2595,10 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     margin-bottom: 0;
 }
 
+.linen-inventory-page .count-blank {
+    display: block;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.4);
+    width: 100%;
+    min-height: 28px;
+}
+
