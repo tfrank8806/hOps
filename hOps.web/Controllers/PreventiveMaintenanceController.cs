@@ -42,7 +42,7 @@ namespace hOps.web.Controllers
         [Route("PreventiveMaintenance")]
         [Route("PreventiveMaintenance/Index")]
         [Route("Maintenance/PMs")]
-        public async Task<IActionResult> Index(int? checklistId = null)
+        public async Task<IActionResult> Index(int? checklistId = null, int? areaYear = null)
         {
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
@@ -117,12 +117,61 @@ namespace hOps.web.Controllers
                 })
                 .ToList();
 
-            var roomLogs = selectedChecklist.ChecklistType == PreventiveMaintenanceChecklistType.Room
-                ? await BuildRoomLogsAsync(propertyId, selectedChecklist.Id, frequency, cycleWindows)
-                : new List<PreventiveMaintenanceRoomLogViewModel>();
-            var areaLogs = selectedChecklist.ChecklistType == PreventiveMaintenanceChecklistType.Area
-                ? await BuildAreaLogsAsync(propertyId, selectedChecklist.Id, areaOptions, frequency, cycleWindows)
-                : new List<PreventiveMaintenanceAreaLogViewModel>();
+            var areaLogResult = selectedChecklist.ChecklistType == PreventiveMaintenanceChecklistType.Area
+                ? await BuildAreaLogsAsync(propertyId, selectedChecklist.Id, areaOptions, frequency, areaYear)
+                : new AreaLogResult
+                {
+                    Logs = new List<PreventiveMaintenanceAreaLogViewModel>(),
+                    SelectedYear = DateTime.UtcNow.Year,
+                    AvailableYears = new List<int> { DateTime.UtcNow.Year },
+                    CycleWindows = cycleWindows
+                };
+
+            var roomLogReferenceYear = selectedChecklist.ChecklistType == PreventiveMaintenanceChecklistType.Area
+                ? areaLogResult.SelectedYear
+                : DateTime.UtcNow.Year;
+            var roomCycleWindows = selectedChecklist.ChecklistType == PreventiveMaintenanceChecklistType.Area
+                ? areaLogResult.CycleWindows
+                : cycleWindows;
+            var includeRoomDueCalculations = roomLogReferenceYear == DateTime.UtcNow.Year;
+            var roomLogs = await BuildRoomLogsAsync(
+                propertyId,
+                selectedChecklist.Id,
+                frequency,
+                roomCycleWindows,
+                roomLogReferenceYear,
+                includeRoomDueCalculations);
+
+            var areaCycleDefinitions = areaLogResult.CycleWindows
+                .Select(window => new MaintenanceCycleDefinitionViewModel
+                {
+                    Index = window.Index,
+                    DueDate = window.DueDate,
+                    Label = $"Cycle {window.Index}"
+                })
+                .ToList();
+            var roomCycleDefinitions = selectedChecklist.ChecklistType == PreventiveMaintenanceChecklistType.Area
+                ? areaCycleDefinitions
+                : cycleDefinitions;
+
+            int? areaPreviousYear = null;
+            int? areaNextYear = null;
+            var availableYears = areaLogResult.AvailableYears ?? new List<int>();
+            if (availableYears.Count > 1)
+            {
+                var index = availableYears.FindIndex(y => y == areaLogResult.SelectedYear);
+                if (index >= 0)
+                {
+                    if (index + 1 < availableYears.Count)
+                    {
+                        areaPreviousYear = availableYears[index + 1];
+                    }
+                    if (index - 1 >= 0)
+                    {
+                        areaNextYear = availableYears[index - 1];
+                    }
+                }
+            }
 
             var checklistOptionsSource = selectionPool.Any()
                 ? selectionPool
@@ -150,11 +199,17 @@ namespace hOps.web.Controllers
                 AreaOptions = areaOptions,
                 RoomOptions = roomOptions,
                 RoomLogs = roomLogs,
-                AreaLogs = areaLogs,
+                AreaLogs = areaLogResult.Logs,
                 ActiveSession = activeSession != null
                     ? BuildActiveSessionViewModel(activeSession, DateTime.UtcNow)
                     : null,
-                CycleDefinitions = cycleDefinitions
+                CycleDefinitions = roomCycleDefinitions,
+                RoomLogSelectedYear = roomLogReferenceYear,
+                AreaCycleDefinitions = areaCycleDefinitions,
+                AreaLogSelectedYear = areaLogResult.SelectedYear,
+                AreaLogAvailableYears = availableYears,
+                AreaLogPreviousYear = areaPreviousYear,
+                AreaLogNextYear = areaNextYear
             };
 
             ViewBag.LocalNow = _timeZoneService.ConvertToUserTime(DateTime.UtcNow);
@@ -813,7 +868,13 @@ namespace hOps.web.Controllers
             return string.Join(Environment.NewLine, parts);
         }
 
-        private async Task<List<PreventiveMaintenanceRoomLogViewModel>> BuildRoomLogsAsync(int propertyId, int checklistId, int frequencyPerYear, IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows)
+        private async Task<List<PreventiveMaintenanceRoomLogViewModel>> BuildRoomLogsAsync(
+            int propertyId,
+            int checklistId,
+            int frequencyPerYear,
+            IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows,
+            int referenceYear,
+            bool includeDueCalculations)
         {
             var rooms = await _db.Rooms
                 .Where(r => r.PropertyId == propertyId && r.IncludeInPreventiveMaintenance)
@@ -828,7 +889,6 @@ namespace hOps.web.Controllers
                 .OrderByDescending(s => s.CompletedAtUtc)
                 .ToListAsync();
 
-            var currentYear = DateTime.UtcNow.Year;
             var latestLookup = new Dictionary<string, PreventiveMaintenanceSession>(StringComparer.OrdinalIgnoreCase);
             var completionHistory = new Dictionary<string, List<DateTime>>(StringComparer.OrdinalIgnoreCase);
             foreach (var session in sessions)
@@ -838,7 +898,7 @@ namespace hOps.web.Controllers
                     ? $"room:{session.RoomId.Value}"
                     : $"manual:{(session.RoomNumber ?? string.Empty).Trim()}";
 
-                if (completedAt.Year == currentYear && !latestLookup.ContainsKey(key))
+                if (completedAt.Year == referenceYear && !latestLookup.ContainsKey(key))
                 {
                     latestLookup[key] = session;
                 }
@@ -849,7 +909,7 @@ namespace hOps.web.Controllers
                     completionHistory[key] = history;
                 }
 
-                if (completedAt != DateTime.MinValue && completedAt.Year == currentYear)
+                if (completedAt != DateTime.MinValue && completedAt.Year == referenceYear)
                 {
                     history.Add(completedAt);
                 }
@@ -861,7 +921,7 @@ namespace hOps.web.Controllers
                 var room = rooms[i];
                 latestLookup.TryGetValue($"room:{room.Id}", out var session);
                 completionHistory.TryGetValue($"room:{room.Id}", out var history);
-                logs.Add(BuildRoomLog(room.Id, room.RoomNumber ?? $"Room {room.Id}", session, frequencyPerYear, i, cycleWindows, history));
+                logs.Add(BuildRoomLog(room.Id, room.RoomNumber ?? $"Room {room.Id}", session, frequencyPerYear, i, cycleWindows, history, referenceYear, includeDueCalculations));
             }
 
             var manualLogs = latestLookup
@@ -869,7 +929,7 @@ namespace hOps.web.Controllers
                 .Select((kvp, index) =>
                 {
                     completionHistory.TryGetValue(kvp.Key, out var history);
-                    return BuildRoomLog(null, kvp.Value.RoomNumber, kvp.Value, frequencyPerYear, rooms.Count + index, cycleWindows, history);
+                    return BuildRoomLog(null, kvp.Value.RoomNumber, kvp.Value, frequencyPerYear, rooms.Count + index, cycleWindows, history, referenceYear, includeDueCalculations);
                 })
                 .Take(20);
 
@@ -880,12 +940,20 @@ namespace hOps.web.Controllers
                 .ToList();
         }
 
-        private async Task<List<PreventiveMaintenanceAreaLogViewModel>> BuildAreaLogsAsync(
+        private sealed class AreaLogResult
+        {
+            public List<PreventiveMaintenanceAreaLogViewModel> Logs { get; init; } = new();
+            public List<int> AvailableYears { get; init; } = new();
+            public IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> CycleWindows { get; init; } = Array.Empty<MaintenanceScheduleHelper.MaintenanceCycleWindow>();
+            public int SelectedYear { get; init; }
+        }
+
+        private async Task<AreaLogResult> BuildAreaLogsAsync(
             int propertyId,
             int checklistId,
             IReadOnlyList<string> configuredAreas,
             int frequencyPerYear,
-            IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows)
+            int? requestedYear)
         {
             var sessions = await _db.PreventiveMaintenanceSessions
                 .Include(s => s.CompletedBy)
@@ -895,10 +963,34 @@ namespace hOps.web.Controllers
                 .OrderByDescending(s => s.CompletedAtUtc)
                 .ToListAsync();
 
+            var availableYears = sessions
+                .Select(s => (s.CompletedAtUtc ?? s.StartedAtUtc).Year)
+                .Where(year => year > 0)
+                .Distinct()
+                .OrderByDescending(year => year)
+                .ToList();
+
+            if (!availableYears.Any())
+            {
+                availableYears.Add(DateTime.UtcNow.Year);
+            }
+
+            var selectedYear = requestedYear.HasValue && availableYears.Contains(requestedYear.Value)
+                ? requestedYear.Value
+                : availableYears.First();
+
+            var selectedYearSessions = sessions
+                .Where(s =>
+                {
+                    var completedAt = s.CompletedAtUtc ?? s.StartedAtUtc;
+                    return completedAt.Year == selectedYear;
+                })
+                .ToList();
+
             var latestLookup = new Dictionary<string, PreventiveMaintenanceSession>(StringComparer.OrdinalIgnoreCase);
             var completionHistory = new Dictionary<string, List<DateTime>>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var session in sessions)
+            foreach (var session in selectedYearSessions)
             {
                 var label = MaintenanceChecklistHelper.NormalizeAreaLabel(session.AreaLabel ?? session.RoomNumber) ?? "General";
                 var completedAt = session.CompletedAtUtc ?? session.StartedAtUtc;
@@ -946,16 +1038,24 @@ namespace hOps.web.Controllers
                 labels.Add("General");
             }
 
+            var cycleWindows = MaintenanceScheduleHelper.BuildCycleWindows(new DateTime(selectedYear, 1, 1), frequencyPerYear);
+            var includeDueDetails = selectedYear == DateTime.UtcNow.Year;
             var areaLogs = new List<PreventiveMaintenanceAreaLogViewModel>();
             for (var i = 0; i < labels.Count; i++)
             {
                 var label = labels[i];
                 latestLookup.TryGetValue(label, out var session);
                 completionHistory.TryGetValue(label, out var history);
-                areaLogs.Add(BuildAreaLog(label, session, frequencyPerYear, i, cycleWindows, history));
+                areaLogs.Add(BuildAreaLog(label, session, frequencyPerYear, i, cycleWindows, history, selectedYear, includeDueDetails));
             }
 
-            return areaLogs;
+            return new AreaLogResult
+            {
+                Logs = areaLogs,
+                AvailableYears = availableYears,
+                CycleWindows = cycleWindows,
+                SelectedYear = selectedYear
+            };
         }
 
         private PreventiveMaintenanceAreaLogViewModel BuildAreaLog(
@@ -964,9 +1064,11 @@ namespace hOps.web.Controllers
             int frequencyPerYear,
             int areaIndex,
             IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows,
-            List<DateTime>? completionHistory)
+            List<DateTime>? completionHistory,
+            int referenceYear,
+            bool includeDueCalculations)
         {
-            var roomLog = BuildRoomLog(null, label, session, frequencyPerYear, areaIndex, cycleWindows, completionHistory);
+            var roomLog = BuildRoomLog(null, label, session, frequencyPerYear, areaIndex, cycleWindows, completionHistory, referenceYear, includeDueCalculations);
             return new PreventiveMaintenanceAreaLogViewModel
             {
                 AreaLabel = roomLog.RoomNumber,
@@ -981,14 +1083,23 @@ namespace hOps.web.Controllers
         }
 
 
-        private static PreventiveMaintenanceRoomLogViewModel BuildRoomLog(int? roomId, string? roomNumber, PreventiveMaintenanceSession? session, int frequencyPerYear, int roomIndex, IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows, List<DateTime>? completionHistory)
+        private static PreventiveMaintenanceRoomLogViewModel BuildRoomLog(
+            int? roomId,
+            string? roomNumber,
+            PreventiveMaintenanceSession? session,
+            int frequencyPerYear,
+            int roomIndex,
+            IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows,
+            List<DateTime>? completionHistory,
+            int referenceYear,
+            bool includeDueCalculations)
         {
             var log = new PreventiveMaintenanceRoomLogViewModel
             {
                 RoomId = roomId,
                 RoomNumber = string.IsNullOrWhiteSpace(roomNumber) ? (roomId.HasValue ? $"Room {roomId}" : "Room") : roomNumber!,
                 LastDurationSeconds = session?.TotalDurationSeconds,
-                CompletedByName = session?.CompletedAtUtc.HasValue == true && session.CompletedAtUtc.Value.Year == DateTime.UtcNow.Year
+                CompletedByName = session?.CompletedAtUtc.HasValue == true && session.CompletedAtUtc.Value.Year == referenceYear
                     ? BuildUserName(session?.CompletedBy)
                     : null
             };
@@ -1004,21 +1115,24 @@ namespace hOps.web.Controllers
                 }
             }
 
-            var nextDue = MaintenanceScheduleHelper.CalculateNextDueDate(session?.CompletedAtUtc, frequencyPerYear, roomIndex);
-            log.NextDueAtUtc = nextDue;
-            if (nextDue.HasValue)
+            if (includeDueCalculations)
             {
-                var now = DateTime.UtcNow.Date;
-                var dueDate = nextDue.Value.Date;
-                if (dueDate <= now)
+                var nextDue = MaintenanceScheduleHelper.CalculateNextDueDate(session?.CompletedAtUtc, frequencyPerYear, roomIndex);
+                log.NextDueAtUtc = nextDue;
+                if (nextDue.HasValue)
                 {
-                    log.IsOverdue = true;
-                    log.IsDue = true;
-                }
-                else if (dueDate <= now.AddDays(7))
-                {
-                    log.IsDue = true;
-                    log.IsOverdue = false;
+                    var now = DateTime.UtcNow.Date;
+                    var dueDate = nextDue.Value.Date;
+                    if (dueDate <= now)
+                    {
+                        log.IsOverdue = true;
+                        log.IsDue = true;
+                    }
+                    else if (dueDate <= now.AddDays(7))
+                    {
+                        log.IsDue = true;
+                        log.IsOverdue = false;
+                    }
                 }
             }
 

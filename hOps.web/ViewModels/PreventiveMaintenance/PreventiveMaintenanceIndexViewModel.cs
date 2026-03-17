@@ -24,6 +24,12 @@ namespace hOps.web.ViewModels.PreventiveMaintenance
         public IReadOnlyList<PreventiveMaintenanceAreaLogViewModel> AreaLogs { get; set; } = Array.Empty<PreventiveMaintenanceAreaLogViewModel>();
         public PreventiveMaintenanceActiveSessionViewModel? ActiveSession { get; set; }
         public IReadOnlyList<MaintenanceCycleDefinitionViewModel> CycleDefinitions { get; set; } = Array.Empty<MaintenanceCycleDefinitionViewModel>();
+        public int RoomLogSelectedYear { get; set; } = DateTime.UtcNow.Year;
+        public IReadOnlyList<MaintenanceCycleDefinitionViewModel> AreaCycleDefinitions { get; set; } = Array.Empty<MaintenanceCycleDefinitionViewModel>();
+        public int AreaLogSelectedYear { get; set; } = DateTime.UtcNow.Year;
+        public int? AreaLogPreviousYear { get; set; }
+        public int? AreaLogNextYear { get; set; }
+        public IReadOnlyList<int> AreaLogAvailableYears { get; set; } = Array.Empty<int>();
         public bool RequiresRoom => SelectedChecklistType == PreventiveMaintenanceChecklistType.Room;
         public bool RequiresArea => SelectedChecklistType == PreventiveMaintenanceChecklistType.Area;
     }
