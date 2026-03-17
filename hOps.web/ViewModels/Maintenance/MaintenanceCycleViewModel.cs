@@ -16,5 +16,7 @@ namespace hOps.web.ViewModels.Maintenance
         public int Index { get; set; }
         public DateTime DueDate { get; set; }
         public DateTime? CompletedAt { get; set; }
+        public int? SessionId { get; set; }
+        public string? Notes { get; set; }
     }
 }

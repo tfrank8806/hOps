@@ -372,6 +372,21 @@ namespace hOps.web.Controllers
                 TotalDurationSeconds = durationSeconds
             };
 
+            var manualComment = request.Comments?.Trim();
+            if (!string.IsNullOrWhiteSpace(manualComment))
+            {
+                session.Tasks.Add(new PreventiveMaintenanceSessionTask
+                {
+                    TaskName = "Manual PM Comment",
+                    TaskDescription = "Notes captured when recording a manual PM.",
+                    Notes = manualComment,
+                    SortOrder = 0,
+                    Status = PreventiveMaintenanceTaskStatus.Completed,
+                    CompletedAtUtc = completedUtc,
+                    UpdatedAtUtc = completedUtc
+                });
+            }
+
             _db.PreventiveMaintenanceSessions.Add(session);
             await _db.SaveChangesAsync();
 
@@ -900,14 +915,15 @@ namespace hOps.web.Controllers
         {
             var sessions = await _db.PreventiveMaintenanceSessions
                 .Include(s => s.CompletedBy)
+                .Include(s => s.Tasks)
                 .Where(s => s.PropertyId == propertyId &&
                             s.ChecklistId == checklistId &&
                             s.Status == PreventiveMaintenanceSessionStatus.Completed)
-                .OrderByDescending(s => s.CompletedAtUtc)
+                .OrderByDescending(s => s.CompletedAtUtc ?? s.StartedAtUtc)
                 .ToListAsync();
 
             var availableYears = sessions
-                .Select(s => (s.CompletedAtUtc ?? s.StartedAtUtc).Year)
+                .Select(GetCompletionYear)
                 .Where(year => year > 0)
                 .Distinct()
                 .OrderByDescending(year => year)
@@ -923,21 +939,17 @@ namespace hOps.web.Controllers
                 : availableYears.First();
 
             var selectedYearSessions = sessions
-                .Where(s =>
-                {
-                    var completedAt = s.CompletedAtUtc ?? s.StartedAtUtc;
-                    return completedAt.Year == selectedYear;
-                })
+                .Where(s => GetCompletionYear(s) == selectedYear)
+                .OrderByDescending(GetCompletionInstant)
                 .ToList();
 
             var cycleWindows = MaintenanceScheduleHelper.BuildCycleWindows(new DateTime(selectedYear, 1, 1), frequencyPerYear);
             var includeDueCalculations = selectedYear == DateTime.UtcNow.Year;
 
             var latestLookup = new Dictionary<string, PreventiveMaintenanceSession>(StringComparer.OrdinalIgnoreCase);
-            var completionHistory = new Dictionary<string, List<DateTime>>(StringComparer.OrdinalIgnoreCase);
+            var completionHistory = new Dictionary<string, List<PreventiveMaintenanceSession>>(StringComparer.OrdinalIgnoreCase);
             foreach (var session in selectedYearSessions)
             {
-                var completedAt = session.CompletedAtUtc ?? session.StartedAtUtc;
                 var key = session.RoomId.HasValue
                     ? $"room:{session.RoomId.Value}"
                     : $"manual:{(session.RoomNumber ?? string.Empty).Trim()}";
@@ -949,14 +961,11 @@ namespace hOps.web.Controllers
 
                 if (!completionHistory.TryGetValue(key, out var history))
                 {
-                    history = new List<DateTime>();
+                    history = new List<PreventiveMaintenanceSession>();
                     completionHistory[key] = history;
                 }
 
-                if (completedAt != DateTime.MinValue)
-                {
-                    history.Add(completedAt);
-                }
+                history.Add(session);
             }
 
             var logs = new List<PreventiveMaintenanceRoomLogViewModel>();
@@ -1008,14 +1017,15 @@ namespace hOps.web.Controllers
         {
             var sessions = await _db.PreventiveMaintenanceSessions
                 .Include(s => s.CompletedBy)
+                .Include(s => s.Tasks)
                 .Where(s => s.PropertyId == propertyId &&
                             s.ChecklistId == checklistId &&
                             s.Status == PreventiveMaintenanceSessionStatus.Completed)
-                .OrderByDescending(s => s.CompletedAtUtc)
+                .OrderByDescending(s => s.CompletedAtUtc ?? s.StartedAtUtc)
                 .ToListAsync();
 
             var availableYears = sessions
-                .Select(s => (s.CompletedAtUtc ?? s.StartedAtUtc).Year)
+                .Select(GetCompletionYear)
                 .Where(year => year > 0)
                 .Distinct()
                 .OrderByDescending(year => year)
@@ -1031,15 +1041,12 @@ namespace hOps.web.Controllers
                 : availableYears.First();
 
             var selectedYearSessions = sessions
-                .Where(s =>
-                {
-                    var completedAt = s.CompletedAtUtc ?? s.StartedAtUtc;
-                    return completedAt.Year == selectedYear;
-                })
+                .Where(s => GetCompletionYear(s) == selectedYear)
+                .OrderByDescending(GetCompletionInstant)
                 .ToList();
 
             var latestLookup = new Dictionary<string, PreventiveMaintenanceSession>(StringComparer.OrdinalIgnoreCase);
-            var completionHistory = new Dictionary<string, List<DateTime>>(StringComparer.OrdinalIgnoreCase);
+            var completionHistory = new Dictionary<string, List<PreventiveMaintenanceSession>>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var session in selectedYearSessions)
             {
@@ -1048,7 +1055,6 @@ namespace hOps.web.Controllers
                 {
                     continue;
                 }
-                var completedAt = session.CompletedAtUtc ?? session.StartedAtUtc;
 
                 if (!latestLookup.ContainsKey(label))
                 {
@@ -1057,14 +1063,11 @@ namespace hOps.web.Controllers
 
                 if (!completionHistory.TryGetValue(label, out var history))
                 {
-                    history = new List<DateTime>();
+                    history = new List<PreventiveMaintenanceSession>();
                     completionHistory[label] = history;
                 }
 
-                if (completedAt != DateTime.MinValue)
-                {
-                    history.Add(completedAt);
-                }
+                history.Add(session);
             }
 
             var labels = new List<string>();
@@ -1124,7 +1127,7 @@ namespace hOps.web.Controllers
             int frequencyPerYear,
             int areaIndex,
             IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows,
-            List<DateTime>? completionHistory,
+            List<PreventiveMaintenanceSession>? completionHistory,
             int referenceYear,
             bool includeDueCalculations)
         {
@@ -1150,7 +1153,7 @@ namespace hOps.web.Controllers
             int frequencyPerYear,
             int roomIndex,
             IReadOnlyList<MaintenanceScheduleHelper.MaintenanceCycleWindow> cycleWindows,
-            List<DateTime>? completionHistory,
+            List<PreventiveMaintenanceSession>? completionHistory,
             int referenceYear,
             bool includeDueCalculations)
         {
@@ -1158,26 +1161,35 @@ namespace hOps.web.Controllers
             {
                 RoomId = roomId,
                 RoomNumber = string.IsNullOrWhiteSpace(roomNumber) ? (roomId.HasValue ? $"Room {roomId}" : "Room") : roomNumber!,
-                LastDurationSeconds = session?.TotalDurationSeconds,
-                CompletedByName = session?.CompletedAtUtc.HasValue == true && session.CompletedAtUtc.Value.Year == referenceYear
-                    ? BuildUserName(session?.CompletedBy)
-                    : null
+                LastDurationSeconds = null,
+                CompletedByName = null
             };
 
+            PreventiveMaintenanceSession? latestCompletion = null;
             if (completionHistory != null && completionHistory.Count > 0)
             {
-                var latest = completionHistory
-                    .OrderByDescending(d => d)
+                latestCompletion = completionHistory
+                    .OrderByDescending(GetCompletionInstant)
                     .FirstOrDefault();
-                if (latest != default)
+            }
+
+            var displaySession = latestCompletion ?? session;
+            if (displaySession != null)
+            {
+                var completedAt = GetCompletionInstant(displaySession);
+                if (completedAt != DateTime.MinValue)
                 {
-                    log.LastCompletedAtUtc = latest;
+                    log.LastCompletedAtUtc = completedAt;
                 }
+
+                log.LastDurationSeconds = displaySession.TotalDurationSeconds;
+                log.CompletedByName = BuildUserName(displaySession.CompletedBy);
             }
 
             if (includeDueCalculations)
             {
-                var nextDue = MaintenanceScheduleHelper.CalculateNextDueDate(session?.CompletedAtUtc, frequencyPerYear, roomIndex);
+                var referenceSession = session ?? latestCompletion;
+                var nextDue = MaintenanceScheduleHelper.CalculateNextDueDate(referenceSession?.CompletedAtUtc, frequencyPerYear, roomIndex);
                 log.NextDueAtUtc = nextDue;
                 if (nextDue.HasValue)
                 {
@@ -1199,16 +1211,19 @@ namespace hOps.web.Controllers
             var statuses = new List<MaintenanceCycleStatusViewModel>();
             if (cycleWindows != null && cycleWindows.Count > 0)
             {
-                var completions = completionHistory?.OrderBy(d => d).ToList() ?? new List<DateTime>();
+                var completions = completionHistory?
+                    .OrderBy(GetCompletionInstant)
+                    .ToList() ?? new List<PreventiveMaintenanceSession>();
                 foreach (var window in cycleWindows)
                 {
-                    DateTime? completion = null;
+                    PreventiveMaintenanceSession? matchedSession = null;
                     for (var i = 0; i < completions.Count; i++)
                     {
                         var candidate = completions[i];
-                        if (candidate >= window.StartDate && candidate <= window.DueDate)
+                        var candidateInstant = GetCompletionInstant(candidate);
+                        if (candidateInstant >= window.StartDate && candidateInstant <= window.DueDate)
                         {
-                            completion = candidate;
+                            matchedSession = candidate;
                             completions.RemoveAt(i);
                             break;
                         }
@@ -1218,13 +1233,48 @@ namespace hOps.web.Controllers
                     {
                         Index = window.Index,
                         DueDate = window.DueDate,
-                        CompletedAt = completion
+                        CompletedAt = matchedSession != null ? GetCompletionInstant(matchedSession) : null,
+                        SessionId = matchedSession?.Id,
+                        Notes = matchedSession != null ? BuildSessionNotesSummary(matchedSession) : null
                     });
                 }
             }
 
             log.CycleStatuses = statuses;
             return log;
+        }
+
+        private static DateTime GetCompletionInstant(PreventiveMaintenanceSession session)
+        {
+            return session.CompletedAtUtc ?? session.StartedAtUtc;
+        }
+
+        private static int GetCompletionYear(PreventiveMaintenanceSession session)
+        {
+            return GetCompletionInstant(session).Year;
+        }
+
+        private static string? BuildSessionNotesSummary(PreventiveMaintenanceSession session)
+        {
+            if (session.Tasks == null || session.Tasks.Count == 0)
+            {
+                return null;
+            }
+
+            var lines = session.Tasks
+                .Where(t => !string.IsNullOrWhiteSpace(t.Notes))
+                .OrderBy(t => t.SortOrder)
+                .ThenBy(t => t.TaskName)
+                .Select(t =>
+                {
+                    var label = string.IsNullOrWhiteSpace(t.TaskName) ? "Task" : t.TaskName.Trim();
+                    var note = t.Notes!.Trim();
+                    return string.IsNullOrWhiteSpace(note) ? null : $"{label}: {note}";
+                })
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .ToList();
+
+            return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
         }
 
         private static HashSet<string> BuildRoomLabelLookup(IEnumerable<Room> rooms)

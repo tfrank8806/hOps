@@ -24,5 +24,8 @@ namespace hOps.web.ViewModels.PreventiveMaintenance
 
         [Range(0, 1440)]
         public int DurationMinutes { get; set; } = 60;
+
+        [MaxLength(2000)]
+        public string? Comments { get; set; }
     }
 }

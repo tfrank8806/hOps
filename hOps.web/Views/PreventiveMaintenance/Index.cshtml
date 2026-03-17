@@ -120,6 +120,11 @@
                         <input type="number" class="form-control" id="pmManualDuration" name="DurationMinutes" min="0" max="1440" value="60" />
                     </div>
                     <div class="col-12">
+                        <label for="pmManualComments" class="form-label">Comments</label>
+                        <textarea class="form-control" id="pmManualComments" name="Comments" rows="3" maxlength="2000" placeholder="Add context or any issues noted during this manual PM."></textarea>
+                        <div class="form-text">Optional. These notes are shared on the PM logs for future reference.</div>
+                    </div>
+                    <div class="col-12">
                         <small class="text-muted">Use this when a PM was completed outside the checklist.</small>
                     </div>
                     <div class="col-12">
@@ -277,7 +282,16 @@
                                             @if (status?.CompletedAt.HasValue == true)
                                             {
                                                 var completedLocal = TimeZoneService.ConvertToUserTime(status.CompletedAt.Value);
-                                                <span>@completedLocal.ToString("MMM d")</span>
+                                                var modalDate = completedLocal.ToString("MMMM d, yyyy h:mm tt");
+                                                var normalizedNotes = (status.Notes ?? string.Empty).Replace("\r\n", "\n").Replace("\r", "\n");
+                                                var encodedNotes = Html.AttributeEncode(normalizedNotes).Replace("\n", "&#10;");
+                                                <button type="button"
+                                                        class="btn btn-link btn-sm p-0 text-decoration-none cycle-notes-trigger"
+                                                        data-cycle-room="@log.RoomNumber"
+                                                        data-cycle-date="@modalDate"
+                                                        data-cycle-notes="@encodedNotes">
+                                                    <span>@completedLocal.ToString("MMM d")</span>
+                                                </button>
                                             }
                                             else
                                             {
@@ -452,6 +466,28 @@
             </div>
         </div>
     }
+</div>
+
+<div class="modal fade" id="pmCycleNotesModal" tabindex="-1" aria-labelledby="pmCycleNotesTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="pmCycleNotesTitle">PM Comments</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-muted small mb-2">
+                    <span data-role="cycle-room">Room</span>
+                    <span class="mx-1">•</span>
+                    <span data-role="cycle-date"></span>
+                </div>
+                <pre class="mb-0" data-role="cycle-notes-body">No comments provided for this completion.</pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script type="application/json" id="pmInitialSession">
@@ -969,6 +1005,42 @@
                 return `${secs}s`;
             }
 
+            function initCycleNotesModal() {
+                const modalEl = document.getElementById('pmCycleNotesModal');
+                if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+                    return;
+                }
+
+                const modal = new bootstrap.Modal(modalEl);
+                const roomField = modalEl.querySelector('[data-role="cycle-room"]');
+                const dateField = modalEl.querySelector('[data-role="cycle-date"]');
+                const notesField = modalEl.querySelector('[data-role="cycle-notes-body"]');
+                const triggers = document.querySelectorAll('.cycle-notes-trigger');
+
+                triggers.forEach(button => {
+                    button.addEventListener('click', () => {
+                        if (roomField) {
+                            roomField.textContent = button.dataset.cycleRoom || 'Room';
+                        }
+                        if (dateField) {
+                            dateField.textContent = button.dataset.cycleDate || '';
+                        }
+                        if (notesField) {
+                            const rawNotes = button.dataset.cycleNotes || '';
+                            const normalizedNotes = rawNotes
+                                .replace(/&#10;/g, '\n')
+                                .replace(/&#13;/g, '\n')
+                                .trim();
+                            notesField.textContent = normalizedNotes
+                                ? normalizedNotes
+                                : 'No comments provided for this completion.';
+                        }
+                        modal.show();
+                    });
+                });
+            }
+
+            initCycleNotesModal();
             syncSession(initialSession);
         })();
     </script>
