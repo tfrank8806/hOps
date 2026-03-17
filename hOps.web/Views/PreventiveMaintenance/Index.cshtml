@@ -58,6 +58,39 @@
 
     <div id="pmAlert"></div>
 
+    @if (Model.Checklists.Any())
+    {
+        <div class="card mb-3">
+            <div class="card-body py-3">
+                <form method="get"
+                      action="@Url.Action("Index", "PreventiveMaintenance")"
+                      class="row g-2 align-items-center"
+                      id="pmChecklistForm">
+                    <div class="col-auto">
+                        <label for="pmChecklistSelect" class="col-form-label col-form-label-sm mb-0">Checklist</label>
+                    </div>
+                    <div class="col-sm-6 col-md-4">
+                        <select id="pmChecklistSelect" name="checklistId" class="form-select form-select-sm">
+                            @foreach (var checklist in Model.Checklists)
+                            {
+                                var typeBadge = checklist.ChecklistType == hOps.web.Models.PreventiveMaintenanceChecklistType.Area
+                                    ? "Area"
+                                    : "Room";
+                                var isSelected = checklist.Id == Model.SelectedChecklistId;
+                                <option value="@checklist.Id" selected="@(isSelected ? "selected" : null)">
+                                    @checklist.Name (@typeBadge)
+                                </option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <small class="text-muted">Switch checklists to start a different PM type.</small>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+
     <div id="pmStartPanel" class="card mb-4" hidden>
         <div class="card-body">
             <form id="pmStartForm" class="row g-3">
@@ -542,6 +575,7 @@
             const hasChecklist = appEl.dataset.hasChecklist === 'true';
             const requiresArea = appEl.dataset.requiresArea === 'true';
             const checklistId = parseInt(appEl.dataset.checklistId || '0', 10) || 0;
+            const checklistSelect = document.getElementById('pmChecklistSelect');
             const urls = {
                 start: appEl.dataset.startUrl,
                 update: appEl.dataset.updateUrl,
@@ -706,6 +740,12 @@
                     } else {
                         areaInput.value = '';
                     }
+                });
+            }
+
+            if (checklistSelect && checklistSelect.form) {
+                checklistSelect.addEventListener('change', () => {
+                    checklistSelect.form.submit();
                 });
             }
 
