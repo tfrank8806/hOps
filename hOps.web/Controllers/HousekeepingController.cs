@@ -9,6 +9,7 @@ using hOps.web.ViewModels.Housekeeping;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace hOps.web.Controllers
@@ -48,20 +49,43 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public IActionResult MprTracker()
+        public async Task<IActionResult> MprTracker(int? month, int? year, string? period, DateTime? start, DateTime? end)
         {
+            var now = _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
             var model = new MprTrackerViewModel
             {
-                CanEditStandards = UserCanEditMprStandards()
+                EntryDate = now,
+                CanEditStandards = UserCanEditMprStandards(),
+                CanManageHousekeepers = UserCanEditMprStandards(),
+                LogFilter = new MprTrackerLogFilterViewModel
+                {
+                    SelectedMonth = month ?? 0,
+                    SelectedYear = year ?? 0,
+                    PeriodType = string.IsNullOrWhiteSpace(period) ? MprTrackerLogFilterViewModel.PeriodMonth : period!,
+                    CustomStartDate = start,
+                    CustomEndDate = end
+                }
             };
+
+            await PopulateMprTrackerAsync(model);
+            ApplyTempDataMessages(model);
+
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult MprTracker(MprTrackerViewModel model)
+        public async Task<IActionResult> MprTracker(MprTrackerViewModel model)
         {
+            var currentProperty = ViewBag.CurrentProperty as Property;
             var canEditStandards = UserCanEditMprStandards();
             model.CanEditStandards = canEditStandards;
+            model.CanManageHousekeepers = canEditStandards;
+            model.EntryDate = model.EntryDate == default ? _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date : model.EntryDate.Date;
+
+            if (currentProperty == null)
+            {
+                ModelState.AddModelError(string.Empty, "Select a property to track housekeeping productivity.");
+            }
 
             if (!canEditStandards)
             {
@@ -71,18 +95,327 @@ namespace hOps.web.Controllers
                 model.ResetStandardsToDefaults();
             }
 
+            if (!model.SelectedHousekeeperId.HasValue)
+            {
+                ModelState.AddModelError(nameof(model.SelectedHousekeeperId), "Select a housekeeper before saving.");
+            }
+
             if (!ModelState.IsValid)
             {
+                await PopulateMprTrackerAsync(model, currentProperty);
                 return View(model);
             }
 
             model.Calculate();
+
+            if (currentProperty == null)
+            {
+                await PopulateMprTrackerAsync(model);
+                return View(model);
+            }
+
+            var housekeeper = await _context.HousekeeperProfiles
+                .FirstOrDefaultAsync(h => h.Id == model.SelectedHousekeeperId && h.PropertyId == currentProperty.Id && !h.IsDeleted);
+
+            if (housekeeper == null)
+            {
+                ModelState.AddModelError(nameof(model.SelectedHousekeeperId), "The selected housekeeper could not be found.");
+                await PopulateMprTrackerAsync(model, currentProperty);
+                return View(model);
+            }
+
+            var currentUser = await _userManager.GetUserAsync(User);
+            var entry = new HousekeepingMprEntry
+            {
+                PropertyId = currentProperty.Id,
+                HousekeeperId = housekeeper.Id,
+                HousekeeperName = housekeeper.Name,
+                EntryDate = model.EntryDate.Date,
+                CheckoutRooms = model.CheckoutRooms,
+                LinenChangeRooms = model.LinenChangeRooms,
+                StayoverRooms = model.StayoverRooms,
+                DndRooms = model.DndRooms,
+                HoursWorked = model.HoursWorked,
+                TotalMinutesWorked = model.TotalMinutesWorked,
+                MinutesPerRoom = model.MinutesPerRoom,
+                DepartureStandardMinutes = model.DepartureStandardMinutes,
+                LinenChangeStandardMinutes = model.LinenChangeStandardMinutes,
+                StayoverStandardMinutes = model.StayoverStandardMinutes,
+                CreatedAt = DateTime.UtcNow,
+                CreatedByUserId = currentUser?.Id
+            };
+
+            _context.HousekeepingMprEntries.Add(entry);
+            await _context.SaveChangesAsync();
+
+            model.EntrySaved = true;
+            model.StatusMessage = $"Saved entry for {housekeeper.Name} on {model.EntryDate:MMM d}.";
+
+            await PopulateMprTrackerAsync(model, currentProperty);
             return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> AddHousekeeper(string name, string? period, int? month, int? year, DateTime? start, DateTime? end)
+        {
+            var routeValues = BuildFilterRouteValues(period, month, year, start, end);
+
+            if (!UserCanEditMprStandards())
+            {
+                TempData["MprTrackerError"] = "Only managers can manage housekeeper names.";
+                return RedirectToAction(nameof(MprTracker), routeValues);
+            }
+
+            var currentProperty = ViewBag.CurrentProperty as Property;
+            if (currentProperty == null)
+            {
+                TempData["MprTrackerError"] = "Select a property before managing housekeeper names.";
+                return RedirectToAction(nameof(MprTracker), routeValues);
+            }
+
+            var trimmedName = name?.Trim();
+            if (string.IsNullOrWhiteSpace(trimmedName))
+            {
+                TempData["MprTrackerError"] = "Enter a housekeeper name before adding it.";
+                return RedirectToAction(nameof(MprTracker), routeValues);
+            }
+
+            var normalized = trimmedName.ToUpperInvariant();
+            var existing = await _context.HousekeeperProfiles
+                .FirstOrDefaultAsync(h => h.PropertyId == currentProperty.Id && h.Name.ToUpper() == normalized);
+
+            if (existing != null)
+            {
+                if (existing.IsDeleted)
+                {
+                    existing.IsDeleted = false;
+                    existing.DeletedAt = null;
+                    await _context.SaveChangesAsync();
+                    TempData["MprTrackerStatus"] = $"Restored {existing.Name} to the list.";
+                }
+                else
+                {
+                    TempData["MprTrackerError"] = $"{existing.Name} is already listed.";
+                }
+
+                return RedirectToAction(nameof(MprTracker), routeValues);
+            }
+
+            var profile = new HousekeeperProfile
+            {
+                PropertyId = currentProperty.Id,
+                Name = trimmedName,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.HousekeeperProfiles.Add(profile);
+            await _context.SaveChangesAsync();
+
+            TempData["MprTrackerStatus"] = $"Added {profile.Name} to the list.";
+            return RedirectToAction(nameof(MprTracker), routeValues);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteHousekeeper(int id, string? period, int? month, int? year, DateTime? start, DateTime? end)
+        {
+            var routeValues = BuildFilterRouteValues(period, month, year, start, end);
+
+            if (!UserCanEditMprStandards())
+            {
+                TempData["MprTrackerError"] = "Only managers can delete housekeeper names.";
+                return RedirectToAction(nameof(MprTracker), routeValues);
+            }
+
+            var currentProperty = ViewBag.CurrentProperty as Property;
+            if (currentProperty == null)
+            {
+                TempData["MprTrackerError"] = "Select a property before managing housekeeper names.";
+                return RedirectToAction(nameof(MprTracker), routeValues);
+            }
+
+            var housekeeper = await _context.HousekeeperProfiles
+                .FirstOrDefaultAsync(h => h.Id == id && h.PropertyId == currentProperty.Id);
+
+            if (housekeeper == null)
+            {
+                TempData["MprTrackerError"] = "The selected housekeeper could not be found.";
+                return RedirectToAction(nameof(MprTracker), routeValues);
+            }
+
+            housekeeper.IsDeleted = true;
+            housekeeper.DeletedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            TempData["MprTrackerStatus"] = $"Removed {housekeeper.Name} from the dropdown.";
+            return RedirectToAction(nameof(MprTracker), routeValues);
         }
 
         private bool UserCanEditMprStandards()
         {
             return User.IsInRole("Manager") || User.IsInRole("Admin");
+        }
+
+        private object BuildFilterRouteValues(string? period, int? month, int? year, DateTime? start, DateTime? end)
+        {
+            return new
+            {
+                period = string.IsNullOrWhiteSpace(period) ? null : period,
+                month,
+                year,
+                start = start.HasValue ? start.Value.ToString("yyyy-MM-dd") : null,
+                end = end.HasValue ? end.Value.ToString("yyyy-MM-dd") : null
+            };
+        }
+
+        private void ApplyTempDataMessages(MprTrackerViewModel model)
+        {
+            if (TempData.TryGetValue("MprTrackerStatus", out var status) && status is string statusMessage)
+            {
+                model.StatusMessage = statusMessage;
+            }
+
+            if (TempData.TryGetValue("MprTrackerError", out var error) && error is string errorMessage)
+            {
+                model.ErrorMessage = errorMessage;
+            }
+        }
+
+        private async Task PopulateMprTrackerAsync(MprTrackerViewModel model, Property? currentProperty = null)
+        {
+            currentProperty ??= ViewBag.CurrentProperty as Property;
+            if (currentProperty == null)
+            {
+                model.ErrorMessage ??= "Select a property to manage housekeeping productivity.";
+                model.Housekeepers = new List<HousekeeperOptionViewModel>();
+                model.LogRows = new List<MprTrackerLogRowViewModel>();
+                model.LogDates = new List<DateTime>();
+                return;
+            }
+
+            var propertyId = currentProperty.Id;
+            var allHousekeepers = await _context.HousekeeperProfiles
+                .Where(h => h.PropertyId == propertyId)
+                .OrderBy(h => h.Name)
+                .ToListAsync();
+
+            model.Housekeepers = allHousekeepers
+                .Where(h => !h.IsDeleted)
+                .Select(h => new HousekeeperOptionViewModel
+                {
+                    Id = h.Id,
+                    Name = h.Name,
+                    IsDeleted = h.IsDeleted
+                })
+                .ToList();
+
+            if (!model.SelectedHousekeeperId.HasValue && model.Housekeepers.Any())
+            {
+                model.SelectedHousekeeperId = model.Housekeepers.First().Id;
+            }
+
+            var now = _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
+            model.LogFilter ??= new MprTrackerLogFilterViewModel();
+            if (model.LogFilter.SelectedYear <= 0)
+            {
+                model.LogFilter.SelectedYear = now.Year;
+            }
+
+            if (model.LogFilter.SelectedMonth <= 0)
+            {
+                model.LogFilter.SelectedMonth = now.Month;
+            }
+
+            var (start, end) = model.LogFilter.GetDateRange(now);
+            var totalDays = (end.Date - start.Date).Days;
+            model.LogDates = new List<DateTime>();
+            for (var offset = 0; offset <= totalDays; offset++)
+            {
+                model.LogDates.Add(start.Date.AddDays(offset));
+            }
+
+            var entries = await _context.HousekeepingMprEntries
+                .Where(e => e.PropertyId == propertyId && e.EntryDate >= start.Date && e.EntryDate <= end.Date)
+                .Include(e => e.Housekeeper)
+                .ToListAsync();
+
+            model.LogRows = BuildLogRows(allHousekeepers, entries);
+        }
+
+        private static List<MprTrackerLogRowViewModel> BuildLogRows(
+            List<HousekeeperProfile> housekeepers,
+            IEnumerable<HousekeepingMprEntry> entries)
+        {
+            var rows = new Dictionary<string, MprTrackerLogRowViewModel>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var housekeeper in housekeepers)
+            {
+                var key = BuildHousekeeperRowKey(housekeeper.Id, housekeeper.Name);
+                if (!rows.ContainsKey(key))
+                {
+                    rows[key] = new MprTrackerLogRowViewModel
+                    {
+                        HousekeeperId = housekeeper.Id,
+                        HousekeeperName = housekeeper.Name,
+                        IsDeleted = housekeeper.IsDeleted
+                    };
+                }
+            }
+
+            foreach (var entry in entries)
+            {
+                var key = BuildHousekeeperRowKey(entry.HousekeeperId, entry.Housekeeper?.Name ?? entry.HousekeeperName);
+                if (!rows.TryGetValue(key, out var row))
+                {
+                    row = new MprTrackerLogRowViewModel
+                    {
+                        HousekeeperId = entry.HousekeeperId,
+                        HousekeeperName = entry.Housekeeper?.Name ?? entry.HousekeeperName,
+                        IsDeleted = entry.Housekeeper?.IsDeleted ?? false
+                    };
+                    rows[key] = row;
+                }
+
+                var day = entry.EntryDate.Date;
+                if (!row.Cells.TryGetValue(day, out var cell))
+                {
+                    cell = new MprTrackerLogCellViewModel();
+                    row.Cells[day] = cell;
+                }
+
+                cell.CheckoutRooms += entry.CheckoutRooms;
+                cell.LinenChangeRooms += entry.LinenChangeRooms;
+                cell.StayoverRooms += entry.StayoverRooms;
+                cell.DndRooms += entry.DndRooms;
+                cell.HoursWorked += entry.HoursWorked;
+                cell.TotalMinutesWorked += entry.TotalMinutesWorked;
+                cell.RecalculateMinutesPerRoom();
+
+                row.Summary.CheckoutRooms += entry.CheckoutRooms;
+                row.Summary.LinenChangeRooms += entry.LinenChangeRooms;
+                row.Summary.StayoverRooms += entry.StayoverRooms;
+                row.Summary.DndRooms += entry.DndRooms;
+                row.Summary.HoursWorked += entry.HoursWorked;
+                row.Summary.TotalMinutesWorked += entry.TotalMinutesWorked;
+            }
+
+            foreach (var row in rows.Values)
+            {
+                var trackedRooms = row.Summary.CheckoutRooms + row.Summary.StayoverRooms;
+                row.Summary.MinutesPerRoom = trackedRooms > 0 && row.Summary.HoursWorked > 0
+                    ? Math.Round((row.Summary.HoursWorked * 60m) / trackedRooms, 2, MidpointRounding.AwayFromZero)
+                    : null;
+            }
+
+            return rows.Values
+                .OrderBy(r => r.HousekeeperName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static string BuildHousekeeperRowKey(int? id, string name)
+        {
+            return id.HasValue
+                ? $"HK:{id.Value}"
+                : $"NAME:{(name ?? string.Empty).Trim().ToUpperInvariant()}";
         }
 
         [HttpPost]

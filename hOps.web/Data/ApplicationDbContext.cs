@@ -95,6 +95,8 @@ namespace hOps.web.Data
         public DbSet<MaintenanceLogTemplate> MaintenanceLogTemplates { get; set; }
         public DbSet<MaintenanceLogEntry> MaintenanceLogEntries { get; set; }
         public DbSet<EmergencyLightTestEntry> EmergencyLightTestEntries { get; set; }
+        public DbSet<HousekeeperProfile> HousekeeperProfiles { get; set; }
+        public DbSet<HousekeepingMprEntry> HousekeepingMprEntries { get; set; }
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
         public DbSet<SiteVisitReport> SiteVisitReports { get; set; }
         public DbSet<SiteVisitReportItem> SiteVisitReportItems { get; set; }
@@ -1136,6 +1138,57 @@ namespace hOps.web.Data
                 .WithMany()
                 .HasForeignKey(i => i.InventoryItemId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<HousekeeperProfile>()
+                .Property(h => h.Name)
+                .HasMaxLength(200);
+
+            builder.Entity<HousekeeperProfile>()
+                .HasIndex(h => new { h.PropertyId, h.Name })
+                .IsUnique();
+
+            builder.Entity<HousekeeperProfile>()
+                .HasOne(h => h.Property)
+                .WithMany(p => p.Housekeepers)
+                .HasForeignKey(h => h.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<HousekeepingMprEntry>()
+                .HasIndex(e => new { e.PropertyId, e.EntryDate, e.HousekeeperId });
+
+            builder.Entity<HousekeepingMprEntry>()
+                .Property(e => e.HousekeeperName)
+                .HasMaxLength(200);
+
+            builder.Entity<HousekeepingMprEntry>()
+                .Property(e => e.HoursWorked)
+                .HasColumnType("decimal(10,2)");
+
+            builder.Entity<HousekeepingMprEntry>()
+                .Property(e => e.TotalMinutesWorked)
+                .HasColumnType("decimal(10,2)");
+
+            builder.Entity<HousekeepingMprEntry>()
+                .Property(e => e.MinutesPerRoom)
+                .HasColumnType("decimal(10,2)");
+
+            builder.Entity<HousekeepingMprEntry>()
+                .HasOne(e => e.Property)
+                .WithMany(p => p.HousekeepingMprEntries)
+                .HasForeignKey(e => e.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<HousekeepingMprEntry>()
+                .HasOne(e => e.Housekeeper)
+                .WithMany(h => h.Entries)
+                .HasForeignKey(e => e.HousekeeperId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<HousekeepingMprEntry>()
+                .HasOne(e => e.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

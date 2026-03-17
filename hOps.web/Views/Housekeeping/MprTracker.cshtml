@@ -1,44 +1,104 @@
+@using Microsoft.AspNetCore.Mvc.Rendering
+@using hOps.web.ViewModels.Housekeeping
 @model hOps.web.ViewModels.Housekeeping.MprTrackerViewModel
 @{
     ViewData["Title"] = "MPR Tracker";
     ViewData["MainContainerClass"] = "main-inner--wide";
+    var filterPeriod = Model.LogFilter?.PeriodType ?? MprTrackerLogFilterViewModel.PeriodMonth;
+    var filterMonth = Model.LogFilter?.SelectedMonth ?? DateTime.UtcNow.Month;
+    if (filterMonth < 1 || filterMonth > 12)
+    {
+        filterMonth = DateTime.UtcNow.Month;
+    }
+    var filterYear = Model.LogFilter?.SelectedYear ?? DateTime.UtcNow.Year;
+    if (filterYear < 2000)
+    {
+        filterYear = DateTime.UtcNow.Year;
+    }
+    var filterStart = Model.LogFilter?.CustomStartDate?.ToString("yyyy-MM-dd");
+    var filterEnd = Model.LogFilter?.CustomEndDate?.ToString("yyyy-MM-dd");
+    var minYear = filterYear - 2;
+    if (minYear < 2000)
+    {
+        minYear = 2000;
+    }
+    var maxYear = filterYear + 2;
+    if (maxYear < minYear)
+    {
+        maxYear = minYear + 4;
+    }
+    var disableHousekeeperSelect = !Model.Housekeepers.Any();
+    var housekeeperItems = Model.Housekeepers
+        .Select(h => new SelectListItem { Value = h.Id.ToString(), Text = h.Name })
+        .ToList();
+}
+
+@await Html.PartialAsync("_MessagesNav")
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @Model.StatusMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
 }
 
 <div class="card shadow-sm mb-4">
     <div class="card-header">
         <h2 class="h5 mb-0">Minutes Per Room Tracker</h2>
         <small class="text-muted">
-            Based on the HK MPR Tracker workbook. Enter the daily productivity inputs for a housekeeper to
-            calculate minutes per room and compare against Aimbridge standards.
+            Enter the daily productivity inputs for a housekeeper to calculate minutes per room and capture a permanent log.
         </small>
     </div>
     <div class="card-body">
         <form asp-action="MprTracker" method="post" class="row g-3">
-            @Html.AntiForgeryToken()
             <div class="col-12">
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
+                <label asp-for="SelectedHousekeeperId" class="form-label"></label>
+                <select asp-for="SelectedHousekeeperId" class="form-select" asp-items="housekeeperItems" disabled="@disableHousekeeperSelect">
+                    <option value="">Select a housekeeper</option>
+                </select>
+                <span asp-validation-for="SelectedHousekeeperId" class="text-danger small"></span>
+                @if (!Model.Housekeepers.Any())
+                {
+                    <small class="text-muted d-block mt-1">Add housekeeper names below to start tracking.</small>
+                }
+            </div>
+            <div class="col-md-2">
+                <label asp-for="EntryDate" class="form-label"></label>
+                <input asp-for="EntryDate" class="form-control" type="date" />
+                <span asp-validation-for="EntryDate" class="text-danger small"></span>
+            </div>
+            <div class="col-md-2">
                 <label asp-for="CheckoutRooms" class="form-label"></label>
                 <input asp-for="CheckoutRooms" class="form-control" type="number" min="0" step="1" />
                 <span asp-validation-for="CheckoutRooms" class="text-danger small"></span>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label asp-for="LinenChangeRooms" class="form-label"></label>
                 <input asp-for="LinenChangeRooms" class="form-control" type="number" min="0" step="1" />
                 <span asp-validation-for="LinenChangeRooms" class="text-danger small"></span>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label asp-for="StayoverRooms" class="form-label"></label>
                 <input asp-for="StayoverRooms" class="form-control" type="number" min="0" step="1" />
                 <span asp-validation-for="StayoverRooms" class="text-danger small"></span>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label asp-for="DndRooms" class="form-label"></label>
                 <input asp-for="DndRooms" class="form-control" type="number" min="0" step="1" />
                 <span asp-validation-for="DndRooms" class="text-danger small"></span>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label asp-for="HoursWorked" class="form-label"></label>
                 <div class="input-group">
                     <input asp-for="HoursWorked" class="form-control" type="number" min="0" max="24" step="0.25" />
@@ -50,7 +110,7 @@
             {
                 <div class="col-12">
                     <div class="alert alert-info small mb-0">
-                        Managers can override the corporate time standards for this calculation. Changes are not saved permanently.
+                        Managers can override the corporate time standards for this calculation. Changes apply only to this submission.
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -88,9 +148,14 @@
                     </div>
                 </div>
             }
-            <div class="col-12 d-flex justify-content-end">
-                <button type="submit" class="btn btn-primary">
-                    Calculate
+            <div class="col-12 d-flex justify-content-end gap-2">
+                <input asp-for="LogFilter.PeriodType" type="hidden" />
+                <input asp-for="LogFilter.SelectedMonth" type="hidden" />
+                <input asp-for="LogFilter.SelectedYear" type="hidden" />
+                <input asp-for="LogFilter.CustomStartDate" type="hidden" />
+                <input asp-for="LogFilter.CustomEndDate" type="hidden" />
+                <button type="submit" class="btn btn-primary" disabled="@disableHousekeeperSelect">
+                    Calculate &amp; Save
                 </button>
             </div>
         </form>
@@ -99,7 +164,7 @@
 
 @if (Model.HasResults)
 {
-    <div class="row g-4">
+    <div class="row g-4 mb-4">
         <div class="col-md-4">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
@@ -146,7 +211,7 @@
         </div>
     </div>
 
-    <div class="card shadow-sm mt-4">
+    <div class="card shadow-sm mb-4">
         <div class="card-header">
             <h3 class="h6 mb-0">Productivity vs. standards</h3>
             <small class="text-muted">
@@ -205,12 +270,215 @@
                 </table>
             </div>
             <p class="text-muted small mb-0 mt-3">
-                Positive variance means productivity exceeded the allowed minutes. Investigate assignments if the
-                variance is consistently above zero.
+                Positive variance means productivity exceeded the allowed minutes. Investigate assignments if the variance is consistently above zero.
             </p>
         </div>
     </div>
 }
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        <h3 class="h6 mb-0">Housekeeper list</h3>
+        <small class="text-muted">Names in this list populate the dropdown above.</small>
+    </div>
+    <div class="card-body">
+        @if (Model.CanManageHousekeepers)
+        {
+            <form asp-action="AddHousekeeper" method="post" class="row g-2 align-items-end mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Add housekeeper</label>
+                    <input type="text" name="name" class="form-control" placeholder="Full name" required />
+                </div>
+                <div class="col-auto">
+                    <input type="hidden" name="period" value="@filterPeriod" />
+                    <input type="hidden" name="month" value="@filterMonth" />
+                    <input type="hidden" name="year" value="@filterYear" />
+                    <input type="hidden" name="start" value="@filterStart" />
+                    <input type="hidden" name="end" value="@filterEnd" />
+                    <button type="submit" class="btn btn-outline-primary">Add</button>
+                </div>
+            </form>
+        }
+        else
+        {
+            <p class="text-muted small mb-3">Contact a manager if you need to update the housekeeper list.</p>
+        }
+
+        <ul class="list-group list-group-flush">
+            @if (!Model.Housekeepers.Any())
+            {
+                <li class="list-group-item text-muted small">No housekeepers have been added yet.</li>
+            }
+            else
+            {
+                foreach (var hk in Model.Housekeepers)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>@hk.Name</span>
+                        @if (Model.CanManageHousekeepers)
+                        {
+                            <form asp-action="DeleteHousekeeper" method="post" class="ms-2">
+                                <input type="hidden" name="id" value="@hk.Id" />
+                                <input type="hidden" name="period" value="@filterPeriod" />
+                                <input type="hidden" name="month" value="@filterMonth" />
+                                <input type="hidden" name="year" value="@filterYear" />
+                                <input type="hidden" name="start" value="@filterStart" />
+                                <input type="hidden" name="end" value="@filterEnd" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove @hk.Name from the list?');">
+                                    Delete
+                                </button>
+                            </form>
+                        }
+                    </li>
+                }
+            }
+        </ul>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header d-flex flex-wrap justify-content-between gap-2 align-items-center">
+        <div>
+            <h3 class="h6 mb-0">Productivity log</h3>
+            <small class="text-muted">View daily stats for the selected period.</small>
+        </div>
+    </div>
+    <div class="card-body">
+        <form asp-action="MprTracker" method="get" class="row g-3 align-items-end mb-3">
+            <div class="col-md-3">
+                <label class="form-label">Period</label>
+                <select class="form-select" name="period">
+                    @if (string.Equals(filterPeriod, MprTrackerLogFilterViewModel.PeriodMonth, StringComparison.OrdinalIgnoreCase))
+                    {
+                        <option value="@MprTrackerLogFilterViewModel.PeriodMonth" selected>Single month</option>
+                    }
+                    else
+                    {
+                        <option value="@MprTrackerLogFilterViewModel.PeriodMonth">Single month</option>
+                    }
+                    @if (string.Equals(filterPeriod, MprTrackerLogFilterViewModel.PeriodYearToDate, StringComparison.OrdinalIgnoreCase))
+                    {
+                        <option value="@MprTrackerLogFilterViewModel.PeriodYearToDate" selected>Year to date</option>
+                    }
+                    else
+                    {
+                        <option value="@MprTrackerLogFilterViewModel.PeriodYearToDate">Year to date</option>
+                    }
+                    @if (string.Equals(filterPeriod, MprTrackerLogFilterViewModel.PeriodCustom, StringComparison.OrdinalIgnoreCase))
+                    {
+                        <option value="@MprTrackerLogFilterViewModel.PeriodCustom" selected>Custom range</option>
+                    }
+                    else
+                    {
+                        <option value="@MprTrackerLogFilterViewModel.PeriodCustom">Custom range</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Month</label>
+                <select class="form-select" name="month">
+                    @for (var m = 1; m <= 12; m++)
+                    {
+                        var label = new DateTime(2000, m, 1).ToString("MMMM");
+                        if (filterMonth == m)
+                        {
+                            <option value="@m" selected>@label</option>
+                        }
+                        else
+                        {
+                            <option value="@m">@label</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Year</label>
+                <select class="form-select" name="year">
+                    @for (var y = minYear; y <= maxYear; y++)
+                    {
+                        if (filterYear == y)
+                        {
+                            <option value="@y" selected>@y</option>
+                        }
+                        else
+                        {
+                            <option value="@y">@y</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Custom start</label>
+                <input type="date" class="form-control" name="start" value="@filterStart" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Custom end</label>
+                <input type="date" class="form-control" name="end" value="@filterEnd" />
+            </div>
+            <div class="col-md-1 d-grid">
+                <button type="submit" class="btn btn-outline-secondary">View</button>
+            </div>
+        </form>
+
+        @if (!Model.LogRows.Any())
+        {
+            <p class="text-muted mb-0">No productivity entries for the selected period.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-nowrap">Housekeeper</th>
+                            <th class="text-nowrap">Totals</th>
+                            @foreach (var date in Model.LogDates)
+                            {
+                                <th class="text-center text-nowrap">@date.ToString("MMM d")</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Model.LogRows)
+                        {
+                            <tr>
+                                <th scope="row">@row.HousekeeperName</th>
+                                <td class="small">
+                                    <div>CO: <strong>@row.Summary.CheckoutRooms</strong></div>
+                                    <div>LC: <strong>@row.Summary.LinenChangeRooms</strong></div>
+                                    <div>SO: <strong>@row.Summary.StayoverRooms</strong></div>
+                                    <div>DND: <strong>@row.Summary.DndRooms</strong></div>
+                                    <div>Total hrs: @row.Summary.HoursWorked.ToString("0.##")</div>
+                                    <div>MPR: @(row.Summary.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
+                                </td>
+                                @foreach (var date in Model.LogDates)
+                                {
+                                    if (row.Cells.TryGetValue(date.Date, out var cell))
+                                    {
+                                        <td class="small">
+                                            <div>CO: <strong>@cell.CheckoutRooms</strong></div>
+                                            <div>LC: <strong>@cell.LinenChangeRooms</strong></div>
+                                            <div>SO: <strong>@cell.StayoverRooms</strong></div>
+                                            <div>DND: <strong>@cell.DndRooms</strong></div>
+                                            <div>MPR: @(cell.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
+                                        </td>
+                                    }
+                                    else
+                                    {
+                                        <td class="text-center text-muted">—</td>
+                                    }
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted small mt-2 mb-0">
+                Scroll horizontally to view the entire month or custom range. Each cell represents activity for that specific day.
+            </p>
+        }
+    </div>
+</div>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />

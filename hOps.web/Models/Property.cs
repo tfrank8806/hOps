@@ -75,5 +75,8 @@ namespace hOps.web.Models
         public ICollection<EquipmentItem> EquipmentItems { get; set; } = new List<EquipmentItem>();
         public ICollection<MaintenanceLogTemplate> MaintenanceLogTemplates { get; set; } = new List<MaintenanceLogTemplate>();
         public ICollection<EmergencyLightTestEntry> EmergencyLightTestEntries { get; set; } = new List<EmergencyLightTestEntry>();
+
+        public ICollection<HousekeeperProfile> Housekeepers { get; set; } = new List<HousekeeperProfile>();
+        public ICollection<HousekeepingMprEntry> HousekeepingMprEntries { get; set; } = new List<HousekeepingMprEntry>();
     }
 }
