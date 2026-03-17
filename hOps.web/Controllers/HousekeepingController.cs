@@ -9,8 +9,10 @@ using hOps.web.ViewModels.Housekeeping;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace hOps.web.Controllers
 {
@@ -22,6 +24,7 @@ namespace hOps.web.Controllers
         private readonly IPassOnLogNotificationService _notificationService;
         private readonly IUserTimeZoneService _timeZoneService;
         private readonly ILogger<HousekeepingController> _logger;
+        private const string MissingMprSchemaMessage = "The MPR Tracker database tables are missing. Run the AddHousekeepingMprTracker migration (e.g. `dotnet ef database update`) and reload this page.";
 
         public HousekeepingController(
             ApplicationDbContext context,
@@ -67,7 +70,15 @@ namespace hOps.web.Controllers
                 }
             };
 
-            await PopulateMprTrackerAsync(model);
+            try
+            {
+                await PopulateMprTrackerAsync(model);
+            }
+            catch (Exception ex) when (HandleMissingMprSchema(ex, model))
+            {
+                // Error message added inside handler.
+            }
+
             ApplyTempDataMessages(model);
 
             return View(model);
@@ -100,59 +111,66 @@ namespace hOps.web.Controllers
                 ModelState.AddModelError(nameof(model.SelectedHousekeeperId), "Select a housekeeper before saving.");
             }
 
-            if (!ModelState.IsValid)
+            try
             {
+                if (!ModelState.IsValid)
+                {
+                    await PopulateMprTrackerAsync(model, currentProperty);
+                    return View(model);
+                }
+
+                model.Calculate();
+
+                if (currentProperty == null)
+                {
+                    await PopulateMprTrackerAsync(model);
+                    return View(model);
+                }
+
+                var housekeeper = await _context.HousekeeperProfiles
+                    .FirstOrDefaultAsync(h => h.Id == model.SelectedHousekeeperId && h.PropertyId == currentProperty.Id && !h.IsDeleted);
+
+                if (housekeeper == null)
+                {
+                    ModelState.AddModelError(nameof(model.SelectedHousekeeperId), "The selected housekeeper could not be found.");
+                    await PopulateMprTrackerAsync(model, currentProperty);
+                    return View(model);
+                }
+
+                var currentUser = await _userManager.GetUserAsync(User);
+                var entry = new HousekeepingMprEntry
+                {
+                    PropertyId = currentProperty.Id,
+                    HousekeeperId = housekeeper.Id,
+                    HousekeeperName = housekeeper.Name,
+                    EntryDate = model.EntryDate.Date,
+                    CheckoutRooms = model.CheckoutRooms,
+                    LinenChangeRooms = model.LinenChangeRooms,
+                    StayoverRooms = model.StayoverRooms,
+                    DndRooms = model.DndRooms,
+                    HoursWorked = model.HoursWorked,
+                    TotalMinutesWorked = model.TotalMinutesWorked,
+                    MinutesPerRoom = model.MinutesPerRoom,
+                    DepartureStandardMinutes = model.DepartureStandardMinutes,
+                    LinenChangeStandardMinutes = model.LinenChangeStandardMinutes,
+                    StayoverStandardMinutes = model.StayoverStandardMinutes,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedByUserId = currentUser?.Id
+                };
+
+                _context.HousekeepingMprEntries.Add(entry);
+                await _context.SaveChangesAsync();
+
+                model.EntrySaved = true;
+                model.StatusMessage = $"Saved entry for {housekeeper.Name} on {model.EntryDate:MMM d}.";
+
                 await PopulateMprTrackerAsync(model, currentProperty);
                 return View(model);
             }
-
-            model.Calculate();
-
-            if (currentProperty == null)
+            catch (Exception ex) when (HandleMissingMprSchema(ex, model))
             {
-                await PopulateMprTrackerAsync(model);
                 return View(model);
             }
-
-            var housekeeper = await _context.HousekeeperProfiles
-                .FirstOrDefaultAsync(h => h.Id == model.SelectedHousekeeperId && h.PropertyId == currentProperty.Id && !h.IsDeleted);
-
-            if (housekeeper == null)
-            {
-                ModelState.AddModelError(nameof(model.SelectedHousekeeperId), "The selected housekeeper could not be found.");
-                await PopulateMprTrackerAsync(model, currentProperty);
-                return View(model);
-            }
-
-            var currentUser = await _userManager.GetUserAsync(User);
-            var entry = new HousekeepingMprEntry
-            {
-                PropertyId = currentProperty.Id,
-                HousekeeperId = housekeeper.Id,
-                HousekeeperName = housekeeper.Name,
-                EntryDate = model.EntryDate.Date,
-                CheckoutRooms = model.CheckoutRooms,
-                LinenChangeRooms = model.LinenChangeRooms,
-                StayoverRooms = model.StayoverRooms,
-                DndRooms = model.DndRooms,
-                HoursWorked = model.HoursWorked,
-                TotalMinutesWorked = model.TotalMinutesWorked,
-                MinutesPerRoom = model.MinutesPerRoom,
-                DepartureStandardMinutes = model.DepartureStandardMinutes,
-                LinenChangeStandardMinutes = model.LinenChangeStandardMinutes,
-                StayoverStandardMinutes = model.StayoverStandardMinutes,
-                CreatedAt = DateTime.UtcNow,
-                CreatedByUserId = currentUser?.Id
-            };
-
-            _context.HousekeepingMprEntries.Add(entry);
-            await _context.SaveChangesAsync();
-
-            model.EntrySaved = true;
-            model.StatusMessage = $"Saved entry for {housekeeper.Name} on {model.EntryDate:MMM d}.";
-
-            await PopulateMprTrackerAsync(model, currentProperty);
-            return View(model);
         }
 
         [HttpPost]
@@ -180,39 +198,46 @@ namespace hOps.web.Controllers
                 return RedirectToAction(nameof(MprTracker), routeValues);
             }
 
-            var normalized = trimmedName.ToUpperInvariant();
-            var existing = await _context.HousekeeperProfiles
-                .FirstOrDefaultAsync(h => h.PropertyId == currentProperty.Id && h.Name.ToUpper() == normalized);
-
-            if (existing != null)
+            try
             {
-                if (existing.IsDeleted)
+                var normalized = trimmedName.ToUpperInvariant();
+                var existing = await _context.HousekeeperProfiles
+                    .FirstOrDefaultAsync(h => h.PropertyId == currentProperty.Id && h.Name.ToUpper() == normalized);
+
+                if (existing != null)
                 {
-                    existing.IsDeleted = false;
-                    existing.DeletedAt = null;
-                    await _context.SaveChangesAsync();
-                    TempData["MprTrackerStatus"] = $"Restored {existing.Name} to the list.";
-                }
-                else
-                {
-                    TempData["MprTrackerError"] = $"{existing.Name} is already listed.";
+                    if (existing.IsDeleted)
+                    {
+                        existing.IsDeleted = false;
+                        existing.DeletedAt = null;
+                        await _context.SaveChangesAsync();
+                        TempData["MprTrackerStatus"] = $"Restored {existing.Name} to the list.";
+                    }
+                    else
+                    {
+                        TempData["MprTrackerError"] = $"{existing.Name} is already listed.";
+                    }
+
+                    return RedirectToAction(nameof(MprTracker), routeValues);
                 }
 
+                var profile = new HousekeeperProfile
+                {
+                    PropertyId = currentProperty.Id,
+                    Name = trimmedName,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.HousekeeperProfiles.Add(profile);
+                await _context.SaveChangesAsync();
+
+                TempData["MprTrackerStatus"] = $"Added {profile.Name} to the list.";
                 return RedirectToAction(nameof(MprTracker), routeValues);
             }
-
-            var profile = new HousekeeperProfile
+            catch (Exception ex) when (HandleMissingMprSchema(ex))
             {
-                PropertyId = currentProperty.Id,
-                Name = trimmedName,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.HousekeeperProfiles.Add(profile);
-            await _context.SaveChangesAsync();
-
-            TempData["MprTrackerStatus"] = $"Added {profile.Name} to the list.";
-            return RedirectToAction(nameof(MprTracker), routeValues);
+                return RedirectToAction(nameof(MprTracker), routeValues);
+            }
         }
 
         [HttpPost]
@@ -233,21 +258,28 @@ namespace hOps.web.Controllers
                 return RedirectToAction(nameof(MprTracker), routeValues);
             }
 
-            var housekeeper = await _context.HousekeeperProfiles
-                .FirstOrDefaultAsync(h => h.Id == id && h.PropertyId == currentProperty.Id);
-
-            if (housekeeper == null)
+            try
             {
-                TempData["MprTrackerError"] = "The selected housekeeper could not be found.";
+                var housekeeper = await _context.HousekeeperProfiles
+                    .FirstOrDefaultAsync(h => h.Id == id && h.PropertyId == currentProperty.Id);
+
+                if (housekeeper == null)
+                {
+                    TempData["MprTrackerError"] = "The selected housekeeper could not be found.";
+                    return RedirectToAction(nameof(MprTracker), routeValues);
+                }
+
+                housekeeper.IsDeleted = true;
+                housekeeper.DeletedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                TempData["MprTrackerStatus"] = $"Removed {housekeeper.Name} from the dropdown.";
                 return RedirectToAction(nameof(MprTracker), routeValues);
             }
-
-            housekeeper.IsDeleted = true;
-            housekeeper.DeletedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            TempData["MprTrackerStatus"] = $"Removed {housekeeper.Name} from the dropdown.";
-            return RedirectToAction(nameof(MprTracker), routeValues);
+            catch (Exception ex) when (HandleMissingMprSchema(ex))
+            {
+                return RedirectToAction(nameof(MprTracker), routeValues);
+            }
         }
 
         private bool UserCanEditMprStandards()
@@ -416,6 +448,58 @@ namespace hOps.web.Controllers
             return id.HasValue
                 ? $"HK:{id.Value}"
                 : $"NAME:{(name ?? string.Empty).Trim().ToUpperInvariant()}";
+        }
+
+        private bool HandleMissingMprSchema(Exception ex, MprTrackerViewModel? model = null)
+        {
+            if (!IsMissingMprSchemaException(ex))
+            {
+                return false;
+            }
+
+            _logger.LogWarning(ex, "Housekeeping MPR Tracker tables are missing. Prompting user to run migration.");
+
+            if (model != null)
+            {
+                model.ErrorMessage = MissingMprSchemaMessage;
+                model.Housekeepers = new List<HousekeeperOptionViewModel>();
+                model.LogRows = new List<MprTrackerLogRowViewModel>();
+                model.LogDates = new List<DateTime>();
+            }
+            else
+            {
+                TempData["MprTrackerError"] = MissingMprSchemaMessage;
+            }
+
+            return true;
+        }
+
+        private static bool IsMissingMprSchemaException(Exception ex)
+        {
+            var root = GetInnermostException(ex);
+            if (root is PostgresException postgresException && string.Equals(postgresException.SqlState, "42P01", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (root is SqliteException sqliteException
+                && sqliteException.SqliteErrorCode == 1
+                && sqliteException.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static Exception GetInnermostException(Exception ex)
+        {
+            while (ex.InnerException != null)
+            {
+                ex = ex.InnerException;
+            }
+
+            return ex;
         }
 
         [HttpPost]
