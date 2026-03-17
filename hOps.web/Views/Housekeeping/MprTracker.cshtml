@@ -1,0 +1,173 @@
+@model hOps.web.ViewModels.Housekeeping.MprTrackerViewModel
+@{
+    ViewData["Title"] = "MPR Tracker";
+    ViewData["MainContainerClass"] = "main-inner--wide";
+}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        <h2 class="h5 mb-0">Minutes Per Room Tracker</h2>
+        <small class="text-muted">
+            Based on the HK MPR Tracker workbook. Enter the daily productivity inputs for a housekeeper to
+            calculate minutes per room and compare against Aimbridge standards.
+        </small>
+    </div>
+    <div class="card-body">
+        <form asp-action="MprTracker" method="post" class="row g-3">
+            @Html.AntiForgeryToken()
+            <div class="col-12">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="CheckoutRooms" class="form-label"></label>
+                <input asp-for="CheckoutRooms" class="form-control" type="number" min="0" step="1" />
+                <span asp-validation-for="CheckoutRooms" class="text-danger small"></span>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="LinenChangeRooms" class="form-label"></label>
+                <input asp-for="LinenChangeRooms" class="form-control" type="number" min="0" step="1" />
+                <span asp-validation-for="LinenChangeRooms" class="text-danger small"></span>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="StayoverRooms" class="form-label"></label>
+                <input asp-for="StayoverRooms" class="form-control" type="number" min="0" step="1" />
+                <span asp-validation-for="StayoverRooms" class="text-danger small"></span>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="DndRooms" class="form-label"></label>
+                <input asp-for="DndRooms" class="form-control" type="number" min="0" step="1" />
+                <span asp-validation-for="DndRooms" class="text-danger small"></span>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="HoursWorked" class="form-label"></label>
+                <div class="input-group">
+                    <input asp-for="HoursWorked" class="form-control" type="number" min="0" max="24" step="0.25" />
+                    <span class="input-group-text">hrs</span>
+                </div>
+                <span asp-validation-for="HoursWorked" class="text-danger small"></span>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+                <button type="submit" class="btn btn-primary">
+                    Calculate
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.HasResults)
+{
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-uppercase text-muted small">Total rooms cleaned</div>
+                    <div class="display-6 fw-semibold">@Model.TotalRoomsCleaned</div>
+                    <p class="mb-0 text-muted small">
+                        Includes @Model.CheckoutRooms checkout(s),
+                        @Model.LinenChangeRooms linen change(s),
+                        and @Model.StayoverRooms stayover(s).<br />
+                        @Model.DndRooms DND / no service rooms reported.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-uppercase text-muted small">Total minutes worked</div>
+                    <div class="display-6 fw-semibold">@Model.TotalMinutesWorked.ToString("0.##")</div>
+                    <p class="mb-0 text-muted small">(@Model.HoursWorked.ToString("0.##") hrs × 60)</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-uppercase text-muted small">Minutes per room</div>
+                    @if (Model.MinutesPerRoom.HasValue)
+                    {
+                        <div class="display-6 fw-semibold">@Model.MinutesPerRoom.Value.ToString("0.##")</div>
+                        <p class="mb-0 text-muted small">
+                            Calculated as Hours Worked ÷ ((Checkout + Stayover rooms) / 60).
+                        </p>
+                    }
+                    else
+                    {
+                        <div class="display-6 fw-semibold">--</div>
+                        <p class="mb-0 text-muted small">
+                            Add hours worked plus at least one checkout or stayover room to view minutes per room.
+                        </p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-header">
+            <h3 class="h6 mb-0">Productivity vs. standards</h3>
+            <small class="text-muted">
+                Departure rooms ≤ 30 min, linen changes ≤ 20 min, stayovers ≤ 15 min.
+            </small>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Task type</th>
+                            <th class="text-end">Rooms</th>
+                            <th class="text-end">Guideline (min)</th>
+                            <th class="text-end">Total guideline minutes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Checkout</td>
+                            <td class="text-end">@Model.CheckoutRooms</td>
+                            <td class="text-end">30</td>
+                            <td class="text-end">@Model.DepartureGuidelineTotalMinutes.ToString("0")</td>
+                        </tr>
+                        <tr>
+                            <td>Linen change</td>
+                            <td class="text-end">@Model.LinenChangeRooms</td>
+                            <td class="text-end">20</td>
+                            <td class="text-end">@Model.LinenChangeGuidelineTotalMinutes.ToString("0")</td>
+                        </tr>
+                        <tr>
+                            <td>Stayover</td>
+                            <td class="text-end">@Model.StayoverRooms</td>
+                            <td class="text-end">15</td>
+                            <td class="text-end">@Model.StayoverGuidelineTotalMinutes.ToString("0")</td>
+                        </tr>
+                        <tr class="table-light fw-semibold">
+                            <td>Total guideline minutes</td>
+                            <td class="text-end">@Model.TotalRoomsCleaned</td>
+                            <td></td>
+                            <td class="text-end">@Model.TotalGuidelineMinutes.ToString("0.##")</td>
+                        </tr>
+                        <tr>
+                            <td>Actual minutes worked</td>
+                            <td class="text-end" colspan="2"></td>
+                            <td class="text-end">@Model.TotalMinutesWorked.ToString("0.##")</td>
+                        </tr>
+                        <tr class="fw-semibold @(Model.VarianceFromGuideline > 0 ? "text-danger" : "text-success")">
+                            <td>Variance (actual - guideline)</td>
+                            <td class="text-end" colspan="2"></td>
+                            <td class="text-end">@Model.VarianceFromGuideline.ToString("+0.##;-0.##;0")</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted small mb-0 mt-3">
+                Positive variance means productivity exceeded the allowed minutes. Investigate assignments if the
+                variance is consistently above zero.
+            </p>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

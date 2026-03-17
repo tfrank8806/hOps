@@ -47,6 +47,25 @@ namespace hOps.web.Controllers
             return View(model);
         }
 
+        [HttpGet]
+        public IActionResult MprTracker()
+        {
+            var model = new MprTrackerViewModel();
+            return View(model);
+        }
+
+        [HttpPost]
+        public IActionResult MprTracker(MprTrackerViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            model.Calculate();
+            return View(model);
+        }
+
         [HttpPost]
         public async Task<IActionResult> DailyRecap(DailyRecapViewModel model)
         {
