@@ -97,7 +97,8 @@ namespace hOps.web.Controllers
                     Text = string.IsNullOrWhiteSpace(r.RoomNumber) ? $"Room {r.Id}" : r.RoomNumber!
                 })
                 .ToList();
-            var roomLabelLookup = BuildRoomLabelLookup(rooms);
+            var roomLookup = BuildRoomLookup(rooms);
+            var roomLabelLookup = new HashSet<string>(roomLookup.Keys, StringComparer.OrdinalIgnoreCase);
 
             var activeSession = await _db.PreventiveMaintenanceSessions
                 .Include(s => s.Tasks)
@@ -115,7 +116,8 @@ namespace hOps.web.Controllers
                 selectedChecklist.Id,
                 frequency,
                 roomYear,
-                rooms);
+                rooms,
+                roomLookup);
             var roomCycleDefinitions = roomLogResult.CycleWindows
                 .Select(window => new MaintenanceCycleDefinitionViewModel
                 {
@@ -925,7 +927,8 @@ namespace hOps.web.Controllers
             int checklistId,
             int frequencyPerYear,
             int? requestedYear,
-            IReadOnlyList<Room> rooms)
+            IReadOnlyList<Room> rooms,
+            IReadOnlyDictionary<string, Room> roomLookup)
         {
             var sessions = await _db.PreventiveMaintenanceSessions
                 .Include(s => s.CompletedBy)
@@ -964,9 +967,21 @@ namespace hOps.web.Controllers
             var completionHistory = new Dictionary<string, List<PreventiveMaintenanceSession>>(StringComparer.OrdinalIgnoreCase);
             foreach (var session in selectedYearSessions)
             {
-                var key = session.RoomId.HasValue
-                    ? $"room:{session.RoomId.Value}"
-                    : $"manual:{(session.RoomNumber ?? string.Empty).Trim()}";
+                string key;
+                if (session.RoomId.HasValue)
+                {
+                    key = $"room:{session.RoomId.Value}";
+                }
+                else
+                {
+                    key = BuildManualKey(roomLookup, session, out var matchedRoom);
+                    if (matchedRoom != null)
+                    {
+                        session.RoomId = matchedRoom.Id;
+                        session.Room = matchedRoom;
+                        session.RoomNumber = matchedRoom.RoomNumber ?? session.RoomNumber;
+                    }
+                }
 
                 if (!latestLookup.ContainsKey(key))
                 {
@@ -1258,6 +1273,24 @@ namespace hOps.web.Controllers
             return log;
         }
 
+        private static string BuildManualKey(IReadOnlyDictionary<string, Room> roomLookup, PreventiveMaintenanceSession session, out Room? matchedRoom)
+        {
+            matchedRoom = null;
+            var normalized = MaintenanceChecklistHelper.NormalizeAreaLabel(session.RoomNumber);
+            if (!string.IsNullOrWhiteSpace(normalized) && roomLookup.TryGetValue(normalized, out var room))
+            {
+                matchedRoom = room;
+                return $"room:{room.Id}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(normalized))
+            {
+                return $"manual:{normalized}";
+            }
+
+            return $"manual:entry-{session.Id}";
+        }
+
         private static DateTime GetCompletionInstant(PreventiveMaintenanceSession session)
         {
             return session.CompletedAtUtc ?? session.StartedAtUtc;
@@ -1291,33 +1324,34 @@ namespace hOps.web.Controllers
             return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
         }
 
-        private static HashSet<string> BuildRoomLabelLookup(IEnumerable<Room> rooms)
+        private static Dictionary<string, Room> BuildRoomLookup(IEnumerable<Room> rooms)
         {
-            var lookup = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var lookup = new Dictionary<string, Room>(StringComparer.OrdinalIgnoreCase);
             foreach (var room in rooms)
             {
-                var explicitNumber = MaintenanceChecklistHelper.NormalizeAreaLabel(room.RoomNumber);
-                if (!string.IsNullOrWhiteSpace(explicitNumber))
+                AddLabel(lookup, room, room.RoomNumber);
+                if (!string.IsNullOrWhiteSpace(room.RoomNumber))
                 {
-                    lookup.Add(explicitNumber);
-                    if (!explicitNumber.StartsWith("Room", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var prefixed = MaintenanceChecklistHelper.NormalizeAreaLabel($"Room {explicitNumber}");
-                        if (!string.IsNullOrWhiteSpace(prefixed))
-                        {
-                            lookup.Add(prefixed);
-                        }
-                    }
+                    AddLabel(lookup, room, $"Room {room.RoomNumber}");
                 }
-
-                var fallback = MaintenanceChecklistHelper.NormalizeAreaLabel($"Room {room.Id}");
-                if (!string.IsNullOrWhiteSpace(fallback))
-                {
-                    lookup.Add(fallback);
-                }
+                AddLabel(lookup, room, $"Room {room.Id}");
             }
 
             return lookup;
+
+            static void AddLabel(Dictionary<string, Room> target, Room room, string? label)
+            {
+                var normalized = MaintenanceChecklistHelper.NormalizeAreaLabel(label);
+                if (string.IsNullOrWhiteSpace(normalized))
+                {
+                    return;
+                }
+
+                if (!target.ContainsKey(normalized))
+                {
+                    target[normalized] = room;
+                }
+            }
         }
 
         
