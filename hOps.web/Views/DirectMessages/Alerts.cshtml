@@ -20,6 +20,17 @@
                 Alerts = Model.Alerts
             }
         };
+    var readCategories = displayCategories
+        .Select(category => new
+        {
+            Category = category,
+            ReadAlerts = category.Alerts
+                .Where(a => a.IsRead)
+                .OrderByDescending(a => a.CreatedAt)
+                .ToList()
+        })
+        .Where(group => group.ReadAlerts.Any())
+        .ToList();
 }
 
 @section Styles {
@@ -195,19 +206,6 @@
                     </div>
                 }
             </div>
-            @{
-                var readCategories = displayCategories
-                    .Select(category => new
-                    {
-                        Category = category,
-                        ReadAlerts = category.Alerts
-                            .Where(a => a.IsRead)
-                            .OrderByDescending(a => a.CreatedAt)
-                            .ToList()
-                    })
-                    .Where(group => group.ReadAlerts.Any())
-                    .ToList();
-            }
             @if (readCategories.Any())
             {
                 <div class="mt-4">
