@@ -16,7 +16,9 @@
      data-resume-url="@Url.Action("ResumeSession", "PreventiveMaintenance")"
      data-finish-url="@Url.Action("FinishSession", "PreventiveMaintenance")"
      data-active-session-url="@Url.Action("ActiveSessionStatus", "PreventiveMaintenance")"
-     data-has-checklist="@Model.HasChecklist.ToString().ToLowerInvariant()">
+     data-has-checklist="@Model.HasChecklist.ToString().ToLowerInvariant()"
+     data-requires-area="@Model.RequiresArea.ToString().ToLowerInvariant()"
+     data-checklist-id="@Model.SelectedChecklistId">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
         <div>
             <h2 class="mb-0">Preventative Maintenance (PMs)</h2>
@@ -59,21 +61,42 @@
         <div class="card-body">
             <form id="pmStartForm" class="row g-3">
                 @Html.AntiForgeryToken()
-                <div class="col-md-4">
-                    <label for="pmRoomSelect" class="form-label">Select a room</label>
-                    <select id="pmRoomSelect" class="form-select">
-                        <option value="">-- Select room --</option>
-                        @foreach (var option in Model.RoomOptions)
-                        {
-                            <option value="@option.Value">@option.Text</option>
-                        }
-                    </select>
-                    <div class="form-text">Optional shortcut to auto-fill the room number.</div>
-                </div>
-                <div class="col-md-4">
-                    <label for="pmRoomNumber" class="form-label">Room number *</label>
-                    <input type="text" class="form-control" id="pmRoomNumber" required maxlength="32" />
-                </div>
+                @if (Model.RequiresArea)
+                {
+                    <div class="col-md-6">
+                        <label for="pmAreaSelect" class="form-label">Select an area</label>
+                        <select id="pmAreaSelect" class="form-select">
+                            <option value="">-- Select area --</option>
+                            @foreach (var area in Model.AreaOptions)
+                            {
+                                <option value="@area">@area</option>
+                            }
+                        </select>
+                        <div class="form-text">Choose a configured area to auto-fill the field on the right.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="pmAreaInput" class="form-label">Area name *</label>
+                        <input type="text" class="form-control" id="pmAreaInput" maxlength="160" required />
+                    </div>
+                }
+                else
+                {
+                    <div class="col-md-4">
+                        <label for="pmRoomSelect" class="form-label">Select a room</label>
+                        <select id="pmRoomSelect" class="form-select">
+                            <option value="">-- Select room --</option>
+                            @foreach (var option in Model.RoomOptions)
+                            {
+                                <option value="@option.Value">@option.Text</option>
+                            }
+                        </select>
+                        <div class="form-text">Optional shortcut to auto-fill the room number.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="pmRoomNumber" class="form-label">Room number *</label>
+                        <input type="text" class="form-control" id="pmRoomNumber" required maxlength="32" />
+                    </div>
+                }
                 <div class="col-md-4">
                     <label for="pmStartTime" class="form-label">Start date &amp; time</label>
                     <input type="datetime-local" class="form-control" id="pmStartTime" />
@@ -507,6 +530,8 @@
             const startForm = document.getElementById('pmStartForm');
             const roomSelect = document.getElementById('pmRoomSelect');
             const roomNumberInput = document.getElementById('pmRoomNumber');
+            const areaSelect = document.getElementById('pmAreaSelect');
+            const areaInput = document.getElementById('pmAreaInput');
             const startTimeInput = document.getElementById('pmStartTime');
             const startCancel = document.getElementById('pmStartCancel');
             const manualRoomSelect = document.getElementById('pmManualRoomSelect');
@@ -514,6 +539,8 @@
             const alertContainer = document.getElementById('pmAlert');
             const sessionContainer = document.getElementById('pmSessionContainer');
             const hasChecklist = appEl.dataset.hasChecklist === 'true';
+            const requiresArea = appEl.dataset.requiresArea === 'true';
+            const checklistId = parseInt(appEl.dataset.checklistId || '0', 10) || 0;
             const urls = {
                 start: appEl.dataset.startUrl,
                 update: appEl.dataset.updateUrl,
@@ -567,11 +594,27 @@
 
             function setStartDefaults() {
                 const now = new Date();
-                startTimeInput.value = formatLocalInput(now);
-                roomSelect.value = '';
-                roomNumberInput.value = '';
-                delete roomNumberInput.dataset.selectedRoomId;
-                delete roomNumberInput.dataset.selectedRoomLabel;
+                if (startTimeInput) {
+                    startTimeInput.value = formatLocalInput(now);
+                }
+
+                if (requiresArea) {
+                    if (areaSelect) {
+                        areaSelect.value = '';
+                    }
+                    if (areaInput) {
+                        areaInput.value = '';
+                    }
+                } else {
+                    if (roomSelect) {
+                        roomSelect.value = '';
+                    }
+                    if (roomNumberInput) {
+                        roomNumberInput.value = '';
+                        delete roomNumberInput.dataset.selectedRoomId;
+                        delete roomNumberInput.dataset.selectedRoomLabel;
+                    }
+                }
             }
 
             function toggleStartPanel(show) {
@@ -615,7 +658,7 @@
                 startCancel.addEventListener('click', () => toggleStartPanel(false));
             }
 
-            if (roomSelect && roomNumberInput) {
+            if (!requiresArea && roomSelect && roomNumberInput) {
                 roomSelect.addEventListener('change', () => {
                     const option = roomSelect.selectedOptions[0];
                     if (option && option.value) {
@@ -638,7 +681,7 @@
                 });
             }
 
-            if (roomNumberInput) {
+            if (!requiresArea && roomNumberInput) {
                 roomNumberInput.addEventListener('input', () => {
                     if (!roomNumberInput.dataset.selectedRoomLabel) {
                         return;
@@ -650,6 +693,17 @@
                         if (roomSelect) {
                             roomSelect.value = '';
                         }
+                    }
+                });
+            }
+
+            if (requiresArea && areaSelect && areaInput) {
+                areaSelect.addEventListener('change', () => {
+                    const option = areaSelect.selectedOptions[0];
+                    if (option && option.value) {
+                        areaInput.value = option.value;
+                    } else {
+                        areaInput.value = '';
                     }
                 });
             }
@@ -728,10 +782,32 @@
             if (startForm) {
                 startForm.addEventListener('submit', async (event) => {
                     event.preventDefault();
-                    const roomNumber = roomNumberInput.value.trim();
-                    if (!roomNumber) {
-                        roomNumberInput.focus();
-                        return;
+                    let roomNumberValue = '';
+                    let selectedRoomId = null;
+                    let areaLabelValue = null;
+
+                    if (requiresArea) {
+                        const areaLabel = (areaInput?.value || '').trim();
+                        if (!areaLabel) {
+                            if (areaInput) {
+                                areaInput.focus();
+                            }
+                            showAlert('warning', 'Enter an area before starting the PM.');
+                            return;
+                        }
+                        roomNumberValue = areaLabel;
+                        areaLabelValue = areaLabel;
+                    } else {
+                        if (!roomNumberInput) {
+                            return;
+                        }
+                        const roomNumber = roomNumberInput.value.trim();
+                        if (!roomNumber) {
+                            roomNumberInput.focus();
+                            return;
+                        }
+                        roomNumberValue = roomNumber;
+                        selectedRoomId = roomNumberInput.dataset.selectedRoomId ? Number(roomNumberInput.dataset.selectedRoomId) : null;
                     }
 
                     if (sessionState) {
@@ -743,9 +819,11 @@
                     }
 
                     const payload = {
-                        roomNumber,
-                        startedAtUtc: new Date(startTimeInput.value || new Date().toISOString()).toISOString(),
-                        roomId: roomNumberInput.dataset.selectedRoomId ? Number(roomNumberInput.dataset.selectedRoomId) : null
+                        checklistId,
+                        roomNumber: roomNumberValue,
+                        startedAtUtc: new Date((startTimeInput && startTimeInput.value) || new Date().toISOString()).toISOString(),
+                        roomId: selectedRoomId,
+                        areaLabel: areaLabelValue
                     };
 
                     try {
