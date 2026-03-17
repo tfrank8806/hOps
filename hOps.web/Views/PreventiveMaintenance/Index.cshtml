@@ -1,5 +1,6 @@
 @using System.Text.Json
 @using System.Linq
+@using System.Net
 @model hOps.web.ViewModels.PreventiveMaintenance.PreventiveMaintenanceIndexViewModel
 @{
     ViewData["Title"] = "PMs";
@@ -307,12 +308,12 @@
                                                 var completedLocal = TimeZoneService.ConvertToUserTime(status.CompletedAt.Value);
                                                 var modalDate = completedLocal.ToString("MMMM d, yyyy h:mm tt");
                                                 var normalizedNotes = (status.Notes ?? string.Empty).Replace("\r\n", "\n").Replace("\r", "\n");
-                                                var encodedNotes = Html.AttributeEncode(normalizedNotes).Replace("\n", "&#10;");
+                                                var encodedNotes = WebUtility.HtmlEncode(normalizedNotes).Replace("\n", "&#10;");
                                                 <button type="button"
                                                         class="btn btn-link btn-sm p-0 text-decoration-none cycle-notes-trigger"
                                                         data-cycle-room="@log.RoomNumber"
                                                         data-cycle-date="@modalDate"
-                                                        data-cycle-notes="@encodedNotes">
+                                                        data-cycle-notes="@Html.Raw(encodedNotes)">
                                                     <span>@completedLocal.ToString("MMM d")</span>
                                                 </button>
                                             }

@@ -397,7 +397,7 @@ namespace hOps.web.Controllers
                     TaskDescription = "Notes captured when recording a manual PM.",
                     Notes = manualComment,
                     SortOrder = 0,
-                    Status = PreventiveMaintenanceTaskStatus.Completed,
+                    Status = PreventiveMaintenanceTaskStatus.Complete,
                     CompletedAtUtc = completedUtc,
                     UpdatedAtUtc = completedUtc
                 });
