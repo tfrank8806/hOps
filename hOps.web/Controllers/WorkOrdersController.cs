@@ -1285,7 +1285,7 @@ namespace hOps.web.Controllers
 
             if (filters.HideCompleted)
             {
-                query = query.Where(w => w.Status == null || w.Status != "Completed");
+                query = query.Where(w => w.Status == null || (w.Status != "Completed" && w.Status != "Cancelled"));
             }
 
             var workOrders = await query.ToListAsync();
