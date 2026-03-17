@@ -325,6 +325,20 @@ namespace hOps.web.Controllers
                     TempData["PmError"] = "Enter a room number to record a manual PM.";
                     return RedirectToAction(nameof(Index), new { checklistId = checklist.Id });
                 }
+
+                if (selectedRoom == null)
+                {
+                    var normalizedInput = roomNumber.Trim();
+                    selectedRoom = await _db.Rooms
+                        .Where(r => r.PropertyId == property.Id &&
+                                    r.IncludeInPreventiveMaintenance &&
+                                    r.RoomNumber != null)
+                        .FirstOrDefaultAsync(r => r.RoomNumber!.Equals(normalizedInput, StringComparison.OrdinalIgnoreCase));
+                    if (selectedRoom != null)
+                    {
+                        roomNumber = selectedRoom.RoomNumber ?? normalizedInput;
+                    }
+                }
             }
             else
             {
