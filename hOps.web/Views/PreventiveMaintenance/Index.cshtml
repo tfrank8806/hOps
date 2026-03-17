@@ -139,15 +139,47 @@
     </div>
 
     <div class="card mb-4">
-        <div class="card-header">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <div>
-                    <strong class="mb-0">Room PM Log</strong>
-                    <span class="text-muted small">Due status is based on the property frequency.</span>
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <strong class="mb-0">Room PM Log</strong>
+                        <span class="text-muted small">Due status is based on the property frequency.</span>
+                    </div>
+                    <div class="btn-group" role="group" aria-label="Cycle room log year">
+                        @if (Model.RoomLogPreviousYear.HasValue)
+                        {
+                            <a class="btn btn-outline-secondary btn-sm"
+                               asp-action="Index"
+                               asp-route-checklistId="@Model.SelectedChecklistId"
+                               asp-route-roomYear="@Model.RoomLogPreviousYear"
+                               asp-route-areaYear="@(Model.RequiresArea ? Model.AreaLogSelectedYear : null)"
+                               title="View @Model.RoomLogPreviousYear">
+                                &larr;
+                            </a>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled>&larr;</button>
+                        }
+                        <span class="btn btn-light btn-sm disabled fw-semibold">@Model.RoomLogSelectedYear</span>
+                        @if (Model.RoomLogNextYear.HasValue)
+                        {
+                            <a class="btn btn-outline-secondary btn-sm"
+                               asp-action="Index"
+                               asp-route-checklistId="@Model.SelectedChecklistId"
+                               asp-route-roomYear="@Model.RoomLogNextYear"
+                               asp-route-areaYear="@(Model.RequiresArea ? Model.AreaLogSelectedYear : null)"
+                               title="View @Model.RoomLogNextYear">
+                                &rarr;
+                            </a>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled>&rarr;</button>
+                        }
+                    </div>
                 </div>
-                <span class="text-muted small">Records for @Model.RoomLogSelectedYear</span>
             </div>
-        </div>
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead class="table-light">
@@ -273,14 +305,15 @@
                     </div>
                     <div class="btn-group" role="group" aria-label="Cycle area log year">
                         @if (Model.AreaLogPreviousYear.HasValue)
-                        {
-                            <a class="btn btn-outline-secondary btn-sm"
-                               asp-action="Index"
-                               asp-route-checklistId="@Model.SelectedChecklistId"
-                               asp-route-areaYear="@Model.AreaLogPreviousYear"
-                               title="View @Model.AreaLogPreviousYear">
-                                &larr;
-                            </a>
+                            {
+                                <a class="btn btn-outline-secondary btn-sm"
+                                   asp-action="Index"
+                                   asp-route-checklistId="@Model.SelectedChecklistId"
+                                   asp-route-areaYear="@Model.AreaLogPreviousYear"
+                                   asp-route-roomYear="@Model.RoomLogSelectedYear"
+                                   title="View @Model.AreaLogPreviousYear">
+                                    &larr;
+                                </a>
                         }
                         else
                         {
@@ -288,14 +321,15 @@
                         }
                         <span class="btn btn-light btn-sm disabled fw-semibold">@Model.AreaLogSelectedYear</span>
                         @if (Model.AreaLogNextYear.HasValue)
-                        {
-                            <a class="btn btn-outline-secondary btn-sm"
-                               asp-action="Index"
-                               asp-route-checklistId="@Model.SelectedChecklistId"
-                               asp-route-areaYear="@Model.AreaLogNextYear"
-                               title="View @Model.AreaLogNextYear">
-                                &rarr;
-                            </a>
+                            {
+                                <a class="btn btn-outline-secondary btn-sm"
+                                   asp-action="Index"
+                                   asp-route-checklistId="@Model.SelectedChecklistId"
+                                   asp-route-areaYear="@Model.AreaLogNextYear"
+                                   asp-route-roomYear="@Model.RoomLogSelectedYear"
+                                   title="View @Model.AreaLogNextYear">
+                                    &rarr;
+                                </a>
                         }
                         else
                         {

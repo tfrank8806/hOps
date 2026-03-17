@@ -10,7 +10,6 @@
     var categories = Model.Categories ?? new List<AlertCategoryViewModel>();
     var hasAlerts = Model.Alerts.Any();
     var unreadAlertsCount = Model.Alerts.Count(a => !a.IsRead);
-    var readAlertsCount = Model.Alerts.Count(a => a.IsRead);
     var displayCategories = categories.Any()
         ? categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Label).ToList()
         : new List<AlertCategoryViewModel>
@@ -90,10 +89,6 @@
                 {
                     var unread = category.Alerts
                         .Where(a => !a.IsRead)
-                        .OrderByDescending(a => a.CreatedAt)
-                        .ToList();
-                    var read = category.Alerts
-                        .Where(a => a.IsRead)
                         .OrderByDescending(a => a.CreatedAt)
                         .ToList();
                     var statusBadgeClass = category.UnreadCount > 0 ? "badge bg-warning text-dark" : "badge bg-secondary-subtle text-secondary";
@@ -196,17 +191,46 @@
                                         </div>
                                     }
                                 </div>
-                                <div class="alert-list-section">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="text-uppercase small text-muted">Read</span>
-                                        <span class="badge bg-secondary-subtle text-secondary">@read.Count</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+            @{
+                var readCategories = displayCategories
+                    .Select(category => new
+                    {
+                        Category = category,
+                        ReadAlerts = category.Alerts
+                            .Where(a => a.IsRead)
+                            .OrderByDescending(a => a.CreatedAt)
+                            .ToList()
+                    })
+                    .Where(group => group.ReadAlerts.Any())
+                    .ToList();
+            }
+            @if (readCategories.Any())
+            {
+                <div class="mt-4">
+                    <h3 class="h6 text-uppercase text-muted mb-3">Read alerts</h3>
+                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                        @foreach (var group in readCategories)
+                        {
+                            var read = group.ReadAlerts;
+                            <div class="col" data-alert-category="@group.Category.Key">
+                                <div class="card alert-category-card h-100">
+                                    <div class="card-header bg-white border-bottom">
+                                        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                                            <div>
+                                                <div class="fw-semibold">@group.Category.Label</div>
+                                                <small class="text-muted">
+                                                    @(read.Count == 1 ? "1 read alert" : $"{read.Count} read alerts")
+                                                </small>
+                                            </div>
+                                            <span class="badge bg-secondary-subtle text-secondary">@read.Count</span>
+                                        </div>
                                     </div>
-                                    @if (!read.Any())
-                                    {
-                                        <p class="text-muted small mb-0">No read alerts yet.</p>
-                                    }
-                                    else
-                                    {
+                                    <div class="card-body">
                                         <div class="alert-list">
                                             @foreach (var alert in read)
                                             {
@@ -250,13 +274,13 @@
                                                 </div>
                                             }
                                         </div>
-                                    }
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        }
                     </div>
-                }
-            </div>
+                </div>
+            }
         }
     </div>
 </div>

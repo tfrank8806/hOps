@@ -25,6 +25,9 @@ namespace hOps.web.ViewModels.PreventiveMaintenance
         public PreventiveMaintenanceActiveSessionViewModel? ActiveSession { get; set; }
         public IReadOnlyList<MaintenanceCycleDefinitionViewModel> CycleDefinitions { get; set; } = Array.Empty<MaintenanceCycleDefinitionViewModel>();
         public int RoomLogSelectedYear { get; set; } = DateTime.UtcNow.Year;
+        public int? RoomLogPreviousYear { get; set; }
+        public int? RoomLogNextYear { get; set; }
+        public IReadOnlyList<int> RoomLogAvailableYears { get; set; } = Array.Empty<int>();
         public IReadOnlyList<MaintenanceCycleDefinitionViewModel> AreaCycleDefinitions { get; set; } = Array.Empty<MaintenanceCycleDefinitionViewModel>();
         public int AreaLogSelectedYear { get; set; } = DateTime.UtcNow.Year;
         public int? AreaLogPreviousYear { get; set; }
