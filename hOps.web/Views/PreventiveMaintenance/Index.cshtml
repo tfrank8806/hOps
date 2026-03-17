@@ -192,10 +192,21 @@
         </div>
     }
 
-    <div id="pmSessionContainer" class="mb-4">
+    <div id="pmSessionContainer" class="mb-4" data-collapsed="false">
         <div class="card">
-            <div class="card-body text-muted">
-                <p class="mb-0">Start a PM to load the checklist.</p>
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <strong class="mb-0">Active PM Session</strong>
+                    <div class="text-muted small">Manage tasks without leaving this page.</div>
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="pmSessionToggleBtn">
+                    Collapse
+                </button>
+            </div>
+            <div class="card-body" id="pmSessionContent">
+                <div class="text-muted">
+                    <p class="mb-0">Start a PM to load the checklist.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -572,6 +583,8 @@
             const manualRoomNumberInput = document.getElementById('pmManualRoomNumber');
             const alertContainer = document.getElementById('pmAlert');
             const sessionContainer = document.getElementById('pmSessionContainer');
+            const sessionContent = document.getElementById('pmSessionContent');
+            const sessionToggleBtn = document.getElementById('pmSessionToggleBtn');
             const hasChecklist = appEl.dataset.hasChecklist === 'true';
             const requiresArea = appEl.dataset.requiresArea === 'true';
             const checklistId = parseInt(appEl.dataset.checklistId || '0', 10) || 0;
@@ -596,6 +609,26 @@
 
             let sessionState = null;
             let timerInterval = null;
+            let sessionCollapsed = sessionContainer?.dataset.collapsed === 'true';
+
+            function setSessionCollapsed(collapsed) {
+                sessionCollapsed = collapsed;
+                if (sessionContainer) {
+                    sessionContainer.dataset.collapsed = collapsed ? 'true' : 'false';
+                }
+                if (sessionContent) {
+                    sessionContent.classList.toggle('d-none', collapsed);
+                }
+                if (sessionToggleBtn) {
+                    sessionToggleBtn.textContent = collapsed ? 'Expand' : 'Collapse';
+                }
+            }
+
+            setSessionCollapsed(sessionCollapsed);
+
+            if (sessionToggleBtn) {
+                sessionToggleBtn.addEventListener('click', () => setSessionCollapsed(!sessionCollapsed));
+            }
 
             function syncSession(session, shouldRender = true) {
                 if (session) {
@@ -881,17 +914,16 @@
             }
 
             function renderSession() {
-                if (!sessionContainer) {
+                if (!sessionContent) {
                     return;
                 }
 
                 if (!sessionState) {
-                    sessionContainer.innerHTML = `<div class="card">
-                        <div class="card-body text-muted">
-                            <p class="mb-0">Start a PM to load the checklist.</p>
-                        </div>
+                    sessionContent.innerHTML = `<div class="text-muted">
+                        <p class="mb-0">Start a PM to load the checklist.</p>
                     </div>`;
                     stopTimer();
+                    setSessionCollapsed(sessionCollapsed);
                     return;
                 }
 
@@ -911,36 +943,32 @@
                         </td>
                     </tr>`).join('');
 
-                sessionContainer.innerHTML = `
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                            <div>
-                                <div class="fw-semibold mb-0">Room ${escapeHtml(sessionState.roomLabel || sessionState.roomNumber)}</div>
-                                <div class="text-muted small">Started ${formatRelativeTime(sessionState.startedAtUtc)}</div>
-                            </div>
-                            <div class="text-end">
-                                <div id="pmTimer" class="fs-4 fw-semibold">--:--</div>
-                                <div class="text-muted small" id="pmStatusLabel">${sessionState.status}</div>
-                            </div>
+                sessionContent.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <div>
+                            <div class="fw-semibold mb-0">Room ${escapeHtml(sessionState.roomLabel || sessionState.roomNumber)}</div>
+                            <div class="text-muted small">Started ${formatRelativeTime(sessionState.startedAtUtc)}</div>
                         </div>
-                        <div class="card-body">
-                            <div class="d-flex gap-2 mb-3 flex-wrap">
-                                <button type="button" class="btn btn-outline-secondary" id="pmPauseButton">${sessionState.status === 'Paused' ? 'Resume' : 'Pause'}</button>
-                                <button type="button" class="btn btn-success" id="pmFinishButton" disabled title="Update each task before finishing">Finish</button>
-                            </div>
-                            <div class="table-responsive">
-                                <table class="table align-middle">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Task</th>
-                                            <th style="width:180px;">Status</th>
-                                            <th style="width:220px;">Notes</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>${taskRows}</tbody>
-                                </table>
-                            </div>
+                        <div class="text-end">
+                            <div id="pmTimer" class="fs-4 fw-semibold">--:--</div>
+                            <div class="text-muted small" id="pmStatusLabel">${sessionState.status}</div>
                         </div>
+                    </div>
+                    <div class="d-flex gap-2 mb-3 flex-wrap">
+                        <button type="button" class="btn btn-outline-secondary" id="pmPauseButton">${sessionState.status === 'Paused' ? 'Resume' : 'Pause'}</button>
+                        <button type="button" class="btn btn-success" id="pmFinishButton" disabled title="Update each task before finishing">Finish</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Task</th>
+                                    <th style="width:180px;">Status</th>
+                                    <th style="width:220px;">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>${taskRows}</tbody>
+                        </table>
                     </div>`;
 
                 bindTaskEvents();
@@ -951,6 +979,7 @@
                     stopTimer();
                     updateTimerDisplay();
                 }
+                setSessionCollapsed(sessionCollapsed);
             }
 
             function stopTimer() {
