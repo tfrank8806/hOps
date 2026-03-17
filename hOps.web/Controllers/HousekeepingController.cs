@@ -50,13 +50,27 @@ namespace hOps.web.Controllers
         [HttpGet]
         public IActionResult MprTracker()
         {
-            var model = new MprTrackerViewModel();
+            var model = new MprTrackerViewModel
+            {
+                CanEditStandards = UserCanEditMprStandards()
+            };
             return View(model);
         }
 
         [HttpPost]
         public IActionResult MprTracker(MprTrackerViewModel model)
         {
+            var canEditStandards = UserCanEditMprStandards();
+            model.CanEditStandards = canEditStandards;
+
+            if (!canEditStandards)
+            {
+                ModelState.Remove(nameof(model.DepartureStandardMinutes));
+                ModelState.Remove(nameof(model.LinenChangeStandardMinutes));
+                ModelState.Remove(nameof(model.StayoverStandardMinutes));
+                model.ResetStandardsToDefaults();
+            }
+
             if (!ModelState.IsValid)
             {
                 return View(model);
@@ -64,6 +78,11 @@ namespace hOps.web.Controllers
 
             model.Calculate();
             return View(model);
+        }
+
+        private bool UserCanEditMprStandards()
+        {
+            return User.IsInRole("Manager") || User.IsInRole("Admin");
         }
 
         [HttpPost]

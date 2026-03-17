@@ -46,6 +46,48 @@
                 </div>
                 <span asp-validation-for="HoursWorked" class="text-danger small"></span>
             </div>
+            @if (Model.CanEditStandards)
+            {
+                <div class="col-12">
+                    <div class="alert alert-info small mb-0">
+                        Managers can override the corporate time standards for this calculation. Changes are not saved permanently.
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="DepartureStandardMinutes" class="form-label"></label>
+                    <div class="input-group">
+                        <input asp-for="DepartureStandardMinutes" class="form-control" type="number" min="1" max="180" step="0.5" />
+                        <span class="input-group-text">min</span>
+                    </div>
+                    <span asp-validation-for="DepartureStandardMinutes" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="LinenChangeStandardMinutes" class="form-label"></label>
+                    <div class="input-group">
+                        <input asp-for="LinenChangeStandardMinutes" class="form-control" type="number" min="1" max="180" step="0.5" />
+                        <span class="input-group-text">min</span>
+                    </div>
+                    <span asp-validation-for="LinenChangeStandardMinutes" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="StayoverStandardMinutes" class="form-label"></label>
+                    <div class="input-group">
+                        <input asp-for="StayoverStandardMinutes" class="form-control" type="number" min="1" max="180" step="0.5" />
+                        <span class="input-group-text">min</span>
+                    </div>
+                    <span asp-validation-for="StayoverStandardMinutes" class="text-danger small"></span>
+                </div>
+            }
+            else
+            {
+                <div class="col-12">
+                    <div class="alert alert-light border small mb-0">
+                        Using Aimbridge standards (checkout @Model.DepartureStandardMinutes.ToString("0.##") min,
+                        linen change @Model.LinenChangeStandardMinutes.ToString("0.##") min,
+                        stayover @Model.StayoverStandardMinutes.ToString("0.##") min). Managers can adjust these values.
+                    </div>
+                </div>
+            }
             <div class="col-12 d-flex justify-content-end">
                 <button type="submit" class="btn btn-primary">
                     Calculate
@@ -77,7 +119,7 @@
                 <div class="card-body">
                     <div class="text-uppercase text-muted small">Total minutes worked</div>
                     <div class="display-6 fw-semibold">@Model.TotalMinutesWorked.ToString("0.##")</div>
-                    <p class="mb-0 text-muted small">(@Model.HoursWorked.ToString("0.##") hrs × 60)</p>
+                    <p class="mb-0 text-muted small">(@Model.HoursWorked.ToString("0.##") hrs x 60)</p>
                 </div>
             </div>
         </div>
@@ -89,7 +131,7 @@
                     {
                         <div class="display-6 fw-semibold">@Model.MinutesPerRoom.Value.ToString("0.##")</div>
                         <p class="mb-0 text-muted small">
-                            Calculated as Hours Worked ÷ ((Checkout + Stayover rooms) / 60).
+                            Calculated as Hours Worked / ((Checkout + Stayover rooms) / 60).
                         </p>
                     }
                     else
@@ -108,7 +150,9 @@
         <div class="card-header">
             <h3 class="h6 mb-0">Productivity vs. standards</h3>
             <small class="text-muted">
-                Departure rooms ≤ 30 min, linen changes ≤ 20 min, stayovers ≤ 15 min.
+                Departure rooms &lt;= @Model.DepartureStandardMinutes.ToString("0.##") min,
+                linen changes &lt;= @Model.LinenChangeStandardMinutes.ToString("0.##") min,
+                stayovers &lt;= @Model.StayoverStandardMinutes.ToString("0.##") min.
             </small>
         </div>
         <div class="card-body">
@@ -126,19 +170,19 @@
                         <tr>
                             <td>Checkout</td>
                             <td class="text-end">@Model.CheckoutRooms</td>
-                            <td class="text-end">30</td>
+                            <td class="text-end">@Model.DepartureStandardMinutes.ToString("0.##")</td>
                             <td class="text-end">@Model.DepartureGuidelineTotalMinutes.ToString("0")</td>
                         </tr>
                         <tr>
                             <td>Linen change</td>
                             <td class="text-end">@Model.LinenChangeRooms</td>
-                            <td class="text-end">20</td>
+                            <td class="text-end">@Model.LinenChangeStandardMinutes.ToString("0.##")</td>
                             <td class="text-end">@Model.LinenChangeGuidelineTotalMinutes.ToString("0")</td>
                         </tr>
                         <tr>
                             <td>Stayover</td>
                             <td class="text-end">@Model.StayoverRooms</td>
-                            <td class="text-end">15</td>
+                            <td class="text-end">@Model.StayoverStandardMinutes.ToString("0.##")</td>
                             <td class="text-end">@Model.StayoverGuidelineTotalMinutes.ToString("0")</td>
                         </tr>
                         <tr class="table-light fw-semibold">
