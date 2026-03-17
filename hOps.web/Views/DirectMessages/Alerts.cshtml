@@ -9,7 +9,6 @@
     ViewData["ContentSurfaceClass"] = "content-surface--flush";
     var categories = Model.Categories ?? new List<AlertCategoryViewModel>();
     var hasAlerts = Model.Alerts.Any();
-    var unreadAlertsCount = Model.Alerts.Count(a => !a.IsRead);
     var displayCategories = categories.Any()
         ? categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Label).ToList()
         : new List<AlertCategoryViewModel>
