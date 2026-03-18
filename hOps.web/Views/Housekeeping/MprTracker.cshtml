@@ -4,6 +4,7 @@
 @{
     ViewData["Title"] = "MPR Tracker";
     ViewData["MainContainerClass"] = "main-inner--wide";
+    ViewData["MessagesHeaderTitle"] = "MPR Tracker";
     var filterPeriod = Model.LogFilter?.PeriodType ?? MprTrackerLogFilterViewModel.PeriodMonth;
     var filterMonth = Model.LogFilter?.SelectedMonth ?? DateTime.UtcNow.Month;
     if (filterMonth < 1 || filterMonth > 12)
