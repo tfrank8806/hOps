@@ -99,4 +99,10 @@ namespace hOps.web.ViewModels.Maintenance
         [Required]
         public IFormFile? CsvFile { get; set; }
     }
+
+    public class MaintenancePmChecklistReorderRequest
+    {
+        public int PropertyId { get; set; }
+        public List<int> ChecklistIds { get; set; } = new();
+    }
 }

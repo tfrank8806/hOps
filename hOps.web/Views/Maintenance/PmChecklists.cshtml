@@ -177,10 +177,15 @@
                 }
                 else
                 {
+                    <div class="px-4 py-2 border-bottom small text-muted">
+                        Drag the handle to reorder checklists. Order also controls the PM checklist dropdown on the Preventive Maintenance page.
+                    </div>
+                    <div id="pmChecklistOrderStatus" class="px-4 py-2 border-bottom small text-muted" hidden></div>
                     <div class="table-responsive">
                         <table class="table table-striped align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
+                                    <th style="width:40px;"></th>
                                     <th>Name</th>
                                     <th>Type</th>
                                     <th>Tasks</th>
@@ -189,10 +194,13 @@
                                     <th class="text-end">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="pmChecklistTableBody" data-property-id="@Model.PropertyId">
                                 @foreach (var checklist in Model.Checklists)
                                 {
-                                    <tr>
+                                    <tr class="pm-checklist-row" data-checklist-id="@checklist.Id" draggable="true">
+                                        <td class="text-center text-muted">
+                                            <span class="pm-checklist-drag-handle" title="Drag to reorder" style="cursor: move;">&#x2630;</span>
+                                        </td>
                                         <td>
                                             <div class="fw-semibold">@checklist.Name</div>
                                             @if (checklist.ChecklistType == PreventiveMaintenanceChecklistType.Area && checklist.AreaOptions.Any())
@@ -264,6 +272,175 @@
             if (typeSelect) {
                 typeSelect.addEventListener('change', syncAreaVisibility);
                 syncAreaVisibility();
+            }
+        })();
+
+        (function () {
+            const tableBody = document.getElementById('pmChecklistTableBody');
+            if (!tableBody) {
+                return;
+            }
+
+            const propertyId = parseInt(tableBody.dataset.propertyId ?? '0', 10);
+            if (!propertyId) {
+                return;
+            }
+
+            const reorderEndpoint = '@Url.Action("ReorderChecklists", "Maintenance")';
+            const statusBar = document.getElementById('pmChecklistOrderStatus');
+            let statusHideTimer;
+            let saveTimer;
+            let lastSavedOrderJson = JSON.stringify(getCurrentOrder());
+
+            bindRows();
+
+            tableBody.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                const dragging = tableBody.querySelector('.pm-checklist-row.dragging');
+                if (!dragging) {
+                    return;
+                }
+                const targetRow = event.target.closest('.pm-checklist-row');
+                if (!targetRow || targetRow === dragging) {
+                    return;
+                }
+                const rect = targetRow.getBoundingClientRect();
+                const offset = event.clientY - rect.top;
+                if (offset > rect.height / 2) {
+                    targetRow.after(dragging);
+                } else {
+                    targetRow.before(dragging);
+                }
+            });
+
+            function bindRows() {
+                tableBody.querySelectorAll('.pm-checklist-row').forEach(row => {
+                    if (row.dataset.dragBound === '1') {
+                        return;
+                    }
+                    row.dataset.dragBound = '1';
+                    row.addEventListener('dragstart', (event) => {
+                        row.classList.add('dragging');
+                        if (event.dataTransfer) {
+                            event.dataTransfer.effectAllowed = 'move';
+                        }
+                    });
+                    row.addEventListener('dragend', () => {
+                        row.classList.remove('dragging');
+                        scheduleOrderSave();
+                    });
+                });
+            }
+
+            function getCurrentOrder() {
+                return Array.from(tableBody.querySelectorAll('.pm-checklist-row'))
+                    .map(row => parseInt(row.dataset.checklistId ?? '0', 10))
+                    .filter(id => !Number.isNaN(id) && id > 0);
+            }
+
+            function scheduleOrderSave() {
+                const serialized = JSON.stringify(getCurrentOrder());
+                if (serialized === lastSavedOrderJson) {
+                    return;
+                }
+
+                if (saveTimer) {
+                    clearTimeout(saveTimer);
+                }
+
+                saveTimer = setTimeout(() => {
+                    const order = getCurrentOrder();
+                    const refreshedSerialized = JSON.stringify(order);
+                    if (refreshedSerialized === lastSavedOrderJson || order.length === 0) {
+                        return;
+                    }
+                    persistOrder(order, refreshedSerialized);
+                }, 200);
+            }
+
+            function getAntiForgeryToken() {
+                const field = document.querySelector('input[name="__RequestVerificationToken"]');
+                return field?.value ?? null;
+            }
+
+            async function persistOrder(order, serializedOrder) {
+                const token = getAntiForgeryToken();
+                if (!token) {
+                    setStatus('Missing security token. Refresh and try again.', 'error');
+                    return;
+                }
+
+                setStatus('Saving order…', 'pending');
+                try {
+                    const response = await fetch(reorderEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': token
+                        },
+                        body: JSON.stringify({
+                            propertyId: propertyId,
+                            checklistIds: order
+                        })
+                    });
+
+                    if (!response.ok) {
+                        let errorMessage = 'Unable to save order.';
+                        try {
+                            const errorPayload = await response.json();
+                            if (errorPayload?.error) {
+                                errorMessage = errorPayload.error;
+                            }
+                        } catch {
+                            // ignore parsing errors
+                        }
+                        throw new Error(errorMessage);
+                    }
+
+                    const payload = await response.json();
+                    if (!payload || payload.success !== true) {
+                        throw new Error('Unable to save order.');
+                    }
+
+                    lastSavedOrderJson = serializedOrder;
+                    setStatus('Order saved.', 'success');
+                } catch (error) {
+                    console.error(error);
+                    setStatus(error?.message ?? 'Unable to save order.', 'error');
+                }
+            }
+
+            function setStatus(message, state) {
+                if (!statusBar) {
+                    return;
+                }
+
+                statusBar.hidden = false;
+                statusBar.textContent = message;
+                statusBar.classList.remove('text-muted', 'text-success', 'text-danger');
+                if (state === 'success') {
+                    statusBar.classList.add('text-success');
+                }
+                else if (state === 'error') {
+                    statusBar.classList.add('text-danger');
+                }
+                else {
+                    statusBar.classList.add('text-muted');
+                }
+
+                if (statusHideTimer) {
+                    clearTimeout(statusHideTimer);
+                }
+
+                if (state === 'pending') {
+                    return;
+                }
+
+                if (state === 'success') {
+                    statusHideTimer = setTimeout(() => {
+                        statusBar.hidden = true;
+                    }, 2000);
+                }
             }
         })();
     </script>

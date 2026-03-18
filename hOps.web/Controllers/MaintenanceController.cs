@@ -128,6 +128,7 @@ namespace hOps.web.Controllers
             }
             else
             {
+                var nextSortOrder = await GetNextChecklistSortOrderAsync(selectedProperty.Id);
                 var checklist = new PreventiveMaintenanceChecklist
                 {
                     PropertyId = selectedProperty.Id,
@@ -135,6 +136,7 @@ namespace hOps.web.Controllers
                     ChecklistType = request.ChecklistType,
                     AreaOptionsJson = areaJson,
                     IsActive = request.IsActive,
+                    SortOrder = nextSortOrder,
                     CreatedAtUtc = now,
                     UpdatedAtUtc = now,
                     CreatedById = currentUser.Id,
@@ -203,6 +205,77 @@ namespace hOps.web.Controllers
 
             TempData["PmChecklistMessage"] = "PM frequency updated.";
             return RedirectToAction(nameof(PmChecklists), new { propertyId });
+        }
+
+        [HttpPost("PMs/Checklists/Reorder")]
+        public async Task<IActionResult> ReorderChecklists([FromBody] MaintenancePmChecklistReorderRequest? request)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(currentUser);
+            if (!UserCanManageMaintenance(roles))
+            {
+                return Forbid();
+            }
+
+            if (request == null || request.PropertyId <= 0 || request.ChecklistIds == null || request.ChecklistIds.Count == 0)
+            {
+                return BadRequest(new { error = "Provide a property and checklist order." });
+            }
+
+            var properties = await GetManageablePropertiesAsync(currentUser, roles);
+            var property = properties.FirstOrDefault(p => p.Id == request.PropertyId);
+            if (property == null)
+            {
+                return Forbid();
+            }
+
+            var checklists = await _db.PreventiveMaintenanceChecklists
+                .Where(c => c.PropertyId == property.Id)
+                .OrderBy(c => c.SortOrder)
+                .ThenBy(c => c.Id)
+                .ToListAsync();
+
+            if (!checklists.Any())
+            {
+                return BadRequest(new { error = "No checklists exist for this property." });
+            }
+
+            var propertyChecklistIds = checklists.Select(c => c.Id).ToHashSet();
+            var invalidIds = request.ChecklistIds.Where(id => !propertyChecklistIds.Contains(id)).ToList();
+            if (invalidIds.Any())
+            {
+                return BadRequest(new { error = "One or more checklists are invalid for this property." });
+            }
+
+            var orderLookup = request.ChecklistIds
+                .Select((id, index) => (id, index))
+                .GroupBy(x => x.id)
+                .ToDictionary(group => group.Key, group => group.First().index);
+
+            var nextOrder = orderLookup.Count;
+            var now = DateTime.UtcNow;
+            foreach (var checklist in checklists)
+            {
+                if (orderLookup.TryGetValue(checklist.Id, out var order))
+                {
+                    checklist.SortOrder = order;
+                }
+                else
+                {
+                    checklist.SortOrder = nextOrder++;
+                }
+
+                checklist.UpdatedAtUtc = now;
+                checklist.UpdatedById = currentUser.Id;
+            }
+
+            await _db.SaveChangesAsync();
+            return Json(new { success = true });
         }
 
         [HttpPost("PMs/Checklists/{id:int}/Toggle")]
@@ -416,6 +489,7 @@ namespace hOps.web.Controllers
                 : "[]";
 
             var now = DateTime.UtcNow;
+            var nextSortOrder = await GetNextChecklistSortOrderAsync(property.Id);
             var checklist = new PreventiveMaintenanceChecklist
             {
                 PropertyId = property.Id,
@@ -423,6 +497,7 @@ namespace hOps.web.Controllers
                 ChecklistType = form.ChecklistType,
                 AreaOptionsJson = areaJson,
                 IsActive = true,
+                SortOrder = nextSortOrder,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,
                 CreatedById = currentUser.Id,
@@ -627,8 +702,8 @@ namespace hOps.web.Controllers
             var checklistEntities = await _db.PreventiveMaintenanceChecklists
                 .AsNoTracking()
                 .Where(c => c.PropertyId == selectedProperty.Id)
-                .OrderByDescending(c => c.IsActive)
-                .ThenBy(c => c.Name)
+                .OrderBy(c => c.SortOrder)
+                .ThenBy(c => c.Id)
                 .ToListAsync();
 
             var taskCounts = await _db.PreventiveMaintenanceTasks
@@ -861,6 +936,16 @@ namespace hOps.web.Controllers
                 CanChangeType = true,
                 HasExistingSessions = false
             };
+        }
+
+        private async Task<int> GetNextChecklistSortOrderAsync(int propertyId)
+        {
+            var maxSortOrder = await _db.PreventiveMaintenanceChecklists
+                .Where(c => c.PropertyId == propertyId)
+                .Select(c => (int?)c.SortOrder)
+                .MaxAsync();
+
+            return maxSortOrder.HasValue ? maxSortOrder.Value + 1 : 0;
         }
 
         private async Task<List<Property>> GetManageablePropertiesAsync(ApplicationUser user, IList<string> roles)

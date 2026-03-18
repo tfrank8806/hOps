@@ -791,6 +791,9 @@ namespace hOps.web.Data
             builder.Entity<PreventiveMaintenanceChecklist>()
                 .HasIndex(c => new { c.PropertyId, c.IsActive });
 
+            builder.Entity<PreventiveMaintenanceChecklist>()
+                .HasIndex(c => new { c.PropertyId, c.SortOrder });
+
             builder.Entity<PreventiveMaintenanceTask>()
                 .HasOne(t => t.Property)
                 .WithMany(p => p.PreventiveMaintenanceTasks)

@@ -63,8 +63,8 @@ namespace hOps.web.Controllers
 
             var checklistEntities = await _db.PreventiveMaintenanceChecklists
                 .Where(c => c.PropertyId == propertyId)
-                .OrderByDescending(c => c.IsActive)
-                .ThenBy(c => c.Name)
+                .OrderBy(c => c.SortOrder)
+                .ThenBy(c => c.Id)
                 .ToListAsync();
 
             var activeChecklists = checklistEntities.Where(c => c.IsActive).ToList();
