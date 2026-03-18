@@ -4,7 +4,6 @@
 @{
     ViewData["Title"] = "MPR Tracker";
     ViewData["MainContainerClass"] = "main-inner--wide";
-    ViewData["MessagesHeaderTitle"] = "MPR Tracker";
     var filterPeriod = Model.LogFilter?.PeriodType ?? MprTrackerLogFilterViewModel.PeriodMonth;
     var filterMonth = Model.LogFilter?.SelectedMonth ?? DateTime.UtcNow.Month;
     if (filterMonth < 1 || filterMonth > 12)
@@ -34,7 +33,9 @@
         .ToList();
 }
 
-@await Html.PartialAsync("_MessagesNav")
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <h1 class="h3 mb-0">MPR Tracker</h1>
+</div>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
