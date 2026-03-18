@@ -54,7 +54,7 @@ namespace hOps.web.Controllers
         [HttpGet]
         public async Task<IActionResult> MprTracker(int? month, int? year, string? period, DateTime? start, DateTime? end)
         {
-            var now = _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
+            var now = NormalizeToUtcDate(_timeZoneService.ConvertToUserTime(DateTime.UtcNow));
             var model = new MprTrackerViewModel
             {
                 EntryDate = now,
@@ -91,7 +91,9 @@ namespace hOps.web.Controllers
             var canEditStandards = UserCanEditMprStandards();
             model.CanEditStandards = canEditStandards;
             model.CanManageHousekeepers = canEditStandards;
-            model.EntryDate = model.EntryDate == default ? _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date : model.EntryDate.Date;
+            model.EntryDate = NormalizeToUtcDate(model.EntryDate == default
+                ? _timeZoneService.ConvertToUserTime(DateTime.UtcNow)
+                : model.EntryDate);
 
             if (currentProperty == null)
             {
@@ -143,7 +145,7 @@ namespace hOps.web.Controllers
                     PropertyId = currentProperty.Id,
                     HousekeeperId = housekeeper.Id,
                     HousekeeperName = housekeeper.Name,
-                    EntryDate = model.EntryDate.Date,
+                    EntryDate = model.EntryDate,
                     CheckoutRooms = model.CheckoutRooms,
                     LinenChangeRooms = model.LinenChangeRooms,
                     StayoverRooms = model.StayoverRooms,
@@ -345,7 +347,7 @@ namespace hOps.web.Controllers
                 model.SelectedHousekeeperId = model.Housekeepers.First().Id;
             }
 
-            var now = _timeZoneService.ConvertToUserTime(DateTime.UtcNow).Date;
+            var now = NormalizeToUtcDate(_timeZoneService.ConvertToUserTime(DateTime.UtcNow));
             model.LogFilter ??= new MprTrackerLogFilterViewModel();
             if (model.LogFilter.SelectedYear <= 0)
             {
@@ -362,7 +364,8 @@ namespace hOps.web.Controllers
             model.LogDates = new List<DateTime>();
             for (var offset = 0; offset <= totalDays; offset++)
             {
-                model.LogDates.Add(start.Date.AddDays(offset));
+                var date = start.AddDays(offset);
+                model.LogDates.Add(date.Kind == DateTimeKind.Utc ? date : DateTime.SpecifyKind(date, DateTimeKind.Utc));
             }
 
             var entries = await _context.HousekeepingMprEntries
@@ -853,6 +856,14 @@ namespace hOps.web.Controllers
                 .Trim();
 
             return normalized.Replace("|", "\\|", StringComparison.Ordinal);
+        }
+
+        private static DateTime NormalizeToUtcDate(DateTime value)
+        {
+            var dateOnly = value.Date;
+            return dateOnly.Kind == DateTimeKind.Utc
+                ? dateOnly
+                : DateTime.SpecifyKind(dateOnly, DateTimeKind.Utc);
         }
     }
 }

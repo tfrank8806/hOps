@@ -15,7 +15,7 @@ namespace hOps.web.ViewModels.Housekeeping
 
         [Display(Name = "Entry date")]
         [DataType(DataType.Date)]
-        public DateTime EntryDate { get; set; } = DateTime.Today;
+        public DateTime EntryDate { get; set; } = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
 
         [Display(Name = "Checkout rooms cleaned")]
         [Range(0, 500, ErrorMessage = "Enter a value of 0 or greater.")]
@@ -148,29 +148,37 @@ namespace hOps.web.ViewModels.Housekeeping
 
         public (DateTime Start, DateTime End) GetDateRange(DateTime referenceDate)
         {
-            var safeReference = referenceDate.Date;
+            var safeReference = NormalizeToUtcDate(referenceDate);
             var year = SelectedYear <= 0 ? safeReference.Year : SelectedYear;
 
             switch (PeriodType)
             {
                 case PeriodYearToDate:
-                    var ytdStart = new DateTime(year, 1, 1);
+                    var ytdStart = NormalizeToUtcDate(new DateTime(year, 1, 1));
                     var ytdEnd = year == safeReference.Year
                         ? safeReference
-                        : new DateTime(year, 12, 31);
+                        : NormalizeToUtcDate(new DateTime(year, 12, 31));
                     return (ytdStart, ytdEnd);
                 case PeriodCustom:
                     if (CustomStartDate.HasValue && CustomEndDate.HasValue && CustomEndDate.Value.Date >= CustomStartDate.Value.Date)
                     {
-                        return (CustomStartDate.Value.Date, CustomEndDate.Value.Date);
+                        return (NormalizeToUtcDate(CustomStartDate.Value), NormalizeToUtcDate(CustomEndDate.Value));
                     }
                     break;
             }
 
             var month = SelectedMonth is >= 1 and <= 12 ? SelectedMonth : safeReference.Month;
-            var start = new DateTime(year, month, 1);
-            var end = start.AddMonths(1).AddDays(-1);
+            var start = NormalizeToUtcDate(new DateTime(year, month, 1));
+            var end = NormalizeToUtcDate(new DateTime(year, month, DateTime.DaysInMonth(year, month)));
             return (start, end);
+        }
+
+        private static DateTime NormalizeToUtcDate(DateTime value)
+        {
+            var dateOnly = value.Date;
+            return dateOnly.Kind == DateTimeKind.Utc
+                ? dateOnly
+                : DateTime.SpecifyKind(dateOnly, DateTimeKind.Utc);
         }
     }
 
