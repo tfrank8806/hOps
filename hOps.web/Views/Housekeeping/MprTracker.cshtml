@@ -134,20 +134,24 @@
                 <input asp-for="StayoverRooms" class="form-control" type="number" min="0" step="1" />
                 <span asp-validation-for="StayoverRooms" class="text-danger small"></span>
             </div>
-            <div class="col-md-2">
-                <label asp-for="DeepCleanRooms" class="form-label"></label>
-                <input asp-for="DeepCleanRooms" class="form-control" type="number" min="0" step="1" />
-                <span asp-validation-for="DeepCleanRooms" class="text-danger small"></span>
-            </div>
-            <div class="col-12">
-                <label asp-for="DeepCleanRoomNumbers" class="form-label"></label>
-                <textarea asp-for="DeepCleanRoomNumbers"
-                          class="form-control"
-                          rows="3"
-                          placeholder="One room per line (e.g., 201A)"
-                          spellcheck="false"></textarea>
-                <div class="form-text">Required when deep clean rooms are recorded. Enter one room number per line.</div>
-                <span asp-validation-for="DeepCleanRoomNumbers" class="text-danger small"></span>
+            <div class="col-md-4">
+                <div class="row g-2">
+                    <div class="col-12 col-lg-6">
+                        <label asp-for="DeepCleanRooms" class="form-label"></label>
+                        <input asp-for="DeepCleanRooms" class="form-control" type="number" min="0" step="1" />
+                        <span asp-validation-for="DeepCleanRooms" class="text-danger small"></span>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <label asp-for="DeepCleanRoomNumbers" class="form-label"></label>
+                        <textarea asp-for="DeepCleanRoomNumbers"
+                                  class="form-control"
+                                  rows="3"
+                                  placeholder="One room per line (e.g., 201A)"
+                                  spellcheck="false"></textarea>
+                        <div class="form-text">Required when deep clean rooms are recorded.</div>
+                        <span asp-validation-for="DeepCleanRoomNumbers" class="text-danger small"></span>
+                    </div>
+                </div>
             </div>
             <div class="col-md-2">
                 <label asp-for="DndRooms" class="form-label"></label>
