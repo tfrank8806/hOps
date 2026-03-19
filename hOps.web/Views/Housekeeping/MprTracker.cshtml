@@ -79,6 +79,14 @@
         </small>
     </div>
     <div class="card-body">
+        <div class="d-flex flex-wrap gap-3 align-items-center mb-3 mpr-log-legend text-muted small">
+            <div><span class="badge text-bg-primary me-1">CO</span>Checkout</div>
+            <div><span class="badge text-bg-success me-1">LC</span>Linen change</div>
+            <div><span class="badge text-bg-info me-1">SO</span>Stayover</div>
+            <div><span class="badge text-bg-warning text-dark me-1">DC</span>Deep clean</div>
+            <div><span class="badge text-bg-secondary me-1">DND</span>No service</div>
+            <div><span class="badge text-bg-light border me-1 text-dark">Hours</span>Total recorded hours</div>
+        </div>
         <form asp-action="MprTracker" method="post" class="row g-3">
             <div class="col-12">
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>

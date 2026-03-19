@@ -2518,12 +2518,21 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     vertical-align: top;
 }
 
+.mpr-log-table thead tr {
+    background-color: #f8fafc;
+}
+
+.mpr-log-table tbody tr:nth-child(even) {
+    background-color: #fdfefe;
+}
+
 .mpr-log-table .mpr-log-col-housekeeper {
     position: sticky;
     left: 0;
     min-width: var(--mpr-log-housekeeper-width);
     max-width: var(--mpr-log-housekeeper-width);
-    background-color: var(--brand-surface, #fff);
+    background-color: #f7f9fc;
+    box-shadow: 2px 0 4px rgba(15, 23, 42, 0.08);
     z-index: 3;
 }
 
@@ -2532,7 +2541,8 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     left: var(--mpr-log-housekeeper-width);
     min-width: var(--mpr-log-totals-width);
     max-width: var(--mpr-log-totals-width);
-    background-color: var(--brand-surface, #fff);
+    background-color: #f5f8fb;
+    box-shadow: 2px 0 4px rgba(15, 23, 42, 0.05);
     z-index: 2;
 }
 
@@ -2542,6 +2552,11 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 .mpr-log-table thead .mpr-log-col-totals {
     z-index: 4;
+}
+
+.mpr-log-legend .badge {
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
 }
 
 .issue-report-fab {
