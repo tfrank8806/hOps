@@ -2467,6 +2467,43 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     margin-top: calc(var(--main-header-height, 72px) + 3rem);
 }
 
+.announcement-editor-modal .announcement-editor-form {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.announcement-editor-modal .modal-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.announcement-editor__content-field {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.announcement-editor__content-field .rich-text-editor-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.announcement-editor__content-field .rich-text-editor {
+    flex: 1;
+    min-height: 10rem;
+    max-height: min(55vh, 28rem);
+}
+
+@media (max-width: 767.98px) {
+    .announcement-editor__content-field .rich-text-editor {
+        max-height: min(50vh, 22rem);
+    }
+}
+
 .issue-report-fab {
     position: fixed;
     bottom: 0;
