@@ -92,8 +92,19 @@
                 <span asp-validation-for="SelectedHousekeeperId" class="text-danger small"></span>
                 @if (!Model.Housekeepers.Any())
                 {
-                    <small class="text-muted d-block mt-1">Add housekeeper names below to start tracking.</small>
+                    <small class="text-muted d-block mt-1">Add housekeeper names from the list page to start tracking.</small>
                 }
+                <div class="mt-3">
+                    <a class="btn btn-sm btn-outline-primary"
+                       asp-action="HousekeeperList"
+                       asp-route-period="@filterPeriod"
+                       asp-route-month="@filterMonth"
+                       asp-route-year="@filterYear"
+                       asp-route-start="@filterStart"
+                       asp-route-end="@filterEnd">
+                        Open Housekeeper List
+                    </a>
+                </div>
             </div>
             <div class="col-md-2">
                 <label asp-for="EntryDate" class="form-label"></label>
@@ -335,66 +346,6 @@
         </div>
     </div>
 }
-
-<div class="card shadow-sm mb-4">
-    <div class="card-header">
-        <h3 class="h6 mb-0">Housekeeper list</h3>
-        <small class="text-muted">Names in this list populate the dropdown above.</small>
-    </div>
-    <div class="card-body">
-        @if (Model.CanManageHousekeepers)
-        {
-            <form asp-action="AddHousekeeper" method="post" class="row g-2 align-items-end mb-3">
-                <div class="col-md-6">
-                    <label class="form-label">Add housekeeper</label>
-                    <input type="text" name="name" class="form-control" placeholder="Full name" required />
-                </div>
-                <div class="col-auto">
-                    <input type="hidden" name="period" value="@filterPeriod" />
-                    <input type="hidden" name="month" value="@filterMonth" />
-                    <input type="hidden" name="year" value="@filterYear" />
-                    <input type="hidden" name="start" value="@filterStart" />
-                    <input type="hidden" name="end" value="@filterEnd" />
-                    <button type="submit" class="btn btn-outline-primary">Add</button>
-                </div>
-            </form>
-        }
-        else
-        {
-            <p class="text-muted small mb-3">Contact a manager if you need to update the housekeeper list.</p>
-        }
-
-        <ul class="list-group list-group-flush">
-            @if (!Model.Housekeepers.Any())
-            {
-                <li class="list-group-item text-muted small">No housekeepers have been added yet.</li>
-            }
-            else
-            {
-                foreach (var hk in Model.Housekeepers)
-                {
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span>@hk.Name</span>
-                        @if (Model.CanManageHousekeepers)
-                        {
-                            <form asp-action="DeleteHousekeeper" method="post" class="ms-2">
-                                <input type="hidden" name="id" value="@hk.Id" />
-                                <input type="hidden" name="period" value="@filterPeriod" />
-                                <input type="hidden" name="month" value="@filterMonth" />
-                                <input type="hidden" name="year" value="@filterYear" />
-                                <input type="hidden" name="start" value="@filterStart" />
-                                <input type="hidden" name="end" value="@filterEnd" />
-                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove @hk.Name from the list?');">
-                                    Delete
-                                </button>
-                            </form>
-                        }
-                    </li>
-                }
-            }
-        </ul>
-    </div>
-</div>
 
 <div class="card shadow-sm">
     <div class="card-header d-flex flex-wrap justify-content-between gap-2 align-items-center">

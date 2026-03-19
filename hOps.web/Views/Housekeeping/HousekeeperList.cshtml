@@ -1,0 +1,113 @@
+@using hOps.web.ViewModels.Housekeeping
+@model MprHousekeeperListViewModel
+
+@{
+    ViewData["Title"] = "Housekeeper List";
+    var fallbackDate = DateTime.UtcNow;
+    var filterPeriod = Model.FilterPeriod ?? MprTrackerLogFilterViewModel.PeriodMonth;
+    var filterMonth = Model.FilterMonth ?? fallbackDate.Month;
+    var filterYear = Model.FilterYear ?? fallbackDate.Year;
+    var filterStart = Model.FilterStartString;
+    var filterEnd = Model.FilterEndString;
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1 class="h3 mb-1">Housekeeper List</h1>
+        <p class="text-muted mb-0">Manage the names that populate the Minutes Per Room tracker.</p>
+    </div>
+    <a class="btn btn-outline-secondary"
+       asp-action="MprTracker"
+       asp-route-period="@filterPeriod"
+       asp-route-month="@filterMonth"
+       asp-route-year="@filterYear"
+       asp-route-start="@filterStart"
+       asp-route-end="@filterEnd">
+        Back to MPR Tracker
+    </a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @Model.StatusMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h2 class="h5 mb-0">Housekeeper names</h2>
+        <small class="text-muted">These names appear in the tracker dropdown for the selected property.</small>
+    </div>
+    <div class="card-body">
+        @if (!Model.HasPropertySelected)
+        {
+            <p class="text-muted mb-0">Select a property to add or update the housekeeper list.</p>
+        }
+        else
+        {
+            if (Model.CanManageHousekeepers)
+            {
+                <form asp-action="AddHousekeeper" method="post" class="row g-2 align-items-end mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Add housekeeper</label>
+                        <input type="text" name="name" class="form-control" placeholder="Full name" required />
+                    </div>
+                    <div class="col-auto">
+                        <input type="hidden" name="period" value="@filterPeriod" />
+                        <input type="hidden" name="month" value="@filterMonth" />
+                        <input type="hidden" name="year" value="@filterYear" />
+                        <input type="hidden" name="start" value="@filterStart" />
+                        <input type="hidden" name="end" value="@filterEnd" />
+                        <input type="hidden" name="returnToList" value="true" />
+                        <button type="submit" class="btn btn-outline-primary">Add</button>
+                    </div>
+                </form>
+            }
+            else
+            {
+                <p class="text-muted small mb-3">You need manager or admin access to update this list.</p>
+            }
+
+            <ul class="list-group list-group-flush">
+                @if (!Model.Housekeepers.Any())
+                {
+                    <li class="list-group-item text-muted small">No housekeepers have been added yet.</li>
+                }
+                else
+                {
+                    foreach (var hk in Model.Housekeepers)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>@hk.Name</span>
+                            @if (Model.CanManageHousekeepers)
+                            {
+                                <form asp-action="DeleteHousekeeper" method="post" class="ms-2">
+                                    <input type="hidden" name="id" value="@hk.Id" />
+                                    <input type="hidden" name="period" value="@filterPeriod" />
+                                    <input type="hidden" name="month" value="@filterMonth" />
+                                    <input type="hidden" name="year" value="@filterYear" />
+                                    <input type="hidden" name="start" value="@filterStart" />
+                                    <input type="hidden" name="end" value="@filterEnd" />
+                                    <input type="hidden" name="returnToList" value="true" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove @hk.Name from the list?');">
+                                        Delete
+                                    </button>
+                                </form>
+                            }
+                        </li>
+                    }
+                }
+            </ul>
+        }
+    </div>
+</div>

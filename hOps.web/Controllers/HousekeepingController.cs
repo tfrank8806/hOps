@@ -97,6 +97,25 @@ namespace hOps.web.Controllers
             return View(model);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> HousekeeperList(string? period, int? month, int? year, DateTime? start, DateTime? end)
+        {
+            var model = new MprHousekeeperListViewModel
+            {
+                CanManageHousekeepers = UserCanEditMprStandards(),
+                FilterPeriod = string.IsNullOrWhiteSpace(period) ? null : period,
+                FilterMonth = month,
+                FilterYear = year,
+                FilterStart = start,
+                FilterEnd = end
+            };
+
+            await PopulateHousekeeperListAsync(model);
+            ApplyTempDataMessages(model);
+
+            return View(model);
+        }
+
         [HttpPost]
         public async Task<IActionResult> MprTracker(MprTrackerViewModel model)
         {
@@ -214,28 +233,29 @@ namespace hOps.web.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> AddHousekeeper(string name, string? period, int? month, int? year, DateTime? start, DateTime? end)
+        public async Task<IActionResult> AddHousekeeper(string name, string? period, int? month, int? year, DateTime? start, DateTime? end, bool? returnToList)
         {
             var routeValues = BuildFilterRouteValues(period, month, year, start, end);
+            var redirectAction = returnToList == true ? nameof(HousekeeperList) : nameof(MprTracker);
 
             if (!UserCanEditMprStandards())
             {
                 TempData["MprTrackerError"] = "Only managers can manage housekeeper names.";
-                return RedirectToAction(nameof(MprTracker), routeValues);
+                return RedirectToAction(redirectAction, routeValues);
             }
 
             var currentProperty = ViewBag.CurrentProperty as Property;
             if (currentProperty == null)
             {
                 TempData["MprTrackerError"] = "Select a property before managing housekeeper names.";
-                return RedirectToAction(nameof(MprTracker), routeValues);
+                return RedirectToAction(redirectAction, routeValues);
             }
 
             var trimmedName = name?.Trim();
             if (string.IsNullOrWhiteSpace(trimmedName))
             {
                 TempData["MprTrackerError"] = "Enter a housekeeper name before adding it.";
-                return RedirectToAction(nameof(MprTracker), routeValues);
+                return RedirectToAction(redirectAction, routeValues);
             }
 
             try
@@ -258,7 +278,7 @@ namespace hOps.web.Controllers
                         TempData["MprTrackerError"] = $"{existing.Name} is already listed.";
                     }
 
-                    return RedirectToAction(nameof(MprTracker), routeValues);
+                    return RedirectToAction(redirectAction, routeValues);
                 }
 
                 var profile = new HousekeeperProfile
@@ -272,30 +292,31 @@ namespace hOps.web.Controllers
                 await _context.SaveChangesAsync();
 
                 TempData["MprTrackerStatus"] = $"Added {profile.Name} to the list.";
-                return RedirectToAction(nameof(MprTracker), routeValues);
+                return RedirectToAction(redirectAction, routeValues);
             }
             catch (Exception ex) when (HandleMissingMprSchema(ex))
             {
-                return RedirectToAction(nameof(MprTracker), routeValues);
+                return RedirectToAction(redirectAction, routeValues);
             }
         }
 
         [HttpPost]
-        public async Task<IActionResult> DeleteHousekeeper(int id, string? period, int? month, int? year, DateTime? start, DateTime? end)
+        public async Task<IActionResult> DeleteHousekeeper(int id, string? period, int? month, int? year, DateTime? start, DateTime? end, bool? returnToList)
         {
             var routeValues = BuildFilterRouteValues(period, month, year, start, end);
+            var redirectAction = returnToList == true ? nameof(HousekeeperList) : nameof(MprTracker);
 
             if (!UserCanEditMprStandards())
             {
                 TempData["MprTrackerError"] = "Only managers can delete housekeeper names.";
-                return RedirectToAction(nameof(MprTracker), routeValues);
+                return RedirectToAction(redirectAction, routeValues);
             }
 
             var currentProperty = ViewBag.CurrentProperty as Property;
             if (currentProperty == null)
             {
                 TempData["MprTrackerError"] = "Select a property before managing housekeeper names.";
-                return RedirectToAction(nameof(MprTracker), routeValues);
+                return RedirectToAction(redirectAction, routeValues);
             }
 
             try
@@ -306,7 +327,7 @@ namespace hOps.web.Controllers
                 if (housekeeper == null)
                 {
                     TempData["MprTrackerError"] = "The selected housekeeper could not be found.";
-                    return RedirectToAction(nameof(MprTracker), routeValues);
+                    return RedirectToAction(redirectAction, routeValues);
                 }
 
                 housekeeper.IsDeleted = true;
@@ -314,11 +335,11 @@ namespace hOps.web.Controllers
                 await _context.SaveChangesAsync();
 
                 TempData["MprTrackerStatus"] = $"Removed {housekeeper.Name} from the dropdown.";
-                return RedirectToAction(nameof(MprTracker), routeValues);
+                return RedirectToAction(redirectAction, routeValues);
             }
             catch (Exception ex) when (HandleMissingMprSchema(ex))
             {
-                return RedirectToAction(nameof(MprTracker), routeValues);
+                return RedirectToAction(redirectAction, routeValues);
             }
         }
 
@@ -340,6 +361,19 @@ namespace hOps.web.Controllers
         }
 
         private void ApplyTempDataMessages(MprTrackerViewModel model)
+        {
+            if (TempData.TryGetValue("MprTrackerStatus", out var status) && status is string statusMessage)
+            {
+                model.StatusMessage = statusMessage;
+            }
+
+            if (TempData.TryGetValue("MprTrackerError", out var error) && error is string errorMessage)
+            {
+                model.ErrorMessage = errorMessage;
+            }
+        }
+
+        private void ApplyTempDataMessages(MprHousekeeperListViewModel model)
         {
             if (TempData.TryGetValue("MprTrackerStatus", out var status) && status is string statusMessage)
             {
@@ -412,6 +446,35 @@ namespace hOps.web.Controllers
                 .ToListAsync();
 
             model.LogRows = BuildLogRows(allHousekeepers, entries);
+        }
+
+        private async Task PopulateHousekeeperListAsync(MprHousekeeperListViewModel model)
+        {
+            var currentProperty = ViewBag.CurrentProperty as Property;
+            model.HasPropertySelected = currentProperty != null;
+
+            if (currentProperty == null)
+            {
+                model.ErrorMessage ??= "Select a property to manage housekeeper names.";
+                model.Housekeepers = new List<HousekeeperOptionViewModel>();
+                return;
+            }
+
+            var propertyId = currentProperty.Id;
+            var allHousekeepers = await _context.HousekeeperProfiles
+                .Where(h => h.PropertyId == propertyId)
+                .OrderBy(h => h.Name)
+                .ToListAsync();
+
+            model.Housekeepers = allHousekeepers
+                .Where(h => !h.IsDeleted)
+                .Select(h => new HousekeeperOptionViewModel
+                {
+                    Id = h.Id,
+                    Name = h.Name,
+                    IsDeleted = h.IsDeleted
+                })
+                .ToList();
         }
 
         private async Task TryLoadMprEntryForEditAsync(MprTrackerViewModel model, Property property, int entryId)
