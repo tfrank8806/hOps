@@ -894,108 +894,111 @@ namespace hOps.web.Controllers
             worksheet.Cell(row, 2).Value = _timeZoneService.ConvertToUserTime(DateTime.UtcNow).ToString("g");
             row += 2;
 
-            var headers = new[]
+            var headerRow = row;
+            worksheet.Cell(row, 1).Value = "Housekeeper";
+            worksheet.Cell(row, 2).Value = "Totals";
+            var dateHeaders = model.LogDates.Select(d => _timeZoneService.ConvertToUserTime(d).ToString("MMM d")).ToList();
+            for (var i = 0; i < dateHeaders.Count; i++)
             {
-                "Housekeeper",
-                "Date",
-                "Checkout Rooms",
-                "Linen Change Rooms",
-                "Stayover Rooms",
-                "Deep Clean Rooms",
-                "DND Rooms",
-                "Hours Worked",
-                "Hours Pending",
-                "Total Minutes Worked",
-                "Minutes Per Room",
-                "Entries"
-            };
-
-            for (var column = 0; column < headers.Length; column++)
-            {
-                worksheet.Cell(row, column + 1).Value = headers[column];
+                worksheet.Cell(row, i + 3).Value = dateHeaders[i];
             }
             worksheet.Row(row).Style.Font.Bold = true;
             row++;
 
+            var colCount = dateHeaders.Count + 2;
             var hasRows = false;
+
             foreach (var logRow in model.LogRows.OrderBy(r => r.HousekeeperName, StringComparer.OrdinalIgnoreCase))
             {
-                foreach (var date in model.LogDates)
+                hasRows = true;
+                worksheet.Cell(row, 1).Value = logRow.HousekeeperName;
+                worksheet.Cell(row, 2).Value = BuildCellSummary(logRow.Summary);
+                worksheet.Cell(row, 2).Style.Alignment.WrapText = true;
+
+                for (var i = 0; i < model.LogDates.Count; i++)
                 {
-                    if (!logRow.Cells.TryGetValue(date.Date, out var cell))
-                    {
-                        continue;
-                    }
+                    var date = model.LogDates[i];
+                    var cell = logRow.Cells.TryGetValue(date.Date, out var summaryCell)
+                        ? summaryCell
+                        : null;
+                    var cellText = cell != null
+                        ? BuildCellSummary(new MprTrackerLogSummaryViewModel
+                        {
+                            CheckoutRooms = cell.CheckoutRooms,
+                            LinenChangeRooms = cell.LinenChangeRooms,
+                            StayoverRooms = cell.StayoverRooms,
+                            DeepCleanRooms = cell.DeepCleanRooms,
+                            DndRooms = cell.DndRooms,
+                            HoursWorked = cell.HoursWorked,
+                            HasRecordedHours = cell.HasRecordedHours,
+                            HasPendingHours = cell.HasPendingHours,
+                            MinutesPerRoom = cell.MinutesPerRoom
+                        })
+                        : "--";
 
-                    if (cell.Entries.Count == 0
-                        && cell.CheckoutRooms == 0
-                        && cell.LinenChangeRooms == 0
-                        && cell.StayoverRooms == 0
-                        && cell.DeepCleanRooms == 0
-                        && cell.DndRooms == 0
-                        && !cell.HasRecordedHours
-                        && !cell.HasPendingHours)
-                    {
-                        continue;
-                    }
+                    worksheet.Cell(row, i + 3).Value = cellText;
+                    worksheet.Cell(row, i + 3).Style.Alignment.WrapText = true;
 
-                    hasRows = true;
-                    var localDate = _timeZoneService.ConvertToUserTime(date);
-                    worksheet.Cell(row, 1).Value = logRow.HousekeeperName;
-                    worksheet.Cell(row, 2).Value = localDate.ToString("yyyy-MM-dd");
-                    worksheet.Cell(row, 3).Value = cell.CheckoutRooms;
-                    worksheet.Cell(row, 4).Value = cell.LinenChangeRooms;
-                    worksheet.Cell(row, 5).Value = cell.StayoverRooms;
-                    worksheet.Cell(row, 6).Value = cell.DeepCleanRooms;
-                    worksheet.Cell(row, 7).Value = cell.DndRooms;
-                    worksheet.Cell(row, 8).SetValue(cell.HasRecordedHours ? (double?)cell.HoursWorked : null);
-                    worksheet.Cell(row, 9).Value = cell.HasPendingHours ? "Yes" : string.Empty;
-                    worksheet.Cell(row, 10).Value = cell.TotalMinutesWorked;
-                    worksheet.Cell(row, 11).SetValue(cell.MinutesPerRoom.HasValue ? (double?)cell.MinutesPerRoom : null);
-                    worksheet.Cell(row, 12).Value = cell.Entries.Count;
-                    row++;
                 }
-            }
 
-            if (!hasRows)
-            {
-                worksheet.Cell(row, 1).Value = "No productivity entries found for the selected range.";
-                worksheet.Range(row, 1, row, headers.Length).Merge();
-                worksheet.Row(row).Style.Font.Italic = true;
                 row++;
             }
 
-            row += 2;
-            worksheet.Cell(row, 1).Value = "Summary";
-            worksheet.Row(row).Style.Font.Bold = true;
-            row++;
+            worksheet.Cell(row, 1).Value = "Totals";
+            worksheet.Cell(row, 1).Style.Font.Bold = true;
+            worksheet.Cell(row, 2).Value = BuildCellSummary(model.LogOverallTotals);
+            worksheet.Cell(row, 2).Style.Alignment.WrapText = true;
+            worksheet.Cell(row, 2).Style.Font.Bold = true;
 
-            worksheet.Cell(row, 1).Value = "Checkout rooms";
-            worksheet.Cell(row, 2).Value = model.LogOverallTotals.CheckoutRooms;
-            row++;
-            worksheet.Cell(row, 1).Value = "Linen change rooms";
-            worksheet.Cell(row, 2).Value = model.LogOverallTotals.LinenChangeRooms;
-            row++;
-            worksheet.Cell(row, 1).Value = "Stayover rooms";
-            worksheet.Cell(row, 2).Value = model.LogOverallTotals.StayoverRooms;
-            row++;
-            worksheet.Cell(row, 1).Value = "Deep clean rooms";
-            worksheet.Cell(row, 2).Value = model.LogOverallTotals.DeepCleanRooms;
-            row++;
-            worksheet.Cell(row, 1).Value = "DND / No service";
-            worksheet.Cell(row, 2).Value = model.LogOverallTotals.DndRooms;
-            row++;
-            worksheet.Cell(row, 1).Value = "Hours worked";
-            worksheet.Cell(row, 2).Value = model.LogOverallTotals.HoursWorked;
-            row++;
-            worksheet.Cell(row, 1).Value = "Minutes per room";
-            worksheet.Cell(row, 2).Value = model.LogOverallTotals.MinutesPerRoom;
+            for (var i = 0; i < model.LogDates.Count; i++)
+            {
+                var date = model.LogDates[i].Date;
+                model.LogDailyTotals.TryGetValue(date, out var dailyTotals);
+                dailyTotals ??= new MprTrackerLogSummaryViewModel();
+                worksheet.Cell(row, i + 3).Value = BuildCellSummary(dailyTotals);
+                worksheet.Cell(row, i + 3).Style.Alignment.WrapText = true;
+                worksheet.Cell(row, i + 3).Style.Font.Bold = true;
+            }
 
+            var dataRange = worksheet.Range(headerRow, 1, row, colCount);
+            dataRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            dataRange.Style.Border.InsideBorder = XLBorderStyleValues.Hair;
+            dataRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+            dataRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            dataRange.Style.Alignment.WrapText = true;
             worksheet.Columns().AdjustToContents();
-            worksheet.RangeUsed().Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
-            worksheet.RangeUsed().Style.Border.InsideBorder = XLBorderStyleValues.Dotted;
+            worksheet.Column(1).Width = Math.Max(worksheet.Column(1).Width, 20);
+            worksheet.Column(2).Width = Math.Max(worksheet.Column(2).Width, 25);
+            worksheet.SheetView.FreezeRows(headerRow);
+            worksheet.SheetView.FreezeColumns(2);
+
+            if (!hasRows)
+            {
+                worksheet.Cell(row + 2, 1).Value = "No productivity entries found for the selected range.";
+            }
 
             return workbook;
+        }
+
+        private static string BuildCellSummary(MprTrackerLogSummaryViewModel summary)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine($"CO: {summary.CheckoutRooms}");
+            builder.AppendLine($"LC: {summary.LinenChangeRooms}");
+            builder.AppendLine($"SO: {summary.StayoverRooms}");
+            builder.AppendLine($"DC: {summary.DeepCleanRooms}");
+            builder.AppendLine($"DND: {summary.DndRooms}");
+            builder.Append("Hours: ");
+            builder.Append(summary.HasRecordedHours ? summary.HoursWorked.ToString("0.##") : "--");
+            if (summary.HasPendingHours)
+            {
+                builder.AppendLine();
+                builder.Append("Hours pending");
+            }
+            builder.AppendLine();
+            builder.Append("MPR: ");
+            builder.Append(summary.MinutesPerRoom?.ToString("0.##") ?? "--");
+            return builder.ToString().TrimEnd();
         }
 
         private string BuildLogRangeDescription(MprTrackerViewModel model)
