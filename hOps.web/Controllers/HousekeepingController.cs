@@ -400,6 +400,8 @@ namespace hOps.web.Controllers
                 model.Housekeepers = new List<HousekeeperOptionViewModel>();
                 model.LogRows = new List<MprTrackerLogRowViewModel>();
                 model.LogDates = new List<DateTime>();
+                model.LogDailyTotals = new Dictionary<DateTime, MprTrackerLogSummaryViewModel>();
+                model.LogOverallTotals = new MprTrackerLogSummaryViewModel();
                 return;
             }
 
@@ -450,7 +452,10 @@ namespace hOps.web.Controllers
                 .Include(e => e.Housekeeper)
                 .ToListAsync();
 
-            model.LogRows = BuildLogRows(allHousekeepers, entries);
+            var logData = BuildLogRows(allHousekeepers, entries, model.LogDates);
+            model.LogRows = logData.Rows;
+            model.LogDailyTotals = logData.ColumnTotals;
+            model.LogOverallTotals = logData.OverallTotals;
         }
 
         private async Task PopulateHousekeeperListAsync(MprHousekeeperListViewModel model)
@@ -527,11 +532,22 @@ namespace hOps.web.Controllers
             model.Calculate();
         }
 
-        private static List<MprTrackerLogRowViewModel> BuildLogRows(
+        private static MprTrackerLogData BuildLogRows(
             List<HousekeeperProfile> housekeepers,
-            IEnumerable<HousekeepingMprEntry> entries)
+            IEnumerable<HousekeepingMprEntry> entries,
+            List<DateTime> logDates)
         {
             var rows = new Dictionary<string, MprTrackerLogRowViewModel>(StringComparer.OrdinalIgnoreCase);
+            var columnTotals = new Dictionary<DateTime, MprTrackerLogSummaryViewModel>();
+            foreach (var date in logDates)
+            {
+                var normalized = date.Date;
+                if (!columnTotals.ContainsKey(normalized))
+                {
+                    columnTotals[normalized] = new MprTrackerLogSummaryViewModel();
+                }
+            }
+            var overallTotals = new MprTrackerLogSummaryViewModel();
 
             foreach (var housekeeper in housekeepers)
             {
@@ -609,6 +625,15 @@ namespace hOps.web.Controllers
                     MinutesPerRoom = entry.MinutesPerRoom,
                     CreatedAt = entry.CreatedAt
                 });
+
+                if (!columnTotals.TryGetValue(day, out var dayTotals))
+                {
+                    dayTotals = new MprTrackerLogSummaryViewModel();
+                    columnTotals[day] = dayTotals;
+                }
+
+                ApplyTotals(dayTotals, entry);
+                ApplyTotals(overallTotals, entry);
             }
 
             foreach (var row in rows.Values)
@@ -630,9 +655,27 @@ namespace hOps.web.Controllers
                     : null;
             }
 
-            return rows.Values
-                .OrderBy(r => r.HousekeeperName, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            foreach (var totals in columnTotals.Values)
+            {
+                var trackedRooms = totals.CheckoutRooms + totals.StayoverRooms;
+                totals.MinutesPerRoom = trackedRooms > 0 && totals.HoursWorked > 0
+                    ? Math.Round((totals.HoursWorked * 60m) / trackedRooms, 2, MidpointRounding.AwayFromZero)
+                    : null;
+            }
+
+            var overallTrackedRooms = overallTotals.CheckoutRooms + overallTotals.StayoverRooms;
+            overallTotals.MinutesPerRoom = overallTrackedRooms > 0 && overallTotals.HoursWorked > 0
+                ? Math.Round((overallTotals.HoursWorked * 60m) / overallTrackedRooms, 2, MidpointRounding.AwayFromZero)
+                : null;
+
+            return new MprTrackerLogData
+            {
+                Rows = rows.Values
+                    .OrderBy(r => r.HousekeeperName, StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                ColumnTotals = columnTotals,
+                OverallTotals = overallTotals
+            };
         }
 
         private static string BuildHousekeeperRowKey(int? id, string name)
@@ -640,6 +683,33 @@ namespace hOps.web.Controllers
             return id.HasValue
                 ? $"HK:{id.Value}"
                 : $"NAME:{(name ?? string.Empty).Trim().ToUpperInvariant()}";
+        }
+
+        private static void ApplyTotals(MprTrackerLogSummaryViewModel summary, HousekeepingMprEntry entry)
+        {
+            summary.CheckoutRooms += entry.CheckoutRooms;
+            summary.LinenChangeRooms += entry.LinenChangeRooms;
+            summary.StayoverRooms += entry.StayoverRooms;
+            summary.DeepCleanRooms += entry.DeepCleanRooms;
+            summary.DndRooms += entry.DndRooms;
+
+            if (entry.HoursWorked.HasValue)
+            {
+                summary.HoursWorked += entry.HoursWorked.Value;
+                summary.TotalMinutesWorked += entry.TotalMinutesWorked;
+                summary.HasRecordedHours = true;
+            }
+            else
+            {
+                summary.HasPendingHours = true;
+            }
+        }
+
+        private sealed class MprTrackerLogData
+        {
+            public List<MprTrackerLogRowViewModel> Rows { get; init; } = new();
+            public Dictionary<DateTime, MprTrackerLogSummaryViewModel> ColumnTotals { get; init; } = new();
+            public MprTrackerLogSummaryViewModel OverallTotals { get; init; } = new();
         }
 
         private bool HandleMissingMprSchema(Exception ex, MprTrackerViewModel? model = null)

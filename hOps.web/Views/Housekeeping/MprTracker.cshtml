@@ -576,12 +576,67 @@
                                     {
                                         <td class="text-center text-muted">&mdash;</td>
                                     }
-                                }
-                            </tr>
                         }
-                    </tbody>
-                </table>
-            </div>
+                    </tr>
+                }
+                <tr class="table-light fw-semibold">
+                    <th scope="row">Totals</th>
+                    <td class="small">
+                        <div>CO: <strong>@Model.LogOverallTotals.CheckoutRooms</strong></div>
+                        <div>LC: <strong>@Model.LogOverallTotals.LinenChangeRooms</strong></div>
+                        <div>SO: <strong>@Model.LogOverallTotals.StayoverRooms</strong></div>
+                        <div>DC: <strong>@Model.LogOverallTotals.DeepCleanRooms</strong></div>
+                        <div>DND: <strong>@Model.LogOverallTotals.DndRooms</strong></div>
+                        <div>
+                            Total hrs:
+                            @if (Model.LogOverallTotals.HasRecordedHours)
+                            {
+                                @Model.LogOverallTotals.HoursWorked.ToString("0.##")
+                            }
+                            else
+                            {
+                                <span class="text-muted">--</span>
+                            }
+                        </div>
+                        @if (Model.LogOverallTotals.HasPendingHours)
+                        {
+                            <div class="text-warning small">Hours pending</div>
+                        }
+                        <div>MPR: @(Model.LogOverallTotals.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
+                    </td>
+                    @foreach (var date in Model.LogDates)
+                    {
+                        var normalizedDate = date.Date;
+                        Model.LogDailyTotals.TryGetValue(normalizedDate, out var dayTotals);
+                        dayTotals ??= new MprTrackerLogSummaryViewModel();
+                        <td class="small">
+                            <div>CO: <strong>@dayTotals.CheckoutRooms</strong></div>
+                            <div>LC: <strong>@dayTotals.LinenChangeRooms</strong></div>
+                            <div>SO: <strong>@dayTotals.StayoverRooms</strong></div>
+                            <div>DC: <strong>@dayTotals.DeepCleanRooms</strong></div>
+                            <div>DND: <strong>@dayTotals.DndRooms</strong></div>
+                            <div>
+                                Hours:
+                                @if (dayTotals.HasRecordedHours)
+                                {
+                                    @dayTotals.HoursWorked.ToString("0.##")
+                                }
+                                else
+                                {
+                                    <span class="text-muted">--</span>
+                                }
+                            </div>
+                            @if (dayTotals.HasPendingHours)
+                            {
+                                <div class="text-warning small">Hours pending</div>
+                            }
+                            <div>MPR: @(dayTotals.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
+                        </td>
+                    }
+                </tr>
+            </tbody>
+        </table>
+    </div>
             <p class="text-muted small mt-2 mb-0">
                 Scroll horizontally to view the entire month or custom range. Each cell represents activity for that specific day.
             </p>

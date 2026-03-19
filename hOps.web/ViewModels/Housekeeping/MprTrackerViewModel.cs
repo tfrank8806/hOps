@@ -73,6 +73,8 @@ namespace hOps.web.ViewModels.Housekeeping
         public MprTrackerLogFilterViewModel LogFilter { get; set; } = new();
         public List<DateTime> LogDates { get; set; } = new();
         public List<MprTrackerLogRowViewModel> LogRows { get; set; } = new();
+        public Dictionary<DateTime, MprTrackerLogSummaryViewModel> LogDailyTotals { get; set; } = new();
+        public MprTrackerLogSummaryViewModel LogOverallTotals { get; set; } = new();
 
         public bool HasRecordedHours => HoursWorked.HasValue;
 
