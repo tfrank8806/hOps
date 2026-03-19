@@ -460,7 +460,7 @@
         else
         {
             <div class="table-responsive">
-                <table class="table table-bordered table-sm align-middle mb-0">
+                <table class="table table-bordered table-sm align-middle mb-0 mpr-log-table">
                     <thead class="table-light">
                         <tr>
                             <th class="text-nowrap">Housekeeper</th>
@@ -477,12 +477,12 @@
                             <tr>
                                 <th scope="row">@row.HousekeeperName</th>
                                 <td class="small">
-                                    <div>CO: <strong>@row.Summary.CheckoutRooms</strong></div>
-                                    <div>LC: <strong>@row.Summary.LinenChangeRooms</strong></div>
-                                    <div>SO: <strong>@row.Summary.StayoverRooms</strong></div>
-                                    <div>DC: <strong>@row.Summary.DeepCleanRooms</strong></div>
-                                    <div>DND: <strong>@row.Summary.DndRooms</strong></div>
-                                    <div>
+                                    <div class="mpr-log-line">CO: <strong>@row.Summary.CheckoutRooms</strong></div>
+                                    <div class="mpr-log-line">LC: <strong>@row.Summary.LinenChangeRooms</strong></div>
+                                    <div class="mpr-log-line">SO: <strong>@row.Summary.StayoverRooms</strong></div>
+                                    <div class="mpr-log-line">DC: <strong>@row.Summary.DeepCleanRooms</strong></div>
+                                    <div class="mpr-log-line">DND: <strong>@row.Summary.DndRooms</strong></div>
+                                    <div class="mpr-log-line">
                                         Total hrs:
                                         @if (row.Summary.HasRecordedHours)
                                         {
@@ -495,21 +495,21 @@
                                     </div>
                                     @if (row.Summary.HasPendingHours)
                                     {
-                                        <div class="text-warning small">Hours pending</div>
+                                        <div class="text-warning small mpr-log-line">Hours pending</div>
                                     }
-                                    <div>MPR: @(row.Summary.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
+                                    <div class="mpr-log-line">MPR: @(row.Summary.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
                                 </td>
                                 @foreach (var date in Model.LogDates)
                                 {
                                     if (row.Cells.TryGetValue(date.Date, out var cell))
                                     {
                                         <td class="small">
-                                            <div>CO: <strong>@cell.CheckoutRooms</strong></div>
-                                            <div>LC: <strong>@cell.LinenChangeRooms</strong></div>
-                                            <div>SO: <strong>@cell.StayoverRooms</strong></div>
-                                            <div>DC: <strong>@cell.DeepCleanRooms</strong></div>
-                                            <div>DND: <strong>@cell.DndRooms</strong></div>
-                                            <div>
+                                            <div class="mpr-log-line">CO: <strong>@cell.CheckoutRooms</strong></div>
+                                            <div class="mpr-log-line">LC: <strong>@cell.LinenChangeRooms</strong></div>
+                                            <div class="mpr-log-line">SO: <strong>@cell.StayoverRooms</strong></div>
+                                            <div class="mpr-log-line">DC: <strong>@cell.DeepCleanRooms</strong></div>
+                                            <div class="mpr-log-line">DND: <strong>@cell.DndRooms</strong></div>
+                                            <div class="mpr-log-line">
                                                 Hours:
                                                 @if (cell.HasRecordedHours)
                                                 {
@@ -522,9 +522,9 @@
                                             </div>
                                             @if (cell.HasPendingHours)
                                             {
-                                                <div class="text-warning small">Hours pending</div>
+                                                <div class="text-warning small mpr-log-line">Hours pending</div>
                                             }
-                                            <div>MPR: @(cell.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
+                                            <div class="mpr-log-line">MPR: @(cell.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
                                             @if (cell.Entries.Count == 1)
                                             {
                                                 var entry = cell.Entries[0];
@@ -582,12 +582,12 @@
                 <tr class="table-light fw-semibold">
                     <th scope="row">Totals</th>
                     <td class="small">
-                        <div>CO: <strong>@Model.LogOverallTotals.CheckoutRooms</strong></div>
-                        <div>LC: <strong>@Model.LogOverallTotals.LinenChangeRooms</strong></div>
-                        <div>SO: <strong>@Model.LogOverallTotals.StayoverRooms</strong></div>
-                        <div>DC: <strong>@Model.LogOverallTotals.DeepCleanRooms</strong></div>
-                        <div>DND: <strong>@Model.LogOverallTotals.DndRooms</strong></div>
-                        <div>
+                        <div class="mpr-log-line">CO: <strong>@Model.LogOverallTotals.CheckoutRooms</strong></div>
+                        <div class="mpr-log-line">LC: <strong>@Model.LogOverallTotals.LinenChangeRooms</strong></div>
+                        <div class="mpr-log-line">SO: <strong>@Model.LogOverallTotals.StayoverRooms</strong></div>
+                        <div class="mpr-log-line">DC: <strong>@Model.LogOverallTotals.DeepCleanRooms</strong></div>
+                        <div class="mpr-log-line">DND: <strong>@Model.LogOverallTotals.DndRooms</strong></div>
+                        <div class="mpr-log-line">
                             Total hrs:
                             @if (Model.LogOverallTotals.HasRecordedHours)
                             {
@@ -600,9 +600,9 @@
                         </div>
                         @if (Model.LogOverallTotals.HasPendingHours)
                         {
-                            <div class="text-warning small">Hours pending</div>
+                            <div class="text-warning small mpr-log-line">Hours pending</div>
                         }
-                        <div>MPR: @(Model.LogOverallTotals.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
+                        <div class="mpr-log-line">MPR: @(Model.LogOverallTotals.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
                     </td>
                     @foreach (var date in Model.LogDates)
                     {
@@ -610,12 +610,12 @@
                         Model.LogDailyTotals.TryGetValue(normalizedDate, out var dayTotals);
                         dayTotals ??= new MprTrackerLogSummaryViewModel();
                         <td class="small">
-                            <div>CO: <strong>@dayTotals.CheckoutRooms</strong></div>
-                            <div>LC: <strong>@dayTotals.LinenChangeRooms</strong></div>
-                            <div>SO: <strong>@dayTotals.StayoverRooms</strong></div>
-                            <div>DC: <strong>@dayTotals.DeepCleanRooms</strong></div>
-                            <div>DND: <strong>@dayTotals.DndRooms</strong></div>
-                            <div>
+                            <div class="mpr-log-line">CO: <strong>@dayTotals.CheckoutRooms</strong></div>
+                            <div class="mpr-log-line">LC: <strong>@dayTotals.LinenChangeRooms</strong></div>
+                            <div class="mpr-log-line">SO: <strong>@dayTotals.StayoverRooms</strong></div>
+                            <div class="mpr-log-line">DC: <strong>@dayTotals.DeepCleanRooms</strong></div>
+                            <div class="mpr-log-line">DND: <strong>@dayTotals.DndRooms</strong></div>
+                            <div class="mpr-log-line">
                                 Hours:
                                 @if (dayTotals.HasRecordedHours)
                                 {
@@ -628,9 +628,9 @@
                             </div>
                             @if (dayTotals.HasPendingHours)
                             {
-                                <div class="text-warning small">Hours pending</div>
+                                <div class="text-warning small mpr-log-line">Hours pending</div>
                             }
-                            <div>MPR: @(dayTotals.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
+                            <div class="mpr-log-line">MPR: @(dayTotals.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
                         </td>
                     }
                 </tr>

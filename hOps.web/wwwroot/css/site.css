@@ -2504,6 +2504,15 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     }
 }
 
+.mpr-log-table .mpr-log-line {
+    white-space: nowrap;
+}
+
+.mpr-log-table td,
+.mpr-log-table th {
+    vertical-align: top;
+}
+
 .issue-report-fab {
     position: fixed;
     bottom: 0;
