@@ -52,7 +52,7 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> MprTracker(int? month, int? year, string? period, DateTime? start, DateTime? end)
+        public async Task<IActionResult> MprTracker(int? month, int? year, string? period, DateTime? start, DateTime? end, int? entryId)
         {
             var now = NormalizeToUtcDate(_timeZoneService.ConvertToUserTime(DateTime.UtcNow));
             var model = new MprTrackerViewModel
@@ -77,6 +77,19 @@ namespace hOps.web.Controllers
             catch (Exception ex) when (HandleMissingMprSchema(ex, model))
             {
                 // Error message added inside handler.
+            }
+
+            if (entryId.HasValue && model.ErrorMessage == null)
+            {
+                var currentProperty = ViewBag.CurrentProperty as Property;
+                if (currentProperty != null)
+                {
+                    await TryLoadMprEntryForEditAsync(model, currentProperty, entryId.Value);
+                }
+                else
+                {
+                    model.ErrorMessage = "Select a property before editing a productivity entry.";
+                }
             }
 
             ApplyTempDataMessages(model);
@@ -139,32 +152,57 @@ namespace hOps.web.Controllers
                     return View(model);
                 }
 
-                var currentUser = await _userManager.GetUserAsync(User);
-                var entry = new HousekeepingMprEntry
+                HousekeepingMprEntry? entry = null;
+                if (model.EditingEntryId.HasValue)
                 {
-                    PropertyId = currentProperty.Id,
-                    HousekeeperId = housekeeper.Id,
-                    HousekeeperName = housekeeper.Name,
-                    EntryDate = model.EntryDate,
-                    CheckoutRooms = model.CheckoutRooms,
-                    LinenChangeRooms = model.LinenChangeRooms,
-                    StayoverRooms = model.StayoverRooms,
-                    DndRooms = model.DndRooms,
-                    HoursWorked = model.HoursWorked,
-                    TotalMinutesWorked = model.TotalMinutesWorked,
-                    MinutesPerRoom = model.MinutesPerRoom,
-                    DepartureStandardMinutes = model.DepartureStandardMinutes,
-                    LinenChangeStandardMinutes = model.LinenChangeStandardMinutes,
-                    StayoverStandardMinutes = model.StayoverStandardMinutes,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedByUserId = currentUser?.Id
-                };
+                    entry = await _context.HousekeepingMprEntries
+                        .FirstOrDefaultAsync(e => e.Id == model.EditingEntryId && e.PropertyId == currentProperty.Id);
 
-                _context.HousekeepingMprEntries.Add(entry);
+                    if (entry == null)
+                    {
+                        ModelState.AddModelError(string.Empty, "The entry you attempted to edit could not be found.");
+                        await PopulateMprTrackerAsync(model, currentProperty);
+                        return View(model);
+                    }
+                }
+
+                var currentUser = await _userManager.GetUserAsync(User);
+                var isNewEntry = entry == null;
+                if (entry == null)
+                {
+                    entry = new HousekeepingMprEntry
+                    {
+                        PropertyId = currentProperty.Id,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedByUserId = currentUser?.Id
+                    };
+
+                    _context.HousekeepingMprEntries.Add(entry);
+                }
+
+                entry.HousekeeperId = housekeeper.Id;
+                entry.HousekeeperName = housekeeper.Name;
+                entry.EntryDate = model.EntryDate;
+                entry.CheckoutRooms = model.CheckoutRooms;
+                entry.LinenChangeRooms = model.LinenChangeRooms;
+                entry.StayoverRooms = model.StayoverRooms;
+                entry.DndRooms = model.DndRooms;
+                entry.HoursWorked = model.HoursWorked;
+                entry.TotalMinutesWorked = model.TotalMinutesWorked ?? 0;
+                entry.MinutesPerRoom = model.MinutesPerRoom;
+                entry.DepartureStandardMinutes = model.DepartureStandardMinutes;
+                entry.LinenChangeStandardMinutes = model.LinenChangeStandardMinutes;
+                entry.StayoverStandardMinutes = model.StayoverStandardMinutes;
+
                 await _context.SaveChangesAsync();
 
                 model.EntrySaved = true;
-                model.StatusMessage = $"Saved entry for {housekeeper.Name} on {model.EntryDate:MMM d}.";
+                model.EditingEntryId = null;
+                model.EditingHousekeeperName = null;
+                model.EditingEntryDate = null;
+                model.StatusMessage = isNewEntry
+                    ? $"Saved entry for {housekeeper.Name} on {model.EntryDate:MMM d}."
+                    : $"Updated entry for {housekeeper.Name} on {model.EntryDate:MMM d}.";
 
                 await PopulateMprTrackerAsync(model, currentProperty);
                 return View(model);
@@ -376,6 +414,49 @@ namespace hOps.web.Controllers
             model.LogRows = BuildLogRows(allHousekeepers, entries);
         }
 
+        private async Task TryLoadMprEntryForEditAsync(MprTrackerViewModel model, Property property, int entryId)
+        {
+            var entry = await _context.HousekeepingMprEntries
+                .Include(e => e.Housekeeper)
+                .FirstOrDefaultAsync(e => e.Id == entryId && e.PropertyId == property.Id);
+
+            if (entry == null)
+            {
+                model.ErrorMessage = "The selected productivity entry could not be found.";
+                return;
+            }
+
+            if (entry.HousekeeperId.HasValue && model.Housekeepers.All(h => h.Id != entry.HousekeeperId.Value))
+            {
+                var name = entry.Housekeeper?.Name ?? entry.HousekeeperName;
+                model.Housekeepers.Add(new HousekeeperOptionViewModel
+                {
+                    Id = entry.HousekeeperId.Value,
+                    Name = name,
+                    IsDeleted = entry.Housekeeper?.IsDeleted ?? true
+                });
+
+                model.Housekeepers = model.Housekeepers
+                    .OrderBy(h => h.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            model.EditingEntryId = entry.Id;
+            model.EditingHousekeeperName = entry.Housekeeper?.Name ?? entry.HousekeeperName;
+            model.EditingEntryDate = NormalizeToUtcDate(entry.EntryDate);
+            model.SelectedHousekeeperId = entry.HousekeeperId ?? model.SelectedHousekeeperId;
+            model.EntryDate = NormalizeToUtcDate(entry.EntryDate);
+            model.CheckoutRooms = entry.CheckoutRooms;
+            model.LinenChangeRooms = entry.LinenChangeRooms;
+            model.StayoverRooms = entry.StayoverRooms;
+            model.DndRooms = entry.DndRooms;
+            model.HoursWorked = entry.HoursWorked;
+            model.DepartureStandardMinutes = entry.DepartureStandardMinutes;
+            model.LinenChangeStandardMinutes = entry.LinenChangeStandardMinutes;
+            model.StayoverStandardMinutes = entry.StayoverStandardMinutes;
+            model.Calculate();
+        }
+
         private static List<MprTrackerLogRowViewModel> BuildLogRows(
             List<HousekeeperProfile> housekeepers,
             IEnumerable<HousekeepingMprEntry> entries)
@@ -421,20 +502,55 @@ namespace hOps.web.Controllers
                 cell.LinenChangeRooms += entry.LinenChangeRooms;
                 cell.StayoverRooms += entry.StayoverRooms;
                 cell.DndRooms += entry.DndRooms;
-                cell.HoursWorked += entry.HoursWorked;
                 cell.TotalMinutesWorked += entry.TotalMinutesWorked;
+                if (entry.HoursWorked.HasValue)
+                {
+                    cell.HoursWorked += entry.HoursWorked.Value;
+                    cell.HasRecordedHours = true;
+                    row.Summary.HoursWorked += entry.HoursWorked.Value;
+                    row.Summary.HasRecordedHours = true;
+                }
+                else
+                {
+                    cell.HasPendingHours = true;
+                    row.Summary.HasPendingHours = true;
+                }
                 cell.RecalculateMinutesPerRoom();
 
                 row.Summary.CheckoutRooms += entry.CheckoutRooms;
                 row.Summary.LinenChangeRooms += entry.LinenChangeRooms;
                 row.Summary.StayoverRooms += entry.StayoverRooms;
                 row.Summary.DndRooms += entry.DndRooms;
-                row.Summary.HoursWorked += entry.HoursWorked;
-                row.Summary.TotalMinutesWorked += entry.TotalMinutesWorked;
+                row.Summary.TotalMinutesWorked += entry.HoursWorked.HasValue ? entry.TotalMinutesWorked : 0;
+
+                cell.Entries.Add(new MprTrackerLogEntryViewModel
+                {
+                    Id = entry.Id,
+                    EntryDate = entry.EntryDate,
+                    CheckoutRooms = entry.CheckoutRooms,
+                    LinenChangeRooms = entry.LinenChangeRooms,
+                    StayoverRooms = entry.StayoverRooms,
+                    DndRooms = entry.DndRooms,
+                    HoursWorked = entry.HoursWorked,
+                    TotalMinutesWorked = entry.TotalMinutesWorked,
+                    MinutesPerRoom = entry.MinutesPerRoom,
+                    CreatedAt = entry.CreatedAt
+                });
             }
 
             foreach (var row in rows.Values)
             {
+                foreach (var cell in row.Cells.Values)
+                {
+                    if (cell.Entries.Count > 1)
+                    {
+                        cell.Entries = cell.Entries
+                            .OrderBy(e => e.CreatedAt)
+                            .ThenBy(e => e.Id)
+                            .ToList();
+                    }
+                }
+
                 var trackedRooms = row.Summary.CheckoutRooms + row.Summary.StayoverRooms;
                 row.Summary.MinutesPerRoom = trackedRooms > 0 && row.Summary.HoursWorked > 0
                     ? Math.Round((row.Summary.HoursWorked * 60m) / trackedRooms, 2, MidpointRounding.AwayFromZero)

@@ -15,7 +15,7 @@ namespace hOps.web.Models
         public int LinenChangeRooms { get; set; }
         public int StayoverRooms { get; set; }
         public int DndRooms { get; set; }
-        public decimal HoursWorked { get; set; }
+        public decimal? HoursWorked { get; set; }
         public decimal TotalMinutesWorked { get; set; }
         public decimal? MinutesPerRoom { get; set; }
         public decimal DepartureStandardMinutes { get; set; }

@@ -35,7 +35,7 @@ namespace hOps.web.ViewModels.Housekeeping
 
         [Display(Name = "Total hours worked")]
         [Range(0, 24, ErrorMessage = "Enter the total hours worked between 0 and 24.")]
-        public decimal HoursWorked { get; set; }
+        public decimal? HoursWorked { get; set; }
 
         [Display(Name = "Checkout target (minutes)")]
         [Range(1, 180, ErrorMessage = "Use a value between 1 and 180 minutes.")]
@@ -53,15 +53,23 @@ namespace hOps.web.ViewModels.Housekeeping
         public bool CanManageHousekeepers { get; set; }
         public bool HasResults { get; private set; }
         public bool EntrySaved { get; set; }
+        public int? EditingEntryId { get; set; }
+        public string? EditingHousekeeperName { get; set; }
+        public DateTime? EditingEntryDate { get; set; }
         public string? StatusMessage { get; set; }
         public string? ErrorMessage { get; set; }
+        public bool IsEditing => EditingEntryId.HasValue;
 
         public List<HousekeeperOptionViewModel> Housekeepers { get; set; } = new();
         public MprTrackerLogFilterViewModel LogFilter { get; set; } = new();
         public List<DateTime> LogDates { get; set; } = new();
         public List<MprTrackerLogRowViewModel> LogRows { get; set; } = new();
 
-        public decimal TotalMinutesWorked => Math.Round(HoursWorked * 60m, 2, MidpointRounding.AwayFromZero);
+        public bool HasRecordedHours => HoursWorked.HasValue;
+
+        public decimal? TotalMinutesWorked => HoursWorked.HasValue
+            ? Math.Round(HoursWorked.Value * 60m, 2, MidpointRounding.AwayFromZero)
+            : null;
 
         public int TotalRoomsCleaned => CheckoutRooms + LinenChangeRooms + StayoverRooms;
 
@@ -79,7 +87,9 @@ namespace hOps.web.ViewModels.Housekeeping
                                                 + LinenChangeGuidelineTotalMinutes
                                                 + StayoverGuidelineTotalMinutes;
 
-        public decimal VarianceFromGuideline => TotalMinutesWorked - TotalGuidelineMinutes;
+        public decimal? VarianceFromGuideline => TotalMinutesWorked.HasValue
+            ? TotalMinutesWorked.Value - TotalGuidelineMinutes
+            : null;
 
         public void Calculate()
         {
@@ -87,9 +97,9 @@ namespace hOps.web.ViewModels.Housekeeping
             NormalizeStandards();
             var roomsForMpr = TotalRoomsTrackedForMpr;
 
-            if (roomsForMpr > 0 && HoursWorked > 0)
+            if (roomsForMpr > 0 && HoursWorked.HasValue && HoursWorked.Value > 0)
             {
-                MinutesPerRoom = Math.Round((HoursWorked * 60m) / roomsForMpr, 2, MidpointRounding.AwayFromZero);
+                MinutesPerRoom = Math.Round((HoursWorked.Value * 60m) / roomsForMpr, 2, MidpointRounding.AwayFromZero);
             }
             else
             {
@@ -199,6 +209,8 @@ namespace hOps.web.ViewModels.Housekeeping
         public int DndRooms { get; set; }
         public decimal HoursWorked { get; set; }
         public decimal TotalMinutesWorked { get; set; }
+        public bool HasRecordedHours { get; set; }
+        public bool HasPendingHours { get; set; }
         public decimal? MinutesPerRoom { get; set; }
         public int TotalRoomsTracked => CheckoutRooms + StayoverRooms;
     }
@@ -210,8 +222,11 @@ namespace hOps.web.ViewModels.Housekeeping
         public int StayoverRooms { get; set; }
         public int DndRooms { get; set; }
         public decimal HoursWorked { get; set; }
+        public bool HasRecordedHours { get; set; }
+        public bool HasPendingHours { get; set; }
         public decimal TotalMinutesWorked { get; set; }
         public decimal? MinutesPerRoom { get; set; }
+        public List<MprTrackerLogEntryViewModel> Entries { get; set; } = new();
 
         public void RecalculateMinutesPerRoom()
         {
@@ -220,5 +235,20 @@ namespace hOps.web.ViewModels.Housekeeping
                 ? Math.Round((HoursWorked * 60m) / roomsTracked, 2, MidpointRounding.AwayFromZero)
                 : null;
         }
+    }
+
+    public class MprTrackerLogEntryViewModel
+    {
+        public int Id { get; set; }
+        public DateTime EntryDate { get; set; }
+        public int CheckoutRooms { get; set; }
+        public int LinenChangeRooms { get; set; }
+        public int StayoverRooms { get; set; }
+        public int DndRooms { get; set; }
+        public decimal? HoursWorked { get; set; }
+        public decimal TotalMinutesWorked { get; set; }
+        public decimal? MinutesPerRoom { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public bool HasPendingHours => !HoursWorked.HasValue;
     }
 }

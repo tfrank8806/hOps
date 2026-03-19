@@ -37,6 +37,25 @@
     <h1 class="h3 mb-0">MPR Tracker</h1>
 </div>
 
+@if (Model.IsEditing)
+{
+    <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2" role="alert">
+        <div>
+            <strong>Editing entry:</strong>
+            @Model.EditingHousekeeperName on @Model.EditingEntryDate?.ToString("MMM d")
+        </div>
+        <a class="btn btn-sm btn-outline-warning"
+           asp-action="MprTracker"
+           asp-route-period="@filterPeriod"
+           asp-route-month="@filterMonth"
+           asp-route-year="@filterYear"
+           asp-route-start="@filterStart"
+           asp-route-end="@filterEnd">
+            Cancel edit
+        </a>
+    </div>
+}
+
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
     <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -63,6 +82,7 @@
         <form asp-action="MprTracker" method="post" class="row g-3">
             <div class="col-12">
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <input asp-for="EditingEntryId" type="hidden" />
             </div>
             <div class="col-md-4">
                 <label asp-for="SelectedHousekeeperId" class="form-label"></label>
@@ -157,8 +177,20 @@
                 <input asp-for="LogFilter.CustomStartDate" type="hidden" />
                 <input asp-for="LogFilter.CustomEndDate" type="hidden" />
                 <button type="submit" class="btn btn-primary" disabled="@disableHousekeeperSelect">
-                    Calculate &amp; Save
+                    @(Model.IsEditing ? "Update Entry" : "Calculate &amp; Save")
                 </button>
+                @if (Model.IsEditing)
+                {
+                    <a class="btn btn-outline-secondary"
+                       asp-action="MprTracker"
+                       asp-route-period="@filterPeriod"
+                       asp-route-month="@filterMonth"
+                       asp-route-year="@filterYear"
+                       asp-route-start="@filterStart"
+                       asp-route-end="@filterEnd">
+                        Cancel edit
+                    </a>
+                }
             </div>
         </form>
     </div>
@@ -185,8 +217,20 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <div class="text-uppercase text-muted small">Total minutes worked</div>
-                    <div class="display-6 fw-semibold">@Model.TotalMinutesWorked.ToString("0.##")</div>
-                    <p class="mb-0 text-muted small">(@Model.HoursWorked.ToString("0.##") hrs x 60)</p>
+                    @if (Model.TotalMinutesWorked.HasValue)
+                    {
+                        <div class="display-6 fw-semibold">@Model.TotalMinutesWorked.Value.ToString("0.##")</div>
+                        <p class="mb-0 text-muted small">
+                            (@(Model.HoursWorked?.ToString("0.##") ?? "0") hrs x 60)
+                        </p>
+                    }
+                    else
+                    {
+                        <div class="display-6 fw-semibold">--</div>
+                        <p class="mb-0 text-muted small">
+                            Add hours worked to calculate minutes.
+                        </p>
+                    }
                 </div>
             </div>
         </div>
@@ -261,12 +305,26 @@
                         <tr>
                             <td>Actual minutes worked</td>
                             <td class="text-end" colspan="2"></td>
-                            <td class="text-end">@Model.TotalMinutesWorked.ToString("0.##")</td>
+                            <td class="text-end">
+                                @(Model.TotalMinutesWorked.HasValue
+                                    ? Model.TotalMinutesWorked.Value.ToString("0.##")
+                                    : "--")
+                            </td>
                         </tr>
-                        <tr class="fw-semibold @(Model.VarianceFromGuideline > 0 ? "text-danger" : "text-success")">
+                        @{
+                            var variance = Model.VarianceFromGuideline;
+                            var varianceClass = variance.HasValue
+                                ? (variance.Value > 0 ? "text-danger" : variance.Value < 0 ? "text-success" : string.Empty)
+                                : "text-muted";
+                        }
+                        <tr class="fw-semibold @varianceClass">
                             <td>Variance (actual - guideline)</td>
                             <td class="text-end" colspan="2"></td>
-                            <td class="text-end">@Model.VarianceFromGuideline.ToString("+0.##;-0.##;0")</td>
+                            <td class="text-end">
+                                @(variance.HasValue
+                                    ? variance.Value.ToString("+0.##;-0.##;0")
+                                    : "--")
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -450,7 +508,21 @@
                                     <div>LC: <strong>@row.Summary.LinenChangeRooms</strong></div>
                                     <div>SO: <strong>@row.Summary.StayoverRooms</strong></div>
                                     <div>DND: <strong>@row.Summary.DndRooms</strong></div>
-                                    <div>Total hrs: @row.Summary.HoursWorked.ToString("0.##")</div>
+                                    <div>
+                                        Total hrs:
+                                        @if (row.Summary.HasRecordedHours)
+                                        {
+                                            @row.Summary.HoursWorked.ToString("0.##")
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">--</span>
+                                        }
+                                    </div>
+                                    @if (row.Summary.HasPendingHours)
+                                    {
+                                        <div class="text-warning small">Hours pending</div>
+                                    }
                                     <div>MPR: @(row.Summary.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
                                 </td>
                                 @foreach (var date in Model.LogDates)
@@ -462,12 +534,72 @@
                                             <div>LC: <strong>@cell.LinenChangeRooms</strong></div>
                                             <div>SO: <strong>@cell.StayoverRooms</strong></div>
                                             <div>DND: <strong>@cell.DndRooms</strong></div>
+                                            <div>
+                                                Hours:
+                                                @if (cell.HasRecordedHours)
+                                                {
+                                                    @cell.HoursWorked.ToString("0.##")
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">--</span>
+                                                }
+                                            </div>
+                                            @if (cell.HasPendingHours)
+                                            {
+                                                <div class="text-warning small">Hours pending</div>
+                                            }
                                             <div>MPR: @(cell.MinutesPerRoom?.ToString("0.##") ?? "--")</div>
+                                            @if (cell.Entries.Count == 1)
+                                            {
+                                                var entry = cell.Entries[0];
+                                                <div class="mt-2">
+                                                    <a class="btn btn-link btn-sm p-0"
+                                                       asp-action="MprTracker"
+                                                       asp-route-entryId="@entry.Id"
+                                                       asp-route-period="@filterPeriod"
+                                                       asp-route-month="@filterMonth"
+                                                       asp-route-year="@filterYear"
+                                                       asp-route-start="@filterStart"
+                                                       asp-route-end="@filterEnd">
+                                                        Edit entry
+                                                    </a>
+                                                    @if (entry.HasPendingHours)
+                                                    {
+                                                        <span class="badge bg-warning text-dark ms-2">Hours needed</span>
+                                                    }
+                                                </div>
+                                            }
+                                            else if (cell.Entries.Count > 1)
+                                            {
+                                                <div class="mt-2 border-top pt-1">
+                                                    <div class="text-muted small mb-1">Entries</div>
+                                                    @foreach (var entry in cell.Entries)
+                                                    {
+                                                        <div class="d-flex justify-content-between align-items-start gap-2 small mb-1">
+                                                            <div>
+                                                                <div>CO: <strong>@entry.CheckoutRooms</strong>, LC: <strong>@entry.LinenChangeRooms</strong>, SO: <strong>@entry.StayoverRooms</strong></div>
+                                                                <div>Hours: @(entry.HoursWorked.HasValue ? entry.HoursWorked.Value.ToString("0.##") : "--")</div>
+                                                            </div>
+                                                            <a class="btn btn-link btn-sm p-0"
+                                                               asp-action="MprTracker"
+                                                               asp-route-entryId="@entry.Id"
+                                                               asp-route-period="@filterPeriod"
+                                                               asp-route-month="@filterMonth"
+                                                               asp-route-year="@filterYear"
+                                                               asp-route-start="@filterStart"
+                                                               asp-route-end="@filterEnd">
+                                                                Edit
+                                                            </a>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
                                         </td>
                                     }
                                     else
                                     {
-                                        <td class="text-center text-muted">—</td>
+                                        <td class="text-center text-muted">&mdash;</td>
                                     }
                                 }
                             </tr>
