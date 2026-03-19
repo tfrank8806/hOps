@@ -385,6 +385,17 @@
             <h3 class="h6 mb-0">Productivity log</h3>
             <small class="text-muted">View daily stats for the selected period.</small>
         </div>
+        <div class="d-flex gap-2 align-items-center">
+            <a class="btn btn-outline-primary btn-sm"
+               asp-action="ExportMprLog"
+               asp-route-period="@filterPeriod"
+               asp-route-month="@filterMonth"
+               asp-route-year="@filterYear"
+               asp-route-start="@filterStart"
+               asp-route-end="@filterEnd">
+                Export (.xlsx)
+            </a>
+        </div>
     </div>
     <div class="card-body">
         <form asp-action="MprTracker" method="get" class="row g-3 align-items-end mb-3">

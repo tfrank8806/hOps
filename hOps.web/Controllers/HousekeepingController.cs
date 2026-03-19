@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
+using ClosedXML.Excel;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
@@ -114,6 +116,60 @@ namespace hOps.web.Controllers
             ApplyTempDataMessages(model);
 
             return View(model);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExportMprLog(string? period, int? month, int? year, DateTime? start, DateTime? end)
+        {
+            var routeValues = BuildFilterRouteValues(period, month, year, start, end);
+            var currentProperty = ViewBag.CurrentProperty as Property;
+
+            if (currentProperty == null)
+            {
+                TempData["MprTrackerError"] = "Select a property to export the productivity log.";
+                return RedirectToAction(nameof(MprTracker), routeValues);
+            }
+
+            var model = new MprTrackerViewModel
+            {
+                LogFilter = new MprTrackerLogFilterViewModel
+                {
+                    SelectedMonth = month ?? 0,
+                    SelectedYear = year ?? 0,
+                    PeriodType = string.IsNullOrWhiteSpace(period) ? MprTrackerLogFilterViewModel.PeriodMonth : period!,
+                    CustomStartDate = start,
+                    CustomEndDate = end
+                }
+            };
+
+            try
+            {
+                await PopulateMprTrackerAsync(model, currentProperty);
+            }
+            catch (Exception ex) when (HandleMissingMprSchema(ex, model))
+            {
+                TempData["MprTrackerError"] = MissingMprSchemaMessage;
+                return RedirectToAction(nameof(MprTracker), routeValues);
+            }
+
+            if (!model.LogRows.Any() || !model.LogDates.Any())
+            {
+                TempData["MprTrackerError"] = "No productivity entries were found for the selected range.";
+                return RedirectToAction(nameof(MprTracker), routeValues);
+            }
+
+            using var workbook = BuildMprLogWorkbook(model, currentProperty);
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            var fileNameSafeProperty = string.IsNullOrWhiteSpace(currentProperty.Name)
+                ? "Property"
+                : new string(currentProperty.Name.Where(ch => !Path.GetInvalidFileNameChars().Contains(ch)).ToArray());
+            if (string.IsNullOrWhiteSpace(fileNameSafeProperty))
+            {
+                fileNameSafeProperty = "Property";
+            }
+            var fileName = $"MprProductivity_{fileNameSafeProperty}_{DateTime.UtcNow:yyyyMMddHHmmss}.xlsx";
+            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
 
         [HttpPost]
@@ -820,6 +876,138 @@ namespace hOps.web.Controllers
 
                 _context.DeepCleanSessions.Add(session);
             }
+        }
+
+        private XLWorkbook BuildMprLogWorkbook(MprTrackerViewModel model, Property property)
+        {
+            var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Productivity Log");
+
+            var row = 1;
+            worksheet.Cell(row, 1).Value = "Property";
+            worksheet.Cell(row, 2).Value = property.Name;
+            row++;
+            worksheet.Cell(row, 1).Value = "Date range";
+            worksheet.Cell(row, 2).Value = BuildLogRangeDescription(model);
+            row++;
+            worksheet.Cell(row, 1).Value = "Generated";
+            worksheet.Cell(row, 2).Value = _timeZoneService.ConvertToUserTime(DateTime.UtcNow).ToString("g");
+            row += 2;
+
+            var headers = new[]
+            {
+                "Housekeeper",
+                "Date",
+                "Checkout Rooms",
+                "Linen Change Rooms",
+                "Stayover Rooms",
+                "Deep Clean Rooms",
+                "DND Rooms",
+                "Hours Worked",
+                "Hours Pending",
+                "Total Minutes Worked",
+                "Minutes Per Room",
+                "Entries"
+            };
+
+            for (var column = 0; column < headers.Length; column++)
+            {
+                worksheet.Cell(row, column + 1).Value = headers[column];
+            }
+            worksheet.Row(row).Style.Font.Bold = true;
+            row++;
+
+            var hasRows = false;
+            foreach (var logRow in model.LogRows.OrderBy(r => r.HousekeeperName, StringComparer.OrdinalIgnoreCase))
+            {
+                foreach (var date in model.LogDates)
+                {
+                    if (!logRow.Cells.TryGetValue(date.Date, out var cell))
+                    {
+                        continue;
+                    }
+
+                    if (cell.Entries.Count == 0
+                        && cell.CheckoutRooms == 0
+                        && cell.LinenChangeRooms == 0
+                        && cell.StayoverRooms == 0
+                        && cell.DeepCleanRooms == 0
+                        && cell.DndRooms == 0
+                        && !cell.HasRecordedHours
+                        && !cell.HasPendingHours)
+                    {
+                        continue;
+                    }
+
+                    hasRows = true;
+                    var localDate = _timeZoneService.ConvertToUserTime(date);
+                    worksheet.Cell(row, 1).Value = logRow.HousekeeperName;
+                    worksheet.Cell(row, 2).Value = localDate.ToString("yyyy-MM-dd");
+                    worksheet.Cell(row, 3).Value = cell.CheckoutRooms;
+                    worksheet.Cell(row, 4).Value = cell.LinenChangeRooms;
+                    worksheet.Cell(row, 5).Value = cell.StayoverRooms;
+                    worksheet.Cell(row, 6).Value = cell.DeepCleanRooms;
+                    worksheet.Cell(row, 7).Value = cell.DndRooms;
+                    worksheet.Cell(row, 8).Value = cell.HasRecordedHours ? cell.HoursWorked : null;
+                    worksheet.Cell(row, 9).Value = cell.HasPendingHours ? "Yes" : string.Empty;
+                    worksheet.Cell(row, 10).Value = cell.TotalMinutesWorked;
+                    worksheet.Cell(row, 11).Value = cell.MinutesPerRoom;
+                    worksheet.Cell(row, 12).Value = cell.Entries.Count;
+                    row++;
+                }
+            }
+
+            if (!hasRows)
+            {
+                worksheet.Cell(row, 1).Value = "No productivity entries found for the selected range.";
+                worksheet.Range(row, 1, row, headers.Length).Merge();
+                worksheet.Row(row).Style.Font.Italic = true;
+                row++;
+            }
+
+            row += 2;
+            worksheet.Cell(row, 1).Value = "Summary";
+            worksheet.Row(row).Style.Font.Bold = true;
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Checkout rooms";
+            worksheet.Cell(row, 2).Value = model.LogOverallTotals.CheckoutRooms;
+            row++;
+            worksheet.Cell(row, 1).Value = "Linen change rooms";
+            worksheet.Cell(row, 2).Value = model.LogOverallTotals.LinenChangeRooms;
+            row++;
+            worksheet.Cell(row, 1).Value = "Stayover rooms";
+            worksheet.Cell(row, 2).Value = model.LogOverallTotals.StayoverRooms;
+            row++;
+            worksheet.Cell(row, 1).Value = "Deep clean rooms";
+            worksheet.Cell(row, 2).Value = model.LogOverallTotals.DeepCleanRooms;
+            row++;
+            worksheet.Cell(row, 1).Value = "DND / No service";
+            worksheet.Cell(row, 2).Value = model.LogOverallTotals.DndRooms;
+            row++;
+            worksheet.Cell(row, 1).Value = "Hours worked";
+            worksheet.Cell(row, 2).Value = model.LogOverallTotals.HoursWorked;
+            row++;
+            worksheet.Cell(row, 1).Value = "Minutes per room";
+            worksheet.Cell(row, 2).Value = model.LogOverallTotals.MinutesPerRoom;
+
+            worksheet.Columns().AdjustToContents();
+            worksheet.RangeUsed().Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            worksheet.RangeUsed().Style.Border.InsideBorder = XLBorderStyleValues.Dotted;
+
+            return workbook;
+        }
+
+        private string BuildLogRangeDescription(MprTrackerViewModel model)
+        {
+            if (model.LogDates == null || !model.LogDates.Any())
+            {
+                return "No dates";
+            }
+
+            var startLocal = _timeZoneService.ConvertToUserTime(model.LogDates.First());
+            var endLocal = _timeZoneService.ConvertToUserTime(model.LogDates.Last());
+            return $"{startLocal:yyyy-MM-dd} - {endLocal:yyyy-MM-dd}";
         }
 
         private bool HandleMissingMprSchema(Exception ex, MprTrackerViewModel? model = null)
