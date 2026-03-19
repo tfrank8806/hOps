@@ -948,10 +948,10 @@ namespace hOps.web.Controllers
                     worksheet.Cell(row, 5).Value = cell.StayoverRooms;
                     worksheet.Cell(row, 6).Value = cell.DeepCleanRooms;
                     worksheet.Cell(row, 7).Value = cell.DndRooms;
-                    worksheet.Cell(row, 8).Value = cell.HasRecordedHours ? cell.HoursWorked : null;
+                    worksheet.Cell(row, 8).SetValue(cell.HasRecordedHours ? (double?)cell.HoursWorked : null);
                     worksheet.Cell(row, 9).Value = cell.HasPendingHours ? "Yes" : string.Empty;
                     worksheet.Cell(row, 10).Value = cell.TotalMinutesWorked;
-                    worksheet.Cell(row, 11).Value = cell.MinutesPerRoom;
+                    worksheet.Cell(row, 11).SetValue(cell.MinutesPerRoom.HasValue ? (double?)cell.MinutesPerRoom : null);
                     worksheet.Cell(row, 12).Value = cell.Entries.Count;
                     row++;
                 }
