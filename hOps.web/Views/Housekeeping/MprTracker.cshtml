@@ -507,7 +507,7 @@
                     <tbody>
                         @foreach (var row in Model.LogRows)
                         {
-                            <tr>
+                            <tr class="mpr-log-row">
                                 <th scope="row" class="mpr-log-col-housekeeper">@row.HousekeeperName</th>
                                 <td class="small mpr-log-col-totals">
                                     <div class="mpr-log-line">CO: <strong>@row.Summary.CheckoutRooms</strong></div>
@@ -612,7 +612,7 @@
                         }
                     </tr>
                 }
-                <tr class="table-light fw-semibold">
+                <tr class="table-light fw-semibold summary-row">
                     <th scope="row" class="mpr-log-col-housekeeper">Totals</th>
                     <td class="small mpr-log-col-totals">
                         <div class="mpr-log-line">CO: <strong>@Model.LogOverallTotals.CheckoutRooms</strong></div>

@@ -2554,6 +2554,28 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     z-index: 4;
 }
 
+.mpr-log-table tbody tr {
+    border-top: 1px solid rgba(148, 163, 184, 0.4);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.mpr-log-table tbody tr + tr {
+    border-top: none;
+}
+
+.mpr-log-table tbody tr:first-of-type {
+    border-top: 2px solid rgba(15, 23, 42, 0.35);
+}
+
+.mpr-log-table tbody tr:last-of-type {
+    border-bottom: 2px solid rgba(15, 23, 42, 0.35);
+}
+
+.mpr-log-table tbody tr.summary-row {
+    border-top: 2px solid rgba(15, 23, 42, 0.35);
+    border-bottom: 2px solid rgba(15, 23, 42, 0.35);
+}
+
 .mpr-log-legend .badge {
     font-size: 0.75rem;
     letter-spacing: 0.02em;
