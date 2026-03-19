@@ -127,6 +127,11 @@
                 <span asp-validation-for="StayoverRooms" class="text-danger small"></span>
             </div>
             <div class="col-md-2">
+                <label asp-for="DeepCleanRooms" class="form-label"></label>
+                <input asp-for="DeepCleanRooms" class="form-control" type="number" min="0" step="1" />
+                <span asp-validation-for="DeepCleanRooms" class="text-danger small"></span>
+            </div>
+            <div class="col-md-2">
                 <label asp-for="DndRooms" class="form-label"></label>
                 <input asp-for="DndRooms" class="form-control" type="number" min="0" step="1" />
                 <span asp-validation-for="DndRooms" class="text-danger small"></span>
@@ -146,7 +151,7 @@
                         Managers can override the corporate time standards for this calculation. Changes apply only to this submission.
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label asp-for="DepartureStandardMinutes" class="form-label"></label>
                     <div class="input-group">
                         <input asp-for="DepartureStandardMinutes" class="form-control" type="number" min="1" max="180" step="0.5" />
@@ -154,7 +159,7 @@
                     </div>
                     <span asp-validation-for="DepartureStandardMinutes" class="text-danger small"></span>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label asp-for="LinenChangeStandardMinutes" class="form-label"></label>
                     <div class="input-group">
                         <input asp-for="LinenChangeStandardMinutes" class="form-control" type="number" min="1" max="180" step="0.5" />
@@ -162,13 +167,21 @@
                     </div>
                     <span asp-validation-for="LinenChangeStandardMinutes" class="text-danger small"></span>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label asp-for="StayoverStandardMinutes" class="form-label"></label>
                     <div class="input-group">
                         <input asp-for="StayoverStandardMinutes" class="form-control" type="number" min="1" max="180" step="0.5" />
                         <span class="input-group-text">min</span>
                     </div>
                     <span asp-validation-for="StayoverStandardMinutes" class="text-danger small"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="DeepCleanStandardMinutes" class="form-label"></label>
+                    <div class="input-group">
+                        <input asp-for="DeepCleanStandardMinutes" class="form-control" type="number" min="1" max="240" step="0.5" />
+                        <span class="input-group-text">min</span>
+                    </div>
+                    <span asp-validation-for="DeepCleanStandardMinutes" class="text-danger small"></span>
                 </div>
             }
             else
@@ -177,7 +190,8 @@
                     <div class="alert alert-light border small mb-0">
                         Using Aimbridge standards (checkout @Model.DepartureStandardMinutes.ToString("0.##") min,
                         linen change @Model.LinenChangeStandardMinutes.ToString("0.##") min,
-                        stayover @Model.StayoverStandardMinutes.ToString("0.##") min). Managers can adjust these values.
+                        stayover @Model.StayoverStandardMinutes.ToString("0.##") min,
+                        deep clean @Model.DeepCleanStandardMinutes.ToString("0.##") min). Managers can adjust these values.
                     </div>
                 </div>
             }
@@ -218,7 +232,8 @@
                     <p class="mb-0 text-muted small">
                         Includes @Model.CheckoutRooms checkout(s),
                         @Model.LinenChangeRooms linen change(s),
-                        and @Model.StayoverRooms stayover(s).<br />
+                        @Model.StayoverRooms stayover(s),
+                        and @Model.DeepCleanRooms deep clean(s).<br />
                         @Model.DndRooms DND / no service rooms reported.
                     </p>
                 </div>
@@ -274,7 +289,8 @@
             <small class="text-muted">
                 Departure rooms &lt;= @Model.DepartureStandardMinutes.ToString("0.##") min,
                 linen changes &lt;= @Model.LinenChangeStandardMinutes.ToString("0.##") min,
-                stayovers &lt;= @Model.StayoverStandardMinutes.ToString("0.##") min.
+                stayovers &lt;= @Model.StayoverStandardMinutes.ToString("0.##") min,
+                deep cleans &lt;= @Model.DeepCleanStandardMinutes.ToString("0.##") min.
             </small>
         </div>
         <div class="card-body">
@@ -306,6 +322,12 @@
                             <td class="text-end">@Model.StayoverRooms</td>
                             <td class="text-end">@Model.StayoverStandardMinutes.ToString("0.##")</td>
                             <td class="text-end">@Model.StayoverGuidelineTotalMinutes.ToString("0")</td>
+                        </tr>
+                        <tr>
+                            <td>Deep clean</td>
+                            <td class="text-end">@Model.DeepCleanRooms</td>
+                            <td class="text-end">@Model.DeepCleanStandardMinutes.ToString("0.##")</td>
+                            <td class="text-end">@Model.DeepCleanGuidelineTotalMinutes.ToString("0")</td>
                         </tr>
                         <tr class="table-light fw-semibold">
                             <td>Total guideline minutes</td>
@@ -458,6 +480,7 @@
                                     <div>CO: <strong>@row.Summary.CheckoutRooms</strong></div>
                                     <div>LC: <strong>@row.Summary.LinenChangeRooms</strong></div>
                                     <div>SO: <strong>@row.Summary.StayoverRooms</strong></div>
+                                    <div>DC: <strong>@row.Summary.DeepCleanRooms</strong></div>
                                     <div>DND: <strong>@row.Summary.DndRooms</strong></div>
                                     <div>
                                         Total hrs:
@@ -484,6 +507,7 @@
                                             <div>CO: <strong>@cell.CheckoutRooms</strong></div>
                                             <div>LC: <strong>@cell.LinenChangeRooms</strong></div>
                                             <div>SO: <strong>@cell.StayoverRooms</strong></div>
+                                            <div>DC: <strong>@cell.DeepCleanRooms</strong></div>
                                             <div>DND: <strong>@cell.DndRooms</strong></div>
                                             <div>
                                                 Hours:
@@ -529,7 +553,7 @@
                                                     {
                                                         <div class="d-flex justify-content-between align-items-start gap-2 small mb-1">
                                                             <div>
-                                                                <div>CO: <strong>@entry.CheckoutRooms</strong>, LC: <strong>@entry.LinenChangeRooms</strong>, SO: <strong>@entry.StayoverRooms</strong></div>
+                                                                <div>CO: <strong>@entry.CheckoutRooms</strong>, LC: <strong>@entry.LinenChangeRooms</strong>, SO: <strong>@entry.StayoverRooms</strong>, DC: <strong>@entry.DeepCleanRooms</strong></div>
                                                                 <div>Hours: @(entry.HoursWorked.HasValue ? entry.HoursWorked.Value.ToString("0.##") : "--")</div>
                                                             </div>
                                                             <a class="btn btn-link btn-sm p-0"

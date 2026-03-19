@@ -9,6 +9,7 @@ namespace hOps.web.ViewModels.Housekeeping
         public const int DefaultDepartureMinutes = 30;
         public const int DefaultLinenChangeMinutes = 20;
         public const int DefaultStayoverMinutes = 15;
+        public const int DefaultDeepCleanMinutes = 60;
 
         [Display(Name = "Housekeeper")]
         public int? SelectedHousekeeperId { get; set; }
@@ -29,6 +30,10 @@ namespace hOps.web.ViewModels.Housekeeping
         [Range(0, 500, ErrorMessage = "Enter a value of 0 or greater.")]
         public int StayoverRooms { get; set; }
 
+        [Display(Name = "Deep clean rooms completed")]
+        [Range(0, 500, ErrorMessage = "Enter a value of 0 or greater.")]
+        public int DeepCleanRooms { get; set; }
+
         [Display(Name = "DND / No service rooms")]
         [Range(0, 500, ErrorMessage = "Enter a value of 0 or greater.")]
         public int DndRooms { get; set; }
@@ -48,6 +53,10 @@ namespace hOps.web.ViewModels.Housekeeping
         [Display(Name = "Stayover target (minutes)")]
         [Range(1, 180, ErrorMessage = "Use a value between 1 and 180 minutes.")]
         public decimal StayoverStandardMinutes { get; set; } = DefaultStayoverMinutes;
+
+        [Display(Name = "Deep clean target (minutes)")]
+        [Range(1, 240, ErrorMessage = "Use a value between 1 and 240 minutes.")]
+        public decimal DeepCleanStandardMinutes { get; set; } = DefaultDeepCleanMinutes;
 
         public bool CanEditStandards { get; set; }
         public bool CanManageHousekeepers { get; set; }
@@ -71,7 +80,7 @@ namespace hOps.web.ViewModels.Housekeeping
             ? Math.Round(HoursWorked.Value * 60m, 2, MidpointRounding.AwayFromZero)
             : null;
 
-        public int TotalRoomsCleaned => CheckoutRooms + LinenChangeRooms + StayoverRooms;
+        public int TotalRoomsCleaned => CheckoutRooms + LinenChangeRooms + StayoverRooms + DeepCleanRooms;
 
         public int TotalRoomsTrackedForMpr => CheckoutRooms + StayoverRooms;
 
@@ -83,9 +92,12 @@ namespace hOps.web.ViewModels.Housekeeping
 
         public decimal StayoverGuidelineTotalMinutes => StayoverRooms * StayoverStandardMinutes;
 
+        public decimal DeepCleanGuidelineTotalMinutes => DeepCleanRooms * DeepCleanStandardMinutes;
+
         public decimal TotalGuidelineMinutes => DepartureGuidelineTotalMinutes
                                                 + LinenChangeGuidelineTotalMinutes
-                                                + StayoverGuidelineTotalMinutes;
+                                                + StayoverGuidelineTotalMinutes
+                                                + DeepCleanGuidelineTotalMinutes;
 
         public decimal? VarianceFromGuideline => TotalMinutesWorked.HasValue
             ? TotalMinutesWorked.Value - TotalGuidelineMinutes
@@ -112,6 +124,7 @@ namespace hOps.web.ViewModels.Housekeeping
             DepartureStandardMinutes = DefaultDepartureMinutes;
             LinenChangeStandardMinutes = DefaultLinenChangeMinutes;
             StayoverStandardMinutes = DefaultStayoverMinutes;
+            DeepCleanStandardMinutes = DefaultDeepCleanMinutes;
         }
 
         public void ResetEntryInputs(DateTime? preservedEntryDate = null)
@@ -124,6 +137,7 @@ namespace hOps.web.ViewModels.Housekeeping
             CheckoutRooms = 0;
             LinenChangeRooms = 0;
             StayoverRooms = 0;
+            DeepCleanRooms = 0;
             DndRooms = 0;
             HoursWorked = null;
             HasResults = false;
@@ -145,6 +159,11 @@ namespace hOps.web.ViewModels.Housekeeping
             if (StayoverStandardMinutes <= 0)
             {
                 StayoverStandardMinutes = DefaultStayoverMinutes;
+            }
+
+            if (DeepCleanStandardMinutes <= 0)
+            {
+                DeepCleanStandardMinutes = DefaultDeepCleanMinutes;
             }
         }
     }
@@ -222,6 +241,7 @@ namespace hOps.web.ViewModels.Housekeeping
         public int CheckoutRooms { get; set; }
         public int LinenChangeRooms { get; set; }
         public int StayoverRooms { get; set; }
+        public int DeepCleanRooms { get; set; }
         public int DndRooms { get; set; }
         public decimal HoursWorked { get; set; }
         public decimal TotalMinutesWorked { get; set; }
@@ -236,6 +256,7 @@ namespace hOps.web.ViewModels.Housekeeping
         public int CheckoutRooms { get; set; }
         public int LinenChangeRooms { get; set; }
         public int StayoverRooms { get; set; }
+        public int DeepCleanRooms { get; set; }
         public int DndRooms { get; set; }
         public decimal HoursWorked { get; set; }
         public bool HasRecordedHours { get; set; }
@@ -260,6 +281,7 @@ namespace hOps.web.ViewModels.Housekeeping
         public int CheckoutRooms { get; set; }
         public int LinenChangeRooms { get; set; }
         public int StayoverRooms { get; set; }
+        public int DeepCleanRooms { get; set; }
         public int DndRooms { get; set; }
         public decimal? HoursWorked { get; set; }
         public decimal TotalMinutesWorked { get; set; }

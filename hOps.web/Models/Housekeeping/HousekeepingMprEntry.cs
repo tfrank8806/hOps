@@ -14,6 +14,7 @@ namespace hOps.web.Models
         public int CheckoutRooms { get; set; }
         public int LinenChangeRooms { get; set; }
         public int StayoverRooms { get; set; }
+        public int DeepCleanRooms { get; set; }
         public int DndRooms { get; set; }
         public decimal? HoursWorked { get; set; }
         public decimal TotalMinutesWorked { get; set; }
@@ -21,6 +22,7 @@ namespace hOps.web.Models
         public decimal DepartureStandardMinutes { get; set; }
         public decimal LinenChangeStandardMinutes { get; set; }
         public decimal StayoverStandardMinutes { get; set; }
+        public decimal DeepCleanStandardMinutes { get; set; }
         public DateTime CreatedAt { get; set; }
         public string? CreatedByUserId { get; set; }
         public ApplicationUser? CreatedByUser { get; set; }

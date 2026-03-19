@@ -206,6 +206,7 @@ namespace hOps.web.Controllers
                 entry.CheckoutRooms = model.CheckoutRooms;
                 entry.LinenChangeRooms = model.LinenChangeRooms;
                 entry.StayoverRooms = model.StayoverRooms;
+                entry.DeepCleanRooms = model.DeepCleanRooms;
                 entry.DndRooms = model.DndRooms;
                 entry.HoursWorked = model.HoursWorked;
                 entry.TotalMinutesWorked = model.TotalMinutesWorked ?? 0;
@@ -213,6 +214,7 @@ namespace hOps.web.Controllers
                 entry.DepartureStandardMinutes = model.DepartureStandardMinutes;
                 entry.LinenChangeStandardMinutes = model.LinenChangeStandardMinutes;
                 entry.StayoverStandardMinutes = model.StayoverStandardMinutes;
+                entry.DeepCleanStandardMinutes = model.DeepCleanStandardMinutes;
 
                 await _context.SaveChangesAsync();
 
@@ -515,11 +517,13 @@ namespace hOps.web.Controllers
             model.CheckoutRooms = entry.CheckoutRooms;
             model.LinenChangeRooms = entry.LinenChangeRooms;
             model.StayoverRooms = entry.StayoverRooms;
+            model.DeepCleanRooms = entry.DeepCleanRooms;
             model.DndRooms = entry.DndRooms;
             model.HoursWorked = entry.HoursWorked;
             model.DepartureStandardMinutes = entry.DepartureStandardMinutes;
             model.LinenChangeStandardMinutes = entry.LinenChangeStandardMinutes;
             model.StayoverStandardMinutes = entry.StayoverStandardMinutes;
+            model.DeepCleanStandardMinutes = entry.DeepCleanStandardMinutes;
             model.Calculate();
         }
 
@@ -567,6 +571,7 @@ namespace hOps.web.Controllers
                 cell.CheckoutRooms += entry.CheckoutRooms;
                 cell.LinenChangeRooms += entry.LinenChangeRooms;
                 cell.StayoverRooms += entry.StayoverRooms;
+                cell.DeepCleanRooms += entry.DeepCleanRooms;
                 cell.DndRooms += entry.DndRooms;
                 cell.TotalMinutesWorked += entry.TotalMinutesWorked;
                 if (entry.HoursWorked.HasValue)
@@ -586,6 +591,7 @@ namespace hOps.web.Controllers
                 row.Summary.CheckoutRooms += entry.CheckoutRooms;
                 row.Summary.LinenChangeRooms += entry.LinenChangeRooms;
                 row.Summary.StayoverRooms += entry.StayoverRooms;
+                row.Summary.DeepCleanRooms += entry.DeepCleanRooms;
                 row.Summary.DndRooms += entry.DndRooms;
                 row.Summary.TotalMinutesWorked += entry.HoursWorked.HasValue ? entry.TotalMinutesWorked : 0;
 
@@ -596,6 +602,7 @@ namespace hOps.web.Controllers
                     CheckoutRooms = entry.CheckoutRooms,
                     LinenChangeRooms = entry.LinenChangeRooms,
                     StayoverRooms = entry.StayoverRooms,
+                    DeepCleanRooms = entry.DeepCleanRooms,
                     DndRooms = entry.DndRooms,
                     HoursWorked = entry.HoursWorked,
                     TotalMinutesWorked = entry.TotalMinutesWorked,
