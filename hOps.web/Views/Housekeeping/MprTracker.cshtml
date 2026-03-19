@@ -484,8 +484,8 @@
                 <table class="table table-bordered table-sm align-middle mb-0 mpr-log-table">
                     <thead class="table-light">
                         <tr>
-                            <th class="text-nowrap">Housekeeper</th>
-                            <th class="text-nowrap">Totals</th>
+                            <th class="text-nowrap mpr-log-col-housekeeper">Housekeeper</th>
+                            <th class="text-nowrap mpr-log-col-totals">Totals</th>
                             @foreach (var date in Model.LogDates)
                             {
                                 <th class="text-center text-nowrap">@date.ToString("MMM d")</th>
@@ -496,8 +496,8 @@
                         @foreach (var row in Model.LogRows)
                         {
                             <tr>
-                                <th scope="row">@row.HousekeeperName</th>
-                                <td class="small">
+                                <th scope="row" class="mpr-log-col-housekeeper">@row.HousekeeperName</th>
+                                <td class="small mpr-log-col-totals">
                                     <div class="mpr-log-line">CO: <strong>@row.Summary.CheckoutRooms</strong></div>
                                     <div class="mpr-log-line">LC: <strong>@row.Summary.LinenChangeRooms</strong></div>
                                     <div class="mpr-log-line">SO: <strong>@row.Summary.StayoverRooms</strong></div>
@@ -601,8 +601,8 @@
                     </tr>
                 }
                 <tr class="table-light fw-semibold">
-                    <th scope="row">Totals</th>
-                    <td class="small">
+                    <th scope="row" class="mpr-log-col-housekeeper">Totals</th>
+                    <td class="small mpr-log-col-totals">
                         <div class="mpr-log-line">CO: <strong>@Model.LogOverallTotals.CheckoutRooms</strong></div>
                         <div class="mpr-log-line">LC: <strong>@Model.LogOverallTotals.LinenChangeRooms</strong></div>
                         <div class="mpr-log-line">SO: <strong>@Model.LogOverallTotals.StayoverRooms</strong></div>

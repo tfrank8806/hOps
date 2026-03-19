@@ -2504,6 +2504,11 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     }
 }
 
+:root {
+    --mpr-log-housekeeper-width: 220px;
+    --mpr-log-totals-width: 240px;
+}
+
 .mpr-log-table .mpr-log-line {
     white-space: nowrap;
 }
@@ -2511,6 +2516,32 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 .mpr-log-table td,
 .mpr-log-table th {
     vertical-align: top;
+}
+
+.mpr-log-table .mpr-log-col-housekeeper {
+    position: sticky;
+    left: 0;
+    min-width: var(--mpr-log-housekeeper-width);
+    max-width: var(--mpr-log-housekeeper-width);
+    background-color: var(--brand-surface, #fff);
+    z-index: 3;
+}
+
+.mpr-log-table .mpr-log-col-totals {
+    position: sticky;
+    left: var(--mpr-log-housekeeper-width);
+    min-width: var(--mpr-log-totals-width);
+    max-width: var(--mpr-log-totals-width);
+    background-color: var(--brand-surface, #fff);
+    z-index: 2;
+}
+
+.mpr-log-table thead .mpr-log-col-housekeeper {
+    z-index: 5;
+}
+
+.mpr-log-table thead .mpr-log-col-totals {
+    z-index: 4;
 }
 
 .issue-report-fab {
