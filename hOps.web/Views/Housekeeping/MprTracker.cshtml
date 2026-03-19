@@ -177,7 +177,7 @@
                 <input asp-for="LogFilter.CustomStartDate" type="hidden" />
                 <input asp-for="LogFilter.CustomEndDate" type="hidden" />
                 <button type="submit" class="btn btn-primary" disabled="@disableHousekeeperSelect">
-                    @(Model.IsEditing ? "Update Entry" : "Calculate &amp; Save")
+                    @(Model.IsEditing ? "Update Entry" : "Calculate & Save")
                 </button>
                 @if (Model.IsEditing)
                 {
