@@ -114,6 +114,22 @@ namespace hOps.web.ViewModels.Housekeeping
             StayoverStandardMinutes = DefaultStayoverMinutes;
         }
 
+        public void ResetEntryInputs(DateTime? preservedEntryDate = null)
+        {
+            EntryDate = preservedEntryDate.HasValue
+                ? DateTime.SpecifyKind(preservedEntryDate.Value.Date, DateTimeKind.Utc)
+                : DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+
+            SelectedHousekeeperId = null;
+            CheckoutRooms = 0;
+            LinenChangeRooms = 0;
+            StayoverRooms = 0;
+            DndRooms = 0;
+            HoursWorked = null;
+            HasResults = false;
+            MinutesPerRoom = null;
+        }
+
         private void NormalizeStandards()
         {
             if (DepartureStandardMinutes <= 0)

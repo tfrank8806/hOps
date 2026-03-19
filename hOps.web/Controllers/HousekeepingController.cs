@@ -154,6 +154,7 @@ namespace hOps.web.Controllers
                 }
 
                 model.Calculate();
+                var preservedEntryDate = model.EntryDate;
 
                 if (currentProperty == null)
                 {
@@ -224,6 +225,8 @@ namespace hOps.web.Controllers
                     : $"Updated entry for {housekeeper.Name} on {model.EntryDate:MMM d}.";
 
                 await PopulateMprTrackerAsync(model, currentProperty);
+                model.ResetEntryInputs(preservedEntryDate);
+                ModelState.Clear();
                 return View(model);
             }
             catch (Exception ex) when (HandleMissingMprSchema(ex, model))
