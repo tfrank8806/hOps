@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace hOps.web.Models
 {
@@ -16,6 +17,7 @@ namespace hOps.web.Models
         public int StayoverRooms { get; set; }
         public int DeepCleanRooms { get; set; }
         public int DndRooms { get; set; }
+        public string? DeepCleanRoomNumbers { get; set; }
         public decimal? HoursWorked { get; set; }
         public decimal TotalMinutesWorked { get; set; }
         public decimal? MinutesPerRoom { get; set; }
@@ -26,5 +28,6 @@ namespace hOps.web.Models
         public DateTime CreatedAt { get; set; }
         public string? CreatedByUserId { get; set; }
         public ApplicationUser? CreatedByUser { get; set; }
+        public ICollection<DeepCleanSession> DeepCleanSessions { get; set; } = new List<DeepCleanSession>();
     }
 }

@@ -34,6 +34,9 @@ namespace hOps.web.ViewModels.Housekeeping
         [Range(0, 500, ErrorMessage = "Enter a value of 0 or greater.")]
         public int DeepCleanRooms { get; set; }
 
+        [Display(Name = "Deep clean room numbers")]
+        public string DeepCleanRoomNumbers { get; set; } = string.Empty;
+
         [Display(Name = "DND / No service rooms")]
         [Range(0, 500, ErrorMessage = "Enter a value of 0 or greater.")]
         public int DndRooms { get; set; }
@@ -141,6 +144,7 @@ namespace hOps.web.ViewModels.Housekeeping
             StayoverRooms = 0;
             DeepCleanRooms = 0;
             DndRooms = 0;
+            DeepCleanRoomNumbers = string.Empty;
             HoursWorked = null;
             HasResults = false;
             MinutesPerRoom = null;

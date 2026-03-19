@@ -37,5 +37,8 @@ namespace hOps.web.Models
         public DateTime LastSavedAtUtc { get; set; } = DateTime.UtcNow;
 
         public ICollection<DeepCleanSessionTask> Tasks { get; set; } = new List<DeepCleanSessionTask>();
+
+        public int? HousekeepingMprEntryId { get; set; }
+        public HousekeepingMprEntry? HousekeepingMprEntry { get; set; }
     }
 }

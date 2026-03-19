@@ -145,6 +145,26 @@ namespace hOps.web.Controllers
                 ModelState.AddModelError(nameof(model.SelectedHousekeeperId), "Select a housekeeper before saving.");
             }
 
+            var deepCleanRoomNumbers = ParseDeepCleanRoomNumbers(model.DeepCleanRoomNumbers);
+            if (model.DeepCleanRooms > 0)
+            {
+                if (!deepCleanRoomNumbers.Any())
+                {
+                    ModelState.AddModelError(nameof(model.DeepCleanRoomNumbers), "Enter the room numbers that were deep cleaned.");
+                }
+                else if (deepCleanRoomNumbers.Count != model.DeepCleanRooms)
+                {
+                    ModelState.AddModelError(
+                        nameof(model.DeepCleanRoomNumbers),
+                        $"Enter {model.DeepCleanRooms} room number(s) to match the deep clean count.");
+                }
+            }
+            else
+            {
+                deepCleanRoomNumbers.Clear();
+                model.DeepCleanRoomNumbers = string.Empty;
+            }
+
             try
             {
                 if (!ModelState.IsValid)
@@ -208,6 +228,9 @@ namespace hOps.web.Controllers
                 entry.StayoverRooms = model.StayoverRooms;
                 entry.DeepCleanRooms = model.DeepCleanRooms;
                 entry.DndRooms = model.DndRooms;
+                entry.DeepCleanRoomNumbers = deepCleanRoomNumbers.Any()
+                    ? string.Join("\n", deepCleanRoomNumbers)
+                    : null;
                 entry.HoursWorked = model.HoursWorked;
                 entry.TotalMinutesWorked = model.TotalMinutesWorked ?? 0;
                 entry.MinutesPerRoom = model.MinutesPerRoom;
@@ -217,6 +240,12 @@ namespace hOps.web.Controllers
                 entry.DeepCleanStandardMinutes = model.DeepCleanStandardMinutes;
 
                 await _context.SaveChangesAsync();
+
+                if (currentProperty != null)
+                {
+                    await SyncDeepCleanSessionsAsync(entry, currentProperty, currentUser, deepCleanRoomNumbers);
+                    await _context.SaveChangesAsync();
+                }
 
                 model.EntrySaved = true;
                 model.EditingEntryId = null;
@@ -524,6 +553,7 @@ namespace hOps.web.Controllers
             model.StayoverRooms = entry.StayoverRooms;
             model.DeepCleanRooms = entry.DeepCleanRooms;
             model.DndRooms = entry.DndRooms;
+            model.DeepCleanRoomNumbers = entry.DeepCleanRoomNumbers ?? string.Empty;
             model.HoursWorked = entry.HoursWorked;
             model.DepartureStandardMinutes = entry.DepartureStandardMinutes;
             model.LinenChangeStandardMinutes = entry.LinenChangeStandardMinutes;
@@ -712,6 +742,86 @@ namespace hOps.web.Controllers
             public MprTrackerLogSummaryViewModel OverallTotals { get; init; } = new();
         }
 
+        private static List<string> ParseDeepCleanRoomNumbers(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return new List<string>();
+            }
+
+            var separators = new[] { '\r', '\n', ',', ';' };
+            return raw
+                .Split(separators, StringSplitOptions.RemoveEmptyEntries)
+                .Select(r => r.Trim())
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .ToList();
+        }
+
+        private async Task SyncDeepCleanSessionsAsync(
+            HousekeepingMprEntry entry,
+            Property property,
+            ApplicationUser? user,
+            IReadOnlyCollection<string> roomNumbers)
+        {
+            var existingSessions = await _context.DeepCleanSessions
+                .Where(s => s.HousekeepingMprEntryId == entry.Id)
+                .ToListAsync();
+
+            if (existingSessions.Any())
+            {
+                _context.DeepCleanSessions.RemoveRange(existingSessions);
+            }
+
+            if (roomNumbers == null || roomNumbers.Count == 0)
+            {
+                return;
+            }
+
+            var userId = user?.Id ?? string.Empty;
+            var rooms = await _context.Rooms
+                .Where(r => r.PropertyId == property.Id && r.IncludeInDeepClean)
+                .ToListAsync();
+
+            var roomLookup = new Dictionary<string, Room>(StringComparer.OrdinalIgnoreCase);
+            foreach (var room in rooms)
+            {
+                var number = room.RoomNumber?.Trim();
+                if (!string.IsNullOrWhiteSpace(number) && !roomLookup.ContainsKey(number))
+                {
+                    roomLookup[number] = room;
+                }
+            }
+
+            var completionUtc = entry.EntryDate == default ? DateTime.UtcNow.Date : entry.EntryDate;
+
+            foreach (var roomText in roomNumbers)
+            {
+                var cleanedRoom = roomText.Trim();
+                if (string.IsNullOrEmpty(cleanedRoom))
+                {
+                    continue;
+                }
+
+                roomLookup.TryGetValue(cleanedRoom, out var matchedRoom);
+                var session = new DeepCleanSession
+                {
+                    PropertyId = property.Id,
+                    RoomId = matchedRoom?.Id,
+                    RoomNumber = matchedRoom?.RoomNumber ?? cleanedRoom,
+                    CreatedById = userId,
+                    StartedAtUtc = completionUtc,
+                    Status = DeepCleanSessionStatus.Completed,
+                    CompletedAtUtc = completionUtc,
+                    CompletedById = userId,
+                    LastSavedAtUtc = completionUtc,
+                    TotalDurationSeconds = 0,
+                    HousekeepingMprEntryId = entry.Id
+                };
+
+                _context.DeepCleanSessions.Add(session);
+            }
+        }
+
         private bool HandleMissingMprSchema(Exception ex, MprTrackerViewModel? model = null)
         {
             if (!IsMissingMprSchemaException(ex))
@@ -727,6 +837,8 @@ namespace hOps.web.Controllers
                 model.Housekeepers = new List<HousekeeperOptionViewModel>();
                 model.LogRows = new List<MprTrackerLogRowViewModel>();
                 model.LogDates = new List<DateTime>();
+                model.LogDailyTotals = new Dictionary<DateTime, MprTrackerLogSummaryViewModel>();
+                model.LogOverallTotals = new MprTrackerLogSummaryViewModel();
             }
             else
             {

@@ -910,6 +910,12 @@ namespace hOps.web.Data
                 .OnDelete(DeleteBehavior.SetNull);
 
             builder.Entity<DeepCleanSession>()
+                .HasOne(s => s.HousekeepingMprEntry)
+                .WithMany(e => e.DeepCleanSessions)
+                .HasForeignKey(s => s.HousekeepingMprEntryId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<DeepCleanSession>()
                 .HasIndex(s => new { s.PropertyId, s.Status });
 
             builder.Entity<DeepCleanSessionTask>()
