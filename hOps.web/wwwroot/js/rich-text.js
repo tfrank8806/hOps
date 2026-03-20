@@ -856,6 +856,23 @@
     }
 
     function handleKeydown(event, context) {
+        if (!context || !context.editor) {
+            return;
+        }
+
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            if (context.editor.dataset.mentionsActive !== 'true') {
+                if (event.key === 'ArrowUp' && isCaretAtBoundary(context.editor, 'start')) {
+                    event.preventDefault();
+                    return;
+                }
+                if (event.key === 'ArrowDown' && isCaretAtBoundary(context.editor, 'end')) {
+                    event.preventDefault();
+                    return;
+                }
+            }
+        }
+
         if (event.key === 'Enter' && !event.shiftKey && !event.altKey && !event.metaKey) {
             event.preventDefault();
             insertParagraph(context);
@@ -878,6 +895,25 @@
             event.preventDefault();
             applyInlineCommand(context, 'underline');
         }
+    }
+
+    function isCaretAtBoundary(editor, boundary) {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0 || !selection.isCollapsed) {
+            return false;
+        }
+        const range = selection.getRangeAt(0);
+        if (!editor.contains(range.startContainer)) {
+            return false;
+        }
+        const probe = document.createRange();
+        probe.selectNodeContents(editor);
+        if (boundary === 'start') {
+            probe.setEnd(range.startContainer, range.startOffset);
+            return probe.collapsed;
+        }
+        probe.setStart(range.endContainer, range.endOffset);
+        return probe.collapsed;
     }
 
     function insertParagraph(context) {

@@ -261,6 +261,7 @@
 
         positionSuggestions(input, container);
         container.classList.remove('d-none');
+        input.dataset.mentionsActive = 'true';
     }
 
     function hideSuggestions(input) {
@@ -274,6 +275,7 @@
         if (info.container) {
             info.container.classList.add('d-none');
         }
+        delete input.dataset.mentionsActive;
     }
 
     function positionSuggestions(input, container) {
