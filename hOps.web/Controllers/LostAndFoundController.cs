@@ -1,8 +1,11 @@
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
+using hOps.web.ViewModels.WorkOrders;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -96,6 +99,38 @@ namespace hOps.web.Controllers
                 return View("Index", viewModel);
             }
 
+            var housekeepingDepartments = new Dictionary<int, Department>();
+            Department? fallbackHousekeepingDepartment = null;
+
+            if (targetPropertyIds.Any())
+            {
+                var candidateDepartments = await _context.Departments
+                    .Where(d => !d.PropertyId.HasValue || targetPropertyIds.Contains(d.PropertyId.Value))
+                    .ToListAsync();
+
+                foreach (var department in candidateDepartments)
+                {
+                    if (string.IsNullOrWhiteSpace(department.Name) ||
+                        !department.Name.Equals("Housekeeping", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (department.PropertyId.HasValue)
+                    {
+                        var propertyId = department.PropertyId.Value;
+                        if (!housekeepingDepartments.ContainsKey(propertyId))
+                        {
+                            housekeepingDepartments[propertyId] = department;
+                        }
+                    }
+                    else if (fallbackHousekeepingDepartment == null)
+                    {
+                        fallbackHousekeepingDepartment = department;
+                    }
+                }
+            }
+
             string? photoPath = null;
             if (submission.Photo != null && submission.Photo.Length > 0)
             {
@@ -146,6 +181,13 @@ namespace hOps.web.Controllers
                 };
 
                 _context.LostFoundEntries.Add(entry);
+
+                var departmentId = housekeepingDepartments.TryGetValue(propertyId, out var department)
+                    ? department.Id
+                    : fallbackHousekeepingDepartment?.Id;
+
+                var workOrder = BuildLostFoundWorkOrder(entry, propertyId, departmentId, currentUser.Id);
+                _context.WorkOrders.Add(workOrder);
             }
 
             await _context.SaveChangesAsync();
@@ -724,6 +766,134 @@ namespace hOps.web.Controllers
                 counterpart.MatchedEntryId = null;
                 _context.LostFoundEntries.Update(counterpart);
             }
+        }
+
+        private static WorkOrder BuildLostFoundWorkOrder(LostFoundEntry entry, int propertyId, int? departmentId, string userId)
+        {
+            var workOrder = new WorkOrder
+            {
+                Status = WorkOrderStatusOptions.DefaultStatus,
+                Issue = BuildLostFoundWorkOrderIssue(entry),
+                Details = BuildLostFoundWorkOrderDetails(entry),
+                Location = BuildLostFoundWorkOrderLocation(entry),
+                CreatedAt = DateTime.UtcNow,
+                DueDate = DateTime.UtcNow.Date,
+                CreatedById = userId,
+                DepartmentId = departmentId
+            };
+
+            workOrder.Properties.Add(new WorkOrderProperty
+            {
+                PropertyId = propertyId
+            });
+
+            return workOrder;
+        }
+
+        private static string BuildLostFoundWorkOrderIssue(LostFoundEntry entry)
+        {
+            var descriptor = GetLostFoundItemDescription(entry);
+            var issue = $"Lost & Found - {descriptor}";
+
+            return issue.Length <= 256 ? issue : issue.Substring(0, 256);
+        }
+
+        private static string BuildLostFoundWorkOrderLocation(LostFoundEntry entry)
+        {
+            var location = entry.Location?.Trim() ?? string.Empty;
+            return location.Length <= 128 ? location : location.Substring(0, 128);
+        }
+
+        private static string? BuildLostFoundWorkOrderDetails(LostFoundEntry entry)
+        {
+            var builder = new StringBuilder();
+
+            builder.AppendLine($"Entry Type: {(entry.Type == LostFoundType.Found ? "Found" : "Lost")}");
+            var description = GetLostFoundItemDescription(entry);
+            if (!string.IsNullOrWhiteSpace(description))
+            {
+                builder.AppendLine($"Item: {description}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.Location))
+            {
+                builder.AppendLine($"Location: {entry.Location}");
+            }
+
+            if (entry.Type == LostFoundType.Found)
+            {
+                if (entry.DateFound.HasValue)
+                {
+                    builder.AppendLine($"Date Found: {FormatDate(entry.DateFound)}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(entry.FoundBy))
+                {
+                    builder.AppendLine($"Found By: {entry.FoundBy}");
+                }
+            }
+            else
+            {
+                if (entry.DateReportedLost.HasValue)
+                {
+                    builder.AppendLine($"Date Reported Lost: {FormatDate(entry.DateReportedLost)}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(entry.GuestName))
+                {
+                    builder.AppendLine($"Guest: {entry.GuestName}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(entry.GuestPhone))
+                {
+                    builder.AppendLine($"Guest Phone: {entry.GuestPhone}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(entry.GuestEmail))
+                {
+                    builder.AppendLine($"Guest Email: {entry.GuestEmail}");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.Stored))
+            {
+                builder.AppendLine($"Storage: {entry.Stored}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.Notes))
+            {
+                builder.AppendLine($"Notes: {entry.Notes}");
+            }
+
+            var details = builder.ToString().Trim();
+            if (string.IsNullOrWhiteSpace(details))
+            {
+                return null;
+            }
+
+            return details.Length <= 2000 ? details : details.Substring(0, 2000);
+        }
+
+        private static string GetLostFoundItemDescription(LostFoundEntry entry)
+        {
+            var rawValue = entry.Type == LostFoundType.Found ? entry.ItemFound : entry.ItemLost;
+
+            if (string.IsNullOrWhiteSpace(rawValue))
+            {
+                return entry.Type == LostFoundType.Found ? "Found Item" : "Lost Item";
+            }
+
+            return rawValue.Trim();
+        }
+
+        private static string FormatDate(DateTime? value)
+        {
+            if (!value.HasValue)
+            {
+                return string.Empty;
+            }
+
+            return value.Value.ToString("yyyy-MM-dd");
         }
 
         private static DateTime? NormalizeDateToUtc(DateTime? value)
