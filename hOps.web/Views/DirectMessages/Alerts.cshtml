@@ -20,17 +20,6 @@
                 Alerts = Model.Alerts
             }
         };
-    var readCategories = displayCategories
-        .Select(category => new
-        {
-            Category = category,
-            ReadAlerts = category.Alerts
-                .Where(a => a.IsRead)
-                .OrderByDescending(a => a.CreatedAt)
-                .ToList()
-        })
-        .Where(group => group.ReadAlerts.Any())
-        .ToList();
 }
 
 @section Styles {
@@ -99,6 +88,10 @@
                 {
                     var unread = category.Alerts
                         .Where(a => !a.IsRead)
+                        .OrderByDescending(a => a.CreatedAt)
+                        .ToList();
+                    var read = category.Alerts
+                        .Where(a => a.IsRead)
                         .OrderByDescending(a => a.CreatedAt)
                         .ToList();
                     var statusBadgeClass = category.UnreadCount > 0 ? "badge bg-warning text-dark" : "badge bg-secondary-subtle text-secondary";
@@ -201,33 +194,17 @@
                                         </div>
                                     }
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                }
-            </div>
-            @if (readCategories.Any())
-            {
-                <div class="mt-4">
-                    <h3 class="h6 text-uppercase text-muted mb-3">Read alerts</h3>
-                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-                        @foreach (var group in readCategories)
-                        {
-                            var read = group.ReadAlerts;
-                            <div class="col" data-alert-category="@group.Category.Key">
-                                <div class="card alert-category-card h-100">
-                                    <div class="card-header bg-white border-bottom">
-                                        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                                            <div>
-                                                <div class="fw-semibold">@group.Category.Label</div>
-                                                <small class="text-muted">
-                                                    @(read.Count == 1 ? "1 read alert" : $"{read.Count} read alerts")
-                                                </small>
-                                            </div>
-                                            <span class="badge bg-secondary-subtle text-secondary">@read.Count</span>
-                                        </div>
+                                <div class="alert-list-section border-top pt-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-uppercase small text-muted">Read</span>
+                                        <span class="badge bg-secondary-subtle text-secondary">@read.Count</span>
                                     </div>
-                                    <div class="card-body">
+                                    @if (!read.Any())
+                                    {
+                                        <p class="text-muted small mb-0">No read alerts.</p>
+                                    }
+                                    else
+                                    {
                                         <div class="alert-list">
                                             @foreach (var alert in read)
                                             {
@@ -271,13 +248,13 @@
                                                 </div>
                                             }
                                         </div>
-                                    </div>
+                                    }
                                 </div>
                             </div>
-                        }
+                        </div>
                     </div>
-                </div>
-            }
+                }
+            </div>
         }
     </div>
 </div>
