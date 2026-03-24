@@ -1,7 +1,6 @@
 @model hOps.web.ViewModels.Housekeeping.LinenInventory.SupplyInventoryPageViewModel
 @using System.Globalization
 @using System.Text.Json
-@using System.Linq
 
 @{
     ViewData["Title"] = "Supply Inventory";
@@ -99,8 +98,11 @@
             <h2 class="h5 mb-0">Supply Worksheet</h2>
             <small class="text-muted">Columns mirror Inventory Count &rarr; Order Cost</small>
         </div>
-        <div class="d-flex align-items-center gap-3">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
             <span class="text-muted small" data-role="item-count">@Model.TemplateItems.Count item(s)</span>
+            <button type="button" class="btn btn-outline-primary btn-sm" data-action="save-history">
+                Save Snapshot
+            </button>
             <button type="button" class="btn btn-outline-secondary btn-sm" data-action="reset-template">
                 Reset to Template
             </button>
@@ -127,54 +129,32 @@
     </div>
 </div>
 
-<div class="card mt-4">
+<div class="card mt-4" data-role="history-card">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
-            <h2 class="h5 mb-0">Inventory History</h2>
-            <small class="text-muted">Recent submissions saved for this property</small>
+            <h2 class="h5 mb-0">Snapshot History</h2>
+            <small class="text-muted">Save versions locally and reload them anytime</small>
         </div>
+        <small class="text-muted">Snapshots stay in this browser for @Model.PropertyName.</small>
     </div>
     <div class="card-body">
-        @if (!Model.HistoryEntries.Any())
-        {
-            <div class="alert alert-info mb-0">
-                No history yet. Save your first inventory snapshot to populate this log.
-            </div>
-        }
-        else
-        {
-            <div class="table-responsive">
-                <table class="table table-sm table-bordered align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Inventory Date</th>
-                            <th>Performed By</th>
-                            <th>Budget</th>
-                            <th>Projected Need</th>
-                            <th>Total Cost</th>
-                            <th style="width:170px;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var entry in Model.HistoryEntries)
-                        {
-                            <tr>
-                                <td>@entry.DisplayLabel</td>
-                                <td>@(string.IsNullOrWhiteSpace(entry.PerformedBy) ? "N/A" : entry.PerformedBy)</td>
-                                <td class="text-end">$@entry.MonthlyBudget.ToString("N2")</td>
-                                <td class="text-end">$@entry.ProjectedNeedCost.ToString("N2")</td>
-                                <td class="text-end">$@entry.TotalCost.ToString("N2")</td>
-                                <td class="text-nowrap">
-                                    <a asp-action="History" asp-route-id="@entry.SessionId" class="btn btn-link btn-sm">View</a>
-                                    <a asp-action="Index" asp-route-sessionId="@entry.SessionId" class="btn btn-link btn-sm">Edit</a>
-                                    <a asp-action="DownloadHistory" asp-route-id="@entry.SessionId" class="btn btn-outline-secondary btn-sm">Download</a>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
+        <div class="alert alert-info mb-0" data-role="history-empty">
+            No history yet. Save your first supply snapshot to populate this log.
+        </div>
+        <div class="table-responsive d-none" data-role="history-table-wrapper">
+            <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Saved On</th>
+                        <th class="text-end">Monthly Budget</th>
+                        <th class="text-end">Inventory Value</th>
+                        <th class="text-end">Order Cost</th>
+                        <th style="width:160px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody data-role="history-rows"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 

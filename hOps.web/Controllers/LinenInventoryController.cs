@@ -983,30 +983,12 @@ namespace hOps.web.Controllers
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.PropertyId == property.Id);
 
-            var historyEntries = await _context.LinenInventorySessions
-                .AsNoTracking()
-                .Where(s => s.PropertyId == property.Id && s.Items.Any())
-                .OrderByDescending(s => s.InventoryDate)
-                .ThenByDescending(s => s.CreatedAtUtc)
-                .Select(s => new LinenInventoryHistoryEntryViewModel
-                {
-                    SessionId = s.Id,
-                    InventoryDate = s.InventoryDate,
-                    PerformedBy = s.PerformedBy,
-                    TotalCost = s.TotalCost,
-                    ProjectedNeedCost = s.ProjectedNeedCost,
-                    MonthlyBudget = s.MonthlyBudget
-                })
-                .Take(12)
-                .ToListAsync();
-
             var viewModel = new SupplyInventoryPageViewModel
             {
                 PropertyId = property.Id,
                 PropertyName = property.Name,
                 DefaultMonthlyBudget = settings?.DefaultMonthlyBudget ?? 0,
-                TemplateItems = LoadSupplyTemplate(),
-                HistoryEntries = historyEntries
+                TemplateItems = LoadSupplyTemplate()
             };
 
             return View(viewModel);

@@ -13,8 +13,6 @@ namespace hOps.web.ViewModels.Housekeeping.LinenInventory
         public decimal DefaultMonthlyBudget { get; set; }
 
         public List<SupplyInventoryItemViewModel> TemplateItems { get; set; } = new();
-
-        public List<LinenInventoryHistoryEntryViewModel> HistoryEntries { get; set; } = new();
     }
 
     public class SupplyInventoryItemViewModel
