@@ -42,6 +42,21 @@
         .alert-category-card .alert-item p {
             font-size: 0.95rem;
         }
+
+        .alert-list-section {
+            padding: 1rem;
+            border-radius: 0.5rem;
+        }
+
+        .alert-list-section--unread {
+            background-color: #fff8e1;
+            border: 1px solid rgba(255, 193, 7, 0.35);
+        }
+
+        .alert-list-section--read {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+        }
     </style>
 }
 
@@ -138,7 +153,7 @@
                                 </div>
                             </div>
                             <div class="card-body d-flex flex-column gap-4">
-                                <div class="alert-list-section">
+                                <div class="alert-list-section alert-list-section--unread">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <span class="text-uppercase small text-muted">Unread</span>
                                         <span class="badge bg-warning-subtle text-warning">@unread.Count</span>
@@ -194,7 +209,7 @@
                                         </div>
                                     }
                                 </div>
-                                <div class="alert-list-section border-top pt-3">
+                                <div class="alert-list-section alert-list-section--read mt-3">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <span class="text-uppercase small text-muted">Read</span>
                                         <span class="badge bg-secondary-subtle text-secondary">@read.Count</span>
