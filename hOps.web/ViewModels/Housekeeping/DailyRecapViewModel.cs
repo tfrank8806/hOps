@@ -51,6 +51,12 @@ namespace hOps.web.ViewModels.Housekeeping
         public List<DailyRecapInspectionFailureRow> InspectionFailures { get; set; } = new();
         public List<DailyRecapPublicAreaRow> PublicAreas { get; set; } = new();
 
+        [Display(Name = "Public Areas Attendant")]
+        public string? PublicAreasAttendant { get; set; }
+
+        [Display(Name = "Laundry Attendant")]
+        public string? LaundryAttendant { get; set; }
+
         [Display(Name = "Top performers / recognition")]
         public string? PerformanceHighlights { get; set; }
 

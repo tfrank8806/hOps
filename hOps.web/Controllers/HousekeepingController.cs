@@ -1333,7 +1333,8 @@ namespace hOps.web.Controllers
                 .Where(row => row != null && HasAnyValue(row.Area, row.Completed, row.Issues, row.ItemsToOrder, row.Notes))
                 .ToList();
 
-            if (!rows.Any())
+            var hasAttendants = HasAnyValue(model.PublicAreasAttendant, model.LaundryAttendant);
+            if (!rows.Any() && !hasAttendants)
             {
                 return;
             }
@@ -1341,6 +1342,27 @@ namespace hOps.web.Controllers
             builder.AppendLine("## 6. Public Areas / Laundry / Supplies");
             builder.AppendLine("_Attach completed & signed Houseman/Public Area Attendant checklist when applicable._");
             builder.AppendLine();
+
+            if (hasAttendants)
+            {
+                if (!string.IsNullOrWhiteSpace(model.PublicAreasAttendant))
+                {
+                    builder.AppendLine($"- **Public Areas Attendant:** {FormatValue(model.PublicAreasAttendant)}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(model.LaundryAttendant))
+                {
+                    builder.AppendLine($"- **Laundry Attendant:** {FormatValue(model.LaundryAttendant)}");
+                }
+
+                builder.AppendLine();
+            }
+
+            if (!rows.Any())
+            {
+                return;
+            }
+
             builder.AppendLine("| Area / Item | Completed? | Issue / Shortage | Items Need Order | Notes |");
             builder.AppendLine("| --- | --- | --- | --- | --- |");
 

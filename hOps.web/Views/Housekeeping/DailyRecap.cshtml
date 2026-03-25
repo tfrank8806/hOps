@@ -144,6 +144,22 @@
                         <h2 class="h5 mb-0">1. Staffing Overview</h2>
                         <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="Staffing">Add row</button>
                     </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label asp-for="PublicAreasAttendant" class="form-label fw-semibold"></label>
+                            <input asp-for="PublicAreasAttendant"
+                                   class="form-control"
+                                   placeholder="Name of the associate covering public areas" />
+                            <span asp-validation-for="PublicAreasAttendant" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="LaundryAttendant" class="form-label fw-semibold"></label>
+                            <input asp-for="LaundryAttendant"
+                                   class="form-control"
+                                   placeholder="Name of the associate covering laundry" />
+                            <span asp-validation-for="LaundryAttendant" class="text-danger small"></span>
+                        </div>
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-sm table-bordered align-middle">
                             <thead class="table-light">
