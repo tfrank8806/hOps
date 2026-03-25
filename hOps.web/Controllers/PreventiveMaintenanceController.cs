@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Text.Json;
+using System.Threading.Tasks;
+using ClosedXML.Excel;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
@@ -23,6 +25,7 @@ namespace hOps.web.Controllers
     [AutoValidateAntiforgeryToken]
     public class PreventiveMaintenanceController : BaseController
     {
+        private const string ExcelContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         private readonly ApplicationDbContext _db;
         private readonly IUserTimeZoneService _timeZoneService;
         private readonly ILogger<PreventiveMaintenanceController> _logger;
@@ -235,6 +238,178 @@ namespace hOps.web.Controllers
             ViewBag.PmMessage = TempData["PmSetupMessage"];
 
             return View(viewModel);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExportRoomLog(int checklistId, int? year = null)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["PmError"] = "Select a property before exporting the PM log.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var checklist = await _db.PreventiveMaintenanceChecklists
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == checklistId && c.PropertyId == property.Id);
+            if (checklist == null)
+            {
+                return NotFound();
+            }
+
+            var frequency = await _db.PreventiveMaintenanceSettings
+                .AsNoTracking()
+                .Where(s => s.PropertyId == property.Id)
+                .Select(s => s.FrequencyPerYear)
+                .FirstOrDefaultAsync();
+
+            var rooms = await _db.Rooms
+                .Where(r => r.PropertyId == property.Id && r.IncludeInPreventiveMaintenance)
+                .OrderBy(r => r.RoomNumber)
+                .ToListAsync();
+            var roomLookup = BuildRoomLookup(rooms);
+
+            var roomLogResult = await BuildRoomLogsAsync(
+                property.Id,
+                checklist.Id,
+                frequency,
+                year,
+                rooms,
+                roomLookup);
+
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Room PM Log");
+            var cycleWindows = roomLogResult.CycleWindows ?? Array.Empty<MaintenanceScheduleHelper.MaintenanceCycleWindow>();
+            var headers = new List<string> { "Room", "Last Completed", "Duration", "Completed By", "Status", "Next Due" };
+            foreach (var window in cycleWindows)
+            {
+                headers.Add($"Cycle {window.Index} ({window.DueDate:MMM d})");
+            }
+
+            WriteHeaderRow(worksheet, headers);
+
+            var row = 2;
+            foreach (var log in roomLogResult.Logs)
+            {
+                worksheet.Cell(row, 1).Value = log.RoomNumber;
+                WriteDateCell(worksheet.Cell(row, 2), log.LastCompletedAtUtc);
+                worksheet.Cell(row, 3).Value = FormatDurationLabel(log.LastDurationSeconds);
+                worksheet.Cell(row, 4).Value = string.IsNullOrWhiteSpace(log.CompletedByName) ? "--" : log.CompletedByName;
+                worksheet.Cell(row, 5).Value = BuildStatusLabel(log.IsOverdue, log.IsDue);
+                WriteDateCell(worksheet.Cell(row, 6), log.NextDueAtUtc);
+
+                var cycleColumn = 7;
+                foreach (var window in cycleWindows)
+                {
+                    var status = log.CycleStatuses.FirstOrDefault(s => s.Index == window.Index);
+                    worksheet.Cell(row, cycleColumn).Value = BuildCycleCell(status);
+                    worksheet.Cell(row, cycleColumn).Style.Alignment.WrapText = true;
+                    cycleColumn++;
+                }
+
+                row++;
+            }
+
+            worksheet.Columns().AdjustToContents();
+            worksheet.Rows().AdjustToContents();
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            stream.Position = 0;
+
+            var fileName = $"room-pm-log-{property.Id}-{roomLogResult.SelectedYear}-{DateTime.UtcNow:yyyyMMddHHmmss}.xlsx";
+            return File(stream.ToArray(), ExcelContentType, fileName);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExportAreaLog(int checklistId, int? year = null)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["PmError"] = "Select a property before exporting the PM log.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var checklist = await _db.PreventiveMaintenanceChecklists
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == checklistId && c.PropertyId == property.Id);
+            if (checklist == null)
+            {
+                return NotFound();
+            }
+
+            if (checklist.ChecklistType != PreventiveMaintenanceChecklistType.Area)
+            {
+                TempData["PmError"] = "Area PM exports are only available for area-based checklists.";
+                return RedirectToAction(nameof(Index), new { checklistId });
+            }
+
+            var frequency = await _db.PreventiveMaintenanceSettings
+                .AsNoTracking()
+                .Where(s => s.PropertyId == property.Id)
+                .Select(s => s.FrequencyPerYear)
+                .FirstOrDefaultAsync();
+
+            var rooms = await _db.Rooms
+                .Where(r => r.PropertyId == property.Id && r.IncludeInPreventiveMaintenance)
+                .OrderBy(r => r.RoomNumber)
+                .ToListAsync();
+            var roomLookup = BuildRoomLookup(rooms);
+            var roomLabelLookup = new HashSet<string>(roomLookup.Keys, StringComparer.OrdinalIgnoreCase);
+            var configuredAreas = MaintenanceChecklistHelper.ParseAreaOptions(checklist.AreaOptionsJson);
+
+            var areaLogResult = await BuildAreaLogsAsync(
+                property.Id,
+                checklist.Id,
+                configuredAreas,
+                frequency,
+                year,
+                roomLabelLookup);
+
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Area PM Log");
+            var cycleWindows = areaLogResult.CycleWindows ?? Array.Empty<MaintenanceScheduleHelper.MaintenanceCycleWindow>();
+            var headers = new List<string> { "Area", "Last Completed", "Duration", "Completed By", "Status", "Next Due" };
+            foreach (var window in cycleWindows)
+            {
+                headers.Add($"Cycle {window.Index} ({window.DueDate:MMM d})");
+            }
+
+            WriteHeaderRow(worksheet, headers);
+
+            var row = 2;
+            foreach (var log in areaLogResult.Logs)
+            {
+                worksheet.Cell(row, 1).Value = log.AreaLabel;
+                WriteDateCell(worksheet.Cell(row, 2), log.LastCompletedAtUtc);
+                worksheet.Cell(row, 3).Value = FormatDurationLabel(log.LastDurationSeconds);
+                worksheet.Cell(row, 4).Value = string.IsNullOrWhiteSpace(log.CompletedByName) ? "--" : log.CompletedByName;
+                worksheet.Cell(row, 5).Value = BuildStatusLabel(log.IsOverdue, log.IsDue);
+                WriteDateCell(worksheet.Cell(row, 6), log.NextDueAtUtc);
+
+                var cycleColumn = 7;
+                foreach (var window in cycleWindows)
+                {
+                    var status = log.CycleStatuses.FirstOrDefault(s => s.Index == window.Index);
+                    worksheet.Cell(row, cycleColumn).Value = BuildCycleCell(status);
+                    worksheet.Cell(row, cycleColumn).Style.Alignment.WrapText = true;
+                    cycleColumn++;
+                }
+
+                row++;
+            }
+
+            worksheet.Columns().AdjustToContents();
+            worksheet.Rows().AdjustToContents();
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            stream.Position = 0;
+
+            var fileName = $"area-pm-log-{property.Id}-{areaLogResult.SelectedYear}-{DateTime.UtcNow:yyyyMMddHHmmss}.xlsx";
+            return File(stream.ToArray(), ExcelContentType, fileName);
         }
 
         [HttpGet]
@@ -1412,7 +1587,85 @@ namespace hOps.web.Controllers
         }
 
 
-                private static object BuildSessionDto(PreventiveMaintenanceSession session, DateTime asOfUtc)
+        private void WriteDateCell(IXLCell cell, DateTime? utcValue)
+        {
+            if (utcValue.HasValue)
+            {
+                var local = _timeZoneService.ConvertToUserTime(utcValue.Value);
+                cell.Value = local;
+                cell.Style.DateFormat.Format = "MMM dd, yyyy h:mm tt";
+            }
+            else
+            {
+                cell.Value = "--";
+            }
+        }
+
+        private static string BuildStatusLabel(bool isOverdue, bool isDue)
+        {
+            if (isOverdue)
+            {
+                return "Overdue";
+            }
+
+            if (isDue)
+            {
+                return "Due soon";
+            }
+
+            return "Current";
+        }
+
+        private static string FormatDurationLabel(double? seconds)
+        {
+            if (!seconds.HasValue || seconds.Value <= 0)
+            {
+                return "--";
+            }
+
+            var ts = TimeSpan.FromSeconds(seconds.Value);
+            if (ts.TotalHours >= 1)
+            {
+                return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+            }
+
+            if (ts.TotalMinutes >= 1)
+            {
+                return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+            }
+
+            return $"{ts.Seconds}s";
+        }
+
+        private string BuildCycleCell(MaintenanceCycleStatusViewModel? status)
+        {
+            if (status == null || !status.CompletedAt.HasValue)
+            {
+                return "--";
+            }
+
+            var local = _timeZoneService.ConvertToUserTime(status.CompletedAt.Value);
+            if (string.IsNullOrWhiteSpace(status.Notes))
+            {
+                return local.ToString("MMM dd, yyyy");
+            }
+
+            return $"{local:MMM dd, yyyy} - {status.Notes}".Trim();
+        }
+
+        private static void WriteHeaderRow(IXLWorksheet worksheet, IReadOnlyList<string> headers)
+        {
+            for (var i = 0; i < headers.Count; i++)
+            {
+                worksheet.Cell(1, i + 1).Value = headers[i];
+            }
+
+            var headerRange = worksheet.Range(1, 1, 1, headers.Count);
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+        }
+
+        private static object BuildSessionDto(PreventiveMaintenanceSession session, DateTime asOfUtc)
         {
             return new
             {
