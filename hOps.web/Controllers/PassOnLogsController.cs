@@ -912,8 +912,7 @@ namespace hOps.web.Controllers
                 return false;
             }
 
-            var updated = false;
-            var now = DateTime.UtcNow;
+            var toRemove = new List<UserNotification>();
 
             foreach (var notification in notifications)
             {
@@ -921,7 +920,6 @@ namespace hOps.web.Controllers
 
                 if (!matches && TryResolveLogIdFromLink(notification.LinkUrl, out var parsedId))
                 {
-                    notification.PassOnLogId = parsedId;
                     matches = parsedId == logId;
                 }
 
@@ -930,12 +928,16 @@ namespace hOps.web.Controllers
                     continue;
                 }
 
-                notification.IsRead = true;
-                notification.ReadAt = now;
-                updated = true;
+                toRemove.Add(notification);
             }
 
-            return updated;
+            if (!toRemove.Any())
+            {
+                return false;
+            }
+
+            _context.UserNotifications.RemoveRange(toRemove);
+            return true;
         }
 
         private static bool TryResolveLogIdFromLink(string? linkUrl, out int logId)

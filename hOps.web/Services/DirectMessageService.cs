@@ -331,12 +331,8 @@ namespace hOps.web.Services
                 return;
             }
 
-            if (!notification.IsRead)
-            {
-                notification.IsRead = true;
-                notification.ReadAt = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
-            }
+            _context.UserNotifications.Remove(notification);
+            await _context.SaveChangesAsync();
         }
 
         public async Task MarkAllAlertsReadAsync(string userId)
@@ -350,13 +346,7 @@ namespace hOps.web.Services
                 return;
             }
 
-            var now = DateTime.UtcNow;
-            foreach (var notification in notifications)
-            {
-                notification.IsRead = true;
-                notification.ReadAt = now;
-            }
-
+            _context.UserNotifications.RemoveRange(notifications);
             await _context.SaveChangesAsync();
         }
 
@@ -399,13 +389,7 @@ namespace hOps.web.Services
                 return;
             }
 
-            var now = DateTime.UtcNow;
-            foreach (var notification in notifications)
-            {
-                notification.IsRead = true;
-                notification.ReadAt = now;
-            }
-
+            _context.UserNotifications.RemoveRange(notifications);
             await _context.SaveChangesAsync();
         }
 
