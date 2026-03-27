@@ -1,4 +1,5 @@
 @using System
+@using System.Collections.Generic
 @using System.Globalization
 @using System.IO
 @using System.Linq
@@ -19,6 +20,7 @@
         : null;
     var formTitle = Model.IsEditing ? "Edit Work Order" : "Create Work Order";
     var submitLabel = Model.IsEditing ? "Update Work Order" : "Submit Work Order";
+    var canAddAdditionalLocations = !Model.IsEditing;
 
     var filterQuery = new QueryBuilder();
     filterQuery.Add("SortOrder", Model.Filters.SortOrder);
@@ -951,6 +953,54 @@
                                 }
                             </datalist>
                             <span asp-validation-for="Form.Location" class="text-danger"></span>
+                            @if (canAddAdditionalLocations)
+                            {
+                                var additionalLocations = Model.Form?.AdditionalLocations ?? new List<string>();
+                                <div class="mt-3">
+                                    <div class="d-flex flex-column gap-2" data-additional-locations>
+                                        @for (var i = 0; i < additionalLocations.Count; i++)
+                                        {
+                                            var locationValue = additionalLocations[i];
+                                            <div class="input-group additional-location-entry">
+                                                <input type="text"
+                                                       class="form-control"
+                                                       name="Form.AdditionalLocations[@i]"
+                                                       value="@locationValue"
+                                                       placeholder="Room number or location"
+                                                       list="locationSuggestions" />
+                                                <button type="button"
+                                                        class="btn btn-outline-secondary"
+                                                        data-remove-additional-location
+                                                        title="Remove location">
+                                                    <span aria-hidden="true">&times;</span>
+                                                    <span class="visually-hidden">Remove location</span>
+                                                </button>
+                                            </div>
+                                        }
+                                    </div>
+                                    <button type="button"
+                                            class="btn btn-link px-0 mt-2"
+                                            data-add-location-btn>
+                                        + Add Additional Location
+                                    </button>
+                                    <template id="additionalLocationTemplate">
+                                        <div class="input-group additional-location-entry">
+                                            <input type="text"
+                                                   class="form-control"
+                                                   name=""
+                                                   placeholder="Room number or location"
+                                                   list="locationSuggestions" />
+                                            <button type="button"
+                                                    class="btn btn-outline-secondary"
+                                                    data-remove-additional-location
+                                                    title="Remove location">
+                                                <span aria-hidden="true">&times;</span>
+                                                <span class="visually-hidden">Remove location</span>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            }
                         </div>
                         <div class="mb-3">
                             <label asp-for="Form.WorkOrderTypeId" class="form-label"></label>

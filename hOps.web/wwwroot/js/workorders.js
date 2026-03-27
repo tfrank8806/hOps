@@ -526,3 +526,73 @@
         completionModal.show();
     }
 })();
+
+(() => {
+    const list = document.querySelector('[data-additional-locations]');
+    const addButton = document.querySelector('[data-add-location-btn]');
+    const template = document.getElementById('additionalLocationTemplate');
+
+    if (!list || !addButton || !template) {
+        return;
+    }
+
+    const updateInputNames = () => {
+        const entries = list.querySelectorAll('.additional-location-entry');
+        entries.forEach((entry, index) => {
+            const input = entry.querySelector('input');
+            if (input) {
+                input.name = `Form.AdditionalLocations[${index}]`;
+                input.id = `Form_AdditionalLocations_${index}`;
+            }
+        });
+    };
+
+    const createEntryElement = (value = '') => {
+        let element = null;
+        if (template.content && template.content.firstElementChild) {
+            element = template.content.firstElementChild.cloneNode(true);
+        } else if (template.firstElementChild) {
+            element = template.firstElementChild.cloneNode(true);
+        }
+
+        if (!element) {
+            return null;
+        }
+
+        const input = element.querySelector('input');
+        if (input) {
+            input.value = value;
+        }
+
+        return element;
+    };
+
+    const addEntry = (value = '') => {
+        const entry = createEntryElement(value);
+        if (!entry) {
+            return;
+        }
+
+        list.appendChild(entry);
+        updateInputNames();
+        const input = entry.querySelector('input');
+        input?.focus();
+    };
+
+    list.addEventListener('click', event => {
+        const removeButton = event.target.closest('[data-remove-additional-location]');
+        if (!removeButton) {
+            return;
+        }
+
+        event.preventDefault();
+        const entry = removeButton.closest('.additional-location-entry');
+        entry?.remove();
+        updateInputNames();
+    });
+
+    addButton.addEventListener('click', event => {
+        event.preventDefault();
+        addEntry();
+    });
+})();

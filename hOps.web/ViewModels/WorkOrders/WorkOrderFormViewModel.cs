@@ -16,6 +16,9 @@ namespace hOps.web.ViewModels.WorkOrders
         [Display(Name = "Location")]
         public string? Location { get; set; }
 
+        [Display(Name = "Additional Locations")]
+        public List<string> AdditionalLocations { get; set; } = new();
+
         [Display(Name = "Work Order Type")]
         public int? WorkOrderTypeId { get; set; }
 

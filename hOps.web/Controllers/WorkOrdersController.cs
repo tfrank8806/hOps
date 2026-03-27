@@ -209,6 +209,7 @@ namespace hOps.web.Controllers
             }
 
             form.SelectedPropertyIds = selectedPropertyIds;
+            form.AdditionalLocations ??= new List<string>();
 
             var assignableUsers = await GetAssignableUsersAsync(selectedPropertyIds);
             var assignableUserIds = new HashSet<string>(assignableUsers.Select(u => u.UserId), StringComparer.OrdinalIgnoreCase);
@@ -235,7 +236,11 @@ namespace hOps.web.Controllers
                 return View("Index", invalidModel);
             }
 
-            await CreateWorkOrderAsync(form, user!, selectedPropertyIds);
+            var submittedLocations = ExtractSubmittedLocations(form);
+            foreach (var location in submittedLocations)
+            {
+                await CreateWorkOrderAsync(form, user!, selectedPropertyIds, location);
+            }
             return RedirectToAction(nameof(Index));
         }
 
@@ -785,12 +790,18 @@ namespace hOps.web.Controllers
         private async Task<WorkOrder> CreateWorkOrderAsync(
             WorkOrderFormViewModel form,
             ApplicationUser user,
-            IReadOnlyCollection<int> propertyIds)
+            IReadOnlyCollection<int> propertyIds,
+            string? locationOverride = null)
         {
+            var resolvedLocation = locationOverride ?? form.Location;
+            var normalizedLocation = string.IsNullOrWhiteSpace(resolvedLocation)
+                ? string.Empty
+                : resolvedLocation.Trim();
+
             var workOrder = new WorkOrder
             {
                 Status = form.Status,
-                Location = form.Location ?? string.Empty,
+                Location = normalizedLocation,
                 WorkOrderTypeId = form.WorkOrderTypeId,
                 Issue = form.Issue,
                 Details = form.Details,
@@ -862,6 +873,42 @@ namespace hOps.web.Controllers
             }
 
             return workOrder;
+        }
+
+        private static List<string> ExtractSubmittedLocations(WorkOrderFormViewModel form)
+        {
+            var locations = new List<string>();
+
+            void TryAdd(string? value)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    return;
+                }
+
+                var trimmed = value.Trim();
+                if (!string.IsNullOrEmpty(trimmed))
+                {
+                    locations.Add(trimmed);
+                }
+            }
+
+            TryAdd(form.Location);
+
+            if (form.AdditionalLocations != null)
+            {
+                foreach (var extra in form.AdditionalLocations)
+                {
+                    TryAdd(extra);
+                }
+            }
+
+            if (!locations.Any())
+            {
+                locations.Add(string.Empty);
+            }
+
+            return locations;
         }
 
         private async Task SendDepartmentAlertEmailsAsync(WorkOrder workOrder, string workOrderLink, ApplicationUser? createdBy)
@@ -1419,6 +1466,8 @@ namespace hOps.web.Controllers
                 .Where(targetPropertySet.Contains)
                 .Distinct()
                 .ToList();
+
+            effectiveForm.AdditionalLocations ??= new List<string>();
 
             if (!effectiveForm.SelectedPropertyIds.Any() && targetPropertySet.Any())
             {
