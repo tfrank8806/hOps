@@ -13,7 +13,7 @@ namespace hOps.web.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            if (ActiveProvider != "Npgsql.EntityFrameworkCore.PostgreSQL")
+            if (migrationBuilder.ActiveProvider != "Npgsql.EntityFrameworkCore.PostgreSQL")
             {
                 return;
             }
@@ -43,7 +43,7 @@ namespace hOps.web.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            if (ActiveProvider != "Npgsql.EntityFrameworkCore.PostgreSQL")
+            if (migrationBuilder.ActiveProvider != "Npgsql.EntityFrameworkCore.PostgreSQL")
             {
                 return;
             }
