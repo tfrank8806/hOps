@@ -360,6 +360,26 @@
 
 </div>
 
+<div id="calendarEventFlyout" class="calendar-event-flyout d-none" role="dialog" aria-hidden="true" aria-live="polite">
+    <div class="calendar-event-flyout__inner shadow-lg border rounded-3 bg-white">
+        <button type="button" class="btn-close calendar-event-flyout__close" data-flyout-dismiss aria-label="Close"></button>
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge text-uppercase fw-semibold calendar-event-flyout__category" data-flyout="category"></span>
+            <span class="small text-muted" data-flyout="date"></span>
+        </div>
+        <h5 class="mb-2 calendar-event-flyout__title" data-flyout="title"></h5>
+        <div class="calendar-event-flyout__meta mb-2 small text-muted">
+            <div data-flyout="time"></div>
+            <div data-flyout="recurrence"></div>
+        </div>
+        <div class="calendar-event-flyout__properties small fw-semibold text-secondary" data-flyout="properties"></div>
+        <div class="calendar-event-flyout__details small mt-2" data-flyout="details"></div>
+        <div class="calendar-event-flyout__actions mt-3 d-flex gap-2">
+            <a class="btn btn-sm btn-primary" data-flyout="edit-link" href="#">Edit</a>
+        </div>
+    </div>
+</div>
+
 <form asp-action="Delete" method="post" id="calendarDeleteForm" class="d-none">
     @Html.AntiForgeryToken()
     <input type="hidden" name="id" />
@@ -631,6 +651,8 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const modalElement = document.getElementById('eventDetailsModal');
+            const deleteModalElement = document.getElementById('eventDeleteConfirmModal');
+            const flyoutElement = document.getElementById('calendarEventFlyout');
             if (!modalElement) {
                 return;
             }
@@ -641,6 +663,10 @@
 
             if (deleteModalElement && deleteModalElement.parentElement !== document.body) {
                 document.body.appendChild(deleteModalElement);
+            }
+
+            if (flyoutElement && flyoutElement.parentElement !== document.body) {
+                document.body.appendChild(flyoutElement);
             }
 
             const titleEl = modalElement.querySelector('[data-details="title"]');
@@ -659,10 +685,18 @@
             const deleteFormIdInput = deleteForm ? deleteForm.querySelector('input[name="id"]') : null;
             const deleteFormScopeInput = deleteForm ? deleteForm.querySelector('input[name="scope"]') : null;
             const deleteFormOccurrenceInput = deleteForm ? deleteForm.querySelector('input[name="occurrenceDate"]') : null;
-            const deleteModalElement = document.getElementById('eventDeleteConfirmModal');
             const deleteModalTitleTarget = deleteModalElement ? deleteModalElement.querySelector('[data-delete="title"]') : null;
             const deleteOccurrenceButton = deleteModalElement ? deleteModalElement.querySelector('[data-delete-scope="occurrence"]') : null;
             const deleteSeriesButton = deleteModalElement ? deleteModalElement.querySelector('[data-delete-scope="series"]') : null;
+            const flyoutTitleEl = flyoutElement ? flyoutElement.querySelector('[data-flyout="title"]') : null;
+            const flyoutCategoryEl = flyoutElement ? flyoutElement.querySelector('[data-flyout="category"]') : null;
+            const flyoutDateEl = flyoutElement ? flyoutElement.querySelector('[data-flyout="date"]') : null;
+            const flyoutTimeEl = flyoutElement ? flyoutElement.querySelector('[data-flyout="time"]') : null;
+            const flyoutRecurrenceEl = flyoutElement ? flyoutElement.querySelector('[data-flyout="recurrence"]') : null;
+            const flyoutPropertiesEl = flyoutElement ? flyoutElement.querySelector('[data-flyout="properties"]') : null;
+            const flyoutDetailsEl = flyoutElement ? flyoutElement.querySelector('[data-flyout="details"]') : null;
+            const flyoutEditLink = flyoutElement ? flyoutElement.querySelector('[data-flyout="edit-link"]') : null;
+            const flyoutCloseButton = flyoutElement ? flyoutElement.querySelector('[data-flyout-dismiss]') : null;
 
             const getModalInstance = () => {
                 if (window.bootstrap && window.bootstrap.Modal) {
@@ -696,6 +730,8 @@
             let activeEventDataset = null;
             let pendingDeleteDataset = null;
             let deleteActionPendingSubmit = false;
+            let flyoutActiveTrigger = null;
+            let singleClickTimerId = null;
 
             const escapeHtml = (value) => {
                 if (!value) {
@@ -730,6 +766,129 @@
                     .join('');
 
                 return `<ul class="list-unstyled mb-0">${items}</ul>`;
+            };
+
+            const setTextOrToggle = (element, value) => {
+                if (!element) {
+                    return;
+                }
+
+                const textValue = value ? value.trim() : '';
+                if (textValue) {
+                    element.textContent = textValue;
+                    element.classList.remove('d-none');
+                } else {
+                    element.textContent = '';
+                    element.classList.add('d-none');
+                }
+            };
+
+            const hideFlyout = () => {
+                if (!flyoutElement) {
+                    return;
+                }
+
+                flyoutElement.classList.add('d-none');
+                flyoutElement.setAttribute('aria-hidden', 'true');
+                flyoutElement.style.top = '';
+                flyoutElement.style.left = '';
+                flyoutActiveTrigger = null;
+            };
+
+            const positionFlyout = (trigger) => {
+                if (!flyoutElement || !trigger) {
+                    return;
+                }
+
+                const triggerRect = trigger.getBoundingClientRect();
+                const flyoutRect = flyoutElement.getBoundingClientRect();
+                const spacing = 8;
+                const viewportWidth = document.documentElement.clientWidth || window.innerWidth || 0;
+                const viewportHeight = document.documentElement.clientHeight || window.innerHeight || 0;
+                const flyoutWidth = flyoutRect.width || flyoutElement.offsetWidth || 320;
+                const flyoutHeight = flyoutRect.height || flyoutElement.offsetHeight || 200;
+
+                let left = triggerRect.left;
+                let top = triggerRect.bottom + spacing;
+
+                const maxLeft = Math.max(spacing, viewportWidth - flyoutWidth - spacing);
+                if (left > maxLeft) {
+                    left = maxLeft;
+                }
+                if (left < spacing) {
+                    left = spacing;
+                }
+
+                if (top + flyoutHeight > viewportHeight - spacing) {
+                    top = triggerRect.top - flyoutHeight - spacing;
+                }
+
+                if (top < spacing) {
+                    top = spacing;
+                }
+
+                flyoutElement.style.left = `${left}px`;
+                flyoutElement.style.top = `${top}px`;
+            };
+
+            const showFlyout = (trigger) => {
+                if (!flyoutElement) {
+                    updateModal(trigger);
+                    return;
+                }
+
+                const dataset = trigger.dataset || {};
+
+                if (flyoutTitleEl) {
+                    flyoutTitleEl.textContent = dataset.eventTitle || 'Event Details';
+                }
+
+                if (flyoutCategoryEl) {
+                    flyoutCategoryEl.textContent = dataset.eventCategory || 'Category';
+                    flyoutCategoryEl.style.backgroundColor = dataset.eventColor || '#0d6efd';
+                    flyoutCategoryEl.style.color = dataset.eventTextColor || '#fff';
+                }
+
+                setTextOrToggle(flyoutDateEl, dataset.eventDate || '');
+                setTextOrToggle(flyoutTimeEl, dataset.eventTime || 'All day');
+                setTextOrToggle(flyoutRecurrenceEl, dataset.eventRecurrence || '');
+
+                if (flyoutPropertiesEl) {
+                    const props = dataset.eventProperties || '';
+                    if (props) {
+                        flyoutPropertiesEl.textContent = props;
+                        flyoutPropertiesEl.classList.remove('d-none');
+                    } else {
+                        flyoutPropertiesEl.textContent = '';
+                        flyoutPropertiesEl.classList.add('d-none');
+                    }
+                }
+
+                if (flyoutDetailsEl) {
+                    flyoutDetailsEl.innerHTML = renderDetails(dataset.eventDetails);
+                }
+
+                if (flyoutEditLink) {
+                    const editUrl = dataset.eventEditUrl;
+                    if (editUrl) {
+                        flyoutEditLink.classList.remove('d-none', 'disabled');
+                        flyoutEditLink.setAttribute('href', editUrl);
+                    } else {
+                        flyoutEditLink.classList.add('d-none');
+                        flyoutEditLink.removeAttribute('href');
+                    }
+                }
+
+                flyoutElement.classList.remove('d-none');
+                flyoutElement.setAttribute('aria-hidden', 'false');
+                flyoutActiveTrigger = trigger;
+
+                const reposition = () => positionFlyout(trigger);
+                if (window.requestAnimationFrame) {
+                    window.requestAnimationFrame(reposition);
+                } else {
+                    reposition();
+                }
             };
 
             const submitDeleteRequest = (scope, dataset) => {
@@ -791,9 +950,88 @@
                 modal.show();
             };
 
-            document.querySelectorAll('[data-calendar-event]').forEach(element => {
-                element.addEventListener('click', () => updateModal(element));
+            const handleEventSingleClick = (element) => {
+                if (singleClickTimerId) {
+                    window.clearTimeout(singleClickTimerId);
+                }
+
+                singleClickTimerId = window.setTimeout(() => {
+                    const isFlyoutVisible = flyoutElement && !flyoutElement.classList.contains('d-none');
+                    if (isFlyoutVisible && element === flyoutActiveTrigger) {
+                        hideFlyout();
+                    } else {
+                        showFlyout(element);
+                    }
+                    singleClickTimerId = null;
+                }, 180);
+            };
+
+            const handleEventDoubleClick = (element) => {
+                if (singleClickTimerId) {
+                    window.clearTimeout(singleClickTimerId);
+                    singleClickTimerId = null;
+                }
+
+                hideFlyout();
+                updateModal(element);
+            };
+
+            const eventElements = document.querySelectorAll('[data-calendar-event]');
+            eventElements.forEach(element => {
+                element.addEventListener('click', event => {
+                    event.preventDefault();
+                    if (!flyoutElement) {
+                        updateModal(element);
+                        return;
+                    }
+
+                    handleEventSingleClick(element);
+                });
+
+                element.addEventListener('dblclick', event => {
+                    event.preventDefault();
+                    handleEventDoubleClick(element);
+                });
             });
+
+            if (flyoutCloseButton) {
+                flyoutCloseButton.addEventListener('click', event => {
+                    event.preventDefault();
+                    hideFlyout();
+                });
+            }
+
+            if (flyoutElement) {
+                document.addEventListener('click', event => {
+                    if (flyoutElement.classList.contains('d-none')) {
+                        return;
+                    }
+
+                    if (event.target.closest('#calendarEventFlyout') || event.target.closest('[data-calendar-event]')) {
+                        return;
+                    }
+
+                    hideFlyout();
+                });
+
+                document.addEventListener('keydown', event => {
+                    if (event.key === 'Escape') {
+                        hideFlyout();
+                    }
+                });
+
+                window.addEventListener('scroll', () => {
+                    if (!flyoutElement.classList.contains('d-none')) {
+                        hideFlyout();
+                    }
+                }, true);
+
+                window.addEventListener('resize', () => {
+                    if (flyoutActiveTrigger && !flyoutElement.classList.contains('d-none')) {
+                        positionFlyout(flyoutActiveTrigger);
+                    }
+                });
+            }
 
             const handleDeleteAction = () => {
                 if (!activeEventDataset) {

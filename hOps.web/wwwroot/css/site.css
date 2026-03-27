@@ -38,6 +38,40 @@ button,
     z-index: 1450;
 }
 
+.calendar-event-flyout {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: min(360px, calc(100vw - 2rem));
+    z-index: 1600;
+    pointer-events: auto;
+}
+
+.calendar-event-flyout__inner {
+    position: relative;
+    padding: 1rem 1.25rem 1.5rem;
+}
+
+.calendar-event-flyout__close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+}
+
+.calendar-event-flyout__title {
+    word-break: break-word;
+}
+
+.calendar-event-flyout__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.calendar-event-flyout__details {
+    word-break: break-word;
+}
+
 .offcanvas,
 .offcanvas-backdrop {
     z-index: 1500;
