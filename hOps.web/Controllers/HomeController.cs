@@ -1391,11 +1391,11 @@ namespace hOps.web.Controllers
 
         private async Task PopulateCalendarMonthAsync(HomeIndexViewModel viewModel, int propertyId)
         {
-            var todayUtc = DateTime.UtcNow.Date;
-            var monthStart = new DateTime(todayUtc.Year, todayUtc.Month, 1);
-            var viewStart = GetStartOfWeek(monthStart, DayOfWeek.Sunday);
+            var todayUtc = DateTime.UtcNow;
+            var monthStart = new DateTime(todayUtc.Year, todayUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var viewStart = DateTime.SpecifyKind(GetStartOfWeek(monthStart, DayOfWeek.Sunday), DateTimeKind.Utc);
             const int totalSlots = 42;
-            var viewEnd = viewStart.AddDays(totalSlots - 1);
+            var viewEnd = DateTime.SpecifyKind(viewStart.AddDays(totalSlots - 1), DateTimeKind.Utc);
 
             var events = await _context.CalendarEvents
                 .Where(e => e.EventProperties.Any(ep => ep.PropertyId == propertyId))
