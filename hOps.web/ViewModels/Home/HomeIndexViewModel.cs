@@ -29,6 +29,7 @@ namespace hOps.web.ViewModels.Home
         public List<PackageLogSummaryViewModel> PackageLogs { get; set; } = new();
 
         public List<CalendarEventSummaryViewModel> UpcomingEvents { get; set; } = new();
+        public CalendarMonthViewModel CalendarMonth { get; set; } = new();
 
         public List<PassOnLogSummaryViewModel> PassOnLogs { get; set; } = new();
 
@@ -222,6 +223,7 @@ namespace hOps.web.ViewModels.Home
         public const string PassOnLogs = "passOnLogs";
         public const string PackageLog = "packageLog";
         public const string UpcomingEvents = "upcomingEvents";
+        public const string CalendarMonth = "calendarMonth";
         public const string WorkOrders = "workOrders";
         public const string LostFound = "lostFound";
         public const string HotelLayout = "hotelLayout";
@@ -275,5 +277,33 @@ namespace hOps.web.ViewModels.Home
         public string? Notes { get; set; }
         public string? ScheduleTitle { get; set; }
         public DateTime WeekStartDate { get; set; }
+    }
+
+    public class CalendarMonthViewModel
+    {
+        public string MonthLabel { get; set; } = string.Empty;
+        public DateTime MonthStart { get; set; } = DateTime.UtcNow.Date;
+        public List<CalendarMonthWeekViewModel> Weeks { get; set; } = new();
+    }
+
+    public class CalendarMonthWeekViewModel
+    {
+        public List<CalendarMonthDayViewModel> Days { get; set; } = new();
+    }
+
+    public class CalendarMonthDayViewModel
+    {
+        public DateTime Date { get; set; }
+        public bool IsCurrentMonth { get; set; }
+        public bool IsToday { get; set; }
+        public List<CalendarMonthEventBadgeViewModel> Events { get; set; } = new();
+    }
+
+    public class CalendarMonthEventBadgeViewModel
+    {
+        public string Title { get; set; } = string.Empty;
+        public string CategoryName { get; set; } = string.Empty;
+        public string Color { get; set; } = "#0d6efd";
+        public string? LinkUrl { get; set; }
     }
 }

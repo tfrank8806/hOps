@@ -1,0 +1,212 @@
+@model hOps.web.ViewModels.Home.HomeIndexViewModel
+
+@{
+    var calendar = Model.CalendarMonth ?? new hOps.web.ViewModels.Home.CalendarMonthViewModel();
+    var weeks = calendar.Weeks ?? new List<hOps.web.ViewModels.Home.CalendarMonthWeekViewModel>();
+    var hasData = weeks.Any();
+    var weekdayLabels = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+}
+
+<div class="card shadow-sm h-100 home-widget-card home-widget-card--fill calendar-month-widget-card">
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2 home-widget-card__header">
+        <div>
+            <h2 class="h6 mb-0">Calendar Month</h2>
+            <small class="text-muted">@(!string.IsNullOrWhiteSpace(calendar.MonthLabel) ? calendar.MonthLabel : DateTime.UtcNow.ToString("MMMM yyyy"))</small>
+        </div>
+        <a class="btn btn-sm btn-outline-primary" asp-controller="Calendar" asp-action="Index">
+            Open Calendar
+        </a>
+    </div>
+    <div class="card-body home-widget-card__body">
+        @if (!hasData)
+        {
+            <p class="text-muted mb-0">No calendar data available yet. Create an event to populate the month view.</p>
+        }
+        else
+        {
+<style>
+    .calendar-month-widget {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 0.5rem;
+        height: 100%;
+    }
+
+    .calendar-month-widget__weekdays,
+    .calendar-month-widget__grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 0.35rem;
+    }
+
+    .calendar-month-widget__weekday {
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        color: #6c757d;
+        text-align: center;
+    }
+
+    .calendar-month-day {
+        border: 1px solid #e9ecef;
+        border-radius: 0.75rem;
+        padding: 0.5rem;
+        min-height: 4.25rem;
+        background-color: #fff;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .calendar-month-day--muted {
+        background-color: #f8f9fa;
+        color: #6c757d;
+    }
+
+    .calendar-month-day--today {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 1px rgba(13, 110, 253, 0.3);
+    }
+
+    .calendar-month-day__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+
+    .calendar-month-day__today-pill {
+        font-size: 0.6rem;
+        background-color: rgba(13, 110, 253, 0.1);
+        color: #0d6efd;
+        border-radius: 999px;
+        padding: 0.1rem 0.4rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .calendar-month-day__badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        margin-top: 0.35rem;
+    }
+
+    .calendar-month-day__badge {
+        border-radius: 999px;
+        padding: 0.1rem 0.45rem;
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: #fff;
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .calendar-month-day__badge--more {
+        background-color: #e9ecef;
+        color: #495057;
+    }
+
+    .calendar-month-day__empty-note {
+        font-size: 0.7rem;
+        color: #adb5bd;
+    }
+
+    @@media (max-width: 575.98px) {
+        .calendar-month-day {
+            min-height: 4rem;
+        }
+
+        .calendar-month-day__badge {
+            font-size: 0.6rem;
+        }
+    }
+</style>
+            <div class="calendar-month-widget" aria-label="Monthly calendar">
+                <div class="calendar-month-widget__weekdays" aria-hidden="true">
+                    @foreach (var label in weekdayLabels)
+                    {
+                        <div class="calendar-month-widget__weekday">@label</div>
+                    }
+                </div>
+                <div class="calendar-month-widget__grid">
+                    @foreach (var week in weeks)
+                    {
+                        foreach (var day in week.Days)
+                        {
+                            var dayClasses = new List<string> { "calendar-month-day" };
+                            if (!day.IsCurrentMonth)
+                            {
+                                dayClasses.Add("calendar-month-day--muted");
+                            }
+                            if (day.IsToday)
+                            {
+                                dayClasses.Add("calendar-month-day--today");
+                            }
+                            var displayBadges = day.Events?.Take(3).ToList() ?? new List<hOps.web.ViewModels.Home.CalendarMonthEventBadgeViewModel>();
+                            var overflow = day.Events != null && day.Events.Count > displayBadges.Count
+                                ? day.Events.Count - displayBadges.Count
+                                : 0;
+                            <div class="@string.Join(" ", dayClasses)"
+                                 data-calendar-date="@day.Date.ToString("yyyy-MM-dd")">
+                                <div class="calendar-month-day__header">
+                                    <span class="calendar-month-day__date">@day.Date.Day</span>
+                                    @if (day.IsToday)
+                                    {
+                                        <span class="calendar-month-day__today-pill">Today</span>
+                                    }
+                                </div>
+                                <div class="calendar-month-day__badges">
+                                    @if (!displayBadges.Any())
+                                    {
+                                        <span class="calendar-month-day__empty-note">No events</span>
+                                    }
+                                    else
+                                    {
+                                        foreach (var badge in displayBadges)
+                                        {
+                                            var label = string.IsNullOrWhiteSpace(badge.CategoryName)
+                                                ? "Event"
+                                                : badge.CategoryName;
+                                            if (!string.IsNullOrWhiteSpace(badge.LinkUrl))
+                                            {
+                                                <a class="calendar-month-day__badge"
+                                                   style="background-color:@badge.Color"
+                                                   href="@badge.LinkUrl"
+                                                   title="@badge.Title">
+                                                    @label
+                                                </a>
+                                            }
+                                            else
+                                            {
+                                                <span class="calendar-month-day__badge"
+                                                      style="background-color:@badge.Color"
+                                                      title="@badge.Title">
+                                                    @label
+                                                </span>
+                                            }
+                                        }
+
+                                        if (overflow > 0)
+                                        {
+                                            <span class="calendar-month-day__badge calendar-month-day__badge--more"
+                                                  title="@($"{overflow} more events")">
+                                                +@overflow
+                                            </span>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>

@@ -43,6 +43,7 @@ namespace hOps.web.Controllers
             new HomeWidgetDefinition { Id = HomeWidgetIds.Bulletins, DisplayName = "Bulletin Board", Description = "Team conversations & reminders", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 690 },
             new HomeWidgetDefinition { Id = HomeWidgetIds.WorkOrders, DisplayName = "Work Orders", Description = "Active tickets and SLAs", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 690 },
             new HomeWidgetDefinition { Id = HomeWidgetIds.UpcomingEvents, DisplayName = "Upcoming Events", Description = "Calendar highlights", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 490 },
+            new HomeWidgetDefinition { Id = HomeWidgetIds.CalendarMonth, DisplayName = "Calendar Month", Description = "Month view highlighting event days", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 420 },
             new HomeWidgetDefinition { Id = HomeWidgetIds.PassOnLogs, DisplayName = "Pass On Logs", Description = "Recent pass on entries", DefaultSize = HomeWidgetSize.Full, DefaultHeight = 490, DefaultSpanOverride = 8 },
             new HomeWidgetDefinition { Id = HomeWidgetIds.MySchedule, DisplayName = "My Schedule", Description = "Upcoming shifts for you", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 300 },
             new HomeWidgetDefinition { Id = HomeWidgetIds.LostFound, DisplayName = "Lost & Found", Description = "Items awaiting resolution", DefaultSize = HomeWidgetSize.Third, DefaultHeight = 300 },
@@ -59,6 +60,7 @@ namespace hOps.web.Controllers
             new DefaultWidgetLayoutSpec(HomeWidgetIds.Bulletins, HomeWidgetSize.Third),
             new DefaultWidgetLayoutSpec(HomeWidgetIds.WorkOrders, HomeWidgetSize.Third),
             new DefaultWidgetLayoutSpec(HomeWidgetIds.UpcomingEvents, HomeWidgetSize.Third),
+            new DefaultWidgetLayoutSpec(HomeWidgetIds.CalendarMonth, HomeWidgetSize.Third),
             new DefaultWidgetLayoutSpec(HomeWidgetIds.PassOnLogs, HomeWidgetSize.Full, CustomSpan: 8),
             new DefaultWidgetLayoutSpec(HomeWidgetIds.MySchedule, HomeWidgetSize.Third),
             new DefaultWidgetLayoutSpec(HomeWidgetIds.LostFound, HomeWidgetSize.Third),
@@ -163,6 +165,7 @@ namespace hOps.web.Controllers
             await PopulatePassOnLogsAsync(viewModel, propertyId, user.Id);
             await PopulatePackageLogAsync(viewModel, propertyId);
             await PopulateUpcomingEventsAsync(viewModel, propertyId);
+            await PopulateCalendarMonthAsync(viewModel, propertyId);
             await PopulateQuickWorkOrderOptionsAsync(viewModel, propertyId);
             await PopulateActivityFeedAsync(viewModel, propertyId, user.Id);
             await PopulateMyScheduleAsync(viewModel, propertyId, user.Id);
@@ -1386,6 +1389,87 @@ namespace hOps.web.Controllers
             viewModel.UpcomingEvents = summaries;
         }
 
+        private async Task PopulateCalendarMonthAsync(HomeIndexViewModel viewModel, int propertyId)
+        {
+            var todayUtc = DateTime.UtcNow.Date;
+            var monthStart = new DateTime(todayUtc.Year, todayUtc.Month, 1);
+            var viewStart = GetStartOfWeek(monthStart, DayOfWeek.Sunday);
+            const int totalSlots = 42;
+            var viewEnd = viewStart.AddDays(totalSlots - 1);
+
+            var events = await _context.CalendarEvents
+                .Where(e => e.EventProperties.Any(ep => ep.PropertyId == propertyId))
+                .Where(e => e.StartDate <= viewEnd && e.EndDate >= viewStart)
+                .Include(e => e.Category)
+                .AsNoTracking()
+                .ToListAsync();
+
+            var eventLookup = new Dictionary<DateTime, List<CalendarMonthEventBadgeViewModel>>();
+            var calendarLink = Url.Action("Index", "Calendar") ?? string.Empty;
+
+            foreach (var calendarEvent in events)
+            {
+                var eventColor = string.IsNullOrWhiteSpace(calendarEvent.Category?.Color)
+                    ? "#0d6efd"
+                    : calendarEvent.Category!.Color!;
+                var categoryName = string.IsNullOrWhiteSpace(calendarEvent.Category?.Name)
+                    ? "Event"
+                    : calendarEvent.Category!.Name;
+
+                var eventStart = calendarEvent.StartDate.Date < viewStart ? viewStart : calendarEvent.StartDate.Date;
+                var eventEnd = calendarEvent.EndDate.Date > viewEnd ? viewEnd : calendarEvent.EndDate.Date;
+
+                for (var date = eventStart; date <= eventEnd; date = date.AddDays(1))
+                {
+                    if (!eventLookup.TryGetValue(date, out var badges))
+                    {
+                        badges = new List<CalendarMonthEventBadgeViewModel>();
+                        eventLookup[date] = badges;
+                    }
+
+                    badges.Add(new CalendarMonthEventBadgeViewModel
+                    {
+                        Title = calendarEvent.Title,
+                        CategoryName = categoryName,
+                        Color = eventColor,
+                        LinkUrl = calendarLink
+                    });
+                }
+            }
+
+            var weeks = new List<CalendarMonthWeekViewModel>();
+            var cursor = viewStart;
+
+            while (cursor <= viewEnd)
+            {
+                var week = new CalendarMonthWeekViewModel();
+                for (var i = 0; i < 7; i++)
+                {
+                    var currentDate = cursor;
+                    eventLookup.TryGetValue(currentDate, out var dayEvents);
+
+                    week.Days.Add(new CalendarMonthDayViewModel
+                    {
+                        Date = currentDate,
+                        IsCurrentMonth = currentDate.Month == monthStart.Month,
+                        IsToday = currentDate == todayUtc,
+                        Events = dayEvents?.OrderBy(e => e.Title).ToList() ?? new List<CalendarMonthEventBadgeViewModel>()
+                    });
+
+                    cursor = cursor.AddDays(1);
+                }
+
+                weeks.Add(week);
+            }
+
+            viewModel.CalendarMonth = new CalendarMonthViewModel
+            {
+                MonthLabel = monthStart.ToString("MMMM yyyy"),
+                MonthStart = monthStart,
+                Weeks = weeks
+            };
+        }
+
         private async Task<bool> UserHasAccessToProperty(int propertyId, ApplicationUser user)
         {
             return await _context.UserPropertyAccesses
@@ -1796,6 +1880,12 @@ namespace hOps.web.Controllers
             return WidgetDefinitions
                 .Where(def => enabled.Contains(def.Id))
                 .ToList();
+        }
+
+        private static DateTime GetStartOfWeek(DateTime date, DayOfWeek startOfWeek)
+        {
+            var diff = (7 + (date.DayOfWeek - startOfWeek)) % 7;
+            return date.AddDays(-diff).Date;
         }
 
         private async Task EnsureMarketplaceSeedAsync()

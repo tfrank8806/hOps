@@ -244,6 +244,9 @@
                                 createButtonText: "+ New Event",
                                 createFragment: "calendarCreateForm"))
                             break;
+                        case HomeWidgetIds.CalendarMonth:
+                            @await Html.PartialAsync("~/Views/Home/Widgets/_CalendarMonthWidget.cshtml", Model)
+                            break;
                         case HomeWidgetIds.WorkOrders:
                             @await Html.PartialAsync("~/Views/Home/Widgets/_WorkOrdersWidget.cshtml", Model)
                             break;
