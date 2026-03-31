@@ -171,10 +171,15 @@
                 ? definition.DefaultHeight
                 : Model.WidgetHeightDefault;
             var sanitizedDefaultHeight = Math.Clamp(defaultHeight, Model.WidgetHeightMin, Model.WidgetHeightMax);
-            var storedHeight = widget.CustomHeight.HasValue ? Math.Clamp(widget.CustomHeight.Value, Model.WidgetHeightMin, Model.WidgetHeightMax) : (int?)null;
-            var appliedHeight = storedHeight ?? sanitizedDefaultHeight;
+            var snappedDefaultHeight = SnapWidgetHeightToGrid(sanitizedDefaultHeight, widgetRowUnit, widgetRowGap, Model.WidgetHeightMin, Model.WidgetHeightMax);
+            var storedHeightRaw = widget.CustomHeight.HasValue ? Math.Clamp(widget.CustomHeight.Value, Model.WidgetHeightMin, Model.WidgetHeightMax) : (int?)null;
+            var snappedStoredHeight = storedHeightRaw.HasValue
+                ? SnapWidgetHeightToGrid(storedHeightRaw.Value, widgetRowUnit, widgetRowGap, Model.WidgetHeightMin, Model.WidgetHeightMax)
+                : (int?)null;
+            var appliedHeight = snappedStoredHeight ?? snappedDefaultHeight;
             var sizeLabelText = forceFullWidth ? $"{sizeLabel} (locked)" : sizeLabel;
-            var heightLabelText = GetHeightLabel(appliedHeight, sanitizedDefaultHeight, storedHeight.HasValue);
+            var isCustomHeight = snappedStoredHeight.HasValue && Math.Abs(appliedHeight - snappedDefaultHeight) > Model.WidgetHeightResetThreshold;
+            var heightLabelText = GetHeightLabel(appliedHeight, snappedDefaultHeight, isCustomHeight);
             var rowSpan = Math.Max(1, (int)Math.Ceiling((double)(appliedHeight + widgetRowGap) / (widgetRowUnit + widgetRowGap)));
             var widgetStyle = $"--widget-span: {appliedSpan}; --widget-height: {appliedHeight}px; --widget-row-span: {rowSpan};";
             var spanOverrideAttribute = overrideSpan.HasValue
@@ -186,9 +191,9 @@
                  data-grid-span="@appliedSpan"
                  data-grid-height="@appliedHeight"
                  data-grid-rows="@rowSpan"
-                 data-default-height="@sanitizedDefaultHeight"
+                 data-default-height="@snappedDefaultHeight"
                  @(storedSpan.HasValue ? $"data-custom-span=\"{appliedSpan}\"" : string.Empty)
-                 @(storedHeight.HasValue ? $"data-custom-height=\"{appliedHeight}\"" : string.Empty)
+                 @(isCustomHeight ? $"data-custom-height=\"{appliedHeight}\"" : string.Empty)
                  @(forceFullWidth ? "data-lock-width=\"true\"" : string.Empty)
                  @Html.Raw(spanOverrideAttribute)
                  style="@widgetStyle"
@@ -280,8 +285,23 @@
         HomeWidgetSize.Quarter => "One quarter",
         _ => "Custom width"
     };
-    private static string GetHeightLabel(int appliedHeight, int defaultHeight, bool hasCustom) =>
-        hasCustom ? $"Height: {appliedHeight}px" : $"Height: Default ({defaultHeight}px)";
+    private static string GetHeightLabel(int appliedHeight, int defaultHeight, bool isCustom) =>
+        isCustom ? $"Height: {appliedHeight}px" : $"Height: Default ({defaultHeight}px)";
+
+    private static int SnapWidgetHeightToGrid(int height, int rowUnit, int rowGap, int minHeight, int maxHeight)
+    {
+        var clamped = Math.Clamp(height, minHeight, maxHeight);
+        if (rowUnit <= 0)
+        {
+            return clamped;
+        }
+
+        var safeGap = Math.Max(0, rowGap);
+        var step = rowUnit + safeGap;
+        var rows = Math.Max(1, (int)Math.Round((double)(clamped + safeGap) / step));
+        var snapped = rows * rowUnit + Math.Max(0, rows - 1) * safeGap;
+        return Math.Clamp(snapped, minHeight, maxHeight);
+    }
 }
 <script>
     (() => {
@@ -353,7 +373,6 @@
         const MIN_HEIGHT = Number(heightOptions.minHeight) || 220;
         const MAX_HEIGHT = Number(heightOptions.maxHeight) || 900;
         const DEFAULT_HEIGHT = Number(heightOptions.defaultHeight) || 300;
-        const HEIGHT_STEP = Number(heightOptions.step) || 10;
         const HEIGHT_TOLERANCE = Number(heightOptions.tolerance) || 6;
         const ROW_UNIT = Number(grid.dataset.rowUnit) || 30;
         const ROW_GAP = Number(grid.dataset.rowGap) || 0;
@@ -441,10 +460,30 @@
                 label.textContent = `Height: ${Math.round(heightValue)}px`;
             }
         };
-        const computeRowSpan = (heightValue) => {
+        const getRowMetrics = () => {
             const unit = ROW_UNIT > 0 ? ROW_UNIT : 30;
             const gap = ROW_GAP >= 0 ? ROW_GAP : 0;
+            return { unit, gap };
+        };
+        const computeRowSpan = (heightValue) => {
+            const { unit, gap } = getRowMetrics();
             return Math.max(1, Math.ceil((heightValue + gap) / (unit + gap)));
+        };
+        const getNearestRowSpan = (heightValue) => {
+            const { unit, gap } = getRowMetrics();
+            return Math.max(1, Math.round((heightValue + gap) / (unit + gap)));
+        };
+        const calculateHeightFromRows = (rows) => {
+            const { unit, gap } = getRowMetrics();
+            const safeRows = Math.max(1, Math.round(rows));
+            return safeRows * unit + Math.max(0, safeRows - 1) * gap;
+        };
+        const snapHeightToGrid = (heightValue) => {
+            const normalized = clampHeight(heightValue);
+            const rows = getNearestRowSpan(normalized);
+            const snappedHeight = clampHeight(calculateHeightFromRows(rows));
+            const finalRows = computeRowSpan(snappedHeight);
+            return { height: snappedHeight, rows: finalRows };
         };
         const applyRowSpan = (widget, rows) => {
             if (!widget) {
@@ -459,9 +498,10 @@
                 return;
             }
             const defaultHeight = getDefaultHeight(widget);
-            const heightToApply = typeof overrideHeight === 'number' && Number.isFinite(overrideHeight)
-                ? clampHeight(overrideHeight)
+            const baseHeight = typeof overrideHeight === 'number' && Number.isFinite(overrideHeight)
+                ? overrideHeight
                 : defaultHeight;
+            const { height: heightToApply, rows: rowsToApply } = snapHeightToGrid(baseHeight);
             if (Math.abs(heightToApply - defaultHeight) <= HEIGHT_TOLERANCE) {
                 delete widget.dataset.customHeight;
             } else {
@@ -469,7 +509,6 @@
             }
             widget.dataset.gridHeight = String(Math.round(heightToApply));
             widget.style.setProperty('--widget-height', `${heightToApply}px`);
-            const rowsToApply = computeRowSpan(heightToApply);
             applyRowSpan(widget, rowsToApply);
             setHeightLabelText(widget, heightToApply);
         };
@@ -682,6 +721,7 @@
                 widget.classList.toggle('home-widget--editing', enabled);
             });
             dashboard?.classList.toggle('home-dashboard--editing', enabled);
+            grid.classList.toggle('home-widget-grid--editing', enabled);
             if (marketplace) {
                 marketplace.classList.toggle('d-none', !enabled);
             }
@@ -765,7 +805,7 @@
                     const deltaY = event.clientY - startY;
                     if (Math.abs(deltaY) > 0.5) {
                         const rawHeight = initialHeight + deltaY;
-                        const snappedHeight = clampHeight(Math.round(rawHeight / HEIGHT_STEP) * HEIGHT_STEP);
+                        const { height: snappedHeight } = snapHeightToGrid(rawHeight);
                         updateWidgetHeight(widget, snappedHeight);
                     }
                 }

@@ -1541,16 +1541,44 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 .home-widget-grid {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    column-gap: 0.75rem;
+    --home-widget-col-gap: 0.75rem;
+    column-gap: var(--home-widget-col-gap);
     row-gap: var(--home-widget-row-gap, calc(12px * var(--ui-scale)));
     grid-auto-flow: row dense;
     grid-auto-rows: var(--home-widget-row-size, calc(30px * var(--ui-scale)));
     align-items: start;
+    position: relative;
+    isolation: isolate;
+}
+
+.home-widget-grid::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(to bottom, rgba(13, 110, 253, 0.15) 1px, transparent 1px),
+        linear-gradient(to right, rgba(13, 110, 253, 0.12) 1px, transparent 1px);
+    background-size:
+        100% calc(var(--home-widget-row-size, calc(30px * var(--ui-scale))) + var(--home-widget-row-gap, calc(12px * var(--ui-scale)))),
+        calc((100% - (11 * var(--home-widget-col-gap, 0.75rem))) / 12 + var(--home-widget-col-gap, 0.75rem)) 100%;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 0;
+}
+
+.home-widget-grid--editing::before {
+    opacity: 1;
 }
 
 @media (max-width: 767.98px) {
     .home-widget-grid {
         grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .home-widget-grid::before {
+        background-image: linear-gradient(to bottom, rgba(13, 110, 253, 0.15) 1px, transparent 1px);
+        background-size: 100% calc(var(--home-widget-row-size, calc(30px * var(--ui-scale))) + var(--home-widget-row-gap, calc(12px * var(--ui-scale))));
     }
 }
 
@@ -1564,6 +1592,7 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     grid-column: span var(--widget-span, 4);
     grid-row: span var(--widget-row-span, 10);
     --widget-height: calc(260px * var(--ui-scale));
+    z-index: 1;
 }
 
 .home-widget-card {
