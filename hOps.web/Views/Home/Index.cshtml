@@ -73,7 +73,7 @@
             </button>
         </div>
         <div class="text-muted" data-layout-hint>
-            Drag cards to reorder. Use the resize handle or height slider to change dimensions.
+            Drag cards to reorder and use the resize handles to change dimensions while customizing.
         </div>
     </div>
 
@@ -88,7 +88,7 @@
                     <ol class="mb-3">
                         <li>Click <strong>Customize Layout</strong> to unlock drag &amp; resize controls.</li>
                         <li>Use the <em>six-dot</em> handle to drag widgets into a new order.</li>
-                        <li>Grab the corner handle or adjust the Height slider for precise sizing.</li>
+                        <li>Grab the corner resize handles for precise sizing.</li>
                         <li>Widgets snap to a 12-column grid—Full = 12, Half = 6, etc.</li>
                         <li>Press <strong>Save Layout</strong> to keep changes or <strong>Cancel</strong> to revert.</li>
                     </ol>
@@ -197,18 +197,6 @@
                     <span class="home-widget__drag-handle" role="button" tabindex="0" aria-label="Drag widget" title="Drag widget">⋮⋮</span>
                     <span class="home-widget__size-label" data-size-label>@sizeLabelText</span>
                     <span class="home-widget__height-label" data-height-label>@heightLabelText</span>
-                    <div class="home-widget__height-slider">
-                        <span class="text-muted small">Height</span>
-                        <input type="range"
-                               class="form-range form-range-sm"
-                               min="@Model.WidgetHeightMin"
-                               max="@Model.WidgetHeightMax"
-                               step="@Model.WidgetHeightStep"
-                               value="@appliedHeight"
-                               draggable="false"
-                               data-height-slider
-                               aria-label="Widget height" />
-                    </div>
                 </div>
                 <div class="home-widget__content">
                     @switch (widget.WidgetId)
@@ -431,56 +419,6 @@
             }
             return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, numeric));
         };
-        const syncHeightSlider = (widget, heightValue) => {
-            if (!widget) {
-                return;
-            }
-            const slider = widget.querySelector('[data-height-slider]');
-            if (!slider) {
-                return;
-            }
-            const nextValue = String(Math.round(heightValue));
-            if (slider.value !== nextValue) {
-                slider.value = nextValue;
-            }
-        };
-        const initializeHeightSlider = (widget) => {
-            if (!widget) {
-                return;
-            }
-            const slider = widget.querySelector('[data-height-slider]');
-            if (!slider) {
-                return;
-            }
-            if (slider.dataset.heightSlider === 'true') {
-                return;
-            }
-            const currentHeight = Number(widget.dataset.gridHeight || getDefaultHeight(widget));
-            slider.min = slider.min || String(MIN_HEIGHT);
-            slider.max = slider.max || String(MAX_HEIGHT);
-            slider.step = slider.step || String(HEIGHT_STEP);
-            slider.value = String(Math.round(clampHeight(currentHeight)));
-            const applySliderValue = () => {
-                const parsed = Number(slider.value);
-                if (Number.isFinite(parsed)) {
-                    updateWidgetHeight(widget, parsed);
-                }
-            };
-            slider.addEventListener('input', applySliderValue);
-            slider.addEventListener('change', () => {
-                applySliderValue();
-                persistLayoutSnapshot();
-            });
-            slider.dataset.heightSlider = 'true';
-
-            const stopDrag = (event) => event.stopPropagation();
-            slider.addEventListener('pointerdown', stopDrag);
-            slider.addEventListener('pointermove', stopDrag);
-            slider.addEventListener('mousedown', stopDrag);
-            slider.addEventListener('touchstart', stopDrag);
-            slider.addEventListener('touchmove', stopDrag);
-            slider.addEventListener('click', (event) => event.stopPropagation());
-        };
         const getDefaultHeight = (widget) => {
             if (!widget) {
                 return DEFAULT_HEIGHT;
@@ -534,7 +472,6 @@
             const rowsToApply = computeRowSpan(heightToApply);
             applyRowSpan(widget, rowsToApply);
             setHeightLabelText(widget, heightToApply);
-            syncHeightSlider(widget, heightToApply);
         };
 
         const entryHasCustomizations = (entry) => {
@@ -554,7 +491,6 @@
             } else {
                 updateWidgetHeight(widget);
             }
-            initializeHeightSlider(widget);
         });
 
         let isEditing = false;
