@@ -1392,9 +1392,11 @@ namespace hOps.web.Controllers
         private async Task PopulateCalendarMonthAsync(HomeIndexViewModel viewModel, int propertyId)
         {
             var todayUtc = DateTime.UtcNow;
+            var todayDate = todayUtc.Date;
             var monthStart = new DateTime(todayUtc.Year, todayUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             var viewStart = DateTime.SpecifyKind(GetStartOfWeek(monthStart, DayOfWeek.Sunday), DateTimeKind.Utc);
             const int totalSlots = 42;
+            const int visibleWeekCount = 4;
             var viewEnd = DateTime.SpecifyKind(viewStart.AddDays(totalSlots - 1), DateTimeKind.Utc);
 
             var events = await _context.CalendarEvents
@@ -1452,7 +1454,7 @@ namespace hOps.web.Controllers
                     {
                         Date = currentDate,
                         IsCurrentMonth = currentDate.Month == monthStart.Month,
-                        IsToday = currentDate == todayUtc,
+                        IsToday = currentDate.Date == todayDate,
                         Events = dayEvents?.OrderBy(e => e.Title).ToList() ?? new List<CalendarMonthEventBadgeViewModel>()
                     });
 
@@ -1461,6 +1463,8 @@ namespace hOps.web.Controllers
 
                 weeks.Add(week);
             }
+
+            weeks = TrimCalendarWeeks(weeks, visibleWeekCount, todayDate);
 
             viewModel.CalendarMonth = new CalendarMonthViewModel
             {
@@ -1886,6 +1890,26 @@ namespace hOps.web.Controllers
         {
             var diff = (7 + (date.DayOfWeek - startOfWeek)) % 7;
             return date.AddDays(-diff).Date;
+        }
+
+        private static List<CalendarMonthWeekViewModel> TrimCalendarWeeks(List<CalendarMonthWeekViewModel> weeks, int visibleWeekCount, DateTime todayDate)
+        {
+            if (weeks.Count <= visibleWeekCount)
+            {
+                return weeks;
+            }
+
+            var todayWeekIndex = weeks.FindIndex(week => week.Days.Any(day => day.Date.Date == todayDate));
+            if (todayWeekIndex < 0)
+            {
+                return weeks.Take(visibleWeekCount).ToList();
+            }
+
+            var minStartIndex = Math.Max(0, todayWeekIndex - (visibleWeekCount - 1));
+            var maxStartIndex = weeks.Count - visibleWeekCount;
+            var startIndex = Math.Min(minStartIndex, maxStartIndex);
+
+            return weeks.Skip(startIndex).Take(visibleWeekCount).ToList();
         }
 
         private async Task EnsureMarketplaceSeedAsync()
