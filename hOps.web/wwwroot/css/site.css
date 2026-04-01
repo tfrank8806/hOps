@@ -1589,8 +1589,8 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     flex-direction: column;
     min-height: clamp(calc(200px * var(--ui-scale)), var(--widget-height, calc(260px * var(--ui-scale))), calc(100vh - var(--main-header-height, calc(72px * var(--ui-scale))) - 3rem));
     height: clamp(calc(200px * var(--ui-scale)), var(--widget-height, calc(260px * var(--ui-scale))), calc(100vh - var(--main-header-height, calc(72px * var(--ui-scale))) - 3rem));
-    grid-column: span var(--widget-span, 4);
-    grid-row: span var(--widget-row-span, 10);
+    grid-column: var(--widget-column-start, auto) / span var(--widget-span, 4);
+    grid-row: var(--widget-row-start, auto) / span var(--widget-row-span, 10);
     --widget-height: calc(260px * var(--ui-scale));
     z-index: 1;
 }

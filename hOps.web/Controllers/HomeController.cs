@@ -278,7 +278,8 @@ namespace hOps.web.Controllers
                     normalizedSpan = ClampSpan(requestedSpan.Value);
                 }
 
-                if (string.Equals(widget.WidgetId, HomeWidgetIds.HotelLayout, StringComparison.OrdinalIgnoreCase))
+                var isFullWidthLocked = string.Equals(widget.WidgetId, HomeWidgetIds.HotelLayout, StringComparison.OrdinalIgnoreCase);
+                if (isFullWidthLocked)
                 {
                     normalizedSpan = GetSpanForSize(HomeWidgetSize.Full);
                 }
@@ -303,6 +304,23 @@ namespace hOps.web.Controllers
                     }
                 }
 
+                var spanForColumn = normalizedSpan ?? GetDefaultSpanForWidget(definition, parsedSize);
+                int? normalizedColumn = null;
+                if (isFullWidthLocked)
+                {
+                    normalizedColumn = 1;
+                }
+                else if (widget.ColumnStart.HasValue)
+                {
+                    normalizedColumn = ClampColumnStart(widget.ColumnStart.Value, spanForColumn);
+                }
+
+                int? normalizedRow = null;
+                if (widget.RowStart.HasValue)
+                {
+                    normalizedRow = ClampRowStart(widget.RowStart.Value);
+                }
+
                 if (!seen.Add(widget.WidgetId))
                 {
                     continue;
@@ -313,7 +331,9 @@ namespace hOps.web.Controllers
                     WidgetId = widget.WidgetId,
                     Size = parsedSize,
                     CustomSpan = normalizedSpan,
-                    CustomHeight = normalizedHeight
+                    CustomHeight = normalizedHeight,
+                    ColumnStart = normalizedColumn,
+                    RowStart = normalizedRow
                 });
             }
 
@@ -1737,9 +1757,15 @@ namespace hOps.web.Controllers
                         var sanitizedSpan = entry.CustomSpan.HasValue ? ClampSpan(entry.CustomSpan.Value) : (int?)null;
                         var defaultHeight = definition.DefaultHeight > 0 ? definition.DefaultHeight : DefaultWidgetHeight;
                         var sanitizedHeight = entry.CustomHeight.HasValue ? ClampHeight(entry.CustomHeight.Value) : (int?)null;
+                        var spanForColumn = sanitizedSpan ?? GetDefaultSpanForWidget(definition, entry.Size);
+                        var sanitizedColumn = entry.ColumnStart.HasValue
+                            ? ClampColumnStart(entry.ColumnStart.Value, spanForColumn)
+                            : (int?)null;
+                        var sanitizedRow = entry.RowStart.HasValue ? ClampRowStart(entry.RowStart.Value) : (int?)null;
                         if (string.Equals(entry.WidgetId, HomeWidgetIds.HotelLayout, StringComparison.OrdinalIgnoreCase))
                         {
                             sanitizedSpan = GetSpanForSize(HomeWidgetSize.Full);
+                            sanitizedColumn = 1;
                         }
                         else if (sanitizedSpan.HasValue)
                         {
@@ -1759,7 +1785,9 @@ namespace hOps.web.Controllers
                             WidgetId = entry.WidgetId,
                             Size = entry.Size,
                             CustomSpan = sanitizedSpan,
-                            CustomHeight = sanitizedHeight
+                            CustomHeight = sanitizedHeight,
+                            ColumnStart = sanitizedColumn,
+                            RowStart = sanitizedRow
                         });
                     }
                 }
@@ -1838,6 +1866,14 @@ namespace hOps.web.Controllers
         }
 
         private static int ClampSpan(int span) => Math.Clamp(span, 1, 12);
+        private static int ClampColumnStart(int columnStart, int span)
+        {
+            var normalizedSpan = Math.Clamp(span, 1, 12);
+            var maxStart = Math.Max(1, 12 - normalizedSpan + 1);
+            return Math.Clamp(columnStart, 1, maxStart);
+        }
+
+        private static int ClampRowStart(int rowStart) => Math.Clamp(rowStart, 1, 200);
         private static int ClampHeight(int height) => Math.Clamp(height, MinWidgetHeight, MaxWidgetHeight);
 
         private sealed record LayoutPersonaOption(string Key, string Name, string Description);
@@ -1971,6 +2007,8 @@ namespace hOps.web.Controllers
             public string Size { get; set; } = string.Empty;
             public int? CustomSpan { get; set; }
             public int? CustomHeight { get; set; }
+            public int? ColumnStart { get; set; }
+            public int? RowStart { get; set; }
         }
 
         public class ManagerAnnouncementForm
