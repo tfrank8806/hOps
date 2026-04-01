@@ -50,7 +50,7 @@
     {
         <div class="alert alert-success">@message</div>
     }
-    if (!string.IsNullOrWhiteSpace(error))
+    @if (!string.IsNullOrWhiteSpace(error))
     {
         <div class="alert alert-danger">@error</div>
     }
