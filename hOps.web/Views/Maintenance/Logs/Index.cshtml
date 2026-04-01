@@ -14,6 +14,13 @@
         ("Quarterly Logs", Model.QuarterlyTemplates),
         ("Annual Logs", Model.AnnualTemplates)
     };
+    var hasAnyTemplates = Model.DailyTemplates.Any()
+        || Model.WeeklyTemplates.Any()
+        || Model.MonthlyTemplates.Any()
+        || Model.QuarterlyTemplates.Any()
+        || Model.AnnualTemplates.Any()
+        || Model.BiAnnualTemplates.Any()
+        || Model.OtherTemplates.Any();
     var checklistReturnUrl = $"{Context.Request.Path}{Context.Request.QueryString}";
 }
 
@@ -101,7 +108,7 @@
         </div>
     </form>
 
-    @if (!Model.DailyTemplates.Any() && !Model.WeeklyTemplates.Any() && !Model.MonthlyTemplates.Any() && !Model.OtherTemplates.Any())
+    @if (!hasAnyTemplates)
     {
         <div class="card shadow-sm">
             <div class="card-body">
