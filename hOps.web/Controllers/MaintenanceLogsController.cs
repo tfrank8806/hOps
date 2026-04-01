@@ -162,9 +162,11 @@ namespace hOps.web.Controllers
                 item.ScheduleType != MaintenanceLogScheduleType.Weekly &&
                 item.ScheduleType != MaintenanceLogScheduleType.Monthly &&
                 item.ScheduleType != MaintenanceLogScheduleType.Quarterly &&
-                item.ScheduleType != MaintenanceLogScheduleType.Yearly).ToList();
+                item.ScheduleType != MaintenanceLogScheduleType.Yearly &&
+                item.ScheduleType != MaintenanceLogScheduleType.BiAnnual).ToList();
             var quarterly = ordered.Where(item => item.ScheduleType == MaintenanceLogScheduleType.Quarterly).ToList();
             var annual = ordered.Where(item => item.ScheduleType == MaintenanceLogScheduleType.Yearly).ToList();
+            var biAnnual = ordered.Where(item => item.ScheduleType == MaintenanceLogScheduleType.BiAnnual).ToList();
 
             var viewModel = new MaintenanceLogsIndexViewModel
             {
@@ -178,6 +180,7 @@ namespace hOps.web.Controllers
                 MonthlyTemplates = monthly,
                 QuarterlyTemplates = quarterly,
                 AnnualTemplates = annual,
+                BiAnnualTemplates = biAnnual,
                 OtherTemplates = other,
                 CanLoadMoreHistory = historyBlocks < 12
             };
@@ -578,7 +581,7 @@ namespace hOps.web.Controllers
 
             if (!SupportsCycleRendering(template.ScheduleType))
             {
-                TempData["MaintenanceLogError"] = "Cycle-based tracking currently supports daily, weekly, or monthly logs.";
+                TempData["MaintenanceLogError"] = "Cycle-based tracking currently supports daily, weekly, monthly, bi-annual, quarterly, or annual logs.";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -639,7 +642,7 @@ namespace hOps.web.Controllers
 
             if (!SupportsCycleRendering(template.ScheduleType))
             {
-                TempData["MaintenanceLogError"] = "Cycle-based tracking currently supports daily, weekly, or monthly logs.";
+                TempData["MaintenanceLogError"] = "Cycle-based tracking currently supports daily, weekly, monthly, bi-annual, quarterly, or annual logs.";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -1479,7 +1482,8 @@ namespace hOps.web.Controllers
                 or MaintenanceLogScheduleType.Weekly
                 or MaintenanceLogScheduleType.Monthly
                 or MaintenanceLogScheduleType.Quarterly
-                or MaintenanceLogScheduleType.Yearly;
+                or MaintenanceLogScheduleType.Yearly
+                or MaintenanceLogScheduleType.BiAnnual;
         }
 
         private static bool PassesFilters(MaintenanceLogTemplateListItemViewModel item, MaintenanceLogIndexFilterViewModel filters)
@@ -1583,7 +1587,8 @@ namespace hOps.web.Controllers
         {
             return scheduleType == MaintenanceLogScheduleType.Monthly
                 || scheduleType == MaintenanceLogScheduleType.Quarterly
-                || scheduleType == MaintenanceLogScheduleType.Yearly;
+                || scheduleType == MaintenanceLogScheduleType.Yearly
+                || scheduleType == MaintenanceLogScheduleType.BiAnnual;
         }
 
         private static List<MaintenanceLogColumnEditorViewModel> BuildColumnEditors(IReadOnlyList<MaintenanceLogColumnDefinition> columns)

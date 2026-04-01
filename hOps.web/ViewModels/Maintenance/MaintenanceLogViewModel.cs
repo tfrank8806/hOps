@@ -23,6 +23,7 @@ namespace hOps.web.ViewModels.Maintenance
         public IReadOnlyList<MaintenanceLogTemplateListItemViewModel> MonthlyTemplates { get; set; } = Array.Empty<MaintenanceLogTemplateListItemViewModel>();
         public IReadOnlyList<MaintenanceLogTemplateListItemViewModel> QuarterlyTemplates { get; set; } = Array.Empty<MaintenanceLogTemplateListItemViewModel>();
         public IReadOnlyList<MaintenanceLogTemplateListItemViewModel> AnnualTemplates { get; set; } = Array.Empty<MaintenanceLogTemplateListItemViewModel>();
+        public IReadOnlyList<MaintenanceLogTemplateListItemViewModel> BiAnnualTemplates { get; set; } = Array.Empty<MaintenanceLogTemplateListItemViewModel>();
         public IReadOnlyList<MaintenanceLogTemplateListItemViewModel> OtherTemplates { get; set; } = Array.Empty<MaintenanceLogTemplateListItemViewModel>();
         public bool CanLoadMoreHistory { get; set; }
     }

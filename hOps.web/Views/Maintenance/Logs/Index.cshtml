@@ -10,6 +10,7 @@
         ("Daily Logs", Model.DailyTemplates),
         ("Weekly Logs", Model.WeeklyTemplates),
         ("Monthly Logs", Model.MonthlyTemplates),
+        ("Bi-Annual Logs", Model.BiAnnualTemplates),
         ("Quarterly Logs", Model.QuarterlyTemplates),
         ("Annual Logs", Model.AnnualTemplates)
     };
@@ -64,6 +65,7 @@
                         <option value="Daily" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Daily ? "selected" : null)">Daily</option>
                         <option value="Weekly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Weekly ? "selected" : null)">Weekly</option>
                         <option value="Monthly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Monthly ? "selected" : null)">Monthly</option>
+                        <option value="BiAnnual" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.BiAnnual ? "selected" : null)">Bi-Annual</option>
                         <option value="Quarterly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Quarterly ? "selected" : null)">Quarterly</option>
                         <option value="Yearly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Yearly ? "selected" : null)">Annual</option>
                     </select>
@@ -193,7 +195,7 @@
                                 </div>
                                 <span class="badge bg-secondary">Legacy schedule</span>
                             </div>
-                            <p class="text-muted mt-3 mb-0 small">Cycle history will be available once this template moves to a supported schedule (daily/weekly/monthly/quarterly/annual).</p>
+                            <p class="text-muted mt-3 mb-0 small">Cycle history will be available once this template moves to a supported schedule (daily/weekly/monthly/bi-annual/quarterly/annual).</p>
                         </div>
                     </div>
                 }

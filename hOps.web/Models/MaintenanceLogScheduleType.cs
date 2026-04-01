@@ -9,6 +9,7 @@ namespace hOps.web.Models
         Weekly = 2,
         Monthly = 3,
         Quarterly = 4,
-        Yearly = 5
+        Yearly = 5,
+        BiAnnual = 6
     }
 }

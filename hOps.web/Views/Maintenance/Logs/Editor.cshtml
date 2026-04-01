@@ -34,6 +34,7 @@
                             <option value="Weekly">Weekly</option>
                             <option value="Monthly">Monthly</option>
                             <option value="Quarterly">Quarterly</option>
+                            <option value="BiAnnual">Bi-Annual</option>
                             <option value="Yearly">Annual</option>
                         </select>
                     </div>
@@ -100,7 +101,7 @@
                         <label asp-for="DayOfMonth" class="form-label">Day of Month</label>
                         <input asp-for="DayOfMonth" type="number" min="1" max="31" class="form-control" />
                         <span asp-validation-for="DayOfMonth" class="text-danger"></span>
-                        <div class="form-text">Required for Monthly, Quarterly, or Annual schedules.</div>
+                        <div class="form-text">Required for Monthly, Bi-Annual, Quarterly, or Annual schedules.</div>
                     </div>
                     <div class="col-md-3 d-flex align-items-center">
                         <div class="form-check mt-4 pt-2">
@@ -268,7 +269,7 @@
             const scheduleTypeSelect = document.getElementById('scheduleTypeSelect');
             const weeklyFieldset = document.getElementById('weeklyDaysFieldset');
             const monthlyFieldset = document.getElementById('monthlyDayFieldset');
-            const monthlyTypes = new Set(['Monthly', 'Quarterly', 'Yearly']);
+            const monthlyTypes = new Set(['Monthly', 'BiAnnual', 'Quarterly', 'Yearly']);
             const updateScheduleVisibility = () => {
                 const value = scheduleTypeSelect?.value ?? 'None';
                 if (weeklyFieldset) {

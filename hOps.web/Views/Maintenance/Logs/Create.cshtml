@@ -33,6 +33,7 @@
                             <option value="Daily">Daily</option>
                             <option value="Weekly">Weekly</option>
                             <option value="Monthly">Monthly</option>
+                            <option value="BiAnnual">Bi-Annual</option>
                             <option value="Quarterly">Quarterly</option>
                             <option value="Yearly">Annual</option>
                         </select>
@@ -66,7 +67,7 @@
                     <div class="col-md-4 d-none" id="dayOfMonthField">
                         <label asp-for="DayOfMonth" class="form-label">Due Day</label>
                         <input asp-for="DayOfMonth" class="form-control" type="number" min="1" max="31" />
-                        <div class="form-text">1-31, used for monthly, quarterly, or annual cycles.</div>
+                        <div class="form-text">1-31, used for monthly, bi-annual, quarterly, or annual cycles.</div>
                         <span asp-validation-for="DayOfMonth" class="text-danger small"></span>
                     </div>
                 </div>
@@ -90,7 +91,7 @@
             const updateVisibility = () => {
                 const value = scheduleSelect?.value ?? 'Daily';
                 const showWeekly = value === 'Weekly';
-                const showDayOfMonth = value === 'Monthly' || value === 'Quarterly' || value === 'Yearly';
+                const showDayOfMonth = value === 'Monthly' || value === 'Quarterly' || value === 'Yearly' || value === 'BiAnnual';
 
                 if (weeklyFieldset) {
                     weeklyFieldset.classList.toggle('d-none', !showWeekly);

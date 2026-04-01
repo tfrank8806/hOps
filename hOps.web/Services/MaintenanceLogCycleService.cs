@@ -130,7 +130,8 @@ namespace hOps.web.Services
                 or MaintenanceLogScheduleType.Weekly
                 or MaintenanceLogScheduleType.Monthly
                 or MaintenanceLogScheduleType.Quarterly
-                or MaintenanceLogScheduleType.Yearly;
+                or MaintenanceLogScheduleType.Yearly
+                or MaintenanceLogScheduleType.BiAnnual;
         }
 
         private static string NormalizeKey(string? key)
@@ -284,6 +285,7 @@ namespace hOps.web.Services
                 MaintenanceLogScheduleType.Monthly => BuildMonthlyWindow(template, localReference),
                 MaintenanceLogScheduleType.Quarterly => BuildQuarterlyWindow(template, localReference),
                 MaintenanceLogScheduleType.Yearly => BuildYearlyWindow(template, localReference),
+                MaintenanceLogScheduleType.BiAnnual => BuildBiAnnualWindow(template, localReference),
                 _ => MaintenanceLogCycleWindow.Empty
             };
         }
@@ -300,6 +302,7 @@ namespace hOps.web.Services
                 MaintenanceLogScheduleType.Monthly => BuildMonthlyWindowFromStart(template, current.StartLocal.AddMonths(offset)),
                 MaintenanceLogScheduleType.Quarterly => BuildQuarterlyWindowFromStart(template, current.StartLocal.AddMonths(offset * 3)),
                 MaintenanceLogScheduleType.Yearly => BuildYearlyWindowFromStart(template, current.StartLocal.AddYears(offset)),
+                MaintenanceLogScheduleType.BiAnnual => BuildBiAnnualWindowFromStart(template, current.StartLocal.AddMonths(offset * 6)),
                 _ => current
             };
         }
@@ -396,6 +399,36 @@ namespace hOps.web.Services
             return CreateWindow(MaintenanceLogScheduleType.Quarterly, normalizedStart, end, due);
         }
 
+        private static MaintenanceLogCycleWindow BuildBiAnnualWindow(
+            MaintenanceLogTemplate template,
+            DateTime localReference)
+        {
+            var halfStartMonth = localReference.Month <= 6 ? 1 : 7;
+            var start = new DateTime(localReference.Year, halfStartMonth, 1);
+            return BuildBiAnnualWindowFromStart(template, start);
+        }
+
+        private static MaintenanceLogCycleWindow BuildBiAnnualWindowFromStart(
+            MaintenanceLogTemplate template,
+            DateTime start)
+        {
+            var normalizedStart = new DateTime(start.Year, start.Month <= 6 ? 1 : 7, 1);
+            var end = normalizedStart.AddMonths(6);
+            var dueTime = ResolveDueTime(template);
+            var lastMonthDate = end.AddDays(-1);
+            var dayOfMonth = template.DayOfMonth ?? 1;
+            var maxDay = DateTime.DaysInMonth(lastMonthDate.Year, lastMonthDate.Month);
+            var dueDay = Math.Clamp(dayOfMonth, 1, maxDay);
+            var dueDate = new DateTime(lastMonthDate.Year, lastMonthDate.Month, dueDay);
+            var due = dueDate.Add(dueTime);
+            if (due > end)
+            {
+                due = end.AddTicks(-1);
+            }
+
+            return CreateWindow(MaintenanceLogScheduleType.BiAnnual, normalizedStart, end, due);
+        }
+
         private static MaintenanceLogCycleWindow BuildYearlyWindow(
             MaintenanceLogTemplate template,
             DateTime localReference)
@@ -462,6 +495,7 @@ namespace hOps.web.Services
                 MaintenanceLogScheduleType.Monthly => $"monthly:{startLocal:yyyyMM}",
                 MaintenanceLogScheduleType.Quarterly => $"quarterly:{startLocal:yyyy}-q{((startLocal.Month - 1) / 3) + 1}",
                 MaintenanceLogScheduleType.Yearly => $"yearly:{startLocal:yyyy}",
+                MaintenanceLogScheduleType.BiAnnual => $"biannual:{startLocal:yyyy}-h{(startLocal.Month <= 6 ? 1 : 2)}",
                 _ => $"{scheduleType.ToString().ToLowerInvariant()}:{startLocal:O}"
             };
         }
@@ -487,6 +521,7 @@ namespace hOps.web.Services
                 MaintenanceLogScheduleType.Monthly => new CycleWindowRequest(2, 0, 2),
                 MaintenanceLogScheduleType.Quarterly => new CycleWindowRequest(2, 0, 2),
                 MaintenanceLogScheduleType.Yearly => new CycleWindowRequest(2, 0, 1),
+                MaintenanceLogScheduleType.BiAnnual => new CycleWindowRequest(2, 0, 2),
                 _ => new CycleWindowRequest(-1, -1, 0)
             };
         }

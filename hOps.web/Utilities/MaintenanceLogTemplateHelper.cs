@@ -124,6 +124,7 @@ namespace hOps.web.Utilities
                 case MaintenanceLogScheduleType.Monthly:
                 case MaintenanceLogScheduleType.Quarterly:
                 case MaintenanceLogScheduleType.Yearly:
+                case MaintenanceLogScheduleType.BiAnnual:
                     var day = template.DayOfMonth ?? 1;
                     var ordinal = GetOrdinal(day);
                     var period = template.ScheduleType switch
@@ -131,6 +132,7 @@ namespace hOps.web.Utilities
                         MaintenanceLogScheduleType.Monthly => "Monthly",
                         MaintenanceLogScheduleType.Quarterly => "Quarterly",
                         MaintenanceLogScheduleType.Yearly => "Annual",
+                        MaintenanceLogScheduleType.BiAnnual => "Bi-Annual",
                         _ => "Monthly"
                     };
                     if (template.DueTimeLocal.HasValue)
