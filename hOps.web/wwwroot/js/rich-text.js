@@ -1051,7 +1051,8 @@
         if (shouldRestoreSelection) {
             restoreSelectionState(editor, selectionState);
             if (selectionState) {
-                context.selectionState = selectionState;
+                const refreshedState = saveSelectionState(editor);
+                context.selectionState = refreshedState || selectionState;
             }
         }
         const markup = htmlToMarkup(editor);
