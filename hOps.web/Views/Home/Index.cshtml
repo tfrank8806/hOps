@@ -316,6 +316,12 @@
             return;
         }
 
+        document.querySelectorAll('#homeWidgetGrid .modal').forEach(modal => {
+            if (modal?.parentElement && modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
+        });
+
         const liveRegion = document.getElementById('pageLiveRegion');
         const announceStatus = (message) => {
             if (!liveRegion || typeof message !== 'string' || !message.trim()) {
