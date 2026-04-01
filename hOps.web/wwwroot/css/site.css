@@ -1564,7 +1564,7 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.2s ease;
-    z-index: 0;
+    z-index: -1;
 }
 
 .home-widget-grid--editing::before {
@@ -1592,7 +1592,6 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     grid-column: var(--widget-column-start, auto) / span var(--widget-span, 4);
     grid-row: var(--widget-row-start, auto) / span var(--widget-row-span, 10);
     --widget-height: calc(260px * var(--ui-scale));
-    z-index: 1;
 }
 
 .home-widget-card {
@@ -1673,6 +1672,7 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 .home-widget--dragging {
     opacity: 0.65;
+    z-index: 10;
 }
 
 .home-widget__content {
