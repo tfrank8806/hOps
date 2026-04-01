@@ -1,10 +1,31 @@
+@using Microsoft.AspNetCore.Html
 @model hOps.web.ViewModels.Maintenance.MaintenanceLogsIndexViewModel
 
 @{
     ViewData["Title"] = "Maintenance Logs";
     var message = ViewBag.MaintenanceLogMessage as string;
     var error = ViewBag.MaintenanceLogError as string;
+    var groups = new (string Title, IReadOnlyList<hOps.web.ViewModels.Maintenance.MaintenanceLogTemplateListItemViewModel> Items)[]
+    {
+        ("Daily Logs", Model.DailyTemplates),
+        ("Weekly Logs", Model.WeeklyTemplates),
+        ("Monthly Logs", Model.MonthlyTemplates)
+    };
 }
+
+<style>
+    .cycle-card { transition: box-shadow .2s ease; }
+    .cycle-grid { display: flex; flex-wrap: wrap; gap: .75rem; }
+    .cycle-cell { border: 1px solid #dee2e6; border-radius: .5rem; padding: .75rem; min-width: 160px; text-decoration: none; color: inherit; }
+    .cycle-cell:hover { text-decoration: none; }
+    .cycle-cell.status-overdue { border-color: #dc3545; }
+    .cycle-cell.status-due { border-color: #ffc107; }
+    .cycle-cell.status-passed { border-color: #28a745; }
+    .cycle-cell.status-failed { border-color: #dc3545; }
+    .cycle-cell.status-upcoming { opacity: .7; cursor: not-allowed; }
+    .cycle-cell .status-label { font-size: .8rem; font-weight: 600; }
+    .cycle-cell .cycle-range { font-size: .8rem; color: #6c757d; }
+</style>
 
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
@@ -12,26 +33,11 @@
             <h2 class="mb-0">Maintenance Logs</h2>
             <p class="text-muted mb-0">@Model.PropertyName</p>
         </div>
-        <div class="d-flex flex-wrap gap-2 align-items-center">
+        <div class="d-flex gap-2 flex-wrap">
             <a asp-action="EmergencyExitLights" class="btn btn-outline-primary btn-sm">Emergency/Exit Light Log</a>
             @if (Model.CanManage)
             {
-                var canReorder = Model.Templates.Count > 1;
-                <div class="btn-group btn-group-sm" id="reorderControls">
-                    <button type="button"
-                            class="btn btn-outline-secondary"
-                            id="startReorderBtn"
-                            @(canReorder ? null : "disabled")>
-                        Reorder
-                    </button>
-                    <button type="button" class="btn btn-primary d-none" id="saveReorderBtn">Save Order</button>
-                    <button type="button" class="btn btn-outline-secondary d-none" id="cancelReorderBtn">Cancel</button>
-                </div>
                 <a asp-action="Create" class="btn btn-primary btn-sm">Create Template</a>
-            }
-            else
-            {
-                <a asp-action="Create" class="btn btn-primary btn-sm disabled" aria-disabled="true">Create Template</a>
             }
         </div>
     </div>
@@ -40,271 +46,205 @@
     {
         <div class="alert alert-success">@message</div>
     }
-    @if (!string.IsNullOrWhiteSpace(error))
+    if (!string.IsNullOrWhiteSpace(error))
     {
         <div class="alert alert-danger">@error</div>
     }
 
-    @if (Model.CanManage && Model.Templates.Count > 1)
-    {
-        <div class="alert alert-info d-none" id="reorderHelp">
-            Drag rows to set the display order, then click <strong>Save Order</strong>.
+    <form method="get" class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label" for="scheduleFilter">Schedule</label>
+                    <select class="form-select" id="scheduleFilter" name="schedule">
+                        <option value="">All schedules</option>
+                        <option value="Daily" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Daily ? "selected" : null)">Daily</option>
+                        <option value="Weekly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Weekly ? "selected" : null)">Weekly</option>
+                        <option value="Monthly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Monthly ? "selected" : null)">Monthly</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="statusFilter">Status</label>
+                    <select class="form-select" id="statusFilter" name="status">
+                        <option value="">All statuses</option>
+                        <option value="Passed" selected="@(Model.Filters.StatusFilter?.Equals("Passed", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Passed</option>
+                        <option value="Failed" selected="@(Model.Filters.StatusFilter?.Equals("Failed", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Failed</option>
+                        <option value="Due" selected="@(Model.Filters.StatusFilter?.Equals("Due", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Due</option>
+                        <option value="Overdue" selected="@(Model.Filters.StatusFilter?.Equals("Overdue", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Overdue</option>
+                        <option value="Upcoming" selected="@(Model.Filters.StatusFilter?.Equals("Upcoming", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Upcoming</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="completionFilter">Completion</label>
+                    <select class="form-select" id="completionFilter" name="completion">
+                        <option value="">Completed &amp; pending</option>
+                        <option value="completed" selected="@(Model.Filters.CompletionFilter?.Equals("completed", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Completed cycles</option>
+                        <option value="notcompleted" selected="@(Model.Filters.CompletionFilter?.Equals("notcompleted", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Due or overdue</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="nameFilter">Template</label>
+                    <input type="text" id="nameFilter" name="name" value="@Model.Filters.NameQuery" class="form-control" placeholder="Search by name" />
+                </div>
+            </div>
+            <div class="d-flex gap-2 justify-content-end mt-3">
+                <button type="submit" class="btn btn-primary btn-sm">Apply Filters</button>
+                <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Clear</a>
+            </div>
         </div>
-        <div class="small text-muted d-none mb-3" id="reorderStatus"></div>
-    }
+    </form>
 
-    @if (!Model.Templates.Any())
+    @if (!Model.DailyTemplates.Any() && !Model.WeeklyTemplates.Any() && !Model.MonthlyTemplates.Any() && !Model.OtherTemplates.Any())
     {
         <div class="card shadow-sm">
             <div class="card-body">
-                <p class="mb-0 text-muted">No maintenance log templates yet.</p>
+                <p class="mb-0 text-muted">No maintenance log templates match the current filters.</p>
             </div>
         </div>
     }
     else
     {
-        <div class="card shadow-sm" id="maintenanceLogTemplatesCard">
-            <div class="table-responsive">
-                <table class="table table-striped align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Name</th>
-                            <th>Schedule</th>
-                            <th>Status</th>
-                            <th>Entries</th>
-                            <th>Last Entry</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="templatesTableBody" data-reorder-url="@Url.Action("Reorder", "MaintenanceLogs")">
-                        @foreach (var template in Model.Templates)
-                        {
-                            <tr data-template-id="@template.Id">
-                                <td>
-                                    @if (Model.CanManage)
+        @foreach (var group in groups)
+        {
+            if (!group.Items.Any())
+            {
+                continue;
+            }
+
+            <section class="mb-4">
+                <h4 class="h5 mb-3">@group.Title</h4>
+                @foreach (var template in group.Items)
+                {
+                    var latestCycle = template.VisibleCycles.FirstOrDefault();
+                    <div class="card shadow-sm mb-3 cycle-card @(template.IsOverdue ? "border-danger" : null)">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                <div>
+                                    <h5 class="mb-1">@template.Name</h5>
+                                    <p class="text-muted mb-0">@template.ScheduleSummary</p>
+                                </div>
+                                <div class="d-flex gap-2 align-items-center flex-wrap">
+                                    <span class="badge @GetStatusBadgeClass(template.LatestStatus)">@template.LatestStatus</span>
+                                    @if (template.IsOverdue)
                                     {
-                                        <span class="reorder-handle me-2 text-muted d-none" title="Drag to reorder">&#x2630;</span>
+                                        <span class="badge bg-danger">Overdue</span>
                                     }
-                                    @template.Name
-                                </td>
-                                <td>@template.ScheduleSummary</td>
-                                <td>
-                                    @if (template.IsActive)
+                                    else if (latestCycle?.IsLate == true)
                                     {
-                                        <span class="badge bg-success">Active</span>
+                                        <span class="badge bg-warning text-dark">Late</span>
+                                    }
+                                    @if (template.HasChecklistFile)
+                                    {
+                                        <a href="@template.ChecklistFilePath" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener">Checklist</a>
+                                    }
+                                </div>
+                            </div>
+                            <div class="cycle-grid">
+                                @foreach (var cycle in template.VisibleCycles)
+                                {
+                                    var cellClass = $"cycle-cell status-{cycle.Status.ToString().ToLowerInvariant()}";
+                                    var routeValues = new { templateId = template.TemplateId, windowKey = cycle.WindowKey };
+                                    if (cycle.Status == hOps.web.Models.MaintenanceLogCycleStatusKind.Upcoming)
+                                    {
+                                        <div class="@cellClass">
+                                            @CycleCellContent(cycle)
+                                        </div>
                                     }
                                     else
                                     {
-                                        <span class="badge bg-secondary">Inactive</span>
+                                        <a class="@cellClass" asp-action="Cycle" asp-route-templateId="@template.TemplateId" asp-route-windowKey="@cycle.WindowKey">
+                                            @CycleCellContent(cycle)
+                                        </a>
                                     }
-                                </td>
-                                <td>@template.EntryCount</td>
-                                <td>@(template.LastEntryDate?.ToString("MMM d, yyyy") ?? "&mdash;")</td>
-                                <td class="text-end">
-                                    <div class="btn-group btn-group-sm">
-                                        <a asp-action="Detail" asp-route-id="@template.Id" class="btn btn-outline-secondary">Open</a>
-                                        @if (Model.CanManage)
-                                        {
-                                            <a asp-action="Edit" asp-route-id="@template.Id" class="btn btn-outline-secondary">Edit</a>
-                                        }
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </section>
+        }
+
+        @if (Model.OtherTemplates.Any())
+        {
+            <section class="mb-4">
+                <h4 class="h5 mb-3">Other Schedules</h4>
+                @foreach (var template in Model.OtherTemplates)
+                {
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <h5 class="mb-1">@template.Name</h5>
+                                    <p class="text-muted mb-0">@template.ScheduleSummary</p>
+                                </div>
+                                <span class="badge bg-secondary">Legacy schedule</span>
+                            </div>
+                            <p class="text-muted mt-3 mb-0 small">Cycle history will be available once this template moves to a supported schedule (daily/weekly/monthly).</p>
+                        </div>
+                    </div>
+                }
+            </section>
+        }
     }
+
+    <div class="d-flex justify-content-end mt-4">
+        <form method="get" class="d-inline">
+            <input type="hidden" name="schedule" value="@Model.Filters.ScheduleFilter" />
+            <input type="hidden" name="status" value="@Model.Filters.StatusFilter" />
+            <input type="hidden" name="completion" value="@Model.Filters.CompletionFilter" />
+            <input type="hidden" name="name" value="@Model.Filters.NameQuery" />
+            <input type="hidden" name="history" value="@(Model.AdditionalHistoryBlocks + 1)" />
+            <button type="submit" class="btn btn-outline-secondary btn-sm" @(Model.CanLoadMoreHistory ? null : "disabled")>Load older history</button>
+        </form>
+    </div>
 </div>
 
-<form id="maintenanceLogsAntiforgeryForm" class="d-none">
-    @Html.AntiForgeryToken()
-</form>
+@functions {
+    private static string GetStatusBadgeClass(hOps.web.Models.MaintenanceLogCycleStatusKind status) => status switch
+    {
+        hOps.web.Models.MaintenanceLogCycleStatusKind.Passed => "badge bg-success",
+        hOps.web.Models.MaintenanceLogCycleStatusKind.Failed => "badge bg-danger",
+        hOps.web.Models.MaintenanceLogCycleStatusKind.Overdue => "badge bg-danger",
+        hOps.web.Models.MaintenanceLogCycleStatusKind.Due => "badge bg-warning text-dark",
+        hOps.web.Models.MaintenanceLogCycleStatusKind.Upcoming => "badge bg-secondary",
+        _ => "badge bg-secondary"
+    };
 
-@section Scripts {
-    <style>
-        #maintenanceLogTemplatesCard.reorder-mode .reorder-handle {
-            display: inline-flex !important;
-            cursor: grab;
+    private static IHtmlContent CycleCellContent(hOps.web.ViewModels.Maintenance.MaintenanceLogCycleHistoryItemViewModel cycle)
+    {
+        var builder = new System.Text.StringBuilder();
+        builder.Append("<div class='cycle-range'>")
+            .Append(cycle.StartLocal.ToString("MMM d"))
+            .Append(" &ndash; ")
+            .Append(cycle.DueLocal.ToString("MMM d"))
+            .Append("</div>");
+        builder.Append("<div class='status-label'>").Append(cycle.Status).Append("</div>");
+        if (cycle.LatestCompletion != null)
+        {
+            var timestamp = cycle.LatestCompletion.CompletedAtLocal?.ToString("MMM d, h:mm tt") ?? "Recorded";
+            builder.Append("<div class='small text-muted'>Completed ")
+                .Append(timestamp)
+                .Append("</div>");
+        }
+        else if (cycle.LegacyEntries.Count > 0)
+        {
+            builder.Append("<div class='small text-muted'>Legacy records</div>");
+        }
+        else
+        {
+            builder.Append("<div class='small text-muted'>No completion</div>");
         }
 
-        #maintenanceLogTemplatesCard.reorder-mode tbody tr {
-            cursor: grab;
+        if (cycle.IsLate)
+        {
+            builder.Append("<div class='badge bg-warning text-dark mt-2'>Late</div>");
         }
 
-        #maintenanceLogTemplatesCard.reorder-mode tbody tr.dragging {
-            opacity: 0.7;
+        if (cycle.LegacyEntries.Count > 0)
+        {
+            builder.Append("<div class='badge bg-light text-dark border mt-2'>Legacy</div>");
         }
-    </style>
-    <script>
-        (() => {
-            const tableBody = document.getElementById('templatesTableBody');
-            const startBtn = document.getElementById('startReorderBtn');
-            const saveBtn = document.getElementById('saveReorderBtn');
-            const cancelBtn = document.getElementById('cancelReorderBtn');
-            const helpAlert = document.getElementById('reorderHelp');
-            const statusEl = document.getElementById('reorderStatus');
-            const card = document.getElementById('maintenanceLogTemplatesCard');
 
-            if (!tableBody || !startBtn || !card) {
-                return;
-            }
-
-            const toggleButtons = (isReordering) => {
-                startBtn.classList.toggle('d-none', isReordering);
-                saveBtn?.classList.toggle('d-none', !isReordering);
-                cancelBtn?.classList.toggle('d-none', !isReordering);
-                card.classList.toggle('reorder-mode', isReordering);
-                helpAlert?.classList.toggle('d-none', !isReordering);
-            };
-
-            const setDraggable = (enabled) => {
-                tableBody.querySelectorAll('tr[data-template-id]').forEach(row => {
-                    row.setAttribute('draggable', enabled ? 'true' : 'false');
-                    if (!enabled) {
-                        row.classList.remove('dragging');
-                    }
-                });
-            };
-
-            const setStatus = (message, state) => {
-                if (!statusEl) {
-                    return;
-                }
-
-                statusEl.textContent = message || '';
-                statusEl.classList.toggle('d-none', !message);
-                statusEl.classList.remove('text-danger', 'text-success', 'text-muted');
-                if (!message) {
-                    return;
-                }
-
-                if (state === 'error') {
-                    statusEl.classList.add('text-danger');
-                } else if (state === 'muted') {
-                    statusEl.classList.add('text-muted');
-                } else {
-                    statusEl.classList.add('text-success');
-                }
-            };
-
-            let dragSource = null;
-
-            const enableDragAndDrop = () => {
-                tableBody.addEventListener('dragstart', (event) => {
-                    dragSource = event.target?.closest('tr[data-template-id]');
-                    if (!dragSource) {
-                        return;
-                    }
-                    dragSource.classList.add('dragging');
-                    event.dataTransfer.effectAllowed = 'move';
-                });
-
-                tableBody.addEventListener('dragend', () => {
-                    if (dragSource) {
-                        dragSource.classList.remove('dragging');
-                        dragSource = null;
-                    }
-                });
-
-                tableBody.addEventListener('dragover', (event) => {
-                    if (!dragSource) {
-                        return;
-                    }
-                    event.preventDefault();
-
-                    const targetRow = event.target?.closest('tr[data-template-id]');
-                    if (!targetRow || targetRow === dragSource) {
-                        return;
-                    }
-
-                    const targetBounds = targetRow.getBoundingClientRect();
-                    const shouldPlaceBefore = event.clientY - targetBounds.top < targetBounds.height / 2;
-                    tableBody.insertBefore(dragSource, shouldPlaceBefore ? targetRow : targetRow.nextSibling);
-                });
-            };
-
-            enableDragAndDrop();
-            setDraggable(false);
-
-            const getAntiforgeryToken = () => {
-                const formToken = document.querySelector('#maintenanceLogsAntiforgeryForm input[name="__RequestVerificationToken"]');
-                if (formToken?.value) {
-                    return formToken.value;
-                }
-
-                return document.querySelector('#globalAntiforgeryForm input[name="__RequestVerificationToken"]')?.value ?? '';
-            };
-
-            const resetReorderState = () => {
-                setDraggable(false);
-                toggleButtons(false);
-            };
-
-            startBtn.addEventListener('click', () => {
-                if (startBtn.disabled) {
-                    return;
-                }
-                setStatus('');
-                toggleButtons(true);
-                setDraggable(true);
-            });
-
-            cancelBtn?.addEventListener('click', () => {
-                setStatus('Reorder cancelled.', 'muted');
-                resetReorderState();
-            });
-
-            saveBtn?.addEventListener('click', async () => {
-                const ids = Array.from(tableBody.querySelectorAll('tr[data-template-id]'))
-                    .map(row => parseInt(row.getAttribute('data-template-id') ?? '', 10))
-                    .filter(id => Number.isInteger(id) && id > 0);
-
-                if (ids.length === 0) {
-                    setStatus('No templates available to reorder.', 'error');
-                    return;
-                }
-
-                const reorderUrl = tableBody.dataset.reorderUrl;
-                if (!reorderUrl) {
-                    setStatus('Unable to save the new order.', 'error');
-                    return;
-                }
-
-                try {
-                    setStatus('Saving order...', 'muted');
-                    const response = await fetch(reorderUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'RequestVerificationToken': getAntiforgeryToken()
-                        },
-                        body: JSON.stringify({ templateIds: ids })
-                    });
-
-                    if (!response.ok) {
-                        let payload = null;
-                        try {
-                            payload = await response.json();
-                        } catch {
-                            payload = null;
-                        }
-                        const message = payload?.error ?? 'Unable to save the new order.';
-                        throw new Error(message);
-                    }
-
-                    setStatus('Template order updated.');
-                    resetReorderState();
-                }
-                catch (error) {
-                    setStatus(error.message ?? 'Unable to save the new order.', 'error');
-                }
-            });
-        })();
-    </script>
+        return new HtmlString(builder.ToString());
+    }
 }
-
-
-
-

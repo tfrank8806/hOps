@@ -94,6 +94,8 @@ namespace hOps.web.Data
         public DbSet<EquipmentItem> EquipmentItems { get; set; }
         public DbSet<MaintenanceLogTemplate> MaintenanceLogTemplates { get; set; }
         public DbSet<MaintenanceLogEntry> MaintenanceLogEntries { get; set; }
+        public DbSet<MaintenanceLogCycleCompletion> MaintenanceLogCycleCompletions { get; set; }
+        public DbSet<MaintenanceLogCompletionAttachment> MaintenanceLogCompletionAttachments { get; set; }
         public DbSet<EmergencyLightTestEntry> EmergencyLightTestEntries { get; set; }
         public DbSet<HousekeeperProfile> HousekeeperProfiles { get; set; }
         public DbSet<HousekeepingMprEntry> HousekeepingMprEntries { get; set; }
@@ -970,6 +972,61 @@ namespace hOps.web.Data
 
             builder.Entity<MaintenanceLogEntry>()
                 .HasIndex(e => new { e.TemplateId, e.EntryDate });
+
+            builder.Entity<MaintenanceLogCycleCompletion>()
+                .Property(c => c.ScheduleType)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+
+            builder.Entity<MaintenanceLogCycleCompletion>()
+                .Property(c => c.CycleWindowKey)
+                .HasMaxLength(64);
+
+            builder.Entity<MaintenanceLogCycleCompletion>()
+                .Property(c => c.CycleStartLocal)
+                .HasColumnType("timestamp without time zone");
+
+            builder.Entity<MaintenanceLogCycleCompletion>()
+                .Property(c => c.CycleEndLocal)
+                .HasColumnType("timestamp without time zone");
+
+            builder.Entity<MaintenanceLogCycleCompletion>()
+                .Property(c => c.CycleDueLocal)
+                .HasColumnType("timestamp without time zone");
+
+            builder.Entity<MaintenanceLogCycleCompletion>()
+                .HasIndex(c => new { c.TemplateId, c.CycleWindowKey })
+                .IsUnique();
+
+            builder.Entity<MaintenanceLogCycleCompletion>()
+                .HasOne(c => c.Template)
+                .WithMany(t => t.CycleCompletions)
+                .HasForeignKey(c => c.TemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<MaintenanceLogCycleCompletion>()
+                .HasOne(c => c.CompletedByUser)
+                .WithMany()
+                .HasForeignKey(c => c.CompletedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<MaintenanceLogCompletionAttachment>()
+                .HasOne(a => a.Completion)
+                .WithMany(c => c.Attachments)
+                .HasForeignKey(a => a.CompletionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<MaintenanceLogCompletionAttachment>()
+                .Property(a => a.FilePath)
+                .HasMaxLength(260);
+
+            builder.Entity<MaintenanceLogCompletionAttachment>()
+                .Property(a => a.OriginalFileName)
+                .HasMaxLength(160);
+
+            builder.Entity<MaintenanceLogCompletionAttachment>()
+                .Property(a => a.ContentType)
+                .HasMaxLength(120);
 
             builder.Entity<EmergencyLightTestEntry>()
                 .Property(e => e.Location)

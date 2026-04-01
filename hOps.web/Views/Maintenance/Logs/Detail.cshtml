@@ -1,27 +1,25 @@
-@using hOps.web.ViewModels.Maintenance
-@model hOps.web.ViewModels.Maintenance.MaintenanceLogTemplateDetailViewModel
+@model hOps.web.ViewModels.Maintenance.MaintenanceLogCycleDetailViewModel
 
 @{
-    ViewData["Title"] = $"{Model.TemplateName} Log";
+    ViewData["Title"] = $"{Model.TemplateName} Cycle";
     var message = ViewBag.MaintenanceLogMessage as string;
     var error = ViewBag.MaintenanceLogError as string;
-    var entryInput = ViewBag.EntryInput as MaintenanceLogEntryInputModel ?? new MaintenanceLogEntryInputModel
-    {
-        EntryDate = DateTime.UtcNow.Date
-    };
+    var allCycles = ViewBag.AllCycles as IReadOnlyList<hOps.web.ViewModels.Maintenance.MaintenanceLogCycleHistoryItemViewModel> ?? Array.Empty<hOps.web.ViewModels.Maintenance.MaintenanceLogCycleHistoryItemViewModel>();
+    var historyBlocks = ViewBag.HistoryBlocks is int hb ? hb : 0;
+    var cycleWarningKey = ViewBag.CycleChangeTargetKey as string;
 }
 
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
             <h2 class="mb-0">@Model.TemplateName</h2>
-            <p class="text-muted mb-0">@Model.PropertyName — @Model.ScheduleSummary</p>
+            <p class="text-muted mb-0">@Model.ScheduleSummary</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to templates</a>
-            @if (Model.CanManage)
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to Logs</a>
+            @if (Model.ChecklistFilePath != null)
             {
-                <a asp-action="Edit" asp-route-id="@Model.TemplateId" class="btn btn-primary btn-sm">Edit Template</a>
+                <a href="@Model.ChecklistFilePath" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">Download Checklist</a>
             }
         </div>
     </div>
@@ -30,213 +28,313 @@
     {
         <div class="alert alert-success">@message</div>
     }
-    @if (!string.IsNullOrWhiteSpace(error))
+    if (!string.IsNullOrWhiteSpace(error))
     {
         <div class="alert alert-danger">@error</div>
+    }
+    if (!string.IsNullOrWhiteSpace(cycleWarningKey) && Model.CanManage)
+    {
+        <div class="alert alert-warning">
+            The selected completion date belongs to cycle <strong>@cycleWarningKey</strong>. Check <em>Confirm cycle change</em> and submit again if that is correct.
+        </div>
     }
 
     <div class="card shadow-sm mb-4">
         <div class="card-body">
-            <form method="get" class="row g-3 align-items-end">
-                <input type="hidden" name="id" value="@Model.TemplateId" />
-                <div class="col-md-3">
-                    <label class="form-label">Start Date</label>
-                    <input type="date" name="start" value="@(Model.FilterStart?.ToString("yyyy-MM-dd") ?? string.Empty)" class="form-control" />
+            <div class="d-flex justify-content-between flex-wrap gap-3">
+                <div>
+                    <h5 class="mb-1">Cycle @Model.Cycle.WindowKey</h5>
+                    <p class="text-muted mb-0">
+                        @Model.Cycle.StartLocal.ToString("MMM d, yyyy") &ndash; @Model.Cycle.DueLocal.ToString("MMM d, yyyy")
+                    </p>
+                    @if (Model.Cycle.IsLate)
+                    {
+                        <span class="badge bg-warning text-dark mt-2">Late completion</span>
+                    }
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">End Date</label>
-                    <input type="date" name="end" value="@(Model.FilterEnd?.ToString("yyyy-MM-dd") ?? string.Empty)" class="form-control" />
-                </div>
-                <div class="col-md-6 d-flex gap-2">
-                    <button type="submit" class="btn btn-outline-secondary">Apply Filter</button>
-                    <a asp-action="Detail" asp-route-id="@Model.TemplateId" class="btn btn-outline-secondary">Clear</a>
-                    <a asp-action="Export"
-                       asp-route-id="@Model.TemplateId"
-                       asp-route-start="@(Model.FilterStart?.ToString("yyyy-MM-dd"))"
-                       asp-route-end="@(Model.FilterEnd?.ToString("yyyy-MM-dd"))"
-                       class="btn btn-outline-secondary">
-                        Export CSV
-                    </a>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="row g-4">
-        <div class="col-lg-4">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title">Add Entry</h5>
-                    <form asp-action="CreateEntry" asp-route-id="@Model.TemplateId" method="post" class="row g-3" enctype="multipart/form-data">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="start" value="@(Model.FilterStart?.ToString("yyyy-MM-dd") ?? string.Empty)" />
-                        <input type="hidden" name="end" value="@(Model.FilterEnd?.ToString("yyyy-MM-dd") ?? string.Empty)" />
-                        <div class="col-12">
-                            <label class="form-label">Entry Date</label>
-                            <input type="date" name="EntryDate" value="@entryInput.EntryDate.ToString("yyyy-MM-dd")" class="form-control" />
-                            @Html.ValidationMessage("EntryDate", null, new { @class = "text-danger" })
-                        </div>
-                        @foreach (var column in Model.Columns)
-                        {
-                            var value = entryInput.Values.TryGetValue(column.Key, out var existing) ? existing : string.Empty;
-                            <div class="col-12">
-                                <label class="form-label">@column.Label @if (column.Required) { <span class="text-danger">*</span> }</label>
-                                @switch (column.Type)
-                                {
-                                    case "number":
-                                        <input type="number" step="any" class="form-control" name="Values[@column.Key]" value="@value" />
-                                        break;
-                                    case "checkbox":
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="Values[@column.Key]" value="true" @(string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ? "checked" : null) id="entry-checkbox-@column.Key" />
-                                            <label class="form-check-label" for="entry-checkbox-@column.Key">Completed</label>
-                                            <input type="hidden" name="Values[@column.Key]" value="false" />
-                                        </div>
-                                        break;
-                                    case "select":
-                                        <select class="form-select" name="Values[@column.Key]">
-                                            <option value="">Select...</option>
-                                            @foreach (var option in column.Options)
-                                            {
-                                                <option value="@option" selected="@(string.Equals(option, value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option</option>
-                                            }
-                                        </select>
-                                        break;
-                                    default:
-                                        <input type="text" class="form-control" name="Values[@column.Key]" value="@value" />
-                                        break;
-                                }
-                                @Html.ValidationMessage($"Values[{column.Key}]", null, new { @class = "text-danger" })
-
-                                @if (column.IncludeNotes)
-                                {
-                                    var noteValue = entryInput?.Notes != null && entryInput.Notes.TryGetValue(column.Key, out var existingNote)
-                                        ? existingNote
-                                        : string.Empty;
-                                    <label class="form-label mt-2">Notes</label>
-                                    <textarea class="form-control" name="Notes[@column.Key]" rows="2">@noteValue</textarea>
-                                    @Html.ValidationMessage($"Notes[{column.Key}]", null, new { @class = "text-danger" })
-                                }
-
-                                @if (column.IncludePhotos)
-                                {
-                                    <label class="form-label mt-2">Photos</label>
-                                    <input type="file"
-                                           class="form-control"
-                                           name="Photos[@column.Key]"
-                                           accept="image/*"
-                                           multiple />
-                                    <div class="form-text">Optional photos (JPG, PNG, GIF, BMP, or WebP).</div>
-                                    @Html.ValidationMessage($"Photos[{column.Key}]", null, new { @class = "text-danger" })
-                                }
-                            </div>
-                        }
-                        <div class="col-12 d-flex justify-content-end">
-                            <button type="submit" class="btn btn-primary">Record Entry</button>
-                        </div>
-                    </form>
+                <div class="d-flex gap-2 align-items-center">
+                    <span class="badge @GetStatusBadgeClass(Model.Cycle.Status)">@Model.Cycle.Status</span>
+                    @if (Model.Cycle.LegacyEntries.Count > 0)
+                    {
+                        <span class="badge bg-light text-dark border">Legacy history</span>
+                    }
                 </div>
             </div>
         </div>
-        <div class="col-lg-8">
-            <div class="card shadow-sm">
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
                 <div class="card-body">
-                    <h5 class="card-title d-flex justify-content-between align-items-center">
-                        <span>Entries</span>
-                        <small class="text-muted">Showing @Model.Entries.Count entry@(Model.Entries.Count == 1 ? string.Empty : "ies")</small>
-                    </h5>
-                    @if (!Model.Entries.Any())
+                    <h5 class="h6">Record Completion</h5>
+                    @if (Model.CanManage)
                     {
-                        <p class="text-muted mb-0">No entries yet.</p>
+                        <form asp-action="CreateCycleCompletion" asp-route-templateId="@Model.TemplateId" asp-route-windowKey="@Model.Cycle.WindowKey" method="post" enctype="multipart/form-data">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="history" value="@historyBlocks" />
+                            <div class="mb-3">
+                                <label asp-for="CompletionForm.CompletedAtLocal" class="form-label">Completed At</label>
+                                <input asp-for="CompletionForm.CompletedAtLocal" class="form-control" type="datetime-local" />
+                                <span asp-validation-for="CompletionForm.CompletedAtLocal" class="text-danger small"></span>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-6 mb-3">
+                                    <label asp-for="CompletionForm.DurationMinutes" class="form-label">Duration (minutes)</label>
+                                    <input asp-for="CompletionForm.DurationMinutes" class="form-control" />
+                                    <span asp-validation-for="CompletionForm.DurationMinutes" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label asp-for="CompletionForm.Result" class="form-label">Result</label>
+                                    <select asp-for="CompletionForm.Result" class="form-select">
+                                        <option value="Passed">Passed</option>
+                                        <option value="Failed">Failed</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label asp-for="CompletionForm.Notes" class="form-label">Notes</label>
+                                <textarea asp-for="CompletionForm.Notes" rows="3" class="form-control"></textarea>
+                                <span asp-validation-for="CompletionForm.Notes" class="text-danger small"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="createAttachments">Attachments (max 10)</label>
+                                <input type="file" id="createAttachments" name="CompletionAttachments" class="form-control" multiple accept=".jpg,.jpeg,.png,.pdf" />
+                                <small class="text-muted">JPG, PNG, or PDF files.</small>
+                                @Html.ValidationMessage("CompletionAttachments", new { @class = "text-danger small d-block" })
+                            </div>
+                            <div class="form-check mb-3">
+                                <input asp-for="CompletionForm.ConfirmCycleChange" class="form-check-input" id="createConfirmCycle" />
+                                <label class="form-check-label" for="createConfirmCycle">Confirm cycle change</label>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">Save Completion</button>
+                        </form>
                     }
                     else
                     {
-                        <div class="table-responsive">
-                            <table class="table table-striped align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Recorded By</th>
-                                        @foreach (var column in Model.Columns)
-                                        {
-                                            <th>@column.Label</th>
-                                        }
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var entry in Model.Entries)
-                                    {
-                                        <tr>
-                                            <td>@entry.EntryDate.ToString("MMM d, yyyy")</td>
-                                            <td>
-                                                <div class="d-flex flex-column">
-                                                    <span>@entry.CreatedByName</span>
-                                                    <small class="text-muted">@TimeZoneService.ConvertToUserTime(entry.CreatedAtUtc).ToString("g")</small>
-                                                </div>
-                                            </td>
-                                            @foreach (var column in Model.Columns)
-                                            {
-                                                entry.Values.TryGetValue(column.Key, out var value);
-                                                <td>
-                                                    @if (column.Type == "checkbox")
-                                                    {
-                                                    <span class="badge @(string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ? "bg-success" : "bg-secondary")">
-                                                        @(string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ? "Yes" : "No")
-                                                    </span>
-                                                    }
-                                                    else
-                                                    {
-                                                        @(!string.IsNullOrWhiteSpace(value) ? value : "—")
-                                                    }
-                                                    @if (column.IncludeNotes)
-                                                    {
-                                                        entry.Notes.TryGetValue(column.Key, out var noteValue);
-                                                        if (!string.IsNullOrWhiteSpace(noteValue))
-                                                        {
-                                                            <div class="text-muted small mt-1">Notes: @noteValue</div>
-                                                        }
-                                                    }
-                                                    @if (column.IncludePhotos)
-                                                    {
-                                                        entry.Photos.TryGetValue(column.Key, out var photoList);
-                                                        if (photoList != null && photoList.Count > 0)
-                                                        {
-                                                            <div class="mt-2 d-flex flex-wrap gap-2">
-                                                                @foreach (var photo in photoList)
-                                                                {
-                                                                    <a href="@photo.FilePath" target="_blank" rel="noopener" class="maintenance-photo-thumb">
-                                                                        <img src="@photo.FilePath" alt="Photo for @column.Label" class="img-thumbnail" style="max-width: 120px; max-height: 120px;" />
-                                                                    </a>
-                                                                }
-                                                            </div>
-                                                        }
-                                                    }
-                                                </td>
-                                            }
-                                            <td class="text-end">
-                                                @if (Model.CanManage)
-                                                {
-                                                    <form asp-action="DeleteEntry"
-                                                          asp-route-templateId="@Model.TemplateId"
-                                                          asp-route-entryId="@entry.Id"
-                                                          asp-route-start="@(Model.FilterStart?.ToString("yyyy-MM-dd"))"
-                                                          asp-route-end="@(Model.FilterEnd?.ToString("yyyy-MM-dd"))"
-                                                          method="post"
-                                                          onsubmit="return confirm('Delete this log entry?');">
-                                                        @Html.AntiForgeryToken()
-                                                        <button type="submit" class="btn btn-link text-danger p-0">Delete</button>
-                                                    </form>
-                                                }
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
+                        <p class="text-muted mb-0">Only managers can record cycle completions.</p>
                     }
                 </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="h6">Latest Completion</h5>
+                    @if (!Model.CanManage)
+                    {
+                        var latest = Model.Cycle.LatestCompletion;
+                        if (latest == null)
+                        {
+                            <p class="text-muted mb-0">No completions recorded yet.</p>
+                        }
+                        else
+                        {
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <div class="fw-semibold">@latest.Result</div>
+                                    <div class="text-muted small">
+                                        @latest.CompletedAtLocal?.ToString("MMM d, h:mm tt") ?? "Recorded"
+                                        @if (!string.IsNullOrWhiteSpace(latest.CompletedByName))
+                                        {
+                                            <span> by @latest.CompletedByName</span>
+                                        }
+                                    </div>
+                                </div>
+                                <span class="badge bg-secondary">View only</span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(latest.Notes))
+                            {
+                                <p class="mb-0 mt-2">@latest.Notes</p>
+                            }
+                        }
+                        <p class="text-muted mt-3 mb-0">Contact a manager to update completions.</p>
+                    }
+                    else if (Model.EditForm == null)
+                    {
+                        <p class="text-muted">No completions recorded yet.</p>
+                    }
+                    else
+                    {
+                        <form asp-action="EditCycleCompletion" asp-route-templateId="@Model.TemplateId" asp-route-windowKey="@Model.Cycle.WindowKey" asp-route-completionId="@Model.EditForm.CompletionId" method="post" enctype="multipart/form-data">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="history" value="@historyBlocks" />
+                            <div class="mb-3">
+                                <label asp-for="EditForm.CompletedAtLocal" class="form-label">Completed At</label>
+                                <input asp-for="EditForm.CompletedAtLocal" class="form-control" type="datetime-local" />
+                                <span asp-validation-for="EditForm.CompletedAtLocal" class="text-danger small"></span>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-6 mb-3">
+                                    <label asp-for="EditForm.DurationMinutes" class="form-label">Duration (minutes)</label>
+                                    <input asp-for="EditForm.DurationMinutes" class="form-control" />
+                                    <span asp-validation-for="EditForm.DurationMinutes" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label asp-for="EditForm.Result" class="form-label">Result</label>
+                                    <select asp-for="EditForm.Result" class="form-select">
+                                        <option value="Passed">Passed</option>
+                                        <option value="Failed">Failed</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label asp-for="EditForm.Notes" class="form-label">Notes</label>
+                                <textarea asp-for="EditForm.Notes" rows="3" class="form-control"></textarea>
+                                <span asp-validation-for="EditForm.Notes" class="text-danger small"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Existing attachments</label>
+                                @if (Model.Cycle.LatestCompletion?.Attachments.Any() == true)
+                                {
+                                    <ul class="list-unstyled small mb-2">
+                                        @foreach (var attachment in Model.Cycle.LatestCompletion.Attachments)
+                                        {
+                                            <li class="d-flex align-items-center justify-content-between border rounded px-2 py-1 mb-1">
+                                                <a href="@attachment.FilePath" target="_blank" rel="noopener">@attachment.OriginalFileName ?? attachment.FilePath</a>
+                                                <div class="form-check ms-2">
+                                                    <input class="form-check-input" type="checkbox" name="RemoveAttachmentIds" value="@attachment.AttachmentId" id="removeAttachment-@attachment.AttachmentId" />
+                                                    <label class="form-check-label" for="removeAttachment-@attachment.AttachmentId">Remove</label>
+                                                </div>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                                else
+                                {
+                                    <p class="text-muted small mb-2">No attachments.</p>
+                                }
+                                <input type="file" name="EditCompletionAttachments" class="form-control" multiple accept=".jpg,.jpeg,.png,.pdf" />
+                                <small class="text-muted">Add more JPG, PNG, or PDF files.</small>
+                                @Html.ValidationMessage("EditCompletionAttachments", new { @class = "text-danger small d-block" })
+                            </div>
+                            <div class="form-check mb-3">
+                                <input asp-for="EditForm.ConfirmCycleChange" class="form-check-input" id="editConfirmCycle" />
+                                <label class="form-check-label" for="editConfirmCycle">Confirm cycle change</label>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary btn-sm">Update Completion</button>
+                            </div>
+                        </form>
+                        <form asp-action="DeleteCycleCompletion" asp-route-templateId="@Model.TemplateId" asp-route-windowKey="@Model.Cycle.WindowKey" asp-route-completionId="@Model.EditForm.CompletionId" method="post" class="mt-2" onsubmit="return confirm('Delete the latest completion?');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="history" value="@historyBlocks" />
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete Latest</button>
+                        </form>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="h6">Cycle Completions</h5>
+                    @if (!Model.Cycle.Completions.Any())
+                    {
+                        <p class="text-muted mb-0">No completions yet.</p>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var completion in Model.Cycle.Completions)
+                            {
+                                <li class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <div>
+                                            <div class="fw-semibold">@completion.Result</div>
+                                            <div class="text-muted small">
+                                                @completion.CompletedAtLocal?.ToString("MMM d, h:mm tt") ?? "Recorded"
+                                                @if (!string.IsNullOrWhiteSpace(completion.CompletedByName))
+                                                {
+                                                    <span> by @completion.CompletedByName</span>
+                                                }
+                                            </div>
+                                        </div>
+                                        @if (completion.IsLatest)
+                                        {
+                                            <span class="badge bg-primary">Latest</span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(completion.Notes))
+                                    {
+                                        <p class="mb-1 mt-2">@completion.Notes</p>
+                                    }
+                                    @if (completion.Attachments.Any())
+                                    {
+                                        <div class="small text-muted mb-1">Attachments:</div>
+                                        <ul class="list-unstyled small">
+                                            @foreach (var attachment in completion.Attachments)
+                                            {
+                                                <li><a href="@attachment.FilePath" target="_blank" rel="noopener">@attachment.OriginalFileName ?? attachment.FilePath</a></li>
+                                            }
+                                        </ul>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="h6">Legacy History</h5>
+                    @if (!Model.Cycle.LegacyEntries.Any())
+                    {
+                        <p class="text-muted mb-0">No legacy records for this cycle.</p>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var legacy in Model.Cycle.LegacyEntries.OrderByDescending(l => l.CreatedAtUtc))
+                            {
+                                <li class="list-group-item">
+                                    <div class="fw-semibold">@legacy.CreatedAtLocal.ToString("MMM d, h:mm tt")</div>
+                                    <div class="text-muted small">@legacy.CreatedByName</div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h5 class="h6">Cycle History</h5>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var cycle in allCycles.OrderByDescending(c => c.StartLocal))
+                {
+                    <a asp-action="Cycle" asp-route-templateId="@Model.TemplateId" asp-route-windowKey="@cycle.WindowKey" asp-route-history="@historyBlocks" class="badge @(cycle.WindowKey == Model.Cycle.WindowKey ? "bg-primary" : "bg-light text-dark border")">
+                        @cycle.WindowKey
+                    </a>
+                }
+            </div>
+            <div class="mt-3">
+                <form asp-action="Cycle" method="get" class="d-inline">
+                    <input type="hidden" name="templateId" value="@Model.TemplateId" />
+                    <input type="hidden" name="windowKey" value="@Model.Cycle.WindowKey" />
+                    <input type="hidden" name="history" value="@(historyBlocks + 1)" />
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">Load older cycles</button>
+                </form>
             </div>
         </div>
     </div>
 </div>
+
+@functions {
+    private static string GetStatusBadgeClass(hOps.web.Models.MaintenanceLogCycleStatusKind status) => status switch
+    {
+        hOps.web.Models.MaintenanceLogCycleStatusKind.Passed => "badge bg-success",
+        hOps.web.Models.MaintenanceLogCycleStatusKind.Failed => "badge bg-danger",
+        hOps.web.Models.MaintenanceLogCycleStatusKind.Overdue => "badge bg-danger",
+        hOps.web.Models.MaintenanceLogCycleStatusKind.Due => "badge bg-warning text-dark",
+        hOps.web.Models.MaintenanceLogCycleStatusKind.Upcoming => "badge bg-secondary",
+        _ => "badge bg-secondary"
+    };
+}

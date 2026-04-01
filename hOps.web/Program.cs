@@ -345,6 +345,7 @@ builder.Services.AddScoped<SchedulePublicationService>();
 builder.Services.AddHostedService<DailySummaryEmailService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserTimeZoneService, UserTimeZoneService>();
+builder.Services.AddScoped<IMaintenanceLogCycleService, MaintenanceLogCycleService>();
 
 // Add session support
 builder.Services.AddDistributedMemoryCache();

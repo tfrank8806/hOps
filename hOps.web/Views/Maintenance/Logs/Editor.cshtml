@@ -41,6 +41,45 @@
                         <label asp-for="DueTimeLocal" class="form-label">Due Time (optional)</label>
                         <input asp-for="DueTimeLocal" type="time" class="form-control" />
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="ChecklistFile">Template Checklist (CSV/XLSX)</label>
+                        <input type="file"
+                               class="form-control"
+                               id="ChecklistFile"
+                               name="ChecklistFile"
+                               accept=".csv,.xlsx" />
+                        @Html.ValidationMessage("ChecklistFile", "", new { @class = "text-danger small" })
+                        @if (Model.HasChecklistFile)
+                        {
+                            <div class="form-text mt-1">
+                                Current file:
+                                @if (!string.IsNullOrWhiteSpace(Model.ChecklistFilePath))
+                                {
+                                    <a href="@Model.ChecklistFilePath" target="_blank" rel="noopener">
+                                        @(string.IsNullOrWhiteSpace(Model.ChecklistFileName) ? "Download checklist" : Model.ChecklistFileName)
+                                    </a>
+                                }
+                                else
+                                {
+                                    @(string.IsNullOrWhiteSpace(Model.ChecklistFileName) ? "Checklist file" : Model.ChecklistFileName)
+                                }
+                                @if (Model.ChecklistFileSizeBytes.HasValue)
+                                {
+                                    <span class="text-muted ms-1">
+                                        (@Math.Round(Model.ChecklistFileSizeBytes.Value / 1024d, 1) KB)
+                                    </span>
+                                }
+                            </div>
+                            <div class="form-check mt-2">
+                                <input asp-for="RemoveChecklistFile" class="form-check-input" />
+                                <label asp-for="RemoveChecklistFile" class="form-check-label">Remove existing file</label>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="form-text">Optional upload. One CSV or Excel file per template.</div>
+                        }
+                    </div>
                     <div class="col-md-6 d-none" id="weeklyDaysFieldset">
                         <label class="form-label">Weekly Days</label>
                         <div class="d-flex flex-wrap gap-3">

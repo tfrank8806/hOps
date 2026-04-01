@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using hOps.web.Data;
@@ -11,9 +12,11 @@ using hOps.web.Data;
 namespace hOps.web.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260401140437_AddChecklistFileToMaintenanceLogTemplates")]
+    partial class AddChecklistFileToMaintenanceLogTemplates
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1573,106 +1576,6 @@ namespace hOps.web.Migrations
                     b.ToTable("LostFoundEntries");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.MaintenanceLogCompletionAttachment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("CompletionId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ContentType")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<string>("FilePath")
-                        .IsRequired()
-                        .HasMaxLength(260)
-                        .HasColumnType("character varying(260)");
-
-                    b.Property<long>("FileSizeBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("OriginalFileName")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<DateTime>("UploadedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompletionId");
-
-                    b.ToTable("MaintenanceLogCompletionAttachments");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.MaintenanceLogCycleCompletion", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CompletedByUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("character varying(450)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CycleDueLocal")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<DateTime>("CycleEndLocal")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<DateTime>("CycleStartLocal")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("CycleWindowKey")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<int?>("DurationMinutes")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<int>("Result")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ScheduleType")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<int>("TemplateId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompletedByUserId");
-
-                    b.HasIndex("TemplateId", "CycleWindowKey")
-                        .IsUnique();
-
-                    b.ToTable("MaintenanceLogCycleCompletions");
-                });
-
             modelBuilder.Entity("hOps.web.Models.MaintenanceLogEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -1715,16 +1618,9 @@ namespace hOps.web.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("ChecklistFileName")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
                     b.Property<string>("ChecklistFilePath")
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)");
-
-                    b.Property<long?>("ChecklistFileSizeBytes")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("ColumnsJson")
                         .IsRequired()
@@ -4120,35 +4016,6 @@ namespace hOps.web.Migrations
                     b.Navigation("Property");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.MaintenanceLogCompletionAttachment", b =>
-                {
-                    b.HasOne("hOps.web.Models.MaintenanceLogCycleCompletion", "Completion")
-                        .WithMany("Attachments")
-                        .HasForeignKey("CompletionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Completion");
-                });
-
-            modelBuilder.Entity("hOps.web.Models.MaintenanceLogCycleCompletion", b =>
-                {
-                    b.HasOne("hOps.web.Models.ApplicationUser", "CompletedByUser")
-                        .WithMany()
-                        .HasForeignKey("CompletedByUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("hOps.web.Models.MaintenanceLogTemplate", "Template")
-                        .WithMany("CycleCompletions")
-                        .HasForeignKey("TemplateId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CompletedByUser");
-
-                    b.Navigation("Template");
-                });
-
             modelBuilder.Entity("hOps.web.Models.MaintenanceLogEntry", b =>
                 {
                     b.HasOne("hOps.web.Models.ApplicationUser", "CreatedByUser")
@@ -5006,15 +4873,8 @@ namespace hOps.web.Migrations
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("hOps.web.Models.MaintenanceLogCycleCompletion", b =>
-                {
-                    b.Navigation("Attachments");
-                });
-
             modelBuilder.Entity("hOps.web.Models.MaintenanceLogTemplate", b =>
                 {
-                    b.Navigation("CycleCompletions");
-
                     b.Navigation("Entries");
                 });
 
