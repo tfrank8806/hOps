@@ -31,6 +31,8 @@ namespace hOps.web.Controllers
         private const int TemplateColumnImportLimit = 120;
         private const string LogsIndexView = "~/Views/Maintenance/Logs/Index.cshtml";
         private const string LogsEditorView = "~/Views/Maintenance/Logs/Editor.cshtml";
+        private const string LogsCreateView = "~/Views/Maintenance/Logs/Create.cshtml";
+        private const string LogsChecklistView = "~/Views/Maintenance/Logs/Checklist.cshtml";
         private const string LogsDetailView = "~/Views/Maintenance/Logs/Detail.cshtml";
         private const string EmergencyLightLogView = "~/Views/Maintenance/Logs/EmergencyExitLights.cshtml";
         private static readonly string[] AllowedPhotoExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp" };
@@ -158,7 +160,11 @@ namespace hOps.web.Controllers
             var other = ordered.Where(item =>
                 item.ScheduleType != MaintenanceLogScheduleType.Daily &&
                 item.ScheduleType != MaintenanceLogScheduleType.Weekly &&
-                item.ScheduleType != MaintenanceLogScheduleType.Monthly).ToList();
+                item.ScheduleType != MaintenanceLogScheduleType.Monthly &&
+                item.ScheduleType != MaintenanceLogScheduleType.Quarterly &&
+                item.ScheduleType != MaintenanceLogScheduleType.Yearly).ToList();
+            var quarterly = ordered.Where(item => item.ScheduleType == MaintenanceLogScheduleType.Quarterly).ToList();
+            var annual = ordered.Where(item => item.ScheduleType == MaintenanceLogScheduleType.Yearly).ToList();
 
             var viewModel = new MaintenanceLogsIndexViewModel
             {
@@ -170,6 +176,8 @@ namespace hOps.web.Controllers
                 DailyTemplates = daily,
                 WeeklyTemplates = weekly,
                 MonthlyTemplates = monthly,
+                QuarterlyTemplates = quarterly,
+                AnnualTemplates = annual,
                 OtherTemplates = other,
                 CanLoadMoreHistory = historyBlocks < 12
             };
@@ -274,7 +282,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property before creating a maintenance log template.";
+                TempData["MaintenanceLogError"] = "Select a property before creating a maintenance log.";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -290,31 +298,26 @@ namespace hOps.web.Controllers
                 return Forbid();
             }
 
-            var viewModel = new MaintenanceLogTemplateEditorViewModel
+            var weeklyDefaults = new bool[7];
+            weeklyDefaults[(int)DayOfWeek.Monday] = true;
+            var viewModel = new MaintenanceLogCreateViewModel
             {
                 PropertyId = property.Id,
                 PropertyName = property.Name,
-                CanManage = true,
-                Columns = new List<MaintenanceLogColumnEditorViewModel>
-                {
-                    new MaintenanceLogColumnEditorViewModel { Label = "Task / Item", Key = "task", Required = true },
-                    new MaintenanceLogColumnEditorViewModel { Label = "Status", Key = "status" }
-                }
+                WeeklyDays = weeklyDefaults
             };
 
-            return View(LogsEditorView, viewModel);
+            return View(LogsCreateView, viewModel);
         }
 
         [HttpPost("Create")]
         public async Task<IActionResult> Create(
-            MaintenanceLogTemplateEditorViewModel viewModel,
-            IFormFile? templateCsvFile = null,
-            IFormFile? checklistFile = null)
+            MaintenanceLogCreateViewModel viewModel)
         {
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property before creating a maintenance log template.";
+                TempData["MaintenanceLogError"] = "Select a property before creating a maintenance log.";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -332,39 +335,35 @@ namespace hOps.web.Controllers
 
             viewModel.PropertyId = property.Id;
             viewModel.PropertyName = property.Name;
-            viewModel.CanManage = true;
-
-            if (templateCsvFile is { Length: > 0 } && (viewModel.Columns == null || !viewModel.Columns.Any()))
+            viewModel.WeeklyDays ??= new bool[7];
+            var trimmedName = viewModel.Name?.Trim();
+            if (string.IsNullOrWhiteSpace(trimmedName))
             {
-                try
+                ModelState.AddModelError(nameof(viewModel.Name), "Enter a name for the log.");
+            }
+
+            if (viewModel.ScheduleType == MaintenanceLogScheduleType.None)
+            {
+                ModelState.AddModelError(nameof(viewModel.ScheduleType), "Select a cycle type.");
+            }
+
+            if (viewModel.ScheduleType == MaintenanceLogScheduleType.Weekly)
+            {
+                var weeklySelection = GetSelectedDays(viewModel.WeeklyDays);
+                if (!weeklySelection.Any())
                 {
-                    viewModel.Columns = await ParseTemplateColumnsAsync(templateCsvFile);
-                    if (!viewModel.Columns.Any())
-                    {
-                        ModelState.AddModelError("TemplateCsvFile", "The CSV file did not include any columns.");
-                    }
-                }
-                catch (InvalidOperationException ex)
-                {
-                    ModelState.AddModelError("TemplateCsvFile", ex.Message);
+                    ModelState.AddModelError("WeeklyDays", "Select at least one day for weekly logs.");
                 }
             }
 
-            var sanitizedColumns = BuildColumnDefinitions(viewModel);
-            if (!sanitizedColumns.Any())
+            if (RequiresDayOfMonth(viewModel.ScheduleType) && !viewModel.DayOfMonth.HasValue)
             {
-                ModelState.AddModelError(string.Empty, "Add at least one column to capture log entries.");
-            }
-
-            var checklistValidationError = ValidateChecklistFile(checklistFile);
-            if (!string.IsNullOrEmpty(checklistValidationError))
-            {
-                ModelState.AddModelError("ChecklistFile", checklistValidationError);
+                ModelState.AddModelError(nameof(viewModel.DayOfMonth), "Enter the due day for this schedule.");
             }
 
             if (!ModelState.IsValid)
             {
-                return View(LogsEditorView, viewModel);
+                return View(LogsCreateView, viewModel);
             }
 
             var maxDisplayOrder = await _db.MaintenanceLogTemplates
@@ -375,34 +374,170 @@ namespace hOps.web.Controllers
 
             var template = new MaintenanceLogTemplate
             {
-                Name = viewModel.Name.Trim(),
+                Name = trimmedName!,
                 PropertyId = property.Id,
                 ScheduleType = viewModel.ScheduleType,
                 WeeklyDaysBitmask = viewModel.ScheduleType == MaintenanceLogScheduleType.Weekly
-                    ? MaintenanceLogTemplateHelper.BuildWeeklyBitmask(GetSelectedDays(viewModel))
+                    ? MaintenanceLogTemplateHelper.BuildWeeklyBitmask(GetSelectedDays(viewModel.WeeklyDays))
                     : 0,
-                DayOfMonth = RequiresDayOfMonth(viewModel.ScheduleType) ? viewModel.DayOfMonth : null,
+                DayOfMonth = RequiresDayOfMonth(viewModel.ScheduleType)
+                    ? Math.Clamp(viewModel.DayOfMonth!.Value, 1, 31)
+                    : null,
                 DueTimeLocal = viewModel.DueTimeLocal,
-                IsActive = viewModel.IsActive,
+                IsActive = true,
                 DisplayOrder = maxDisplayOrder + 1,
-                ColumnsJson = MaintenanceLogTemplateHelper.BuildColumnsJson(sanitizedColumns),
+                ColumnsJson = MaintenanceLogTemplateHelper.BuildColumnsJson(BuildDefaultColumns()),
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             };
 
-            if (checklistFile is { Length: > 0 })
+            _db.MaintenanceLogTemplates.Add(template);
+            await _db.SaveChangesAsync();
+
+            TempData["MaintenanceLogMessage"] = "Maintenance log created.";
+            return RedirectToAction(nameof(Detail), new { id = template.Id });
+        }
+
+        [HttpGet("{id:int}/Checklist")]
+        public async Task<IActionResult> Checklist(int id, string? returnUrl = null)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
             {
+                TempData["MaintenanceLogError"] = "Select a property to manage checklists.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!UserCanManage(roles))
+            {
+                return Forbid();
+            }
+
+            var template = await _db.MaintenanceLogTemplates
+                .FirstOrDefaultAsync(t => t.Id == id && t.PropertyId == property.Id);
+            if (template == null)
+            {
+                return NotFound();
+            }
+
+            var viewModel = new MaintenanceLogChecklistViewModel
+            {
+                TemplateId = template.Id,
+                TemplateName = template.Name,
+                PropertyName = property.Name,
+                ChecklistFileName = template.ChecklistFileName ?? Path.GetFileName(template.ChecklistFilePath ?? string.Empty),
+                ChecklistFilePath = template.ChecklistFilePath,
+                ChecklistFileSizeBytes = template.ChecklistFileSizeBytes,
+                ReturnUrl = ResolveReturnUrl(returnUrl)
+            };
+
+            return View(LogsChecklistView, viewModel);
+        }
+
+        [HttpPost("{id:int}/Checklist")]
+        public async Task<IActionResult> Checklist(
+            int id,
+            MaintenanceLogChecklistViewModel viewModel,
+            IFormFile? checklistFile = null)
+        {
+            var property = ViewBag.CurrentProperty as Property;
+            if (property == null)
+            {
+                TempData["MaintenanceLogError"] = "Select a property to manage checklists.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!UserCanManage(roles))
+            {
+                return Forbid();
+            }
+
+            var template = await _db.MaintenanceLogTemplates
+                .FirstOrDefaultAsync(t => t.Id == id && t.PropertyId == property.Id);
+            if (template == null)
+            {
+                return NotFound();
+            }
+
+            viewModel.TemplateId = template.Id;
+            viewModel.TemplateName = template.Name;
+            viewModel.PropertyName = property.Name;
+            viewModel.ChecklistFileName = template.ChecklistFileName ?? Path.GetFileName(template.ChecklistFilePath ?? string.Empty);
+            viewModel.ChecklistFilePath = template.ChecklistFilePath;
+            viewModel.ChecklistFileSizeBytes = template.ChecklistFileSizeBytes;
+            viewModel.ReturnUrl = ResolveReturnUrl(viewModel.ReturnUrl);
+
+            if (viewModel.RemoveChecklist && checklistFile is { Length: > 0 })
+            {
+                ModelState.AddModelError(nameof(viewModel.RemoveChecklist), "Choose either remove or upload, not both.");
+            }
+
+            var checklistValidationError = ValidateChecklistFile(checklistFile);
+            if (!string.IsNullOrEmpty(checklistValidationError))
+            {
+                ModelState.AddModelError("ChecklistFile", checklistValidationError);
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return View(LogsChecklistView, viewModel);
+            }
+
+            var updated = false;
+            if (viewModel.RemoveChecklist)
+            {
+                if (!string.IsNullOrWhiteSpace(template.ChecklistFilePath))
+                {
+                    DeleteChecklistFile(template.ChecklistFilePath);
+                }
+
+                template.ChecklistFilePath = null;
+                template.ChecklistFileName = null;
+                template.ChecklistFileSizeBytes = null;
+                updated = true;
+            }
+            else if (checklistFile is { Length: > 0 })
+            {
+                if (!string.IsNullOrWhiteSpace(template.ChecklistFilePath))
+                {
+                    DeleteChecklistFile(template.ChecklistFilePath);
+                }
+
                 var savedChecklist = await SaveChecklistFileAsync(checklistFile);
                 template.ChecklistFilePath = savedChecklist.FilePath;
                 template.ChecklistFileName = savedChecklist.OriginalFileName;
                 template.ChecklistFileSizeBytes = savedChecklist.FileSizeBytes;
+                updated = true;
             }
 
-            _db.MaintenanceLogTemplates.Add(template);
-            await _db.SaveChangesAsync();
+            if (updated)
+            {
+                template.UpdatedAtUtc = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+                TempData["MaintenanceLogMessage"] = viewModel.RemoveChecklist
+                    ? "Checklist removed."
+                    : "Checklist updated.";
+            }
+            else
+            {
+                TempData["MaintenanceLogMessage"] = "No checklist changes were made.";
+            }
 
-            TempData["MaintenanceLogMessage"] = "Maintenance log template created.";
-            return RedirectToAction(nameof(Detail), new { id = template.Id });
+            return RedirectToSafeReturn(viewModel.ReturnUrl);
         }
         [HttpGet("{id:int}")]
         public IActionResult Detail(int id, string? windowKey = null, int history = 0)
@@ -1318,11 +1453,33 @@ namespace hOps.web.Controllers
             };
         }
 
+        private string ResolveReturnUrl(string? returnUrl)
+        {
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            {
+                return returnUrl;
+            }
+
+            return Url.Action(nameof(Index)) ?? "/Maintenance/Logs";
+        }
+
+        private IActionResult RedirectToSafeReturn(string? returnUrl)
+        {
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+
         private static bool SupportsCycleRendering(MaintenanceLogScheduleType scheduleType)
         {
             return scheduleType is MaintenanceLogScheduleType.Daily
                 or MaintenanceLogScheduleType.Weekly
-                or MaintenanceLogScheduleType.Monthly;
+                or MaintenanceLogScheduleType.Monthly
+                or MaintenanceLogScheduleType.Quarterly
+                or MaintenanceLogScheduleType.Yearly;
         }
 
         private static bool PassesFilters(MaintenanceLogTemplateListItemViewModel item, MaintenanceLogIndexFilterViewModel filters)
@@ -1387,9 +1544,19 @@ namespace hOps.web.Controllers
 
         private static IEnumerable<DayOfWeek> GetSelectedDays(MaintenanceLogTemplateEditorViewModel viewModel)
         {
+            return GetSelectedDays(viewModel.WeeklyDays);
+        }
+
+        private static List<DayOfWeek> GetSelectedDays(bool[]? selections)
+        {
             var days = new List<DayOfWeek>();
-            var selections = viewModel.WeeklyDays ?? Array.Empty<bool>();
-            for (var index = 0; index < selections.Length; index++)
+            if (selections == null || selections.Length == 0)
+            {
+                return days;
+            }
+
+            var limit = Math.Min(selections.Length, 7);
+            for (var index = 0; index < limit; index++)
             {
                 if (selections[index])
                 {
@@ -1441,6 +1608,26 @@ namespace hOps.web.Controllers
                     IncludePhotos = column.IncludePhotos
                 })
                 .ToList();
+        }
+
+        private static List<MaintenanceLogColumnDefinition> BuildDefaultColumns()
+        {
+            return new List<MaintenanceLogColumnDefinition>
+            {
+                new MaintenanceLogColumnDefinition
+                {
+                    Key = "task",
+                    Label = "Task / Item",
+                    Required = true,
+                    Type = MaintenanceLogColumnDefinition.DefaultColumnType
+                },
+                new MaintenanceLogColumnDefinition
+                {
+                    Key = "status",
+                    Label = "Status",
+                    Type = MaintenanceLogColumnDefinition.DefaultColumnType
+                }
+            };
         }
 
         private static List<MaintenanceLogColumnDefinition> BuildColumnDefinitions(MaintenanceLogTemplateEditorViewModel viewModel)

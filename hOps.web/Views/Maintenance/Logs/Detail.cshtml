@@ -7,6 +7,7 @@
     var allCycles = ViewBag.AllCycles as IReadOnlyList<hOps.web.ViewModels.Maintenance.MaintenanceLogCycleHistoryItemViewModel> ?? Array.Empty<hOps.web.ViewModels.Maintenance.MaintenanceLogCycleHistoryItemViewModel>();
     var historyBlocks = ViewBag.HistoryBlocks is int hb ? hb : 0;
     var cycleWarningKey = ViewBag.CycleChangeTargetKey as string;
+    var checklistReturnUrl = $"{Context.Request.Path}{Context.Request.QueryString}";
 }
 
 <div class="container-fluid py-4">
@@ -20,6 +21,13 @@
             @if (Model.ChecklistFilePath != null)
             {
                 <a href="@Model.ChecklistFilePath" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">Download Checklist</a>
+            }
+            @if (Model.CanManage)
+            {
+                <a asp-action="Checklist"
+                   asp-route-id="@Model.TemplateId"
+                   asp-route-returnUrl="@checklistReturnUrl"
+                   class="btn btn-primary btn-sm">Checklist</a>
             }
         </div>
     </div>

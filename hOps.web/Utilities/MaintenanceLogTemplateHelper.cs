@@ -130,7 +130,7 @@ namespace hOps.web.Utilities
                     {
                         MaintenanceLogScheduleType.Monthly => "Monthly",
                         MaintenanceLogScheduleType.Quarterly => "Quarterly",
-                        MaintenanceLogScheduleType.Yearly => "Yearly",
+                        MaintenanceLogScheduleType.Yearly => "Annual",
                         _ => "Monthly"
                     };
                     if (template.DueTimeLocal.HasValue)

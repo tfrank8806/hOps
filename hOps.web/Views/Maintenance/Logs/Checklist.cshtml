@@ -1,0 +1,106 @@
+@model hOps.web.ViewModels.Maintenance.MaintenanceLogChecklistViewModel
+
+@{
+    ViewData["Title"] = "Manage Checklist";
+    var backUrl = !string.IsNullOrWhiteSpace(Model.ReturnUrl) ? Model.ReturnUrl : Url.Action("Index", "MaintenanceLogs");
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h2 class="mb-0">@Model.TemplateName</h2>
+            <p class="text-muted mb-0">@Model.PropertyName</p>
+        </div>
+        <div>
+            <a href="@backUrl" class="btn btn-outline-secondary btn-sm">Back</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form asp-action="Checklist"
+                  asp-route-id="@Model.TemplateId"
+                  method="post"
+                  enctype="multipart/form-data"
+                  id="checklistForm"
+                  data-has-existing="@(Model.HasChecklistFile ? "true" : "false")">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="ReturnUrl" />
+
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                <div class="mb-4">
+                    <label class="form-label">Current Checklist</label>
+                    @if (Model.HasChecklistFile)
+                    {
+                        <div class="d-flex flex-column gap-1">
+                            <div>
+                                <a href="@Model.ChecklistFilePath" target="_blank" rel="noopener">
+                                    @(string.IsNullOrWhiteSpace(Model.ChecklistFileName) ? "Download checklist" : Model.ChecklistFileName)
+                                </a>
+                                @if (Model.ChecklistFileSizeBytes.HasValue)
+                                {
+                                    <span class="text-muted ms-1">
+                                        (@Math.Round(Model.ChecklistFileSizeBytes.Value / 1024d, 1) KB)
+                                    </span>
+                                }
+                            </div>
+                            <div class="form-check">
+                                <input asp-for="RemoveChecklist" class="form-check-input" id="removeChecklistToggle" />
+                                <label asp-for="RemoveChecklist" class="form-check-label">Remove existing checklist</label>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">No checklist file uploaded.</p>
+                    }
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="ChecklistFile">Upload Checklist (CSV/XLSX)</label>
+                    <input type="file"
+                           class="form-control"
+                           id="ChecklistFile"
+                           name="checklistFile"
+                           accept=".csv,.xlsx" />
+                    <div class="form-text">Upload one file to add or replace the checklist.</div>
+                    @Html.ValidationMessage("ChecklistFile", null, new { @class = "text-danger small" })
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="@backUrl" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const form = document.getElementById('checklistForm');
+            if (!form) {
+                return;
+            }
+            form.addEventListener('submit', (event) => {
+                const hasExisting = form.dataset.hasExisting === 'true';
+                if (!hasExisting) {
+                    return;
+                }
+                const removeToggle = document.getElementById('removeChecklistToggle');
+                if (removeToggle && removeToggle.checked) {
+                    return;
+                }
+                const fileInput = document.getElementById('ChecklistFile');
+                if (fileInput && fileInput.files && fileInput.files.length > 0) {
+                    const confirmed = window.confirm('Uploading a new checklist will replace the existing file. Continue?');
+                    if (!confirmed) {
+                        event.preventDefault();
+                    }
+                }
+            });
+        })();
+    </script>
+}

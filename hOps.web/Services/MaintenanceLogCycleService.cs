@@ -128,7 +128,9 @@ namespace hOps.web.Services
         {
             return scheduleType is MaintenanceLogScheduleType.Daily
                 or MaintenanceLogScheduleType.Weekly
-                or MaintenanceLogScheduleType.Monthly;
+                or MaintenanceLogScheduleType.Monthly
+                or MaintenanceLogScheduleType.Quarterly
+                or MaintenanceLogScheduleType.Yearly;
         }
 
         private static string NormalizeKey(string? key)
@@ -280,6 +282,8 @@ namespace hOps.web.Services
                 MaintenanceLogScheduleType.Daily => BuildDailyWindow(template, localReference.Date),
                 MaintenanceLogScheduleType.Weekly => BuildWeeklyWindow(template, localReference.Date),
                 MaintenanceLogScheduleType.Monthly => BuildMonthlyWindow(template, localReference),
+                MaintenanceLogScheduleType.Quarterly => BuildQuarterlyWindow(template, localReference),
+                MaintenanceLogScheduleType.Yearly => BuildYearlyWindow(template, localReference),
                 _ => MaintenanceLogCycleWindow.Empty
             };
         }
@@ -294,6 +298,8 @@ namespace hOps.web.Services
                 MaintenanceLogScheduleType.Daily => BuildDailyWindow(template, current.StartLocal.AddDays(offset)),
                 MaintenanceLogScheduleType.Weekly => BuildWeeklyWindowFromStart(template, current.StartLocal.AddDays(offset * 7)),
                 MaintenanceLogScheduleType.Monthly => BuildMonthlyWindowFromStart(template, current.StartLocal.AddMonths(offset)),
+                MaintenanceLogScheduleType.Quarterly => BuildQuarterlyWindowFromStart(template, current.StartLocal.AddMonths(offset * 3)),
+                MaintenanceLogScheduleType.Yearly => BuildYearlyWindowFromStart(template, current.StartLocal.AddYears(offset)),
                 _ => current
             };
         }
@@ -359,6 +365,66 @@ namespace hOps.web.Services
             return CreateWindow(template.ScheduleType, start, end, due);
         }
 
+        private static MaintenanceLogCycleWindow BuildQuarterlyWindow(
+            MaintenanceLogTemplate template,
+            DateTime localReference)
+        {
+            var quarterIndex = (localReference.Month - 1) / 3;
+            var quarterStartMonth = (quarterIndex * 3) + 1;
+            var start = new DateTime(localReference.Year, quarterStartMonth, 1);
+            return BuildQuarterlyWindowFromStart(template, start);
+        }
+
+        private static MaintenanceLogCycleWindow BuildQuarterlyWindowFromStart(
+            MaintenanceLogTemplate template,
+            DateTime start)
+        {
+            var normalizedStart = new DateTime(start.Year, start.Month, 1);
+            var end = normalizedStart.AddMonths(3);
+            var dueTime = ResolveDueTime(template);
+            var lastMonthDate = end.AddDays(-1);
+            var dayOfMonth = template.DayOfMonth ?? 1;
+            var maxDay = DateTime.DaysInMonth(lastMonthDate.Year, lastMonthDate.Month);
+            var dueDay = Math.Clamp(dayOfMonth, 1, maxDay);
+            var dueDate = new DateTime(lastMonthDate.Year, lastMonthDate.Month, dueDay);
+            var due = dueDate.Add(dueTime);
+            if (due > end)
+            {
+                due = end.AddTicks(-1);
+            }
+
+            return CreateWindow(MaintenanceLogScheduleType.Quarterly, normalizedStart, end, due);
+        }
+
+        private static MaintenanceLogCycleWindow BuildYearlyWindow(
+            MaintenanceLogTemplate template,
+            DateTime localReference)
+        {
+            var start = new DateTime(localReference.Year, 1, 1);
+            return BuildYearlyWindowFromStart(template, start);
+        }
+
+        private static MaintenanceLogCycleWindow BuildYearlyWindowFromStart(
+            MaintenanceLogTemplate template,
+            DateTime start)
+        {
+            var normalizedStart = new DateTime(start.Year, 1, 1);
+            var end = normalizedStart.AddYears(1);
+            var dueTime = ResolveDueTime(template);
+            var lastMonthDate = end.AddDays(-1);
+            var dayOfMonth = template.DayOfMonth ?? 1;
+            var maxDay = DateTime.DaysInMonth(lastMonthDate.Year, lastMonthDate.Month);
+            var dueDay = Math.Clamp(dayOfMonth, 1, maxDay);
+            var dueDate = new DateTime(lastMonthDate.Year, lastMonthDate.Month, dueDay);
+            var due = dueDate.Add(dueTime);
+            if (due > end)
+            {
+                due = end.AddTicks(-1);
+            }
+
+            return CreateWindow(MaintenanceLogScheduleType.Yearly, normalizedStart, end, due);
+        }
+
         private static TimeSpan ResolveDueTime(MaintenanceLogTemplate template)
         {
             return template.DueTimeLocal ?? DefaultDueTime;
@@ -394,6 +460,8 @@ namespace hOps.web.Services
                 MaintenanceLogScheduleType.Daily => $"daily:{startLocal:yyyyMMdd}",
                 MaintenanceLogScheduleType.Weekly => $"weekly:{startLocal:yyyyMMdd}",
                 MaintenanceLogScheduleType.Monthly => $"monthly:{startLocal:yyyyMM}",
+                MaintenanceLogScheduleType.Quarterly => $"quarterly:{startLocal:yyyy}-q{((startLocal.Month - 1) / 3) + 1}",
+                MaintenanceLogScheduleType.Yearly => $"yearly:{startLocal:yyyy}",
                 _ => $"{scheduleType.ToString().ToLowerInvariant()}:{startLocal:O}"
             };
         }
@@ -417,6 +485,8 @@ namespace hOps.web.Services
                 MaintenanceLogScheduleType.Daily => new CycleWindowRequest(7, 0, 7),
                 MaintenanceLogScheduleType.Weekly => new CycleWindowRequest(3, 0, 3),
                 MaintenanceLogScheduleType.Monthly => new CycleWindowRequest(2, 0, 2),
+                MaintenanceLogScheduleType.Quarterly => new CycleWindowRequest(2, 0, 2),
+                MaintenanceLogScheduleType.Yearly => new CycleWindowRequest(2, 0, 1),
                 _ => new CycleWindowRequest(-1, -1, 0)
             };
         }

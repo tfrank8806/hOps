@@ -21,6 +21,8 @@ namespace hOps.web.ViewModels.Maintenance
         public IReadOnlyList<MaintenanceLogTemplateListItemViewModel> DailyTemplates { get; set; } = Array.Empty<MaintenanceLogTemplateListItemViewModel>();
         public IReadOnlyList<MaintenanceLogTemplateListItemViewModel> WeeklyTemplates { get; set; } = Array.Empty<MaintenanceLogTemplateListItemViewModel>();
         public IReadOnlyList<MaintenanceLogTemplateListItemViewModel> MonthlyTemplates { get; set; } = Array.Empty<MaintenanceLogTemplateListItemViewModel>();
+        public IReadOnlyList<MaintenanceLogTemplateListItemViewModel> QuarterlyTemplates { get; set; } = Array.Empty<MaintenanceLogTemplateListItemViewModel>();
+        public IReadOnlyList<MaintenanceLogTemplateListItemViewModel> AnnualTemplates { get; set; } = Array.Empty<MaintenanceLogTemplateListItemViewModel>();
         public IReadOnlyList<MaintenanceLogTemplateListItemViewModel> OtherTemplates { get; set; } = Array.Empty<MaintenanceLogTemplateListItemViewModel>();
         public bool CanLoadMoreHistory { get; set; }
     }
@@ -46,6 +48,40 @@ namespace hOps.web.ViewModels.Maintenance
         public bool HasChecklistFile => !string.IsNullOrWhiteSpace(ChecklistFilePath);
         public IReadOnlyList<MaintenanceLogCycleHistoryItemViewModel> VisibleCycles { get; set; } = Array.Empty<MaintenanceLogCycleHistoryItemViewModel>();
         public bool HasLegacyEntries => VisibleCycles.Any(cycle => cycle.LegacyEntries.Count > 0);
+    }
+
+    public class MaintenanceLogCreateViewModel
+    {
+        public int PropertyId { get; set; }
+        public string PropertyName { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(160)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        public MaintenanceLogScheduleType ScheduleType { get; set; } = MaintenanceLogScheduleType.Daily;
+
+        public bool[] WeeklyDays { get; set; } = new bool[7];
+
+        [Range(1, 31)]
+        public int? DayOfMonth { get; set; }
+
+        [DataType(DataType.Time)]
+        public TimeSpan? DueTimeLocal { get; set; }
+    }
+
+    public class MaintenanceLogChecklistViewModel
+    {
+        public int TemplateId { get; set; }
+        public string TemplateName { get; set; } = string.Empty;
+        public string PropertyName { get; set; } = string.Empty;
+        public string? ChecklistFilePath { get; set; }
+        public string? ChecklistFileName { get; set; }
+        public long? ChecklistFileSizeBytes { get; set; }
+        public bool RemoveChecklist { get; set; }
+        public string? ReturnUrl { get; set; }
+        public bool HasChecklistFile => !string.IsNullOrWhiteSpace(ChecklistFilePath);
     }
 
     public class MaintenanceLogTemplateEditorViewModel

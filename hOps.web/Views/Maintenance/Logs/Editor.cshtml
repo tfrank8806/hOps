@@ -1,7 +1,7 @@
 @model hOps.web.ViewModels.Maintenance.MaintenanceLogTemplateEditorViewModel
 
 @{
-    var pageTitle = Model.IsEditMode ? "Edit Maintenance Log Template" : "Create Maintenance Log Template";
+    var pageTitle = Model.IsEditMode ? "Edit Maintenance Log" : "Maintenance Log";
     ViewData["Title"] = pageTitle;
     var formAction = Model.IsEditMode ? "Edit" : "Create";
 }
@@ -34,7 +34,7 @@
                             <option value="Weekly">Weekly</option>
                             <option value="Monthly">Monthly</option>
                             <option value="Quarterly">Quarterly</option>
-                            <option value="Yearly">Yearly</option>
+                            <option value="Yearly">Annual</option>
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -100,7 +100,7 @@
                         <label asp-for="DayOfMonth" class="form-label">Day of Month</label>
                         <input asp-for="DayOfMonth" type="number" min="1" max="31" class="form-control" />
                         <span asp-validation-for="DayOfMonth" class="text-danger"></span>
-                        <div class="form-text">Required for Monthly, Quarterly, or Yearly schedules.</div>
+                        <div class="form-text">Required for Monthly, Quarterly, or Annual schedules.</div>
                     </div>
                     <div class="col-md-3 d-flex align-items-center">
                         <div class="form-check mt-4 pt-2">
@@ -254,7 +254,7 @@
                             class="btn btn-primary"
                             data-submit-btn="true"
                             data-loading-text="@(Model.IsEditMode ? "Saving..." : "Creating...")">
-                        @(Model.IsEditMode ? "Save Changes" : "Create Template")
+                        @(Model.IsEditMode ? "Save Changes" : "Save Maintenance Log")
                     </button>
                 </div>
             </form>

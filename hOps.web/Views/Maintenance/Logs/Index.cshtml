@@ -9,8 +9,11 @@
     {
         ("Daily Logs", Model.DailyTemplates),
         ("Weekly Logs", Model.WeeklyTemplates),
-        ("Monthly Logs", Model.MonthlyTemplates)
+        ("Monthly Logs", Model.MonthlyTemplates),
+        ("Quarterly Logs", Model.QuarterlyTemplates),
+        ("Annual Logs", Model.AnnualTemplates)
     };
+    var checklistReturnUrl = $"{Context.Request.Path}{Context.Request.QueryString}";
 }
 
 <style>
@@ -37,7 +40,7 @@
             <a asp-action="EmergencyExitLights" class="btn btn-outline-primary btn-sm">Emergency/Exit Light Log</a>
             @if (Model.CanManage)
             {
-                <a asp-action="Create" class="btn btn-primary btn-sm">Create Template</a>
+                <a asp-action="Create" class="btn btn-primary btn-sm">Create New Log</a>
             }
         </div>
     </div>
@@ -61,6 +64,8 @@
                         <option value="Daily" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Daily ? "selected" : null)">Daily</option>
                         <option value="Weekly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Weekly ? "selected" : null)">Weekly</option>
                         <option value="Monthly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Monthly ? "selected" : null)">Monthly</option>
+                        <option value="Quarterly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Quarterly ? "selected" : null)">Quarterly</option>
+                        <option value="Yearly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Yearly ? "selected" : null)">Annual</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -133,10 +138,19 @@
                                     {
                                         <span class="badge bg-warning text-dark">Late</span>
                                     }
-                                    @if (template.HasChecklistFile)
-                                    {
-                                        <a href="@template.ChecklistFilePath" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener">Checklist</a>
-                                    }
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        @if (template.HasChecklistFile)
+                                        {
+                                            <a href="@template.ChecklistFilePath" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener">Download Checklist</a>
+                                        }
+                                        @if (Model.CanManage)
+                                        {
+                                            <a asp-action="Checklist"
+                                               asp-route-id="@template.TemplateId"
+                                               asp-route-returnUrl="@checklistReturnUrl"
+                                               class="btn btn-outline-primary btn-sm">Checklist</a>
+                                        }
+                                    </div>
                                 </div>
                             </div>
                             <div class="cycle-grid">
@@ -179,7 +193,7 @@
                                 </div>
                                 <span class="badge bg-secondary">Legacy schedule</span>
                             </div>
-                            <p class="text-muted mt-3 mb-0 small">Cycle history will be available once this template moves to a supported schedule (daily/weekly/monthly).</p>
+                            <p class="text-muted mt-3 mb-0 small">Cycle history will be available once this template moves to a supported schedule (daily/weekly/monthly/quarterly/annual).</p>
                         </div>
                     </div>
                 }
