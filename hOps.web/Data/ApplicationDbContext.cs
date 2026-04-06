@@ -83,6 +83,9 @@ namespace hOps.web.Data
         public DbSet<DeepCleanChecklistItem> DeepCleanChecklistItems { get; set; }
         public DbSet<DeepCleanSession> DeepCleanSessions { get; set; }
 
+        public DbSet<SupplyInventoryState> SupplyInventoryStates { get; set; }
+        public DbSet<SupplyInventorySnapshot> SupplyInventorySnapshots { get; set; }
+
         public DbSet<LinenInventorySettings> LinenInventorySettings { get; set; }
         public DbSet<LinenInventoryRoomType> LinenInventoryRoomTypes { get; set; }
         public DbSet<LinenInventoryItem> LinenInventoryItems { get; set; }
@@ -1204,6 +1207,37 @@ namespace hOps.web.Data
                 .WithMany()
                 .HasForeignKey(i => i.InventoryItemId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<SupplyInventoryState>()
+                .HasOne(s => s.Property)
+                .WithOne(p => p.SupplyInventoryState)
+                .HasForeignKey<SupplyInventoryState>(s => s.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<SupplyInventoryState>()
+                .HasOne(s => s.UpdatedByUser)
+                .WithMany()
+                .HasForeignKey(s => s.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<SupplyInventoryState>()
+                .HasIndex(s => s.PropertyId)
+                .IsUnique();
+
+            builder.Entity<SupplyInventorySnapshot>()
+                .HasOne(s => s.Property)
+                .WithMany(p => p.SupplyInventorySnapshots)
+                .HasForeignKey(s => s.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<SupplyInventorySnapshot>()
+                .HasOne(s => s.SavedByUser)
+                .WithMany()
+                .HasForeignKey(s => s.SavedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<SupplyInventorySnapshot>()
+                .HasIndex(s => new { s.PropertyId, s.SavedAtUtc });
 
             builder.Entity<HousekeeperProfile>()
                 .Property(h => h.Name)

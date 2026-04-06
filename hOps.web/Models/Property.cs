@@ -71,6 +71,8 @@ namespace hOps.web.Models
         public ICollection<LinenInventoryRoomType> LinenInventoryRoomTypes { get; set; } = new List<LinenInventoryRoomType>();
         public ICollection<LinenInventoryItem> LinenInventoryItems { get; set; } = new List<LinenInventoryItem>();
         public ICollection<LinenInventorySession> LinenInventorySessions { get; set; } = new List<LinenInventorySession>();
+        public SupplyInventoryState? SupplyInventoryState { get; set; }
+        public ICollection<SupplyInventorySnapshot> SupplyInventorySnapshots { get; set; } = new List<SupplyInventorySnapshot>();
 
         public ICollection<EquipmentItem> EquipmentItems { get; set; } = new List<EquipmentItem>();
         public ICollection<MaintenanceLogTemplate> MaintenanceLogTemplates { get; set; } = new List<MaintenanceLogTemplate>();

@@ -20,9 +20,13 @@
         const historyEmptyEl = document.querySelector('[data-role="history-empty"]');
         const historyBody = document.querySelector('[data-role="history-rows"]');
 
-        const stateKey = `supplyInventory.state.${config.propertyId ?? 'default'}`;
+        const propertyId = Number(config.propertyId) || 0;
+        const endpoints = config.endpoints || {};
         const MAX_HISTORY_ENTRIES = 24;
-        let state = loadState();
+        let state = createDefaultState();
+        let saveTimeoutId = null;
+        let saveInProgress = false;
+        let saveQueued = false;
 
         if (budgetInput) {
             budgetInput.value = formatNumberInput(state.monthlyBudget);
@@ -31,7 +35,8 @@
         renderRows();
         updateSummary();
         renderHistory();
-        updateSaveStatus('Ready');
+        updateSaveStatus('Loading saved data...');
+        hydrateFromServer();
 
         tableBody.addEventListener('input', handleTableInput);
         tableBody.addEventListener('change', handleTableInput);
@@ -43,7 +48,7 @@
             state.items.push(buildEmptyItem());
             renderRows();
             updateSummary();
-            saveState();
+            scheduleSave();
         });
 
         resetButton?.addEventListener('click', event => {
@@ -62,13 +67,13 @@
             renderRows();
             updateSummary();
             renderHistory();
-            saveState();
+            scheduleSave(true);
         });
 
         budgetInput?.addEventListener('input', () => {
             state.monthlyBudget = normalizeDecimal(budgetInput.value);
             updateSummary();
-            saveState();
+            scheduleSave();
         });
 
         saveSnapshotButton?.addEventListener('click', event => {
@@ -110,24 +115,116 @@
             };
         }
 
-        function loadState() {
-            if (!supportsLocalStorage()) {
-                return createDefaultState();
+        async function hydrateFromServer() {
+            if (!endpoints.load || !propertyId) {
+                updateSaveStatus('Ready');
+                return;
             }
 
             try {
-                const raw = window.localStorage.getItem(stateKey);
-                if (!raw) {
-                    return createDefaultState();
+                const response = await fetch(`${endpoints.load}?propertyId=${encodeURIComponent(propertyId)}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Unable to load saved data.');
                 }
 
-                const parsed = JSON.parse(raw);
-                const parsedItems = Array.isArray(parsed.items) ? parsed.items : [];
-                const parsedHistory = Array.isArray(parsed.history) ? parsed.history : [];
+                const payload = await response.json();
+                if (payload?.state) {
+                    state.monthlyBudget = normalizeDecimal(payload.state.monthlyBudget ?? state.monthlyBudget);
+                    state.items = Array.isArray(payload.state.items) && payload.state.items.length
+                        ? payload.state.items.map(normalizeServerItem)
+                        : state.items;
 
-                return {
-                    monthlyBudget: normalizeDecimal(parsed.monthlyBudget ?? config.defaultBudget ?? 0),
-                    items: parsedItems.map(item => ({
+                    if (budgetInput) {
+                        budgetInput.value = formatNumberInput(state.monthlyBudget);
+                    }
+                }
+
+                const historyEntries = Array.isArray(payload?.history)
+                    ? payload.history
+                        .map(normalizeSnapshotEntry)
+                        .filter(entry => entry !== null)
+                    : [];
+
+                state.history = historyEntries;
+
+                renderRows();
+                updateSummary();
+                renderHistory();
+                updateSaveStatus('Ready');
+            }
+            catch (error) {
+                console.error('Unable to load supply inventory state', error);
+                updateSaveStatus('Unable to load saved data', true);
+            }
+        }
+
+        function scheduleSave(immediate = false) {
+            if (!endpoints.save || !propertyId) {
+                return;
+            }
+
+            if (immediate) {
+                if (saveTimeoutId) {
+                    window.clearTimeout(saveTimeoutId);
+                    saveTimeoutId = null;
+                }
+                persistStateToServer();
+                return;
+            }
+
+            if (saveTimeoutId) {
+                window.clearTimeout(saveTimeoutId);
+            }
+
+            saveTimeoutId = window.setTimeout(() => {
+                saveTimeoutId = null;
+                persistStateToServer();
+            }, 750);
+        }
+
+        async function persistStateToServer() {
+            if (saveInProgress) {
+                saveQueued = true;
+                return;
+            }
+
+            saveInProgress = true;
+            saveQueued = false;
+            updateSaveStatus('Saving to server...');
+
+            try {
+                const response = await postJson(endpoints.save, buildSavePayload());
+                if (!response?.success) {
+                    throw new Error(response?.message || 'Unable to save changes.');
+                }
+
+                const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                updateSaveStatus(`Saved ${timestamp}`);
+            }
+            catch (error) {
+                console.error('Failed to save supply inventory state', error);
+                updateSaveStatus(error?.message || 'Unable to save changes. Please refresh.', true);
+            }
+            finally {
+                saveInProgress = false;
+                if (saveQueued) {
+                    persistStateToServer();
+                }
+            }
+        }
+
+        function buildSavePayload() {
+            return {
+                propertyId,
+                monthlyBudget: state.monthlyBudget || 0,
+                items: Array.isArray(state.items)
+                    ? state.items.map(item => ({
                         id: item?.id || generateId(),
                         item: item?.item ?? '',
                         description: item?.description ?? '',
@@ -136,49 +233,65 @@
                         quantityPerCase: normalizeDecimal(item?.quantityPerCase),
                         inventoryCount: normalizeDecimal(item?.inventoryCount),
                         orderCaseCount: normalizeDecimal(item?.orderCaseCount)
-                    })),
-                    history: parsedHistory.map(entry => ({
-                        id: entry?.id || generateId(),
-                        savedAt: entry?.savedAt || new Date().toISOString(),
-                        monthlyBudget: normalizeDecimal(entry?.monthlyBudget),
-                        totalInventoryValue: normalizeDecimal(entry?.totalInventoryValue),
-                        totalOrderCost: normalizeDecimal(entry?.totalOrderCost),
-                        items: Array.isArray(entry?.items)
-                            ? entry.items.map(historyItem => ({
-                                id: historyItem?.id || generateId(),
-                                item: historyItem?.item ?? '',
-                                description: historyItem?.description ?? '',
-                                partNumber: historyItem?.partNumber ?? '',
-                                price: normalizeDecimal(historyItem?.price),
-                                quantityPerCase: normalizeDecimal(historyItem?.quantityPerCase),
-                                inventoryCount: normalizeDecimal(historyItem?.inventoryCount),
-                                orderCaseCount: normalizeDecimal(historyItem?.orderCaseCount)
-                            }))
-                            : []
                     }))
-                };
-            }
-            catch (error) {
-                console.error('Failed to load supply inventory state', error);
-                return createDefaultState();
-            }
+                    : []
+            };
         }
 
-        function saveState() {
-            if (!supportsLocalStorage()) {
-                updateSaveStatus('Browser storage unavailable', true);
-                return;
+        function normalizeServerItem(item) {
+            return {
+                id: item?.id || generateId(),
+                item: item?.item ?? '',
+                description: item?.description ?? '',
+                partNumber: item?.partNumber ?? '',
+                price: normalizeDecimal(item?.price),
+                quantityPerCase: normalizeDecimal(item?.quantityPerCase),
+                inventoryCount: normalizeDecimal(item?.inventoryCount),
+                orderCaseCount: normalizeDecimal(item?.orderCaseCount)
+            };
+        }
+
+        function normalizeSnapshotEntry(entry) {
+            if (!entry) {
+                return null;
             }
 
-            try {
-                window.localStorage.setItem(stateKey, JSON.stringify(state));
-                const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                updateSaveStatus(`Saved ${timestamp}`);
+            return {
+                id: entry.id?.toString() || generateId(),
+                savedAt: entry.savedAt || entry.savedAtUtc || new Date().toISOString(),
+                monthlyBudget: normalizeDecimal(entry.monthlyBudget),
+                totalInventoryValue: normalizeDecimal(entry.totalInventoryValue),
+                totalOrderCost: normalizeDecimal(entry.totalOrderCost),
+                items: Array.isArray(entry.items)
+                    ? entry.items.map(normalizeServerItem)
+                    : []
+            };
+        }
+
+        function getAntiforgeryToken() {
+            return document.querySelector('#supplyInventoryAntiforgery input[name="__RequestVerificationToken"]')?.value ?? '';
+        }
+
+        async function postJson(url, payload) {
+            if (!url) {
+                throw new Error('Endpoint missing.');
             }
-            catch (error) {
-                console.error('Failed to save supply inventory state', error);
-                updateSaveStatus('Unable to save to this browser', true);
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': getAntiforgeryToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error('Request failed.');
             }
+
+            return response.json();
         }
 
         function handleTableInput(event) {
@@ -207,7 +320,7 @@
 
             updateRowDisplays(row, item);
             updateSummary();
-            saveState();
+            scheduleSave();
         }
 
         function handleTableClick(event) {
@@ -225,7 +338,7 @@
             state.items = state.items.filter(item => item.id !== row.dataset.itemId);
             renderRows();
             updateSummary();
-            saveState();
+            scheduleSave();
         }
 
         function renderRows() {
@@ -250,34 +363,44 @@
             updateItemCount();
         }
 
-        function handleSaveSnapshot() {
+        async function handleSaveSnapshot() {
             if (!Array.isArray(state.items) || state.items.length === 0) {
                 window.alert('Add at least one item before saving a snapshot.');
                 return;
             }
 
-            const totals = calculateTotals(state.items);
-            const snapshot = {
-                id: generateId(),
-                savedAt: new Date().toISOString(),
-                monthlyBudget: state.monthlyBudget || 0,
-                totalInventoryValue: totals.totalInventoryValue,
-                totalOrderCost: totals.totalOrderCost,
-                items: state.items.map(cloneItemForHistory)
-            };
-
-            if (!Array.isArray(state.history)) {
-                state.history = [];
+            if (!endpoints.snapshot || !propertyId) {
+                window.alert('Snapshot endpoint not configured.');
+                return;
             }
 
-            state.history.unshift(snapshot);
-            if (state.history.length > MAX_HISTORY_ENTRIES) {
-                state.history = state.history.slice(0, MAX_HISTORY_ENTRIES);
-            }
+            try {
+                const response = await postJson(endpoints.snapshot, buildSavePayload());
+                if (!response?.success || !response.snapshot) {
+                    throw new Error(response?.message || 'Unable to save snapshot.');
+                }
 
-            saveState();
-            renderHistory();
-            updateSaveStatus('Saved snapshot');
+                const snapshotEntry = normalizeSnapshotEntry(response.snapshot);
+                if (!snapshotEntry) {
+                    throw new Error('Snapshot response was invalid.');
+                }
+
+                if (!Array.isArray(state.history)) {
+                    state.history = [];
+                }
+
+                state.history.unshift(snapshotEntry);
+                if (state.history.length > MAX_HISTORY_ENTRIES) {
+                    state.history = state.history.slice(0, MAX_HISTORY_ENTRIES);
+                }
+
+                renderHistory();
+                updateSaveStatus('Snapshot saved');
+            }
+            catch (error) {
+                console.error('Unable to save snapshot', error);
+                window.alert(error?.message || 'Unable to save snapshot. Please try again.');
+            }
         }
 
         function renderHistory() {
@@ -369,7 +492,7 @@
                 return;
             }
 
-            const snapshot = state.history.find(entry => entry.id === snapshotId);
+            const snapshot = state.history.find(entry => entry.id?.toString() === snapshotId?.toString());
             if (!snapshot) {
                 return;
             }
@@ -392,23 +515,42 @@
 
             renderRows();
             updateSummary();
-            saveState();
+            scheduleSave(true);
             updateSaveStatus('Loaded snapshot');
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        function deleteSnapshot(snapshotId) {
+        async function deleteSnapshot(snapshotId) {
             if (!Array.isArray(state.history)) {
                 return;
             }
 
-            if (!window.confirm('Delete this snapshot from your browser history?')) {
+            if (!endpoints.deleteSnapshot || !propertyId) {
                 return;
             }
 
-            state.history = state.history.filter(entry => entry.id !== snapshotId);
-            saveState();
-            renderHistory();
+            if (!window.confirm('Delete this snapshot from history?')) {
+                return;
+            }
+
+            try {
+                const response = await postJson(endpoints.deleteSnapshot, {
+                    propertyId,
+                    snapshotId: Number(snapshotId)
+                });
+
+                if (!response?.success) {
+                    throw new Error(response?.message || 'Unable to delete snapshot.');
+                }
+
+                const targetId = snapshotId?.toString() ?? '';
+                state.history = state.history.filter(entry => (entry?.id?.toString() ?? '') !== targetId);
+                renderHistory();
+            }
+            catch (error) {
+                console.error('Unable to delete snapshot', error);
+                window.alert(error?.message || 'Unable to delete snapshot. Please try again.');
+            }
         }
 
         function buildRow(item) {
@@ -565,19 +707,6 @@
             }, { totalInventoryValue: 0, totalOrderCost: 0 });
         }
 
-        function cloneItemForHistory(item) {
-            return {
-                id: item?.id || generateId(),
-                item: item?.item ?? '',
-                description: item?.description ?? '',
-                partNumber: item?.partNumber ?? '',
-                price: normalizeDecimal(item?.price),
-                quantityPerCase: normalizeDecimal(item?.quantityPerCase),
-                inventoryCount: normalizeDecimal(item?.inventoryCount),
-                orderCaseCount: normalizeDecimal(item?.orderCaseCount)
-            };
-        }
-
         function formatDateTime(value) {
             const date = new Date(value);
             if (Number.isNaN(date.getTime())) {
@@ -591,18 +720,6 @@
                 hour: 'numeric',
                 minute: '2-digit'
             });
-        }
-
-        function supportsLocalStorage() {
-            try {
-                const key = '__supplyInventoryTest';
-                window.localStorage.setItem(key, '1');
-                window.localStorage.removeItem(key);
-                return true;
-            }
-            catch {
-                return false;
-            }
         }
 
         function normalizeDecimal(value) {

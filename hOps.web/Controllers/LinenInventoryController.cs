@@ -21,6 +21,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace hOps.web.Controllers
 {
@@ -31,6 +32,12 @@ namespace hOps.web.Controllers
         private readonly IUserTimeZoneService _timeZoneService;
         private readonly ILogger<LinenInventoryController> _logger;
         private readonly IWebHostEnvironment _environment;
+        private static readonly JsonSerializerOptions SupplyInventorySerializerOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+        private const int SupplyInventorySnapshotLimit = 24;
 
         public LinenInventoryController(
             ApplicationDbContext context,
@@ -994,6 +1001,172 @@ namespace hOps.web.Controllers
             return View(viewModel);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetSupplyInventoryState(int propertyId)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            if (propertyId <= 0 || !await UserHasPropertyAccessAsync(user.Id, propertyId))
+            {
+                return Forbid();
+            }
+
+            var stateEntity = await _context.SupplyInventoryStates
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.PropertyId == propertyId);
+
+            SupplyInventoryPayload? payload = null;
+            if (stateEntity != null)
+            {
+                payload = DeserializeSupplyPayload(stateEntity.DataJson);
+                payload.MonthlyBudget = stateEntity.MonthlyBudget;
+            }
+
+            var historyEntities = await _context.SupplyInventorySnapshots
+                .AsNoTracking()
+                .Where(s => s.PropertyId == propertyId)
+                .OrderByDescending(s => s.SavedAtUtc)
+                .Take(SupplyInventorySnapshotLimit)
+                .ToListAsync();
+
+            var history = historyEntities
+                .Select(BuildSnapshotResponse)
+                .ToList();
+
+            return Json(new
+            {
+                success = true,
+                state = payload == null
+                    ? null
+                    : new
+                    {
+                        monthlyBudget = payload.MonthlyBudget,
+                        items = ProjectItemsForClient(payload.Items)
+                    },
+                history
+            });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveSupplyInventoryState([FromBody] SupplyInventorySaveRequest request)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            if (request == null || request.PropertyId <= 0 || !await UserHasPropertyAccessAsync(user.Id, request.PropertyId))
+            {
+                return Forbid();
+            }
+
+            var payload = NormalizeIncomingPayload(request);
+            var totals = CalculateTotals(payload.Items);
+            var serialized = JsonSerializer.Serialize(payload, SupplyInventorySerializerOptions);
+            var now = DateTime.UtcNow;
+
+            var entity = await _context.SupplyInventoryStates.FirstOrDefaultAsync(s => s.PropertyId == request.PropertyId);
+            if (entity == null)
+            {
+                entity = new SupplyInventoryState
+                {
+                    PropertyId = request.PropertyId
+                };
+                _context.SupplyInventoryStates.Add(entity);
+            }
+
+            entity.MonthlyBudget = payload.MonthlyBudget;
+            entity.TotalInventoryValue = totals.totalInventoryValue;
+            entity.TotalOrderCost = totals.totalOrderCost;
+            entity.DataJson = serialized;
+            entity.UpdatedAtUtc = now;
+            entity.UpdatedByUserId = user.Id;
+
+            await _context.SaveChangesAsync();
+
+            return Json(new
+            {
+                success = true,
+                totals
+            });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveSupplyInventorySnapshot([FromBody] SupplyInventorySaveRequest request)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            if (request == null || request.PropertyId <= 0 || !await UserHasPropertyAccessAsync(user.Id, request.PropertyId))
+            {
+                return Forbid();
+            }
+
+            var payload = NormalizeIncomingPayload(request);
+            if (payload.Items.Count == 0)
+            {
+                return BadRequest(new { message = "Add at least one item before saving a snapshot." });
+            }
+
+            var totals = CalculateTotals(payload.Items);
+            var snapshot = new SupplyInventorySnapshot
+            {
+                PropertyId = request.PropertyId,
+                MonthlyBudget = payload.MonthlyBudget,
+                TotalInventoryValue = totals.totalInventoryValue,
+                TotalOrderCost = totals.totalOrderCost,
+                DataJson = JsonSerializer.Serialize(payload, SupplyInventorySerializerOptions),
+                SavedAtUtc = DateTime.UtcNow,
+                SavedByUserId = user.Id
+            };
+
+            _context.SupplyInventorySnapshots.Add(snapshot);
+            await _context.SaveChangesAsync();
+            await TrimSnapshotHistoryAsync(request.PropertyId);
+
+            return Json(new
+            {
+                success = true,
+                snapshot = BuildSnapshotResponse(snapshot)
+            });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteSupplyInventorySnapshot([FromBody] DeleteSupplySnapshotRequest request)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            if (request == null || request.PropertyId <= 0 || request.SnapshotId <= 0 || !await UserHasPropertyAccessAsync(user.Id, request.PropertyId))
+            {
+                return Forbid();
+            }
+
+            var snapshot = await _context.SupplyInventorySnapshots
+                .FirstOrDefaultAsync(s => s.PropertyId == request.PropertyId && s.Id == request.SnapshotId);
+
+            if (snapshot == null)
+            {
+                return NotFound(new { message = "Snapshot not found." });
+            }
+
+            _context.SupplyInventorySnapshots.Remove(snapshot);
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true });
+        }
+
         private async Task<LinenInventoryPageViewModel> BuildPageViewModelAsync(
             Property property,
             ApplicationUser user,
@@ -1515,6 +1688,206 @@ namespace hOps.web.Controllers
         {
             public string RoomTypeName { get; set; } = string.Empty;
             public decimal UnitsPerRoom { get; set; }
+        }
+
+        private async Task<bool> UserHasPropertyAccessAsync(string userId, int propertyId)
+        {
+            if (propertyId <= 0 || string.IsNullOrWhiteSpace(userId))
+            {
+                return false;
+            }
+
+            return await _context.UserPropertyAccesses
+                .AnyAsync(upa => upa.ApplicationUserId == userId && upa.PropertyId == propertyId);
+        }
+
+        private async Task TrimSnapshotHistoryAsync(int propertyId)
+        {
+            var excessSnapshots = await _context.SupplyInventorySnapshots
+                .Where(s => s.PropertyId == propertyId)
+                .OrderByDescending(s => s.SavedAtUtc)
+                .Skip(SupplyInventorySnapshotLimit)
+                .ToListAsync();
+
+            if (excessSnapshots.Count == 0)
+            {
+                return;
+            }
+
+            _context.SupplyInventorySnapshots.RemoveRange(excessSnapshots);
+            await _context.SaveChangesAsync();
+        }
+
+        private static SupplyInventoryPayload NormalizeIncomingPayload(SupplyInventorySaveRequest request)
+        {
+            var payload = new SupplyInventoryPayload
+            {
+                MonthlyBudget = NormalizeDecimal(request.MonthlyBudget)
+            };
+
+            if (request.Items == null || request.Items.Count == 0)
+            {
+                return payload;
+            }
+
+            foreach (var input in request.Items)
+            {
+                if (input == null)
+                {
+                    continue;
+                }
+
+                payload.Items.Add(new SupplyInventoryItemPayload
+                {
+                    Id = string.IsNullOrWhiteSpace(input.Id) ? Guid.NewGuid().ToString("N") : input.Id.Trim(),
+                    Item = input.Item?.Trim() ?? string.Empty,
+                    Description = input.Description?.Trim() ?? string.Empty,
+                    PartNumber = input.PartNumber?.Trim() ?? string.Empty,
+                    Price = NormalizeDecimal(input.Price),
+                    QuantityPerCase = NormalizeDecimal(input.QuantityPerCase),
+                    InventoryCount = NormalizeDecimal(input.InventoryCount),
+                    OrderCaseCount = NormalizeDecimal(input.OrderCaseCount)
+                });
+            }
+
+            return payload;
+        }
+
+        private static SupplyInventoryPayload DeserializeSupplyPayload(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return new SupplyInventoryPayload();
+            }
+
+            try
+            {
+                var payload = JsonSerializer.Deserialize<SupplyInventoryPayload>(json, SupplyInventorySerializerOptions);
+                if (payload == null)
+                {
+                    return new SupplyInventoryPayload();
+                }
+
+                payload.MonthlyBudget = NormalizeDecimal(payload.MonthlyBudget);
+                payload.Items = payload.Items?
+                    .Where(item => item != null)
+                    .Select(item => new SupplyInventoryItemPayload
+                    {
+                        Id = string.IsNullOrWhiteSpace(item!.Id) ? Guid.NewGuid().ToString("N") : item.Id.Trim(),
+                        Item = item.Item?.Trim() ?? string.Empty,
+                        Description = item.Description?.Trim() ?? string.Empty,
+                        PartNumber = item.PartNumber?.Trim() ?? string.Empty,
+                        Price = NormalizeDecimal(item.Price),
+                        QuantityPerCase = NormalizeDecimal(item.QuantityPerCase),
+                        InventoryCount = NormalizeDecimal(item.InventoryCount),
+                        OrderCaseCount = NormalizeDecimal(item.OrderCaseCount)
+                    })
+                    .ToList() ?? new List<SupplyInventoryItemPayload>();
+
+                return payload;
+            }
+            catch
+            {
+                return new SupplyInventoryPayload();
+            }
+        }
+
+        private static (decimal totalInventoryValue, decimal totalOrderCost) CalculateTotals(IEnumerable<SupplyInventoryItemPayload> items)
+        {
+            decimal inventoryValue = 0;
+            decimal orderCost = 0;
+
+            foreach (var item in items)
+            {
+                var price = NormalizeDecimal(item.Price);
+                inventoryValue += NormalizeDecimal(item.InventoryCount) * price;
+                orderCost += NormalizeDecimal(item.OrderCaseCount) * price;
+            }
+
+            return (
+                Math.Round(inventoryValue, 2, MidpointRounding.AwayFromZero),
+                Math.Round(orderCost, 2, MidpointRounding.AwayFromZero));
+        }
+
+        private static decimal NormalizeDecimal(decimal? value)
+        {
+            return value.HasValue
+                ? Math.Round(value.Value, 2, MidpointRounding.AwayFromZero)
+                : 0;
+        }
+
+        private static object BuildSnapshotResponse(SupplyInventorySnapshot snapshot)
+        {
+            var payload = DeserializeSupplyPayload(snapshot.DataJson);
+            payload.MonthlyBudget = snapshot.MonthlyBudget;
+
+            return new
+            {
+                id = snapshot.Id,
+                savedAt = snapshot.SavedAtUtc,
+                monthlyBudget = snapshot.MonthlyBudget,
+                totalInventoryValue = snapshot.TotalInventoryValue,
+                totalOrderCost = snapshot.TotalOrderCost,
+                items = ProjectItemsForClient(payload.Items)
+            };
+        }
+
+        private static IEnumerable<object> ProjectItemsForClient(IEnumerable<SupplyInventoryItemPayload> items)
+        {
+            return items.Select(item => new
+            {
+                id = item.Id,
+                item = item.Item,
+                description = item.Description,
+                partNumber = item.PartNumber,
+                price = item.Price,
+                quantityPerCase = item.QuantityPerCase,
+                inventoryCount = item.InventoryCount,
+                orderCaseCount = item.OrderCaseCount
+            });
+        }
+
+        public sealed class SupplyInventorySaveRequest
+        {
+            public int PropertyId { get; set; }
+            public decimal MonthlyBudget { get; set; }
+            public List<SupplyInventoryItemInput> Items { get; set; } = new();
+        }
+
+        public sealed class SupplyInventoryItemInput
+        {
+            public string? Id { get; set; }
+            public string? Item { get; set; }
+            public string? Description { get; set; }
+            public string? PartNumber { get; set; }
+            public decimal? Price { get; set; }
+            public decimal? QuantityPerCase { get; set; }
+            public decimal? InventoryCount { get; set; }
+            public decimal? OrderCaseCount { get; set; }
+        }
+
+        public sealed class DeleteSupplySnapshotRequest
+        {
+            public int PropertyId { get; set; }
+            public int SnapshotId { get; set; }
+        }
+
+        private sealed class SupplyInventoryPayload
+        {
+            public decimal MonthlyBudget { get; set; }
+            public List<SupplyInventoryItemPayload> Items { get; set; } = new();
+        }
+
+        private sealed class SupplyInventoryItemPayload
+        {
+            public string Id { get; set; } = string.Empty;
+            public string Item { get; set; } = string.Empty;
+            public string Description { get; set; } = string.Empty;
+            public string PartNumber { get; set; } = string.Empty;
+            public decimal Price { get; set; }
+            public decimal QuantityPerCase { get; set; }
+            public decimal InventoryCount { get; set; }
+            public decimal OrderCaseCount { get; set; }
         }
 
         private List<SupplyInventoryItemViewModel> LoadSupplyTemplate()

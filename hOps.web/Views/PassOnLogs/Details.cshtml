@@ -4,59 +4,58 @@
     ViewData["Title"] = Model.Title;
 }
 
-<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
-    <div class="d-flex align-items-start gap-3 flex-grow-1 flex-wrap">
-        <div class="flex-shrink-0">
-            <partial name="_UserAvatar" model="Model.CreatorAvatar" />
+<div class="card mb-4 passon-details-card">
+    <div class="card-header passon-details-card__header d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div class="d-flex align-items-start gap-3 flex-grow-1 flex-wrap">
+            <div class="flex-shrink-0">
+                <partial name="_UserAvatar" model="Model.CreatorAvatar" />
+            </div>
+            <div>
+                <h2 class="mb-2">@Model.Title</h2>
+                @{
+                    var createdLocal = TimeZoneService.ConvertToUserTime(Model.CreatedAt);
+                    var updatedLocal = Model.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(Model.UpdatedAt.Value) : (DateTime?)null;
+                }
+                <div class="text-muted">Posted by @Model.CreatorName on @createdLocal.ToString("f")</div>
+                @if (updatedLocal.HasValue)
+                {
+                    <div class="text-muted">Updated @updatedLocal.Value.ToString("g")</div>
+                }
+                <div class="text-muted">Properties: @string.Join(", ", Model.PropertyNames)</div>
+            </div>
         </div>
-        <div>
-            <h2>@Model.Title</h2>
-            @{
-                var createdLocal = TimeZoneService.ConvertToUserTime(Model.CreatedAt);
-                var updatedLocal = Model.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(Model.UpdatedAt.Value) : (DateTime?)null;
-            }
-            <div class="text-muted">Posted by @Model.CreatorName on @createdLocal.ToString("f")</div>
-            @if (updatedLocal.HasValue)
+        <div class="d-flex gap-2 flex-wrap passon-details-actions">
+            @if (Model.NextLogId.HasValue)
             {
-                <div class="text-muted">Updated @updatedLocal.Value.ToString("g")</div>
+                <a asp-action="Details" asp-route-id="@Model.NextLogId.Value" class="btn btn-outline-primary">
+                    Next (Newer)
+                </a>
             }
-            <div class="text-muted">Properties: @string.Join(", ", Model.PropertyNames)</div>
+            @if (Model.PreviousLogId.HasValue)
+            {
+                <a asp-action="Details" asp-route-id="@Model.PreviousLogId.Value" class="btn btn-outline-primary">
+                    Previous (Older)
+                </a>
+            }
+            <a asp-action="Index" class="btn btn-outline-secondary">Back to Logs</a>
+            @if (Model.CanEdit)
+            {
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
+            }
+            @if (Model.CanDelete)
+            {
+                <form asp-action="Delete"
+                      method="post"
+                      class="d-inline"
+                      onsubmit="return confirm('Are you sure you want to delete this pass on log? This action cannot be undone.');">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            }
         </div>
     </div>
-    <div class="d-flex gap-2 flex-wrap">
-        @if (Model.NextLogId.HasValue)
-        {
-            <a asp-action="Details" asp-route-id="@Model.NextLogId.Value" class="btn btn-outline-primary">
-                Next (Newer)
-            </a>
-        }
-        @if (Model.PreviousLogId.HasValue)
-        {
-            <a asp-action="Details" asp-route-id="@Model.PreviousLogId.Value" class="btn btn-outline-primary">
-                Previous (Older)
-            </a>
-        }
-        <a asp-action="Index" class="btn btn-outline-secondary">Back to Logs</a>
-        @if (Model.CanEdit)
-        {
-            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
-        }
-        @if (Model.CanDelete)
-        {
-            <form asp-action="Delete"
-                  method="post"
-                  class="d-inline"
-                  onsubmit="return confirm('Are you sure you want to delete this pass on log? This action cannot be undone.');">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="id" value="@Model.Id" />
-                <button type="submit" class="btn btn-danger">Delete</button>
-            </form>
-        }
-    </div>
-</div>
-
-<div class="card mb-4">
-    <div class="card-body log-body rich-text-output">
+    <div class="card-body passon-details-card__body log-body rich-text-output">
         @Html.Raw(RichTextRenderer.ToHtml(Model.Body))
     </div>
 </div>
@@ -175,6 +174,43 @@
 
 @section Styles {
     <style>
+        .passon-details-card {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .passon-details-card__header {
+            position: sticky;
+            top: calc(var(--main-header-height, 72px) + var(--space-card, 1.5rem));
+            z-index: 15;
+            background: var(--brand-surface, #fff);
+            padding: 1.25rem var(--space-card-inner);
+            border-bottom: calc(1px * var(--ui-scale, 1)) solid var(--brand-border, #d6dae1);
+            box-shadow: 0 calc(16px * var(--ui-scale, 1)) calc(32px * var(--ui-scale, 1)) rgba(10, 34, 71, 0.08);
+        }
+
+        .passon-details-card__body {
+            min-height: 0;
+        }
+
+        .passon-details-actions form {
+            display: inline-flex;
+        }
+
+        @@media (min-width: 768px) {
+            .passon-details-card {
+                max-height: calc(100vh - var(--main-header-height, 72px) - (var(--space-card, 1.5rem) * 2) - 1rem);
+            }
+
+            .passon-details-card__body {
+                flex: 1 1 auto;
+                overflow-y: auto;
+                padding-right: 0.75rem;
+                scrollbar-gutter: stable;
+            }
+        }
+
         .passon-comment {
             border: 1px solid rgba(13, 110, 253, 0.15);
             border-radius: 0.85rem;
