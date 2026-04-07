@@ -94,7 +94,7 @@
 @{
     var userAuthenticated = User?.Identity?.IsAuthenticated == true ? "true" : "false";
 }
-<body data-user-authenticated="@userAuthenticated">
+<body data-user-authenticated="@userAuthenticated" data-sidebar-managed="true">
     <div class="ui-scale-wrapper">
     <a class="skip-link" href="#mainContent">Skip to main content</a>
     @if (SignInManager.IsSignedIn(User))

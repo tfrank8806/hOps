@@ -170,13 +170,17 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+    const body = document.body;
+    if (!body || body.dataset.sidebarManaged === 'true') {
+        return;
+    }
+
     const sidebarToggleButton = document.querySelector('[data-sidebar-toggle]');
     const sidebarElement = document.getElementById('sidebar');
     if (!sidebarToggleButton || !sidebarElement) {
         return;
     }
 
-    const body = document.body;
     const RESPONSIVE_BREAKPOINT = 992;
     let userToggledSidebar = false;
 
