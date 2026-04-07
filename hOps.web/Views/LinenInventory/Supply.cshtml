@@ -32,7 +32,7 @@
     </style>
 }
 
-<div class="d-flex justify-content-between align-items-start flex-wrap mb-4">
+<div class="d-flex justify-content-between align-items-start flex-wrap mb-3">
     <div class="mb-3 mb-md-0">
         <h1 class="h3 mb-1">Supply Inventory</h1>
         <p class="text-muted mb-0">@Model.PropertyName</p>
@@ -41,12 +41,6 @@
         <button type="button" class="btn btn-primary btn-sm me-2" data-action="add-item">Add Item</button>
         <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to Linen Inventory</a>
     </div>
-</div>
-
-<div class="alert alert-info mb-4">
-    <strong>Based on the standard supply workbook.</strong>
-    <div class="mb-1">We imported the latest worksheet from Dropbox and keep it ready here so you do not have to juggle spreadsheets.</div>
-    <div class="mb-0">Changes now save directly to the hOps database for @Model.PropertyName so you can pick up on any browser or device.</div>
 </div>
 
 <div class="card mb-4">
