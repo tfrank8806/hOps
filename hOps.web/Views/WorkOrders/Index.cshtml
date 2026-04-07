@@ -12,6 +12,7 @@
 @{
     ViewData["Title"] = "Work Orders";
     ViewData["MainContainerClass"] = "main-inner--wide main-inner--wide-stretched";
+    ViewData["ContentSurfaceClass"] = "content-surface--flush";
 
     bool showPropertySelector = Model.PropertyOptions.Count > 1;
     var formAction = Model.IsEditing ? "Edit" : "Create";
