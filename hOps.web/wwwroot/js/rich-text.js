@@ -91,8 +91,38 @@
     const HIGHLIGHT_COLOR = '#fff2a8';
     const contexts = new WeakMap();
     let richTextIdCounter = 0;
+    let selectionTrackingInitialized = false;
+    let activeSelectionContext = null;
 
+    initializeSelectionTracking();
     elements.forEach(initializeEditor);
+
+    function initializeSelectionTracking() {
+        if (selectionTrackingInitialized || typeof document === 'undefined') {
+            return;
+        }
+
+        selectionTrackingInitialized = true;
+        document.addEventListener('selectionchange', handleDocumentSelectionChange);
+    }
+
+    function handleDocumentSelectionChange() {
+        if (!activeSelectionContext) {
+            return;
+        }
+
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) {
+            return;
+        }
+
+        const { editor } = activeSelectionContext;
+        if (!editor || !editor.contains(selection.anchorNode) || !editor.contains(selection.focusNode)) {
+            return;
+        }
+
+        captureEditorSelection(activeSelectionContext);
+    }
 
     function initializeEditor(textarea) {
         if (textarea.dataset.richTextInitialized === 'true') {
@@ -159,13 +189,19 @@
             syncToTextarea(context);
         });
         editor.addEventListener('blur', () => {
+            if (activeSelectionContext === context) {
+                activeSelectionContext = null;
+            }
             captureEditorSelection(context);
             syncToTextarea(context);
         });
         editor.addEventListener('keyup', recordSelection);
         editor.addEventListener('mouseup', recordSelection);
         editor.addEventListener('touchend', recordSelection);
-        editor.addEventListener('focus', recordSelection);
+        editor.addEventListener('focus', () => {
+            activeSelectionContext = context;
+            recordSelection();
+        });
         editor.addEventListener('paste', (event) => handlePaste(event, context));
         editor.addEventListener('keydown', (event) => handleKeydown(event, context));
 
@@ -831,9 +867,70 @@
     }
 
     function insertEmoji(context, emoji) {
+        if (!context || !context.editor || !emoji) {
+            return;
+        }
+
         focusEditor(context);
-        document.execCommand('insertText', false, emoji);
+
+        let inserted = replaceSelectionWithText(context.editor, emoji);
+        if (!inserted) {
+            if (placeCaretAtEnd(context.editor)) {
+                inserted = replaceSelectionWithText(context.editor, emoji);
+            }
+        }
+
+        if (!inserted) {
+            context.editor.appendChild(document.createTextNode(emoji));
+            placeCaretAtEnd(context.editor);
+        }
+
+        captureEditorSelection(context);
         syncToTextarea(context);
+    }
+
+    function replaceSelectionWithText(editor, text) {
+        if (!editor || !text) {
+            return false;
+        }
+
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) {
+            return false;
+        }
+
+        const range = selection.getRangeAt(0);
+        if (!editor.contains(range.startContainer) || !editor.contains(range.endContainer)) {
+            return false;
+        }
+
+        range.deleteContents();
+        const textNode = document.createTextNode(text);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.collapse(true);
+
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return true;
+    }
+
+    function placeCaretAtEnd(editor) {
+        if (!editor) {
+            return false;
+        }
+
+        const selection = window.getSelection();
+        if (!selection) {
+            return false;
+        }
+
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return true;
     }
 
     function handlePaste(event, context) {
