@@ -26,19 +26,34 @@ namespace hOps.web.Utilities
             DateTime rangeStart,
             DateTime rangeEnd)
         {
-            var duration = calendarEvent.EndDate.Date - calendarEvent.StartDate.Date;
-            if (duration < TimeSpan.Zero)
+            var isRecurring = calendarEvent.Recurrence != CalendarRecurrenceType.None;
+            var seriesEndDate = calendarEvent.EndDate.Date < calendarEvent.StartDate.Date
+                ? calendarEvent.StartDate.Date
+                : calendarEvent.EndDate.Date;
+
+            var occurrenceDuration = calendarEvent.EndDate.Date - calendarEvent.StartDate.Date;
+            if (occurrenceDuration < TimeSpan.Zero)
             {
-                duration = TimeSpan.Zero;
+                occurrenceDuration = TimeSpan.Zero;
             }
 
-            var occurrenceStart = AlignOccurrenceStart(calendarEvent, rangeStart, duration);
+            if (isRecurring)
+            {
+                occurrenceDuration = TimeSpan.Zero;
+            }
+
+            var occurrenceStart = AlignOccurrenceStart(calendarEvent, rangeStart, occurrenceDuration);
+            if (occurrenceStart > seriesEndDate)
+            {
+                yield break;
+            }
+
             var safetyCounter = 0;
             var deletedDates = calendarEvent.DeletedOccurrenceDates ?? new HashSet<DateTime>();
 
-            while (occurrenceStart <= rangeEnd && safetyCounter < 1000)
+            while (occurrenceStart <= rangeEnd && occurrenceStart <= seriesEndDate && safetyCounter < 1000)
             {
-                var occurrenceEnd = occurrenceStart.Add(duration);
+                var occurrenceEnd = occurrenceStart.Add(occurrenceDuration);
                 var isDeletedOccurrence = deletedDates.Contains(occurrenceStart.Date);
 
                 if (!isDeletedOccurrence && occurrenceEnd >= rangeStart && occurrenceStart <= rangeEnd)
@@ -46,17 +61,18 @@ namespace hOps.web.Utilities
                     yield return calendarEvent.CloneWithDates(occurrenceStart, occurrenceEnd);
                 }
 
-                if (calendarEvent.Recurrence == CalendarRecurrenceType.None)
+                if (!isRecurring)
                 {
                     yield break;
                 }
 
-                occurrenceStart = GetNextOccurrenceStart(occurrenceStart, calendarEvent.Recurrence);
-                if (occurrenceStart == DateTime.MinValue)
+                var nextStart = GetNextOccurrenceStart(occurrenceStart, calendarEvent.Recurrence);
+                if (nextStart == DateTime.MinValue || nextStart > seriesEndDate)
                 {
                     yield break;
                 }
 
+                occurrenceStart = nextStart;
                 safetyCounter++;
             }
         }
