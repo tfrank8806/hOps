@@ -10,6 +10,7 @@ using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
 using hOps.web.Utilities;
+using hOps.web.ViewModels;
 using hOps.web.ViewModels.Home;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -1345,12 +1346,13 @@ namespace hOps.web.Controllers
         private async Task PopulateUpcomingEventsAsync(HomeIndexViewModel viewModel, int propertyId)
         {
             var now = DateTime.UtcNow;
+            var lookAheadEnd = now.Date.AddMonths(3);
+
             var events = await _context.CalendarEvents
                 .Where(e => e.EventProperties.Any(ep => ep.PropertyId == propertyId))
+                .Where(e => e.StartDate <= lookAheadEnd)
                 .Include(e => e.Category)
-                .Where(e => e.EndDate >= now.Date)
-                .OrderBy(e => e.StartDate)
-                .Take(5)
+                .Include(e => e.Exceptions)
                 .AsNoTracking()
                 .ToListAsync();
 
@@ -1383,30 +1385,33 @@ namespace hOps.web.Controllers
                 return null;
             }
 
-            var summaries = events
-                .Select(e =>
-                {
-                    var dateLabel = BuildDateLabel(e.StartDate, e.EndDate);
-                    var timeLabel = BuildTimeLabel(e.StartTime, e.EndTime);
+            var displayEvents = events
+                .Select(MapCalendarEventForDisplay)
+                .ToList();
 
-                    return new CalendarEventSummaryViewModel
-                    {
-                        Id = e.Id,
-                        Title = e.Title,
-                        StartDate = e.StartDate,
-                        EndDate = e.EndDate,
-                        StartTime = e.StartTime,
-                        EndTime = e.EndTime,
-                        CategoryName = e.Category?.Name ?? "Event",
-                        CategoryColor = string.IsNullOrWhiteSpace(e.Category?.Color) ? "#6c757d" : e.Category!.Color,
-                        DetailUrl = Url.Action("Index", "Calendar") ?? string.Empty,
-                        DateDisplay = dateLabel,
-                        TimeDisplay = timeLabel
-                    };
+            var occurrenceSummaries = CalendarRecurrenceHelper
+                .ExpandOccurrences(displayEvents, now.Date, lookAheadEnd)
+                .Where(e => e.EndDateTime >= now)
+                .OrderBy(e => e.StartDateTime)
+                .ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
+                .Take(5)
+                .Select(e => new CalendarEventSummaryViewModel
+                {
+                    Id = e.Id,
+                    Title = e.Title,
+                    StartDate = e.StartDate,
+                    EndDate = e.EndDate,
+                    StartTime = e.StartTime,
+                    EndTime = e.EndTime,
+                    CategoryName = string.IsNullOrWhiteSpace(e.CategoryName) ? "Event" : e.CategoryName,
+                    CategoryColor = string.IsNullOrWhiteSpace(e.CategoryColor) ? "#6c757d" : e.CategoryColor,
+                    DetailUrl = Url.Action("Index", "Calendar") ?? string.Empty,
+                    DateDisplay = BuildDateLabel(e.StartDate, e.EndDate),
+                    TimeDisplay = BuildTimeLabel(e.StartTime, e.EndTime)
                 })
                 .ToList();
 
-            viewModel.UpcomingEvents = summaries;
+            viewModel.UpcomingEvents = occurrenceSummaries;
         }
 
         private async Task PopulateCalendarMonthAsync(HomeIndexViewModel viewModel, int propertyId)
@@ -1421,27 +1426,36 @@ namespace hOps.web.Controllers
 
             var events = await _context.CalendarEvents
                 .Where(e => e.EventProperties.Any(ep => ep.PropertyId == propertyId))
-                .Where(e => e.StartDate <= viewEnd && e.EndDate >= viewStart)
+                .Where(e => e.StartDate <= viewEnd)
                 .Include(e => e.Category)
+                .Include(e => e.Exceptions)
                 .AsNoTracking()
                 .ToListAsync();
+
+            var displayEvents = events
+                .Select(MapCalendarEventForDisplay)
+                .ToList();
+
+            var occurrencesInRange = CalendarRecurrenceHelper
+                .ExpandOccurrences(displayEvents, viewStart, viewEnd)
+                .ToList();
 
             var eventLookup = new Dictionary<DateTime, List<CalendarMonthEventBadgeViewModel>>();
             var calendarLink = Url.Action("Index", "Calendar") ?? string.Empty;
 
-            foreach (var calendarEvent in events)
+            foreach (var occurrence in occurrencesInRange)
             {
-                var eventColor = string.IsNullOrWhiteSpace(calendarEvent.Category?.Color)
+                var eventColor = string.IsNullOrWhiteSpace(occurrence.CategoryColor)
                     ? "#0d6efd"
-                    : calendarEvent.Category!.Color!;
-                var categoryName = string.IsNullOrWhiteSpace(calendarEvent.Category?.Name)
+                    : occurrence.CategoryColor;
+                var categoryName = string.IsNullOrWhiteSpace(occurrence.CategoryName)
                     ? "Event"
-                    : calendarEvent.Category!.Name;
+                    : occurrence.CategoryName;
 
-                var eventStart = calendarEvent.StartDate.Date < viewStart ? viewStart : calendarEvent.StartDate.Date;
-                var eventEnd = calendarEvent.EndDate.Date > viewEnd ? viewEnd : calendarEvent.EndDate.Date;
+                var occurrenceStart = occurrence.StartDate.Date < viewStart ? viewStart : occurrence.StartDate.Date;
+                var occurrenceEnd = occurrence.EndDate.Date > viewEnd ? viewEnd : occurrence.EndDate.Date;
 
-                for (var date = eventStart; date <= eventEnd; date = date.AddDays(1))
+                for (var date = occurrenceStart; date <= occurrenceEnd; date = date.AddDays(1))
                 {
                     if (!eventLookup.TryGetValue(date, out var badges))
                     {
@@ -1451,7 +1465,7 @@ namespace hOps.web.Controllers
 
                     badges.Add(new CalendarMonthEventBadgeViewModel
                     {
-                        Title = calendarEvent.Title,
+                        Title = occurrence.Title,
                         CategoryName = categoryName,
                         Color = eventColor,
                         LinkUrl = calendarLink
@@ -1491,6 +1505,41 @@ namespace hOps.web.Controllers
                 MonthLabel = monthStart.ToString("MMMM yyyy"),
                 MonthStart = monthStart,
                 Weeks = weeks
+            };
+        }
+
+        private static CalendarEventDisplayViewModel MapCalendarEventForDisplay(CalendarEvent calendarEvent)
+        {
+            var deletedOccurrenceDates = calendarEvent.Exceptions?
+                .Where(ex => ex.Type == CalendarEventExceptionType.DeletedOccurrence)
+                .Select(ex => ex.OccurrenceDate.Date)
+                .ToHashSet() ?? new HashSet<DateTime>();
+
+            var categoryColor = string.IsNullOrWhiteSpace(calendarEvent.Category?.Color)
+                ? "#6c757d"
+                : calendarEvent.Category!.Color!;
+
+            var categoryName = string.IsNullOrWhiteSpace(calendarEvent.Category?.Name)
+                ? "Event"
+                : calendarEvent.Category!.Name;
+
+            return new CalendarEventDisplayViewModel
+            {
+                Id = calendarEvent.Id,
+                Title = calendarEvent.Title,
+                CategoryName = categoryName,
+                CategoryColor = categoryColor,
+                CategoryTextColor = "#ffffff",
+                StartDate = calendarEvent.StartDate,
+                StartTime = calendarEvent.StartTime,
+                EndDate = calendarEvent.EndDate,
+                EndTime = calendarEvent.EndTime,
+                Recurrence = calendarEvent.Recurrence,
+                Details = calendarEvent.Details,
+                CreatedAtUtc = calendarEvent.CreatedAtUtc,
+                PropertyNames = new List<string>(),
+                Attachments = new List<CalendarEventAttachmentViewModel>(),
+                DeletedOccurrenceDates = deletedOccurrenceDates
             };
         }
 
