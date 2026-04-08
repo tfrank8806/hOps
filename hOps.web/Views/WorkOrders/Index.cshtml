@@ -446,6 +446,12 @@
             overflow: visible;
         }
 
+        .workorders-form-actions {
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
         .workorders-form-column {
             align-self: stretch;
         }
@@ -474,11 +480,23 @@
                 max-height: 100%;
             }
 
-        .workorders-form-card .card-body {
-            overflow-y: auto;
-            padding-right: 0.5rem;
+            .workorders-form-card .card-body {
+                overflow-y: auto;
+                padding-right: 0.5rem;
+                padding-bottom: 1.25rem;
+            }
+
+            .workorders-form-actions {
+                position: sticky;
+                bottom: 0;
+                background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #fff 45%);
+                margin-top: 1.25rem;
+                padding-top: 1rem;
+                padding-bottom: 0.75rem;
+                border-top: 1px solid rgba(15, 23, 42, 0.08);
+                box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.08);
+            }
         }
-    }
 
     #workOrdersForm {
         scroll-margin-top: calc(var(--main-header-height, 72px) + 1rem);
@@ -1114,7 +1132,9 @@
                             var soleProperty = Model.PropertyOptions[0];
                             <input type="hidden" name="Form.SelectedPropertyIds" value="@soleProperty.Id" />
                         }
-                        <button type="submit" class="btn btn-primary w-100">@submitLabel</button>
+                        <div class="workorders-form-actions">
+                            <button type="submit" class="btn btn-primary w-100">@submitLabel</button>
+                        </div>
                     </form>
                 </div>
             </div>
