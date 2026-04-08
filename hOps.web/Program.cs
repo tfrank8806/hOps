@@ -343,6 +343,7 @@ builder.Services.AddScoped<IPropertyAccessService, PropertyAccessService>();
 builder.Services.AddSingleton<SchedulePdfRenderer>();
 builder.Services.AddScoped<SchedulePublicationService>();
 builder.Services.AddHostedService<DailySummaryEmailService>();
+builder.Services.AddHostedService<CalendarReminderService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserTimeZoneService, UserTimeZoneService>();
 builder.Services.AddScoped<IMaintenanceLogCycleService, MaintenanceLogCycleService>();

@@ -102,6 +102,76 @@
                 <span asp-validation-for="Form.Attachments" class="text-danger"></span>
             </div>
 
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Reminders</label>
+                <div class="form-text">Select when teammates should receive reminders.</div>
+                @if (Model.ReminderOptions.Any())
+                {
+                    <div class="row g-2 mt-2">
+                        @foreach (var option in Model.ReminderOptions)
+                        {
+                            var optionId = $"edit_reminder_{option.Value}";
+                            <div class="col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           id="@optionId"
+                                           name="Form.SelectedReminderOffsets"
+                                           value="@option.Value"
+                                           @(option.Selected ? "checked" : string.Empty) />
+                                    <label class="form-check-label" for="@optionId">@option.Text</label>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-light border mt-2 mb-0">No reminder options are available.</div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Department assignment</label>
+                <div class="form-check">
+                    <input class="form-check-input"
+                           type="radio"
+                           id="editDeptAll"
+                           name="Form.NotifyAllDepartments"
+                           value="true"
+                           data-dept-radio="edit"
+                           @(Model.Form.NotifyAllDepartments ? "checked" : string.Empty) />
+                    <label class="form-check-label" for="editDeptAll">All departments on selected properties</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input"
+                           type="radio"
+                           id="editDeptSpecific"
+                           name="Form.NotifyAllDepartments"
+                           value="false"
+                           data-dept-radio="edit"
+                           @(Model.Form.NotifyAllDepartments ? string.Empty : "checked") />
+                    <label class="form-check-label" for="editDeptSpecific">Specific department</label>
+                </div>
+                <div class="mt-2">
+                    @if (Model.DepartmentOptions.Any())
+                    {
+                        <select asp-for="Form.TargetDepartmentId"
+                                class="form-select"
+                                id="editDepartmentSelect"
+                                asp-items="Model.DepartmentOptions"
+                                disabled="@(Model.Form.NotifyAllDepartments)">
+                            <option value="">Select a department</option>
+                        </select>
+                    }
+                    else
+                    {
+                        <div class="alert alert-light border mb-0">No departments are available for your selected properties.</div>
+                    }
+                </div>
+                <span asp-validation-for="Form.TargetDepartmentId" class="text-danger"></span>
+            </div>
+
             @if (Model.ShowPropertySelection)
             {
                 <div class="mb-3">
@@ -157,4 +227,21 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const editDepartmentSelect = document.getElementById('editDepartmentSelect');
+            const radios = document.querySelectorAll('[data-dept-radio="edit"]');
+            if (!editDepartmentSelect || radios.length === 0) {
+                return;
+            }
+
+            const sync = () => {
+                const isAll = Array.from(radios).some(radio => radio.checked && radio.value === 'true');
+                editDepartmentSelect.disabled = isAll;
+            };
+
+            radios.forEach(radio => radio.addEventListener('change', sync));
+            sync();
+        });
+    </script>
 }

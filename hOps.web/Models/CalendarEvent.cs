@@ -41,5 +41,12 @@ namespace hOps.web.Models
         public ICollection<CalendarEventProperty> EventProperties { get; set; } = new List<CalendarEventProperty>();
 
         public ICollection<CalendarEventException> Exceptions { get; set; } = new List<CalendarEventException>();
+
+        public bool NotifyAllDepartments { get; set; } = true;
+
+        public int? TargetDepartmentId { get; set; }
+        public Department? TargetDepartment { get; set; }
+
+        public ICollection<CalendarEventReminder> Reminders { get; set; } = new List<CalendarEventReminder>();
     }
 }

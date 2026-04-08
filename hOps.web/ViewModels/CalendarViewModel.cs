@@ -53,6 +53,15 @@ namespace hOps.web.ViewModels
         public List<string> AttachmentsToRemove { get; set; } = new();
 
         public List<CalendarEventAttachmentViewModel> ExistingAttachments { get; set; } = new();
+
+        [Display(Name = "Reminders")]
+        public List<int> SelectedReminderOffsets { get; set; } = new();
+
+        [Display(Name = "All Departments")]
+        public bool NotifyAllDepartments { get; set; } = true;
+
+        [Display(Name = "Department")]
+        public int? TargetDepartmentId { get; set; }
     }
 
     public class CalendarEventDisplayViewModel
@@ -209,6 +218,8 @@ namespace hOps.web.ViewModels
         public IEnumerable<SelectListItem> CategoryOptions { get; set; } = Enumerable.Empty<SelectListItem>();
         public List<Property> AccessibleProperties { get; set; } = new();
         public bool ShowPropertySelection { get; set; }
+        public IEnumerable<SelectListItem> ReminderOptions { get; set; } = Enumerable.Empty<SelectListItem>();
+        public IEnumerable<SelectListItem> DepartmentOptions { get; set; } = Enumerable.Empty<SelectListItem>();
     }
 
     public class CalendarEventManageViewModel
@@ -218,6 +229,8 @@ namespace hOps.web.ViewModels
         public IEnumerable<SelectListItem> CategoryOptions { get; set; } = Enumerable.Empty<SelectListItem>();
         public List<Property> AccessibleProperties { get; set; } = new();
         public bool ShowPropertySelection { get; set; }
+        public IEnumerable<SelectListItem> ReminderOptions { get; set; } = Enumerable.Empty<SelectListItem>();
+        public IEnumerable<SelectListItem> DepartmentOptions { get; set; } = Enumerable.Empty<SelectListItem>();
     }
 
     public class CalendarEventAttachmentViewModel

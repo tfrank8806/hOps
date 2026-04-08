@@ -33,6 +33,7 @@ namespace hOps.web.Data
         public DbSet<CalendarEvent> CalendarEvents { get; set; }
         public DbSet<CalendarEventProperty> CalendarEventProperties { get; set; }
         public DbSet<CalendarEventException> CalendarEventExceptions { get; set; }
+        public DbSet<CalendarEventReminder> CalendarEventReminders { get; set; }
         public DbSet<LostFoundEntry> LostFoundEntries { get; set; }
 
         public DbSet<ManagerAnnouncement> ManagerAnnouncements { get; set; }
@@ -282,6 +283,23 @@ namespace hOps.web.Data
             builder.Entity<CalendarEventException>()
                 .HasIndex(e => new { e.CalendarEventId, e.OccurrenceDate })
                 .IsUnique();
+
+            builder.Entity<CalendarEventReminder>()
+                .Property(r => r.ReminderType)
+                .HasConversion<int>();
+
+            builder.Entity<CalendarEventReminder>()
+                .HasOne(r => r.CalendarEvent)
+                .WithMany(e => e.Reminders)
+                .HasForeignKey(r => r.CalendarEventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<CalendarEventReminder>()
+                .HasIndex(r => new { r.CalendarEventId, r.OccurrenceStartUtc, r.ReminderType })
+                .IsUnique();
+
+            builder.Entity<CalendarEventReminder>()
+                .HasIndex(r => new { r.IsSent, r.ScheduledSendUtc });
 
             // Similarly declare keys/relations for other models (if needed)
             // e.g., UserAccessRequest, RoomLayout etc.

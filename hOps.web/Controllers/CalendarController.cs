@@ -134,6 +134,26 @@ namespace hOps.web.Controllers
 
             ValidateAttachments(form.Attachments, 0, "Form.Attachments");
 
+            form.SelectedReminderOffsets ??= new List<int>();
+            var reminderSelections = NormalizeReminderSelections(form.SelectedReminderOffsets);
+
+            var validDepartmentIds = await GetDepartmentIdsForPropertiesAsync(form.SelectedPropertyIds);
+            if (form.NotifyAllDepartments)
+            {
+                form.TargetDepartmentId = null;
+            }
+            else
+            {
+                if (!form.TargetDepartmentId.HasValue)
+                {
+                    ModelState.AddModelError("Form.TargetDepartmentId", "Select a department for this event.");
+                }
+                else if (!validDepartmentIds.Contains(form.TargetDepartmentId.Value))
+                {
+                    ModelState.AddModelError("Form.TargetDepartmentId", "Choose a department associated with the selected properties.");
+                }
+            }
+
             var targetMonth = ResolveTargetMonth(month, year, form.StartDate);
 
             if (!ModelState.IsValid)
@@ -156,7 +176,9 @@ namespace hOps.web.Controllers
                 Recurrence = form.Recurrence,
                 Details = string.IsNullOrWhiteSpace(form.Details) ? null : form.Details.Trim(),
                 CreatedById = user.Id,
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = DateTime.UtcNow,
+                NotifyAllDepartments = form.NotifyAllDepartments,
+                TargetDepartmentId = form.NotifyAllDepartments ? null : form.TargetDepartmentId
             };
 
             foreach (var propertyId in form.SelectedPropertyIds.Distinct())
@@ -178,6 +200,8 @@ namespace hOps.web.Controllers
             {
                 TempData["WarningMessage"] = "Event saved, but one or more attachments could not be uploaded.";
             }
+
+            await SyncEventRemindersAsync(calendarEvent, reminderSelections);
 
             TempData["SuccessMessage"] = "Event created successfully.";
 
@@ -201,6 +225,7 @@ namespace hOps.web.Controllers
 
             var calendarEvent = await _context.CalendarEvents
                 .Include(e => e.EventProperties)
+                .Include(e => e.Reminders)
                 .FirstOrDefaultAsync(e => e.Id == id);
 
             if (calendarEvent == null)
@@ -238,8 +263,17 @@ namespace hOps.web.Controllers
                 Recurrence = calendarEvent.Recurrence,
                 Details = calendarEvent.Details,
                 SelectedPropertyIds = selectedPropertyIds,
-                ExistingAttachments = LoadAttachmentViewModels(calendarEvent.Id)
+                ExistingAttachments = LoadAttachmentViewModels(calendarEvent.Id),
+                NotifyAllDepartments = calendarEvent.NotifyAllDepartments,
+                TargetDepartmentId = calendarEvent.TargetDepartmentId,
+                SelectedReminderOffsets = calendarEvent.Reminders
+                    .Select(r => (int)r.ReminderType)
+                    .Distinct()
+                    .ToList()
             };
+
+            var departmentOptions = await BuildDepartmentOptionsAsync(accessibleProperties.Select(p => p.Id), form.TargetDepartmentId);
+            var reminderOptions = BuildReminderOptions(form.SelectedReminderOffsets);
 
             var viewModel = new CalendarEventManageViewModel
             {
@@ -247,7 +281,9 @@ namespace hOps.web.Controllers
                 Form = form,
                 CategoryOptions = categoryOptions,
                 AccessibleProperties = accessibleProperties,
-                ShowPropertySelection = accessibleProperties.Count > 1
+                ShowPropertySelection = accessibleProperties.Count > 1,
+                DepartmentOptions = departmentOptions,
+                ReminderOptions = reminderOptions
             };
 
             return View(viewModel);
@@ -280,6 +316,7 @@ namespace hOps.web.Controllers
 
             var calendarEvent = await _context.CalendarEvents
                 .Include(e => e.EventProperties)
+                .Include(e => e.Exceptions)
                 .FirstOrDefaultAsync(e => e.Id == id);
 
             if (calendarEvent == null)
@@ -352,9 +389,31 @@ namespace hOps.web.Controllers
 
             ValidateAttachments(form.Attachments, remainingAttachmentCount, "Form.Attachments");
 
+            form.SelectedReminderOffsets ??= new List<int>();
+            var reminderSelections = NormalizeReminderSelections(form.SelectedReminderOffsets);
+
+            var validDepartmentIds = await GetDepartmentIdsForPropertiesAsync(form.SelectedPropertyIds);
+            if (form.NotifyAllDepartments)
+            {
+                form.TargetDepartmentId = null;
+            }
+            else
+            {
+                if (!form.TargetDepartmentId.HasValue)
+                {
+                    ModelState.AddModelError("Form.TargetDepartmentId", "Select a department for this event.");
+                }
+                else if (!validDepartmentIds.Contains(form.TargetDepartmentId.Value))
+                {
+                    ModelState.AddModelError("Form.TargetDepartmentId", "Choose a department associated with the selected properties.");
+                }
+            }
+
             if (!ModelState.IsValid)
             {
                 var categoryOptions = await GetCalendarCategoryOptionsAsync(accessibleProperties.Select(p => p.Id));
+                var departmentOptions = await BuildDepartmentOptionsAsync(accessibleProperties.Select(p => p.Id), form.TargetDepartmentId);
+                var reminderOptions = BuildReminderOptions(form.SelectedReminderOffsets);
 
                 form.ExistingAttachments = existingAttachments;
 
@@ -364,7 +423,9 @@ namespace hOps.web.Controllers
                     Form = form,
                     CategoryOptions = categoryOptions,
                     AccessibleProperties = accessibleProperties,
-                    ShowPropertySelection = accessibleProperties.Count > 1
+                    ShowPropertySelection = accessibleProperties.Count > 1,
+                    DepartmentOptions = departmentOptions,
+                    ReminderOptions = reminderOptions
                 };
 
                 return View(viewModel);
@@ -381,6 +442,8 @@ namespace hOps.web.Controllers
             calendarEvent.EndTime = form.EndTime;
             calendarEvent.Recurrence = form.Recurrence;
             calendarEvent.Details = string.IsNullOrWhiteSpace(form.Details) ? null : form.Details.Trim();
+            calendarEvent.NotifyAllDepartments = form.NotifyAllDepartments;
+            calendarEvent.TargetDepartmentId = form.NotifyAllDepartments ? null : form.TargetDepartmentId;
 
             var newPropertyIds = form.SelectedPropertyIds;
 
@@ -431,6 +494,8 @@ namespace hOps.web.Controllers
             {
                 TempData["WarningMessage"] = "Event updated, but one or more attachments could not be uploaded.";
             }
+
+            await SyncEventRemindersAsync(calendarEvent, reminderSelections);
 
             TempData["SuccessMessage"] = "Event updated successfully.";
 
@@ -501,6 +566,8 @@ namespace hOps.web.Controllers
                         Type = CalendarEventExceptionType.DeletedOccurrence
                     };
                     _context.CalendarEventExceptions.Add(exception);
+                    var occurrenceStartUtc = CalendarEventTimeHelper.CombineDateAndTime(normalizedOccurrence, calendarEvent.StartTime);
+                    await RemoveOccurrenceRemindersAsync(calendarEvent.Id, occurrenceStartUtc);
                     await _context.SaveChangesAsync();
                 }
 
@@ -525,10 +592,14 @@ namespace hOps.web.Controllers
                 : accessibleProperties.ToList();
 
             var propertyIds = visibleProperties.Select(p => p.Id).ToList();
-            var categoryOptions = await GetCalendarCategoryOptionsAsync(propertyIds);
-
             var form = formOverride ?? new CalendarEventFormViewModel();
             form.SelectedPropertyIds ??= new List<int>();
+
+            var departmentOptions = await BuildDepartmentOptionsAsync(propertyIds, form.TargetDepartmentId);
+
+            form.SelectedReminderOffsets ??= new List<int>();
+            var reminderOptions = BuildReminderOptions(form.SelectedReminderOffsets);
+            var categoryOptions = await GetCalendarCategoryOptionsAsync(propertyIds);
 
             if (formOverride == null)
             {
@@ -644,7 +715,9 @@ namespace hOps.web.Controllers
                 Form = form,
                 CategoryOptions = categoryOptions,
                 AccessibleProperties = visibleProperties,
-                ShowPropertySelection = visibleProperties.Count > 1
+                ShowPropertySelection = visibleProperties.Count > 1,
+                ReminderOptions = reminderOptions,
+                DepartmentOptions = departmentOptions
             };
         }
 
@@ -697,6 +770,44 @@ namespace hOps.web.Controllers
                     Text = c.Name
                 })
                 .ToListAsync();
+        }
+
+        private async Task<List<SelectListItem>> BuildDepartmentOptionsAsync(IEnumerable<int> propertyIds, int? selectedDepartmentId)
+        {
+            if (!propertyIds.Any())
+            {
+                return new List<SelectListItem>();
+            }
+
+            var departments = await _context.Departments
+                .Where(d => d.PropertyId.HasValue && propertyIds.Contains(d.PropertyId.Value))
+                .Include(d => d.Property)
+                .OrderBy(d => d.Property!.Name)
+                .ThenBy(d => d.Name)
+                .ToListAsync();
+
+            return departments
+                .Select(d => new SelectListItem
+                {
+                    Value = d.Id.ToString(),
+                    Text = d.Property == null ? d.Name ?? "Department" : $"{d.Name} ({d.Property.Name})",
+                    Selected = selectedDepartmentId.HasValue && d.Id == selectedDepartmentId.Value
+                })
+                .ToList();
+        }
+
+        private static List<SelectListItem> BuildReminderOptions(IEnumerable<int> selectedValues)
+        {
+            var selected = new HashSet<int>(selectedValues ?? Array.Empty<int>());
+            return Enum.GetValues(typeof(CalendarEventReminderOffset))
+                .Cast<CalendarEventReminderOffset>()
+                .Select(option => new SelectListItem
+                {
+                    Value = ((int)option).ToString(),
+                    Text = GetReminderOptionLabel(option),
+                    Selected = selected.Contains((int)option)
+                })
+                .ToList();
         }
 
         private static CalendarEventDisplayViewModel MapToDisplayModel(CalendarEvent calendarEvent, List<CalendarEventAttachmentViewModel> attachments)
@@ -1055,6 +1166,145 @@ namespace hOps.web.Controllers
             }
 
             return new DateTime(fallback.Year, fallback.Month, 1);
+        }
+
+        private static List<CalendarEventReminderOffset> NormalizeReminderSelections(IEnumerable<int>? values)
+        {
+            var offsets = new HashSet<CalendarEventReminderOffset>();
+            if (values != null)
+            {
+                foreach (var raw in values)
+                {
+                    if (Enum.IsDefined(typeof(CalendarEventReminderOffset), raw))
+                    {
+                        offsets.Add((CalendarEventReminderOffset)raw);
+                    }
+                }
+            }
+
+            return offsets.ToList();
+        }
+
+        private static string GetReminderOptionLabel(CalendarEventReminderOffset offset)
+        {
+            return offset switch
+            {
+                CalendarEventReminderOffset.DayOfEvent => "Day of event",
+                CalendarEventReminderOffset.OneDayBefore => "1 day before",
+                CalendarEventReminderOffset.TwoDaysBefore => "2 days before",
+                CalendarEventReminderOffset.OneWeekBefore => "1 week before",
+                _ => "Reminder"
+            };
+        }
+
+        private static TimeSpan GetReminderOffsetSpan(CalendarEventReminderOffset offset)
+        {
+            return offset switch
+            {
+                CalendarEventReminderOffset.DayOfEvent => TimeSpan.Zero,
+                CalendarEventReminderOffset.OneDayBefore => TimeSpan.FromDays(1),
+                CalendarEventReminderOffset.TwoDaysBefore => TimeSpan.FromDays(2),
+                CalendarEventReminderOffset.OneWeekBefore => TimeSpan.FromDays(7),
+                _ => TimeSpan.Zero
+            };
+        }
+
+        private async Task<HashSet<int>> GetDepartmentIdsForPropertiesAsync(IEnumerable<int> propertyIds)
+        {
+            var ids = (propertyIds ?? Enumerable.Empty<int>()).Where(id => id > 0).Distinct().ToList();
+            if (!ids.Any())
+            {
+                return new HashSet<int>();
+            }
+
+            var departmentIds = await _context.Departments
+                .Where(d => d.PropertyId.HasValue && ids.Contains(d.PropertyId.Value))
+                .Select(d => d.Id)
+                .ToListAsync();
+
+            return departmentIds.ToHashSet();
+        }
+
+        private static CalendarEventDisplayViewModel BuildReminderDisplayModel(CalendarEvent calendarEvent)
+        {
+            return new CalendarEventDisplayViewModel
+            {
+                Id = calendarEvent.Id,
+                Title = calendarEvent.Title,
+                StartDate = calendarEvent.StartDate,
+                StartTime = calendarEvent.StartTime,
+                EndDate = calendarEvent.EndDate,
+                EndTime = calendarEvent.EndTime,
+                Recurrence = calendarEvent.Recurrence,
+                Details = calendarEvent.Details,
+                CreatedAtUtc = calendarEvent.CreatedAtUtc,
+                PropertyNames = new List<string>(),
+                Attachments = new List<CalendarEventAttachmentViewModel>(),
+                DeletedOccurrenceDates = calendarEvent.Exceptions?
+                    .Where(ex => ex.Type == CalendarEventExceptionType.DeletedOccurrence)
+                    .Select(ex => NormalizeCalendarDate(ex.OccurrenceDate).Date)
+                    .ToHashSet() ?? new HashSet<DateTime>()
+            };
+        }
+
+        private async Task SyncEventRemindersAsync(CalendarEvent calendarEvent, IReadOnlyCollection<CalendarEventReminderOffset> reminderOffsets)
+        {
+            var existing = await _context.CalendarEventReminders
+                .Where(r => r.CalendarEventId == calendarEvent.Id)
+                .ToListAsync();
+            if (existing.Any())
+            {
+                _context.CalendarEventReminders.RemoveRange(existing);
+            }
+
+            if (reminderOffsets == null || reminderOffsets.Count == 0)
+            {
+                await _context.SaveChangesAsync();
+                return;
+            }
+
+            var displayModel = BuildReminderDisplayModel(calendarEvent);
+            var occurrences = CalendarRecurrenceHelper
+                .ExpandOccurrences(new[] { displayModel }, calendarEvent.StartDate, calendarEvent.EndDate)
+                .ToList();
+
+            var newEntries = new List<CalendarEventReminder>();
+            foreach (var occurrence in occurrences)
+            {
+                var occurrenceStartUtc = CalendarEventTimeHelper.CombineDateAndTime(occurrence.StartDate, occurrence.StartTime);
+                foreach (var offset in reminderOffsets)
+                {
+                    var scheduledUtc = occurrenceStartUtc - GetReminderOffsetSpan(offset);
+                    newEntries.Add(new CalendarEventReminder
+                    {
+                        CalendarEventId = calendarEvent.Id,
+                        ReminderType = offset,
+                        OccurrenceStartUtc = occurrenceStartUtc,
+                        ScheduledSendUtc = scheduledUtc,
+                        IsSent = false
+                    });
+                }
+            }
+
+            if (newEntries.Count > 0)
+            {
+                _context.CalendarEventReminders.AddRange(newEntries);
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        private async Task RemoveOccurrenceRemindersAsync(int calendarEventId, DateTime occurrenceStartUtc)
+        {
+            var reminders = await _context.CalendarEventReminders
+                .Where(r => r.CalendarEventId == calendarEventId && r.OccurrenceStartUtc == occurrenceStartUtc)
+                .ToListAsync();
+            if (reminders.Count == 0)
+            {
+                return;
+            }
+
+            _context.CalendarEventReminders.RemoveRange(reminders);
         }
 
         private static DateTime NormalizeCalendarDate(DateTime value)
