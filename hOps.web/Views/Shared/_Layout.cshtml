@@ -18,7 +18,8 @@
         string.Equals(currentController, "LinenInventory", StringComparison.OrdinalIgnoreCase);
     var siteVisitActive = string.Equals(currentController, "SiteVisit", StringComparison.OrdinalIgnoreCase);
     var supportActive = string.Equals(currentController, "Support", StringComparison.OrdinalIgnoreCase);
-    var managementActive = string.Equals(currentController, "AttendanceTracker", StringComparison.OrdinalIgnoreCase);
+    var managementActive = string.Equals(currentController, "AttendanceTracker", StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(currentController, "MasterEmployees", StringComparison.OrdinalIgnoreCase);
     var mainContainerClass = ViewData["MainContainerClass"] as string ?? string.Empty;
     var contentSurfaceClass = ViewData["ContentSurfaceClass"] as string ?? string.Empty;
     var unreadDirectMessageCount = ViewBag.UnreadDirectMessageCount is int count ? count : 0;
@@ -403,13 +404,6 @@
                             </li>
                             @if (roles.Contains("Manager") || roles.Contains("Admin"))
                             {
-                                <li class="nav-item">
-                                    <a class="nav-link @(currentController == "MasterEmployees" ? "active" : string.Empty)"
-                                       asp-controller="MasterEmployees"
-                                       asp-action="Index">
-                                        <span class="sidebar-text">Employees</span>
-                                    </a>
-                                </li>
                             }
                             <li class="nav-item">
                                 <a class="nav-link @(currentController == "Logs" ? "active" : string.Empty)" asp-controller="Logs" asp-action="Index">
@@ -444,10 +438,17 @@
                                     </a>
                                     <ul class="dropdown-menu">
                                         <li>
-                                            <a class="dropdown-item"
+                                            <a class="dropdown-item @(currentController == "AttendanceTracker" ? "active" : string.Empty)"
                                                asp-controller="AttendanceTracker"
                                                asp-action="Index">
                                                 Attendance Tracker
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item @(currentController == "MasterEmployees" ? "active" : string.Empty)"
+                                               asp-controller="MasterEmployees"
+                                               asp-action="Index">
+                                                Master Employee List
                                             </a>
                                         </li>
                                     </ul>
