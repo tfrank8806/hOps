@@ -45,7 +45,7 @@ namespace hOps.web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(AttendanceRecordFormViewModel model)
+        public async Task<IActionResult> Create([Bind(Prefix = "Form")] AttendanceRecordFormViewModel model)
         {
             if (!TryGetCurrentProperty(out var property, out var redirect))
             {
