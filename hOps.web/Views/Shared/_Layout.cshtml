@@ -1809,6 +1809,9 @@
                 }
                 setSidebarCollapsed(initialCollapsed, { persist: false });
             })();
+            if (body) {
+                body.dataset.sidebarReady = 'true';
+            }
 
             if (sidebarMediaQuery.addEventListener) {
                 sidebarMediaQuery.addEventListener('change', handleSidebarScreenChange);
@@ -2152,6 +2155,9 @@
 
             if (todoSidebar) {
                 initialiseTodoSidebar();
+                if (body) {
+                    body.dataset.todoSidebarReady = 'true';
+                }
 
                 if (todoMediaQuery.addEventListener) {
                     todoMediaQuery.addEventListener('change', handleTodoScreenChange);
