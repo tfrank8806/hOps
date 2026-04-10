@@ -1,0 +1,84 @@
+@model hOps.web.ViewModels.MasterEmployees.MasterEmployeeListViewModel
+@{
+    ViewData["Title"] = "Master Employee List";
+    ViewData["MainContainerClass"] = "main-inner--wide";
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+    <div>
+        <h1 class="h3 mb-0">Master Employee List</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.PropertyName))
+        {
+            <div class="text-muted small">Property: @Model.PropertyName</div>
+        }
+    </div>
+    @if (Model.HasPropertySelected)
+    {
+        <a class="btn btn-primary" asp-action="Create">Add Employee</a>
+    }
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @Model.StatusMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (!Model.HasPropertySelected)
+{
+    <div class="alert alert-info">
+        Select a property to begin managing your master employee list.
+    </div>
+}
+else if (!Model.Employees.Any())
+{
+    <p class="text-muted mb-0">No employees have been added for this property yet.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th scope="col">Employee</th>
+                    <th scope="col">Department</th>
+                    <th scope="col">Position</th>
+                    <th scope="col" class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var employee in Model.Employees)
+                {
+                    <tr>
+                        <td>@employee.DisplayName</td>
+                        <td>@employee.DepartmentName</td>
+                        <td>@employee.Position</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Employee actions">
+                                <a class="btn btn-outline-secondary"
+                                   asp-action="Edit"
+                                   asp-route-id="@employee.Id">Edit</a>
+                                <form asp-action="Delete"
+                                      asp-route-id="@employee.Id"
+                                      method="post"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Delete @employee.DisplayName from this property?');">
+                                    <button type="submit" class="btn btn-outline-danger">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

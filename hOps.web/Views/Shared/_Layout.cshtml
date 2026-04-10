@@ -400,6 +400,16 @@
                                     <span class="sidebar-text">Documents</span>
                                 </a>
                             </li>
+                            @if (roles.Contains("Manager") || roles.Contains("Admin"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link @(currentController == "MasterEmployees" ? "active" : string.Empty)"
+                                       asp-controller="MasterEmployees"
+                                       asp-action="Index">
+                                        <span class="sidebar-text">Employees</span>
+                                    </a>
+                                </li>
+                            }
                             <li class="nav-item">
                                 <a class="nav-link @(currentController == "Logs" ? "active" : string.Empty)" asp-controller="Logs" asp-action="Index">
                                     <span class="sidebar-text">Custom Logs</span>

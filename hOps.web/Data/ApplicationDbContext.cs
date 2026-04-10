@@ -103,6 +103,7 @@ namespace hOps.web.Data
         public DbSet<EmergencyLightTestEntry> EmergencyLightTestEntries { get; set; }
         public DbSet<HousekeeperProfile> HousekeeperProfiles { get; set; }
         public DbSet<HousekeepingMprEntry> HousekeepingMprEntries { get; set; }
+        public DbSet<MasterEmployee> MasterEmployees { get; set; }
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
         public DbSet<SiteVisitReport> SiteVisitReports { get; set; }
         public DbSet<SiteVisitReportItem> SiteVisitReportItems { get; set; }
@@ -1295,6 +1296,33 @@ namespace hOps.web.Data
                 .WithMany(p => p.HousekeepingMprEntries)
                 .HasForeignKey(e => e.PropertyId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<MasterEmployee>()
+                .Property(e => e.FirstName)
+                .HasMaxLength(100);
+
+            builder.Entity<MasterEmployee>()
+                .Property(e => e.LastName)
+                .HasMaxLength(100);
+
+            builder.Entity<MasterEmployee>()
+                .Property(e => e.Position)
+                .HasMaxLength(150);
+
+            builder.Entity<MasterEmployee>()
+                .HasIndex(e => new { e.PropertyId, e.LastName, e.FirstName });
+
+            builder.Entity<MasterEmployee>()
+                .HasOne(e => e.Property)
+                .WithMany(p => p.MasterEmployees)
+                .HasForeignKey(e => e.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<MasterEmployee>()
+                .HasOne(e => e.Department)
+                .WithMany()
+                .HasForeignKey(e => e.DepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<HousekeepingMprEntry>()
                 .HasOne(e => e.Housekeeper)
