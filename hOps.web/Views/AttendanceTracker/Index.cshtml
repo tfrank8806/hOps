@@ -1,8 +1,11 @@
 @model hOps.web.ViewModels.Attendance.AttendanceTrackerViewModel
+@using hOps.web.ViewModels.Attendance
 @{
     ViewData["Title"] = "Attendance Tracker";
     ViewData["MainContainerClass"] = "main-inner--wide";
     var hasEmployees = Model.Form.EmployeeOptions.Any();
+    var filterStartValue = Model.Filter.CustomStartDate?.ToString("yyyy-MM-dd");
+    var filterEndValue = Model.Filter.CustomEndDate?.ToString("yyyy-MM-dd");
 }
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
@@ -81,69 +84,188 @@ else
         <div class="col-12 col-lg-8">
             <div class="card h-100">
                 <div class="card-body">
-                    <h2 class="h5 mb-3">Attendance History</h2>
-                    @if (!Model.Records.Any())
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <h2 class="h5 mb-0">Attendance History</h2>
+                        <div class="small text-muted">
+                            Range: @Model.Filter.RangeStartDate.ToString("MMM d, yyyy") – @Model.Filter.RangeEndDate.ToString("MMM d, yyyy")
+                        </div>
+                    </div>
+
+                    <form method="get" class="row gy-2 gx-3 align-items-end mb-4">
+                        <div class="col-12 col-md-3">
+                            <label class="form-label" for="filterMode">Filter Mode</label>
+                            <select class="form-select" id="filterMode" name="filterMode">
+                                <option value="@AttendanceHistoryFilterModes.Month" selected="@(Model.Filter.Mode == AttendanceHistoryFilterModes.Month ? "selected" : null)">Month</option>
+                                <option value="@AttendanceHistoryFilterModes.Custom" selected="@(Model.Filter.Mode == AttendanceHistoryFilterModes.Custom ? "selected" : null)">Custom Range</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label class="form-label" for="monthInput">Month</label>
+                            <input type="month"
+                                   class="form-control"
+                                   id="monthInput"
+                                   name="month"
+                                   value="@Model.Filter.MonthValue">
+                            <div class="form-text">Used when the filter mode is Month.</div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label class="form-label" for="startDateInput">Start Date</label>
+                            <input type="date"
+                                   class="form-control"
+                                   id="startDateInput"
+                                   name="startDate"
+                                   value="@filterStartValue" />
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label class="form-label" for="endDateInput">End Date</label>
+                            <input type="date"
+                                   class="form-control"
+                                   id="endDateInput"
+                                   name="endDate"
+                                   value="@filterEndValue" />
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <button type="submit" class="btn btn-outline-primary w-100">Apply Filters</button>
+                        </div>
+                    </form>
+
+                    @if (!Model.SummaryRows.Any())
                     {
-                        <p class="text-muted mb-0">No attendance events logged for this property yet.</p>
+                        <p class="text-muted mb-0">No attendance activity was found for this date range.</p>
                     }
                     else
                     {
-                        <div class="table-responsive">
-                            <table class="table table-striped align-middle">
+                        <div class="table-responsive mb-4">
+                            <table class="table table-striped align-middle text-center">
                                 <thead class="table-light">
                                     <tr>
-                                        <th scope="col">Employee</th>
-                                        <th scope="col">Department</th>
-                                        <th scope="col">Position</th>
-                                        <th scope="col">Date</th>
-                                        <th scope="col">Attendance Type</th>
-                                        <th scope="col">Logged</th>
-                                        <th scope="col" class="text-end">Actions</th>
+                                        <th scope="col" class="text-start">Associate</th>
+                                        <th scope="col">Tardy</th>
+                                        <th scope="col">Left Early</th>
+                                        <th scope="col">Call Off</th>
+                                        <th scope="col">No Call/No Show</th>
+                                        <th scope="col">Sick</th>
+                                        <th scope="col">Vacation</th>
+                                        <th scope="col">Personal</th>
+                                        <th scope="col">Bereavement</th>
+                                        <th scope="col">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var record in Model.Records)
+                                    @foreach (var row in Model.SummaryRows)
                                     {
-                                        var loggedAt = TimeZoneService.ConvertToUserTime(record.CreatedAtUtc);
-                                        DateTime? updatedAt = record.UpdatedAtUtc.HasValue ? TimeZoneService.ConvertToUserTime(record.UpdatedAtUtc.Value) : null;
-                                        <tr>
-                                            <td>
-                                                <strong>@record.EmployeeName</strong>
+                                        var isSelected = Model.SelectedEmployeeId.HasValue && Model.SelectedEmployeeId.Value == row.MasterEmployeeId;
+                                        <tr class="@(isSelected ? "table-active" : string.Empty)">
+                                            <td class="text-start position-relative">
+                                                <div class="fw-semibold">@row.EmployeeName</div>
+                                                <div class="small text-muted">@row.DepartmentName &middot; @row.Position</div>
+                                                <a class="stretched-link"
+                                                   asp-action="Index"
+                                                   asp-route-filterMode="@Model.Filter.Mode"
+                                                   asp-route-month="@Model.Filter.MonthValue"
+                                                   asp-route-startDate="@filterStartValue"
+                                                   asp-route-endDate="@filterEndValue"
+                                                   asp-route-selectedEmployeeId="@row.MasterEmployeeId">
+                                                    View details for @row.EmployeeName
+                                                </a>
                                             </td>
-                                            <td>@record.DepartmentName</td>
-                                            <td>@record.Position</td>
-                                            <td>@record.AttendanceDate.ToString("MMM d, yyyy")</td>
-                                            <td>@record.AttendanceTypeDisplay</td>
-                                            <td>
-                                                <div>@loggedAt.ToString("g")</div>
-                                                @if (updatedAt.HasValue)
-                                                {
-                                                    <div class="small text-muted">Updated @updatedAt.Value.ToString("g")</div>
-                                                }
-                                            </td>
-                                            <td class="text-end">
-                                                <div class="btn-group btn-group-sm" role="group" aria-label="Attendance actions">
-                                                    <a class="btn btn-outline-secondary"
-                                                       asp-action="Edit"
-                                                       asp-route-id="@record.Id">
-                                                        Edit
-                                                    </a>
-                                                    <form asp-action="Delete"
-                                                          asp-route-id="@record.Id"
-                                                          method="post"
-                                                          class="d-inline"
-                                                          onsubmit="return confirm('Delete this attendance record?');">
-                                                        @Html.AntiForgeryToken()
-                                                        <button type="submit" class="btn btn-outline-danger">Delete</button>
-                                                    </form>
-                                                </div>
-                                            </td>
+                                            <td>@row.TardyCount</td>
+                                            <td>@row.LeftEarlyCount</td>
+                                            <td>@row.CallOffCount</td>
+                                            <td>@row.NoCallNoShowCount</td>
+                                            <td>@row.SickCount</td>
+                                            <td>@row.VacationCount</td>
+                                            <td>@row.PersonalCount</td>
+                                            <td>@row.BereavementCount</td>
+                                            <td class="fw-semibold">@row.TotalCount</td>
                                         </tr>
                                     }
                                 </tbody>
                             </table>
                         </div>
                     }
+
+                    <div class="border-top pt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h3 class="h6 mb-0">Associate Details</h3>
+                            @if (Model.SelectedEmployeeId.HasValue)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   asp-action="Index"
+                                   asp-route-filterMode="@Model.Filter.Mode"
+                                   asp-route-month="@Model.Filter.MonthValue"
+                                   asp-route-startDate="@filterStartValue"
+                                   asp-route-endDate="@filterEndValue">
+                                    Clear Selection
+                                </a>
+                            }
+                        </div>
+                        @if (!Model.SelectedEmployeeId.HasValue)
+                        {
+                            <p class="text-muted mb-0">Select an associate above to review their detailed attendance history.</p>
+                        }
+                        else if (!Model.SelectedEmployeeDetails.Any())
+                        {
+                            <p class="text-muted mb-0">No attendance entries recorded for @Model.SelectedEmployeeDisplayName within this range.</p>
+                        }
+                        else
+                        {
+                            <p class="mb-3 fw-semibold">Showing entries for @Model.SelectedEmployeeDisplayName</p>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th scope="col">Date</th>
+                                            <th scope="col">Attendance Type</th>
+                                            <th scope="col">Department / Position</th>
+                                            <th scope="col">Logged</th>
+                                            <th scope="col" class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var detail in Model.SelectedEmployeeDetails)
+                                        {
+                                            var createdAt = TimeZoneService.ConvertToUserTime(detail.CreatedAtUtc);
+                                            DateTime? updatedAt = detail.UpdatedAtUtc.HasValue ? TimeZoneService.ConvertToUserTime(detail.UpdatedAtUtc.Value) : null;
+                                            <tr>
+                                                <td>@detail.AttendanceDate.ToString("MMM d, yyyy")</td>
+                                                <td>@detail.AttendanceTypeDisplay</td>
+                                                <td>
+                                                    <div>@detail.DepartmentName</div>
+                                                    <div class="small text-muted">@detail.Position</div>
+                                                </td>
+                                                <td>
+                                                    <div>@createdAt.ToString("g")</div>
+                                                    <div class="small text-muted">By @detail.CreatedByDisplay</div>
+                                                    @if (updatedAt.HasValue)
+                                                    {
+                                                        <div class="small text-muted">Updated @updatedAt.Value.ToString("g")</div>
+                                                    }
+                                                </td>
+                                                <td class="text-end">
+                                                    <div class="btn-group btn-group-sm" role="group" aria-label="Attendance actions for @detail.AttendanceTypeDisplay">
+                                                        <a class="btn btn-outline-secondary"
+                                                           asp-action="Edit"
+                                                           asp-route-id="@detail.RecordId">
+                                                            Edit
+                                                        </a>
+                                                        <form asp-action="Delete"
+                                                              asp-route-id="@detail.RecordId"
+                                                              method="post"
+                                                              class="d-inline"
+                                                              onsubmit="return confirm('Delete this attendance record?');">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="btn btn-outline-danger">Delete</button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
                 </div>
             </div>
         </div>

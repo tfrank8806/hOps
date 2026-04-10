@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using hOps.web.Data;
@@ -34,12 +35,19 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? filterMode, string? month, DateTime? startDate, DateTime? endDate, int? selectedEmployeeId)
         {
             var property = ViewBag.CurrentProperty as Property;
             var status = TempData["AttendanceStatus"] as string;
             var error = TempData["AttendanceError"] as string;
-            var viewModel = await BuildTrackerViewModelAsync(property, null, status, error);
+            var filter = new AttendanceHistoryFilterViewModel
+            {
+                Mode = filterMode ?? AttendanceHistoryFilterModes.Month,
+                MonthValue = month ?? string.Empty,
+                CustomStartDate = startDate,
+                CustomEndDate = endDate
+            };
+            var viewModel = await BuildTrackerViewModelAsync(property, null, filter, selectedEmployeeId, status, error);
             return View(viewModel);
         }
 
@@ -56,7 +64,7 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null);
+                var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null, null, null);
                 return View(nameof(Index), invalidViewModel);
             }
 
@@ -68,7 +76,7 @@ namespace hOps.web.Controllers
             if (employee == null)
             {
                 ModelState.AddModelError(nameof(model.MasterEmployeeId), "Select a valid employee for this property.");
-                var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null);
+                var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null, null, null);
                 return View(nameof(Index), invalidViewModel);
             }
 
@@ -226,6 +234,8 @@ namespace hOps.web.Controllers
         private async Task<AttendanceTrackerViewModel> BuildTrackerViewModelAsync(
             Property? property,
             AttendanceRecordFormViewModel? formOverride,
+            AttendanceHistoryFilterViewModel? filterOverride,
+            int? selectedEmployeeId,
             string? statusMessage,
             string? errorMessage)
         {
@@ -235,24 +245,44 @@ namespace hOps.web.Controllers
                 form.AttendanceDate = DateTime.Today;
             }
 
+            var filter = PrepareFilter(filterOverride);
+
             var viewModel = new AttendanceTrackerViewModel
             {
                 HasPropertySelected = property != null,
                 PropertyName = property?.Name,
                 StatusMessage = statusMessage,
                 ErrorMessage = errorMessage,
-                Form = form
+                Form = form,
+                Filter = filter
             };
+
+            form.AttendanceTypeOptions = BuildAttendanceTypeOptions(form.AttendanceType);
 
             if (property == null)
             {
-                form.AttendanceTypeOptions = BuildAttendanceTypeOptions(form.AttendanceType);
                 return viewModel;
             }
 
             await PopulateEmployeeOptionsAsync(form, property.Id, form.MasterEmployeeId);
             form.AttendanceTypeOptions = BuildAttendanceTypeOptions(form.AttendanceType);
-            viewModel.Records = await LoadAttendanceRowsAsync(property.Id);
+
+            viewModel.SummaryRows = await LoadAttendanceSummaryAsync(property.Id, filter.RangeStartDate, filter.RangeEndDate);
+
+            if (selectedEmployeeId.HasValue)
+            {
+                var selectedSummary = viewModel.SummaryRows.FirstOrDefault(r => r.MasterEmployeeId == selectedEmployeeId.Value);
+                if (selectedSummary != null)
+                {
+                    viewModel.SelectedEmployeeId = selectedSummary.MasterEmployeeId;
+                    viewModel.SelectedEmployeeDisplayName = selectedSummary.EmployeeName;
+                    viewModel.SelectedEmployeeDetails = await LoadAttendanceDetailsAsync(
+                        property.Id,
+                        selectedSummary.MasterEmployeeId,
+                        filter.RangeStartDate,
+                        filter.RangeEndDate);
+                }
+            }
 
             return viewModel;
         }
@@ -283,12 +313,143 @@ namespace hOps.web.Controllers
             model.EmployeeOptions = options;
         }
 
-        private async Task<List<AttendanceRecordRowViewModel>> LoadAttendanceRowsAsync(int propertyId)
+        private AttendanceHistoryFilterViewModel PrepareFilter(AttendanceHistoryFilterViewModel? filterOverride)
+        {
+            var filter = filterOverride ?? new AttendanceHistoryFilterViewModel();
+            var normalizedMode = (filter.Mode ?? AttendanceHistoryFilterModes.Month).Trim().ToLowerInvariant();
+            if (normalizedMode != AttendanceHistoryFilterModes.Custom)
+            {
+                normalizedMode = AttendanceHistoryFilterModes.Month;
+            }
+
+            if (normalizedMode == AttendanceHistoryFilterModes.Month)
+            {
+                DateTime monthReference;
+                if (!string.IsNullOrWhiteSpace(filter.MonthValue) &&
+                    DateTime.TryParseExact(
+                        $"{filter.MonthValue}-01",
+                        "yyyy-MM-dd",
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out var parsedMonth))
+                {
+                    monthReference = parsedMonth;
+                }
+                else
+                {
+                    monthReference = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+                    filter.MonthValue = monthReference.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+                }
+
+                filter.RangeStartDate = new DateTime(monthReference.Year, monthReference.Month, 1);
+                filter.RangeEndDate = filter.RangeStartDate.AddMonths(1).AddDays(-1);
+                filter.CustomStartDate = filter.RangeStartDate;
+                filter.CustomEndDate = filter.RangeEndDate;
+            }
+            else
+            {
+                var start = (filter.CustomStartDate ?? DateTime.Today.AddDays(-30)).Date;
+                var end = (filter.CustomEndDate ?? DateTime.Today).Date;
+                if (end < start)
+                {
+                    (start, end) = (end, start);
+                }
+
+                filter.RangeStartDate = start;
+                filter.RangeEndDate = end;
+                if (string.IsNullOrWhiteSpace(filter.MonthValue))
+                {
+                    filter.MonthValue = start.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+                }
+            }
+
+            filter.Mode = normalizedMode;
+            return filter;
+        }
+
+        private async Task<List<AttendanceSummaryRowViewModel>> LoadAttendanceSummaryAsync(int propertyId, DateTime startDate, DateTime endDate)
+        {
+            var attendanceQuery = _context.AttendanceRecords
+                .Where(r => r.PropertyId == propertyId && r.AttendanceDate >= startDate && r.AttendanceDate <= endDate)
+                .GroupBy(r => r.MasterEmployeeId)
+                .Select(g => new
+                {
+                    MasterEmployeeId = g.Key,
+                    Tardy = g.Count(r => r.AttendanceType == AttendanceRecordType.Tardy),
+                    LeftEarly = g.Count(r => r.AttendanceType == AttendanceRecordType.LeftEarly),
+                    CallOff = g.Count(r => r.AttendanceType == AttendanceRecordType.CallOff),
+                    NoCallNoShow = g.Count(r => r.AttendanceType == AttendanceRecordType.NoCallNoShow),
+                    Sick = g.Count(r => r.AttendanceType == AttendanceRecordType.Sick),
+                    Vacation = g.Count(r => r.AttendanceType == AttendanceRecordType.Vacation),
+                    Personal = g.Count(r => r.AttendanceType == AttendanceRecordType.Personal),
+                    Bereavement = g.Count(r => r.AttendanceType == AttendanceRecordType.Bereavement)
+                });
+
+            var data = await _context.MasterEmployees
+                .Where(e => e.PropertyId == propertyId)
+                .Select(e => new
+                {
+                    e.Id,
+                    e.FirstName,
+                    e.LastName,
+                    DepartmentName = e.Department.Name ?? "Unassigned",
+                    e.Position
+                })
+                .Join(
+                    attendanceQuery,
+                    e => e.Id,
+                    a => a.MasterEmployeeId,
+                    (e, a) => new
+                    {
+                        e.Id,
+                        e.FirstName,
+                        e.LastName,
+                        e.DepartmentName,
+                        Position = e.Position ?? "Unassigned",
+                        Counts = a
+                    })
+                .ToListAsync();
+
+            return data
+                .Select(item =>
+                {
+                    var displayName = $"{item.FirstName} {item.LastName}".Trim();
+                    if (string.IsNullOrWhiteSpace(displayName))
+                    {
+                        displayName = "Employee";
+                    }
+
+                    return new AttendanceSummaryRowViewModel
+                    {
+                        MasterEmployeeId = item.Id,
+                        EmployeeName = displayName,
+                        DepartmentName = item.DepartmentName,
+                        Position = string.IsNullOrWhiteSpace(item.Position) ? "Unassigned" : item.Position,
+                        TardyCount = item.Counts.Tardy,
+                        LeftEarlyCount = item.Counts.LeftEarly,
+                        CallOffCount = item.Counts.CallOff,
+                        NoCallNoShowCount = item.Counts.NoCallNoShow,
+                        SickCount = item.Counts.Sick,
+                        VacationCount = item.Counts.Vacation,
+                        PersonalCount = item.Counts.Personal,
+                        BereavementCount = item.Counts.Bereavement
+                    };
+                })
+                .OrderByDescending(r => r.TotalCount)
+                .ThenBy(r => r.EmployeeName)
+                .ToList();
+        }
+
+        private async Task<List<AttendanceDetailEntryViewModel>> LoadAttendanceDetailsAsync(int propertyId, int employeeId, DateTime startDate, DateTime endDate)
         {
             var records = await _context.AttendanceRecords
-                .Where(r => r.PropertyId == propertyId)
+                .Where(r => r.PropertyId == propertyId &&
+                            r.MasterEmployeeId == employeeId &&
+                            r.AttendanceDate >= startDate &&
+                            r.AttendanceDate <= endDate)
                 .Include(r => r.MasterEmployee)
                     .ThenInclude(e => e.Department)
+                .Include(r => r.CreatedByUser)
                 .OrderByDescending(r => r.AttendanceDate)
                 .ThenByDescending(r => r.CreatedAtUtc)
                 .ToListAsync();
@@ -296,21 +457,27 @@ namespace hOps.web.Controllers
             return records.Select(r =>
             {
                 var employee = r.MasterEmployee;
-                var employeeName = employee != null
-                    ? $"{employee.FirstName} {employee.LastName}".Trim()
-                    : "Employee Removed";
-
-                return new AttendanceRecordRowViewModel
+                var creator = r.CreatedByUser;
+                var creatorName = creator != null
+                    ? $"{creator.FirstName} {creator.LastName}".Trim()
+                    : "Unknown";
+                if (string.IsNullOrWhiteSpace(creatorName))
                 {
-                    Id = r.Id,
-                    EmployeeName = string.IsNullOrWhiteSpace(employeeName) ? "Employee" : employeeName,
-                    DepartmentName = employee?.Department?.Name ?? "Unassigned",
-                    Position = employee?.Position ?? "Unassigned",
+                    creatorName = creator?.Email ?? "Unknown";
+                }
+
+                return new AttendanceDetailEntryViewModel
+                {
+                    RecordId = r.Id,
+                    MasterEmployeeId = r.MasterEmployeeId,
                     AttendanceDate = r.AttendanceDate,
                     AttendanceType = r.AttendanceType,
                     AttendanceTypeDisplay = GetAttendanceTypeLabel(r.AttendanceType),
                     CreatedAtUtc = r.CreatedAtUtc,
-                    UpdatedAtUtc = r.UpdatedAtUtc
+                    UpdatedAtUtc = r.UpdatedAtUtc,
+                    CreatedByDisplay = creatorName,
+                    DepartmentName = employee?.Department?.Name ?? "Unassigned",
+                    Position = employee?.Position ?? "Unassigned"
                 };
             }).ToList();
         }
