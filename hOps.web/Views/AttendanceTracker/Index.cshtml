@@ -1,0 +1,155 @@
+@model hOps.web.ViewModels.Attendance.AttendanceTrackerViewModel
+@{
+    ViewData["Title"] = "Attendance Tracker";
+    ViewData["MainContainerClass"] = "main-inner--wide";
+    var hasEmployees = Model.Form.EmployeeOptions.Any();
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+    <div>
+        <h1 class="h3 mb-0">Attendance Tracker</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.PropertyName))
+        {
+            <div class="text-muted small">Property: @Model.PropertyName</div>
+        }
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @Model.StatusMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (!Model.HasPropertySelected)
+{
+    <div class="alert alert-info mb-0">
+        Select a property to begin logging attendance events.
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-12 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Log Attendance</h2>
+                    @if (!hasEmployees)
+                    {
+                        <div class="alert alert-warning small" role="alert">
+                            Add employees to the master employee list before logging attendance.
+                        </div>
+                    }
+                    <form asp-action="Create" method="post" novalidate>
+                        @Html.AntiForgeryToken()
+                        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                        <div class="mb-3">
+                            <label class="form-label" asp-for="Form.MasterEmployeeId"></label>
+                            <select class="form-select" asp-for="Form.MasterEmployeeId" asp-items="Model.Form.EmployeeOptions">
+                                <option value="">Select employee</option>
+                            </select>
+                            <span class="text-danger" asp-validation-for="Form.MasterEmployeeId"></span>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" asp-for="Form.AttendanceDate"></label>
+                            <input class="form-control" asp-for="Form.AttendanceDate" type="date" />
+                            <span class="text-danger" asp-validation-for="Form.AttendanceDate"></span>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label" asp-for="Form.AttendanceType"></label>
+                            <select class="form-select" asp-for="Form.AttendanceType" asp-items="Model.Form.AttendanceTypeOptions">
+                                <option value="">Select type</option>
+                            </select>
+                            <span class="text-danger" asp-validation-for="Form.AttendanceType"></span>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary" @(hasEmployees ? "" : "disabled")>Save Attendance</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-8">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Attendance History</h2>
+                    @if (!Model.Records.Any())
+                    {
+                        <p class="text-muted mb-0">No attendance events logged for this property yet.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th scope="col">Employee</th>
+                                        <th scope="col">Department</th>
+                                        <th scope="col">Position</th>
+                                        <th scope="col">Date</th>
+                                        <th scope="col">Attendance Type</th>
+                                        <th scope="col">Logged</th>
+                                        <th scope="col" class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var record in Model.Records)
+                                    {
+                                        var loggedAt = TimeZoneService.ConvertToUserTime(record.CreatedAtUtc);
+                                        DateTime? updatedAt = record.UpdatedAtUtc.HasValue ? TimeZoneService.ConvertToUserTime(record.UpdatedAtUtc.Value) : null;
+                                        <tr>
+                                            <td>
+                                                <strong>@record.EmployeeName</strong>
+                                            </td>
+                                            <td>@record.DepartmentName</td>
+                                            <td>@record.Position</td>
+                                            <td>@record.AttendanceDate.ToString("MMM d, yyyy")</td>
+                                            <td>@record.AttendanceTypeDisplay</td>
+                                            <td>
+                                                <div>@loggedAt.ToString("g")</div>
+                                                @if (updatedAt.HasValue)
+                                                {
+                                                    <div class="small text-muted">Updated @updatedAt.Value.ToString("g")</div>
+                                                }
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm" role="group" aria-label="Attendance actions">
+                                                    <a class="btn btn-outline-secondary"
+                                                       asp-action="Edit"
+                                                       asp-route-id="@record.Id">
+                                                        Edit
+                                                    </a>
+                                                    <form asp-action="Delete"
+                                                          asp-route-id="@record.Id"
+                                                          method="post"
+                                                          class="d-inline"
+                                                          onsubmit="return confirm('Delete this attendance record?');">
+                                                        @Html.AntiForgeryToken()
+                                                        <button type="submit" class="btn btn-outline-danger">Delete</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

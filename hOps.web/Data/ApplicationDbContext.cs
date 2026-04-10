@@ -104,6 +104,7 @@ namespace hOps.web.Data
         public DbSet<HousekeeperProfile> HousekeeperProfiles { get; set; }
         public DbSet<HousekeepingMprEntry> HousekeepingMprEntries { get; set; }
         public DbSet<MasterEmployee> MasterEmployees { get; set; }
+        public DbSet<AttendanceRecord> AttendanceRecords { get; set; }
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
         public DbSet<SiteVisitReport> SiteVisitReports { get; set; }
         public DbSet<SiteVisitReportItem> SiteVisitReportItems { get; set; }
@@ -1322,6 +1323,48 @@ namespace hOps.web.Data
                 .HasOne(e => e.Department)
                 .WithMany()
                 .HasForeignKey(e => e.DepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<AttendanceRecord>()
+                .Property(a => a.AttendanceType)
+                .HasConversion<string>()
+                .HasMaxLength(50);
+
+            builder.Entity<AttendanceRecord>()
+                .Property(a => a.AttendanceDate)
+                .HasColumnType("date");
+
+            builder.Entity<AttendanceRecord>()
+                .HasIndex(a => new { a.PropertyId, a.AttendanceDate });
+
+            builder.Entity<AttendanceRecord>()
+                .HasIndex(a => new { a.PropertyId, a.MasterEmployeeId, a.AttendanceDate });
+
+            builder.Entity<AttendanceRecord>()
+                .HasIndex(a => new { a.PropertyId, a.MasterEmployeeId, a.AttendanceType });
+
+            builder.Entity<AttendanceRecord>()
+                .HasOne(a => a.Property)
+                .WithMany(p => p.AttendanceRecords)
+                .HasForeignKey(a => a.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<AttendanceRecord>()
+                .HasOne(a => a.MasterEmployee)
+                .WithMany(e => e.AttendanceRecords)
+                .HasForeignKey(a => a.MasterEmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<AttendanceRecord>()
+                .HasOne(a => a.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(a => a.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<AttendanceRecord>()
+                .HasOne(a => a.UpdatedByUser)
+                .WithMany()
+                .HasForeignKey(a => a.UpdatedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<HousekeepingMprEntry>()

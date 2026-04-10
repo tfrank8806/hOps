@@ -18,6 +18,7 @@
         string.Equals(currentController, "LinenInventory", StringComparison.OrdinalIgnoreCase);
     var siteVisitActive = string.Equals(currentController, "SiteVisit", StringComparison.OrdinalIgnoreCase);
     var supportActive = string.Equals(currentController, "Support", StringComparison.OrdinalIgnoreCase);
+    var managementActive = string.Equals(currentController, "AttendanceTracker", StringComparison.OrdinalIgnoreCase);
     var mainContainerClass = ViewData["MainContainerClass"] as string ?? string.Empty;
     var contentSurfaceClass = ViewData["ContentSurfaceClass"] as string ?? string.Empty;
     var unreadDirectMessageCount = ViewBag.UnreadDirectMessageCount is int count ? count : 0;
@@ -437,6 +438,20 @@
 
                             if (roles.Contains("Manager") || roles.Contains("Admin"))
                             {
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle @(managementActive ? "active" : string.Empty)" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <span class="sidebar-text">Management</span>
+                                    </a>
+                                    <ul class="dropdown-menu">
+                                        <li>
+                                            <a class="dropdown-item"
+                                               asp-controller="AttendanceTracker"
+                                               asp-action="Index">
+                                                Attendance Tracker
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </li>
                                 <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle @(currentController == "Admin" || currentController == "Settings" || currentController == "Properties" ? "active" : string.Empty)" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                         <span class="sidebar-text position-relative">

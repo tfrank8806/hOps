@@ -81,5 +81,6 @@ namespace hOps.web.Models
         public ICollection<HousekeeperProfile> Housekeepers { get; set; } = new List<HousekeeperProfile>();
         public ICollection<HousekeepingMprEntry> HousekeepingMprEntries { get; set; } = new List<HousekeepingMprEntry>();
         public ICollection<MasterEmployee> MasterEmployees { get; set; } = new List<MasterEmployee>();
+        public ICollection<AttendanceRecord> AttendanceRecords { get; set; } = new List<AttendanceRecord>();
     }
 }
