@@ -1,4 +1,5 @@
 @using Microsoft.AspNetCore.Mvc.Rendering
+@using System.Globalization
 @using hOps.web.ViewModels.Housekeeping
 @model hOps.web.ViewModels.Housekeeping.MprTrackerViewModel
 @{
@@ -497,7 +498,20 @@
                     <thead class="table-light">
                         <tr>
                             <th class="text-nowrap mpr-log-col-housekeeper">Housekeeper</th>
-                            <th class="text-nowrap mpr-log-col-totals">Totals</th>
+                            <th class="text-nowrap mpr-log-col-totals" aria-sort="none">
+                                <div class="d-flex flex-column align-items-start">
+                                    <span>Totals</span>
+                                    <button type="button"
+                                            class="btn btn-link btn-sm text-start p-0 text-decoration-none mpr-log-sort"
+                                            data-mpr-sort
+                                            aria-label="Sort rows by MPR, ascending">
+                                        <span class="d-inline-flex align-items-center">
+                                            <span>MPR</span>
+                                            <span class="mpr-log-sort-indicator ms-1" data-sort-indicator>↕</span>
+                                        </span>
+                                    </button>
+                                </div>
+                            </th>
                             @foreach (var date in Model.LogDates)
                             {
                                 <th class="text-center text-nowrap">@date.ToString("MMM d")</th>
@@ -507,7 +521,12 @@
                     <tbody>
                         @foreach (var row in Model.LogRows)
                         {
-                            <tr class="mpr-log-row">
+                            var summaryMpr = row.Summary.MinutesPerRoom.HasValue
+                                ? row.Summary.MinutesPerRoom.Value.ToString(CultureInfo.InvariantCulture)
+                                : string.Empty;
+                            <tr class="mpr-log-row"
+                                data-mpr-value="@summaryMpr"
+                                data-housekeeper-name="@row.HousekeeperName">
                                 <th scope="row" class="mpr-log-col-housekeeper">@row.HousekeeperName</th>
                                 <td class="small mpr-log-col-totals">
                                     <div class="mpr-log-line">CO: <strong>@row.Summary.CheckoutRooms</strong></div>
@@ -679,4 +698,100 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            const initMprSort = () => {
+                const sortButton = document.querySelector('[data-mpr-sort]');
+                const table = document.querySelector('.mpr-log-table');
+                const tbody = table?.querySelector('tbody');
+                if (!sortButton || !table || !tbody) {
+                    return;
+                }
+
+                const header = sortButton.closest('th');
+                const indicator = sortButton.querySelector('[data-sort-indicator]');
+                let sortDirection = 'none';
+
+                const updateIndicator = () => {
+                    if (indicator) {
+                        indicator.textContent = sortDirection === 'asc'
+                            ? '↑'
+                            : sortDirection === 'desc'
+                                ? '↓'
+                                : '↕';
+                    }
+                    if (header) {
+                        header.setAttribute('aria-sort', sortDirection === 'asc'
+                            ? 'ascending'
+                            : sortDirection === 'desc'
+                                ? 'descending'
+                                : 'none');
+                    }
+                    if (sortDirection === 'asc') {
+                        sortButton.setAttribute('aria-label', 'Sort rows by MPR, descending');
+                    } else if (sortDirection === 'desc') {
+                        sortButton.setAttribute('aria-label', 'Sort rows by MPR, ascending');
+                    } else {
+                        sortButton.setAttribute('aria-label', 'Sort rows by MPR, ascending');
+                    }
+                };
+
+                const parseValue = (row) => {
+                    const raw = row?.dataset?.mprValue ?? '';
+                    const numeric = Number.parseFloat(raw);
+                    return Number.isFinite(numeric) ? numeric : null;
+                };
+
+                const getName = (row) => row?.dataset?.housekeeperName?.toLowerCase() ?? '';
+
+                const sortRows = (direction) => {
+                    const rows = Array.from(tbody.querySelectorAll('.mpr-log-row'));
+                    if (!rows.length) {
+                        return;
+                    }
+
+                    rows.sort((a, b) => {
+                        const valA = parseValue(a);
+                        const valB = parseValue(b);
+                        const hasA = typeof valA === 'number';
+                        const hasB = typeof valB === 'number';
+
+                        if (!hasA && !hasB) {
+                            return getName(a).localeCompare(getName(b));
+                        }
+
+                        if (!hasA) {
+                            return 1;
+                        }
+
+                        if (!hasB) {
+                            return -1;
+                        }
+
+                        if (valA === valB) {
+                            return getName(a).localeCompare(getName(b));
+                        }
+
+                        return direction === 'asc' ? valA - valB : valB - valA;
+                    });
+
+                    rows.forEach(row => tbody.appendChild(row));
+                };
+
+                updateIndicator();
+
+                sortButton.addEventListener('click', () => {
+                    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                    sortRows(sortDirection);
+                    updateIndicator();
+                });
+            };
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initMprSort);
+            } else {
+                initMprSort();
+            }
+        })();
+    </script>
 }
