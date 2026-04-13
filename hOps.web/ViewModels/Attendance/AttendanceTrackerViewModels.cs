@@ -88,5 +88,58 @@ namespace hOps.web.ViewModels.Attendance
         public List<AttendanceDetailEntryViewModel> SelectedEmployeeDetails { get; set; } = new();
         public int? SelectedEmployeeId { get; set; }
         public string? SelectedEmployeeDisplayName { get; set; }
+        public AttendanceMonthlyGridViewModel MonthlyGrid { get; set; } = new AttendanceMonthlyGridViewModel();
+    }
+
+    public class AttendanceMonthlyGridViewModel
+    {
+        public DateTime MonthStart { get; set; }
+        public DateTime MonthEnd { get; set; }
+        public string MonthValue { get; set; } = string.Empty;
+        public string MonthDisplay => MonthStart.ToString("MMMM yyyy");
+        public List<DateTime> Days { get; set; } = new();
+        public List<AttendanceGridRowViewModel> Rows { get; set; } = new();
+        public List<AttendanceGridDayTotalViewModel> DayTotals { get; set; } = new();
+        public List<AttendanceCodeLegendItemViewModel> LegendItems { get; set; } = new();
+        public int GrandTotal { get; set; }
+        public bool HasEmployees => Rows.Count > 0;
+    }
+
+    public class AttendanceGridRowViewModel
+    {
+        public int MasterEmployeeId { get; set; }
+        public string EmployeeName { get; set; } = string.Empty;
+        public List<AttendanceGridCellViewModel> Cells { get; set; } = new();
+        public int TotalCount { get; set; }
+    }
+
+    public class AttendanceGridCellViewModel
+    {
+        public DateTime Date { get; set; }
+        public List<AttendanceGridEntryViewModel> Entries { get; set; } = new();
+        public bool HasEntries => Entries.Count > 0;
+    }
+
+    public class AttendanceGridEntryViewModel
+    {
+        public int RecordId { get; set; }
+        public AttendanceRecordType AttendanceType { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public bool IsExcused { get; set; }
+    }
+
+    public class AttendanceGridDayTotalViewModel
+    {
+        public DateTime Date { get; set; }
+        public int TotalCount { get; set; }
+    }
+
+    public class AttendanceCodeLegendItemViewModel
+    {
+        public AttendanceRecordType AttendanceType { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public bool IsExcused { get; set; }
     }
 }

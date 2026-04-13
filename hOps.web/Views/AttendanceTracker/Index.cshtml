@@ -41,6 +41,133 @@
 }
 else
 {
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <h2 class="h5 mb-1">Monthly Attendance Grid</h2>
+                    <div class="text-muted small">@Model.MonthlyGrid.MonthDisplay</div>
+                </div>
+                <form method="get" class="attendance-grid-month-form">
+                    <label class="form-label small text-muted d-block" for="gridMonthInput">Select Month</label>
+                    <div class="d-flex gap-2">
+                        <input type="month"
+                               class="form-control"
+                               id="gridMonthInput"
+                               name="gridMonth"
+                               value="@Model.MonthlyGrid.MonthValue"
+                               max="9999-12" />
+                        <button type="submit" class="btn btn-outline-primary">Update</button>
+                    </div>
+                    <input type="hidden" name="filterMode" value="@Model.Filter.Mode" />
+                    <input type="hidden" name="month" value="@Model.Filter.MonthValue" />
+                    <input type="hidden" name="startDate" value="@filterStartValue" />
+                    <input type="hidden" name="endDate" value="@filterEndValue" />
+                    @if (Model.SelectedEmployeeId.HasValue)
+                    {
+                        <input type="hidden" name="selectedEmployeeId" value="@Model.SelectedEmployeeId" />
+                    }
+                </form>
+            </div>
+
+            @if (!Model.MonthlyGrid.HasEmployees)
+            {
+                <p class="text-muted mb-0">Add employees to the master list to start visualizing attendance.</p>
+            }
+            else
+            {
+                <div class="attendance-grid-wrapper">
+                    <table class="table table-bordered align-middle attendance-grid-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col" class="attendance-grid-name sticky-col text-start">Employee</th>
+                                @foreach (var day in Model.MonthlyGrid.Days)
+                                {
+                                    <th scope="col" class="attendance-grid-day">
+                                        <div class="fw-semibold">@day.Day</div>
+                                        <div class="small text-muted">@day.ToString("ddd")</div>
+                                    </th>
+                                }
+                                <th scope="col" class="attendance-grid-total text-center">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.MonthlyGrid.Rows)
+                            {
+                                <tr>
+                                    <th scope="row" class="attendance-grid-name sticky-col text-start">
+                                        <div class="fw-semibold">@row.EmployeeName</div>
+                                    </th>
+                                    @for (var i = 0; i < Model.MonthlyGrid.Days.Count; i++)
+                                    {
+                                        var cell = row.Cells[i];
+                                        <td class="attendance-grid-cell">
+                                            @if (cell.HasEntries)
+                                            {
+                                                <div class="attendance-grid-cell-codes">
+                                                    @foreach (var entry in cell.Entries)
+                                                    {
+                                                        var pillClass = entry.IsExcused ? "attendance-grid-pill--excused" : "attendance-grid-pill--unexcused";
+                                                        <span class="attendance-grid-pill @pillClass"
+                                                              title="@entry.Label">
+                                                            @entry.Code
+                                                        </span>
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">&ndash;</span>
+                                            }
+                                        </td>
+                                    }
+                                    <td class="attendance-grid-total fw-semibold">@row.TotalCount</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th scope="row" class="attendance-grid-name sticky-col text-start">Daily total</th>
+                                @foreach (var dayTotal in Model.MonthlyGrid.DayTotals)
+                                {
+                                    <td class="attendance-grid-total">@dayTotal.TotalCount</td>
+                                }
+                                <td class="attendance-grid-total fw-semibold">@Model.MonthlyGrid.GrandTotal</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="attendance-grid-legend mt-4">
+                    <div>
+                        <div class="text-uppercase small text-muted fw-semibold mb-2">Unexcused</div>
+                        <div class="d-flex flex-wrap gap-3">
+                            @foreach (var legend in Model.MonthlyGrid.LegendItems.Where(l => !l.IsExcused))
+                            {
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="attendance-grid-pill attendance-grid-pill--unexcused">@legend.Code</span>
+                                    <span class="small text-muted">@legend.Label</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-uppercase small text-muted fw-semibold mb-2">Excused</div>
+                        <div class="d-flex flex-wrap gap-3">
+                            @foreach (var legend in Model.MonthlyGrid.LegendItems.Where(l => l.IsExcused))
+                            {
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="attendance-grid-pill attendance-grid-pill--excused">@legend.Code</span>
+                                    <span class="small text-muted">@legend.Label</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
     <div class="row g-4">
         <div class="col-12 col-lg-4">
             <div class="card h-100">
@@ -127,6 +254,11 @@ else
                         <div class="col-12 col-md-2">
                             <button type="submit" class="btn btn-outline-primary w-100">Apply Filters</button>
                         </div>
+                        <input type="hidden" name="gridMonth" value="@Model.MonthlyGrid.MonthValue" />
+                        @if (Model.SelectedEmployeeId.HasValue)
+                        {
+                            <input type="hidden" name="selectedEmployeeId" value="@Model.SelectedEmployeeId" />
+                        }
                     </form>
 
                     @if (!Model.SummaryRows.Any())
@@ -165,7 +297,8 @@ else
                                                    asp-route-month="@Model.Filter.MonthValue"
                                                    asp-route-startDate="@filterStartValue"
                                                    asp-route-endDate="@filterEndValue"
-                                                   asp-route-selectedEmployeeId="@row.MasterEmployeeId">
+                                                   asp-route-selectedEmployeeId="@row.MasterEmployeeId"
+                                                   asp-route-gridMonth="@Model.MonthlyGrid.MonthValue">
                                                     View details for @row.EmployeeName
                                                 </a>
                                             </td>
@@ -195,7 +328,8 @@ else
                                    asp-route-filterMode="@Model.Filter.Mode"
                                    asp-route-month="@Model.Filter.MonthValue"
                                    asp-route-startDate="@filterStartValue"
-                                   asp-route-endDate="@filterEndValue">
+                                   asp-route-endDate="@filterEndValue"
+                                   asp-route-gridMonth="@Model.MonthlyGrid.MonthValue">
                                     Clear Selection
                                 </a>
                             }

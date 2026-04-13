@@ -2605,6 +2605,87 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     background-color: #f8fafc;
 }
 
+.attendance-grid-wrapper {
+    overflow-x: auto;
+}
+
+.attendance-grid-table {
+    min-width: 720px;
+    white-space: nowrap;
+}
+
+.attendance-grid-table th,
+.attendance-grid-table td {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.attendance-grid-day {
+    font-size: 0.85rem;
+    min-width: 54px;
+}
+
+.attendance-grid-name {
+    min-width: 220px;
+    background-color: #fff;
+}
+
+.attendance-grid-total {
+    min-width: 70px;
+}
+
+.attendance-grid-cell {
+    padding: 0.5rem;
+}
+
+.attendance-grid-cell-codes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.attendance-grid-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+
+.attendance-grid-pill--unexcused {
+    background-color: #fde8e8;
+    color: #b42318;
+    border-color: #f8b4b4;
+}
+
+.attendance-grid-pill--excused {
+    background-color: #e6f4ea;
+    color: #0f5132;
+    border-color: #a9dfbf;
+}
+
+.attendance-grid-legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.attendance-grid-table .sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+}
+
+.attendance-grid-table thead .sticky-col,
+.attendance-grid-table tfoot .sticky-col {
+    z-index: 3;
+}
+
 .mpr-log-table tbody tr:nth-child(even) {
     background-color: #fdfefe;
 }

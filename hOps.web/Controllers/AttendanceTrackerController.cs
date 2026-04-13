@@ -28,6 +28,18 @@ namespace hOps.web.Controllers
             AttendanceRecordType.Personal,
             AttendanceRecordType.Bereavement
         };
+        private static readonly IReadOnlyDictionary<AttendanceRecordType, AttendanceCodeMetadata> _attendanceCodeMap =
+            new Dictionary<AttendanceRecordType, AttendanceCodeMetadata>
+            {
+                [AttendanceRecordType.Tardy] = new("T", "Tardy", false),
+                [AttendanceRecordType.LeftEarly] = new("LE", "Left Early", false),
+                [AttendanceRecordType.CallOff] = new("C", "Call Off", false),
+                [AttendanceRecordType.NoCallNoShow] = new("NS", "No Call/No Show", false),
+                [AttendanceRecordType.Sick] = new("S", "Sick", true),
+                [AttendanceRecordType.Vacation] = new("V", "Vacation", true),
+                [AttendanceRecordType.Personal] = new("P", "Personal", true),
+                [AttendanceRecordType.Bereavement] = new("B", "Bereavement", true)
+            };
 
         public AttendanceTrackerController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
             : base(context, userManager)
@@ -35,7 +47,7 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(string? filterMode, string? month, DateTime? startDate, DateTime? endDate, int? selectedEmployeeId)
+        public async Task<IActionResult> Index(string? filterMode, string? month, DateTime? startDate, DateTime? endDate, int? selectedEmployeeId, string? gridMonth)
         {
             var property = ViewBag.CurrentProperty as Property;
             var status = TempData["AttendanceStatus"] as string;
@@ -47,7 +59,7 @@ namespace hOps.web.Controllers
                 CustomStartDate = startDate,
                 CustomEndDate = endDate
             };
-            var viewModel = await BuildTrackerViewModelAsync(property, null, filter, selectedEmployeeId, status, error);
+            var viewModel = await BuildTrackerViewModelAsync(property, null, filter, selectedEmployeeId, status, error, gridMonth);
             return View(viewModel);
         }
 
@@ -64,7 +76,7 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null, null, null);
+                var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null, null, null, null);
                 return View(nameof(Index), invalidViewModel);
             }
 
@@ -76,7 +88,7 @@ namespace hOps.web.Controllers
             if (employee == null)
             {
                 ModelState.AddModelError(nameof(model.MasterEmployeeId), "Select a valid employee for this property.");
-                var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null, null, null);
+                var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null, null, null, null);
                 return View(nameof(Index), invalidViewModel);
             }
 
@@ -237,7 +249,8 @@ namespace hOps.web.Controllers
             AttendanceHistoryFilterViewModel? filterOverride,
             int? selectedEmployeeId,
             string? statusMessage,
-            string? errorMessage)
+            string? errorMessage,
+            string? gridMonth)
         {
             var form = formOverride ?? new AttendanceRecordFormViewModel();
             if (!form.AttendanceDate.HasValue)
@@ -268,6 +281,7 @@ namespace hOps.web.Controllers
             form.AttendanceTypeOptions = BuildAttendanceTypeOptions(form.AttendanceType);
 
             viewModel.SummaryRows = await LoadAttendanceSummaryAsync(property.Id, filter.RangeStartDate, filter.RangeEndDate);
+            viewModel.MonthlyGrid = await BuildMonthlyGridAsync(property.Id, gridMonth);
 
             if (selectedEmployeeId.HasValue)
             {
@@ -285,6 +299,171 @@ namespace hOps.web.Controllers
             }
 
             return viewModel;
+        }
+
+        private async Task<AttendanceMonthlyGridViewModel> BuildMonthlyGridAsync(int propertyId, string? monthValue)
+        {
+            var (monthStart, monthEnd, normalizedValue) = ResolveGridMonth(monthValue);
+            var daysInMonth = DateTime.DaysInMonth(monthStart.Year, monthStart.Month);
+            var days = Enumerable.Range(0, daysInMonth)
+                .Select(offset => monthStart.AddDays(offset))
+                .ToList();
+            var dayTotals = days
+                .Select(day => new AttendanceGridDayTotalViewModel { Date = day, TotalCount = 0 })
+                .ToList();
+
+            var employees = await _context.MasterEmployees
+                .Where(e => e.PropertyId == propertyId)
+                .OrderBy(e => e.LastName)
+                .ThenBy(e => e.FirstName)
+                .Select(e => new
+                {
+                    e.Id,
+                    e.FirstName,
+                    e.LastName
+                })
+                .ToListAsync();
+
+            var rows = employees
+                .Select(emp =>
+                {
+                    var displayName = $"{emp.FirstName} {emp.LastName}".Trim();
+                    if (string.IsNullOrWhiteSpace(displayName))
+                    {
+                        displayName = "Employee";
+                    }
+                    return new AttendanceGridRowViewModel
+                    {
+                        MasterEmployeeId = emp.Id,
+                        EmployeeName = displayName,
+                        Cells = days.Select(day => new AttendanceGridCellViewModel
+                        {
+                            Date = day
+                        }).ToList(),
+                        TotalCount = 0
+                    };
+                })
+                .ToList();
+
+            if (!rows.Any())
+            {
+                return new AttendanceMonthlyGridViewModel
+                {
+                    MonthStart = monthStart,
+                    MonthEnd = monthEnd,
+                    MonthValue = normalizedValue,
+                    Days = days,
+                    Rows = rows,
+                    DayTotals = dayTotals,
+                    LegendItems = BuildLegendItems(),
+                    GrandTotal = 0
+                };
+            }
+
+            var records = await _context.AttendanceRecords
+                .Where(r => r.PropertyId == propertyId &&
+                            r.AttendanceDate >= monthStart &&
+                            r.AttendanceDate <= monthEnd)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.MasterEmployeeId,
+                    AttendanceDate = r.AttendanceDate,
+                    r.AttendanceType
+                })
+                .ToListAsync();
+
+            var rowLookup = rows.ToDictionary(r => r.MasterEmployeeId);
+            var dayIndexLookup = days
+                .Select((day, index) => new { day, index })
+                .ToDictionary(entry => entry.day.Date, entry => entry.index);
+
+            var dayTotalsArray = dayTotals.ToArray();
+            var grandTotal = 0;
+
+            foreach (var record in records)
+            {
+                if (!rowLookup.TryGetValue(record.MasterEmployeeId, out var row))
+                {
+                    continue;
+                }
+
+                var recordDate = record.AttendanceDate.Date;
+                if (!dayIndexLookup.TryGetValue(recordDate, out var dayIndex))
+                {
+                    continue;
+                }
+
+                if (!_attendanceCodeMap.TryGetValue(record.AttendanceType, out var metadata))
+                {
+                    continue;
+                }
+
+                var entry = new AttendanceGridEntryViewModel
+                {
+                    RecordId = record.Id,
+                    AttendanceType = record.AttendanceType,
+                    Code = metadata.Code,
+                    Label = metadata.Label,
+                    IsExcused = metadata.IsExcused
+                };
+
+                var cell = row.Cells[dayIndex];
+                cell.Entries.Add(entry);
+                row.TotalCount++;
+                dayTotalsArray[dayIndex].TotalCount++;
+                grandTotal++;
+            }
+
+            return new AttendanceMonthlyGridViewModel
+            {
+                MonthStart = monthStart,
+                MonthEnd = monthEnd,
+                MonthValue = normalizedValue,
+                Days = days,
+                Rows = rows,
+                DayTotals = dayTotalsArray.ToList(),
+                LegendItems = BuildLegendItems(),
+                GrandTotal = grandTotal
+            };
+        }
+
+        private static List<AttendanceCodeLegendItemViewModel> BuildLegendItems()
+        {
+            var items = new List<AttendanceCodeLegendItemViewModel>();
+            foreach (var type in _attendanceTypeOrder)
+            {
+                if (_attendanceCodeMap.TryGetValue(type, out var metadata))
+                {
+                    items.Add(new AttendanceCodeLegendItemViewModel
+                    {
+                        AttendanceType = type,
+                        Code = metadata.Code,
+                        Label = metadata.Label,
+                        IsExcused = metadata.IsExcused
+                    });
+                }
+            }
+            return items;
+        }
+
+        private static (DateTime Start, DateTime End, string Value) ResolveGridMonth(string? monthValue)
+        {
+            DateTime monthStart;
+            if (!string.IsNullOrWhiteSpace(monthValue) &&
+                DateTime.TryParseExact($"{monthValue}-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedMonth))
+            {
+                monthStart = parsedMonth;
+            }
+            else
+            {
+                var today = DateTime.Today;
+                monthStart = new DateTime(today.Year, today.Month, 1);
+            }
+
+            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+            var normalizedValue = monthStart.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+            return (monthStart, monthEnd, normalizedValue);
         }
 
         private async Task PopulateEmployeeOptionsAsync(AttendanceRecordFormViewModel model, int propertyId, int? selectedEmployeeId)
@@ -526,5 +705,7 @@ namespace hOps.web.Controllers
             redirect = null;
             return true;
         }
+
+        private sealed record AttendanceCodeMetadata(string Code, string Label, bool IsExcused);
     }
 }
