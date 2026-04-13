@@ -125,6 +125,7 @@ namespace hOps.web.Controllers
                 MasterEmployeeId = employee.Id,
                 AttendanceDate = model.AttendanceDate!.Value.Date,
                 AttendanceType = model.AttendanceType!.Value,
+                Details = NormalizeDetails(model.Details),
                 CreatedAtUtc = DateTime.UtcNow,
                 CreatedByUserId = currentUser.Id
             };
@@ -160,7 +161,8 @@ namespace hOps.web.Controllers
                 Id = record.Id,
                 MasterEmployeeId = record.MasterEmployeeId,
                 AttendanceDate = record.AttendanceDate,
-                AttendanceType = record.AttendanceType
+                AttendanceType = record.AttendanceType,
+                Details = record.Details
             };
 
             await PopulateEmployeeOptionsAsync(form, currentProperty.Id, form.MasterEmployeeId);
@@ -227,6 +229,7 @@ namespace hOps.web.Controllers
             record.MasterEmployeeId = employee.Id;
             record.AttendanceDate = model.AttendanceDate!.Value.Date;
             record.AttendanceType = model.AttendanceType!.Value;
+            record.Details = NormalizeDetails(model.Details);
             record.UpdatedAtUtc = DateTime.UtcNow;
             record.UpdatedByUserId = currentUser.Id;
 
@@ -418,7 +421,8 @@ namespace hOps.web.Controllers
                     r.CreatedAtUtc,
                     CreatedByFirstName = r.CreatedByUser != null ? r.CreatedByUser.FirstName : null,
                     CreatedByLastName = r.CreatedByUser != null ? r.CreatedByUser.LastName : null,
-                    CreatedByEmail = r.CreatedByUser != null ? r.CreatedByUser.Email : null
+                    CreatedByEmail = r.CreatedByUser != null ? r.CreatedByUser.Email : null,
+                    r.Details
                 })
                 .ToListAsync();
 
@@ -465,7 +469,8 @@ namespace hOps.web.Controllers
                     DepartmentName = record.DepartmentName ?? "Unassigned",
                     Position = string.IsNullOrWhiteSpace(record.Position) ? "Unassigned" : record.Position,
                     CreatedByDisplay = creatorName,
-                    CreatedAtUtc = record.CreatedAtUtc
+                    CreatedAtUtc = record.CreatedAtUtc,
+                    Details = record.Details ?? string.Empty
                 };
 
                 var cell = row.Cells[dayIndex];
@@ -832,6 +837,7 @@ namespace hOps.web.Controllers
                     AttendanceDate = r.AttendanceDate,
                     AttendanceType = r.AttendanceType,
                     AttendanceTypeDisplay = GetAttendanceTypeLabel(r.AttendanceType),
+                    Details = r.Details ?? string.Empty,
                     CreatedAtUtc = r.CreatedAtUtc,
                     UpdatedAtUtc = r.UpdatedAtUtc,
                     CreatedByDisplay = creatorName,
@@ -884,6 +890,16 @@ namespace hOps.web.Controllers
 
             redirect = null;
             return true;
+        }
+
+        private static string? NormalizeDetails(string? details)
+        {
+            if (string.IsNullOrWhiteSpace(details))
+            {
+                return null;
+            }
+            var trimmed = details.Trim();
+            return string.IsNullOrEmpty(trimmed) ? null : trimmed;
         }
 
         private sealed record AttendanceCodeMetadata(string Code, string Label, bool IsExcused);

@@ -50,6 +50,51 @@ else
 {
     <div class="card mb-4">
         <div class="card-body">
+            <h2 class="h5 mb-3">Log Attendance</h2>
+            @if (!hasEmployees)
+            {
+                <div class="alert alert-warning small mb-3" role="alert">
+                    Add employees to the master employee list before logging attendance.
+                </div>
+            }
+            <form asp-action="Create" method="post" novalidate id="attendanceLogForm">
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-xl-3">
+                        <label class="form-label" asp-for="Form.MasterEmployeeId"></label>
+                        <select class="form-select" asp-for="Form.MasterEmployeeId" asp-items="Model.Form.EmployeeOptions">
+                            <option value="">Select employee</option>
+                        </select>
+                        <span class="text-danger" asp-validation-for="Form.MasterEmployeeId"></span>
+                    </div>
+                    <div class="col-12 col-sm-6 col-xl-2">
+                        <label class="form-label" asp-for="Form.AttendanceDate"></label>
+                        <input class="form-control" asp-for="Form.AttendanceDate" type="date" />
+                        <span class="text-danger" asp-validation-for="Form.AttendanceDate"></span>
+                    </div>
+                    <div class="col-12 col-sm-6 col-xl-2">
+                        <label class="form-label" asp-for="Form.AttendanceType"></label>
+                        <select class="form-select" asp-for="Form.AttendanceType" asp-items="Model.Form.AttendanceTypeOptions">
+                            <option value="">Select type</option>
+                        </select>
+                        <span class="text-danger" asp-validation-for="Form.AttendanceType"></span>
+                    </div>
+                    <div class="col-12 col-xl-3">
+                        <label class="form-label" asp-for="Form.Details"></label>
+                        <input class="form-control" asp-for="Form.Details" placeholder="Optional notes" />
+                        <span class="text-danger" asp-validation-for="Form.Details"></span>
+                    </div>
+                    <div class="col-12 col-xl-auto">
+                        <button type="submit" class="btn btn-primary w-100" @(hasEmployees ? "" : "disabled")>Save Attendance</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                 <div>
                     <h2 class="h5 mb-1">Attendance Grid</h2>
@@ -214,305 +259,516 @@ else
                     </div>
                 </div>
 
-                <div id="attendanceGridDetailPanel" class="attendance-detail-panel d-none" role="dialog" aria-live="polite">
-                    <div class="attendance-detail-panel__header d-flex justify-content-between align-items-start gap-3">
-                        <div>
-                            <div class="attendance-detail-panel__title" data-detail-employee></div>
-                            <div class="small text-muted" data-detail-date></div>
-                        </div>
-                        <button type="button" class="btn-close" aria-label="Close details" data-detail-close></button>
-                    </div>
-                    <div class="attendance-detail-panel__body" data-detail-body></div>
-                    <div class="attendance-detail-panel__footer d-flex justify-content-end">
-                        <button type="button" class="btn btn-sm btn-primary" data-detail-add>+ Add Attendance</button>
-                    </div>
+                <div id="attendanceDetailOverlay" class="attendance-detail-overlay d-none" role="dialog" aria-modal="true" aria-live="polite">
+                    <div class="attendance-detail-panel" tabindex="-1">
+                        <div class="attendance-detail-panel__header d-flex justify-content-between align-items-start gap-3">
+                            <div>
+                                <div class="attendance-detail-panel__title" data-detail-employee></div>
+                                <div class="small text-muted" data-detail-date></div>
+                            </div>
+                            <button type="button" class="btn-close" aria-label="Close details" data-detail-close></button>
+                        </div>
+                        <div class="attendance-detail-panel__body" data-detail-body></div>
+                        <div class="attendance-detail-panel__footer d-flex justify-content-end">
+                            <button type="button" class="btn btn-sm btn-primary" data-detail-add>+ Add Attendance</button>
+                        </div>
+                    </div>
                 </div>
             }
         </div>
     </div>
 
-    <div class="row g-4">
-        <div class="col-12 col-lg-4">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h2 class="h5 mb-3">Log Attendance</h2>
-                    @if (!hasEmployees)
-                    {
-                        <div class="alert alert-warning small" role="alert">
-                            Add employees to the master employee list before logging attendance.
-                        </div>
-                    }
-                    <form asp-action="Create" method="post" novalidate id="attendanceLogForm">
-                        @Html.AntiForgeryToken()
-                        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
-                        <div class="mb-3">
-                            <label class="form-label" asp-for="Form.MasterEmployeeId"></label>
-                            <select class="form-select" asp-for="Form.MasterEmployeeId" asp-items="Model.Form.EmployeeOptions">
-                                <option value="">Select employee</option>
-                            </select>
-                            <span class="text-danger" asp-validation-for="Form.MasterEmployeeId"></span>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" asp-for="Form.AttendanceDate"></label>
-                            <input class="form-control" asp-for="Form.AttendanceDate" type="date" />
-                            <span class="text-danger" asp-validation-for="Form.AttendanceDate"></span>
-                        </div>
-                        <div class="mb-4">
-                            <label class="form-label" asp-for="Form.AttendanceType"></label>
-                            <select class="form-select" asp-for="Form.AttendanceType" asp-items="Model.Form.AttendanceTypeOptions">
-                                <option value="">Select type</option>
-                            </select>
-                            <span class="text-danger" asp-validation-for="Form.AttendanceType"></span>
-                        </div>
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary" @(hasEmployees ? "" : "disabled")>Save Attendance</button>
-                        </div>
-                    </form>
+    <div class="card mb-4">
+
+        <div class="card-body">
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+
+                <h2 class="h5 mb-0">Attendance History</h2>
+
+                <div class="small text-muted">
+
+                    Range: @Model.Filter.RangeStartDate.ToString("MMM d, yyyy") – @Model.Filter.RangeEndDate.ToString("MMM d, yyyy")
+
                 </div>
+
             </div>
-        </div>
-        <div class="col-12 col-lg-8">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                        <h2 class="h5 mb-0">Attendance History</h2>
-                        <div class="small text-muted">
-                            Range: @Model.Filter.RangeStartDate.ToString("MMM d, yyyy") – @Model.Filter.RangeEndDate.ToString("MMM d, yyyy")
-                        </div>
-                    </div>
 
-                    <form method="get" class="row gy-2 gx-3 align-items-end mb-4">
-                        <div class="col-12 col-md-3">
-                            <label class="form-label" for="filterMode">Filter Mode</label>
-                            <select class="form-select" id="filterMode" name="filterMode">
-                                <option value="@AttendanceHistoryFilterModes.Month" selected="@(Model.Filter.Mode == AttendanceHistoryFilterModes.Month ? "selected" : null)">Month</option>
-                                <option value="@AttendanceHistoryFilterModes.Custom" selected="@(Model.Filter.Mode == AttendanceHistoryFilterModes.Custom ? "selected" : null)">Custom Range</option>
-                            </select>
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <label class="form-label" for="monthInput">Month</label>
-                            <input type="month"
-                                   class="form-control"
-                                   id="monthInput"
-                                   name="month"
-                                   value="@Model.Filter.MonthValue">
-                            <div class="form-text">Used when the filter mode is Month.</div>
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <label class="form-label" for="startDateInput">Start Date</label>
-                            <input type="date"
-                                   class="form-control"
-                                   id="startDateInput"
-                                   name="startDate"
-                                   value="@filterStartValue" />
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <label class="form-label" for="endDateInput">End Date</label>
-                            <input type="date"
-                                   class="form-control"
-                                   id="endDateInput"
-                                   name="endDate"
-                                   value="@filterEndValue" />
-                        </div>
-                        <div class="col-12 col-md-2">
-                            <button type="submit" class="btn btn-outline-primary w-100">Apply Filters</button>
-                        </div>
-                        <input type="hidden" name="gridMonth" value="@Model.MonthlyGrid.MonthValue" />
-                        <input type="hidden" name="gridRangeMode" value="@gridRangeModeValue" />
-                        <input type="hidden" name="gridRangeStart" value="@gridRangeStartMonthValue" />
-                        <input type="hidden" name="gridRangeEnd" value="@gridRangeEndMonthValue" />
-                        @if (!string.IsNullOrEmpty(detailDateValue))
-                        {
-                            <input type="hidden" name="detailDate" value="@detailDateValue" />
-                        }
-                        @if (Model.SelectedEmployeeId.HasValue)
-                        {
-                            <input type="hidden" name="selectedEmployeeId" value="@Model.SelectedEmployeeId" />
-                        }
-                    </form>
 
-                    @if (!Model.SummaryRows.Any())
-                    {
-                        <p class="text-muted mb-0">No attendance activity was found for this date range.</p>
-                    }
-                    else
-                    {
-                        <div class="table-responsive mb-4">
-                            <table class="table table-striped align-middle text-center">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th scope="col" class="text-start">Associate</th>
-                                        <th scope="col">Tardy</th>
-                                        <th scope="col">Left Early</th>
-                                        <th scope="col">Call Off</th>
-                                        <th scope="col">No Call/No Show</th>
-                                        <th scope="col">Sick</th>
-                                        <th scope="col">Vacation</th>
-                                        <th scope="col">Personal</th>
-                                        <th scope="col">Bereavement</th>
-                                        <th scope="col">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var row in Model.SummaryRows)
-                                    {
-                                        var isSelected = Model.SelectedEmployeeId.HasValue && Model.SelectedEmployeeId.Value == row.MasterEmployeeId;
-                                        <tr class="@(isSelected ? "table-active" : string.Empty)">
-                                            <td class="text-start position-relative">
-                                                <div class="fw-semibold">@row.EmployeeName</div>
-                                                <div class="small text-muted">@row.DepartmentName &middot; @row.Position</div>
-                                                <a class="stretched-link"
-                                                   asp-action="Index"
-                                                   asp-route-filterMode="@Model.Filter.Mode"
-                                                   asp-route-month="@Model.Filter.MonthValue"
-                                                   asp-route-startDate="@filterStartValue"
-                                                   asp-route-endDate="@filterEndValue"
-                                                   asp-route-selectedEmployeeId="@row.MasterEmployeeId"
-                                                   asp-route-gridMonth="@Model.MonthlyGrid.MonthValue"
-                                                   asp-route-gridRangeMode="@gridRangeModeValue"
-                                                   asp-route-gridRangeStart="@gridRangeStartMonthValue"
-                                                   asp-route-gridRangeEnd="@gridRangeEndMonthValue"
-                                                   asp-route-detailDate="@detailDateValue"
-                                                   asp-fragment="attendanceDetails">
-                                                    View details for @row.EmployeeName
-                                                </a>
-                                            </td>
-                                            <td>@row.TardyCount</td>
-                                            <td>@row.LeftEarlyCount</td>
-                                            <td>@row.CallOffCount</td>
-                                            <td>@row.NoCallNoShowCount</td>
-                                            <td>@row.SickCount</td>
-                                            <td>@row.VacationCount</td>
-                                            <td>@row.PersonalCount</td>
-                                            <td>@row.BereavementCount</td>
-                                            <td class="fw-semibold">@row.TotalCount</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
 
-                    <div class="border-top pt-3" id="attendanceDetails">
-                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                            <h3 class="h6 mb-0">Associate Details</h3>
-                            @if (Model.SelectedEmployeeId.HasValue)
+            <form method="get" class="row gy-2 gx-3 align-items-end mb-4">
+
+                <div class="col-12 col-md-3">
+
+                    <label class="form-label" for="filterMode">Filter Mode</label>
+
+                    <select class="form-select" id="filterMode" name="filterMode">
+
+                        <option value="@AttendanceHistoryFilterModes.Month" selected="@(Model.Filter.Mode == AttendanceHistoryFilterModes.Month ? "selected" : null)">Month</option>
+
+                        <option value="@AttendanceHistoryFilterModes.Custom" selected="@(Model.Filter.Mode == AttendanceHistoryFilterModes.Custom ? "selected" : null)">Custom Range</option>
+
+                    </select>
+
+                </div>
+
+                <div class="col-12 col-md-3">
+
+                    <label class="form-label" for="monthInput">Month</label>
+
+                    <input type="month"
+
+                           class="form-control"
+
+                           id="monthInput"
+
+                           name="month"
+
+                           value="@Model.Filter.MonthValue">
+
+                    <div class="form-text">Used when the filter mode is Month.</div>
+
+                </div>
+
+                <div class="col-12 col-md-3">
+
+                    <label class="form-label" for="startDateInput">Start Date</label>
+
+                    <input type="date"
+
+                           class="form-control"
+
+                           id="startDateInput"
+
+                           name="startDate"
+
+                           value="@filterStartValue" />
+
+                </div>
+
+                <div class="col-12 col-md-3">
+
+                    <label class="form-label" for="endDateInput">End Date</label>
+
+                    <input type="date"
+
+                           class="form-control"
+
+                           id="endDateInput"
+
+                           name="endDate"
+
+                           value="@filterEndValue" />
+
+                </div>
+
+                <div class="col-12 col-md-2">
+
+                    <button type="submit" class="btn btn-outline-primary w-100">Apply Filters</button>
+
+                </div>
+
+                <input type="hidden" name="gridMonth" value="@Model.MonthlyGrid.MonthValue" />
+
+                <input type="hidden" name="gridRangeMode" value="@gridRangeModeValue" />
+
+                <input type="hidden" name="gridRangeStart" value="@gridRangeStartMonthValue" />
+
+                <input type="hidden" name="gridRangeEnd" value="@gridRangeEndMonthValue" />
+
+                @if (!string.IsNullOrEmpty(detailDateValue))
+
+                {
+
+                    <input type="hidden" name="detailDate" value="@detailDateValue" />
+
+                }
+
+                @if (Model.SelectedEmployeeId.HasValue)
+
+                {
+
+                    <input type="hidden" name="selectedEmployeeId" value="@Model.SelectedEmployeeId" />
+
+                }
+
+            </form>
+
+
+
+            @if (!Model.SummaryRows.Any())
+
+            {
+
+                <p class="text-muted mb-0">No attendance activity was found for this date range.</p>
+
+            }
+
+            else
+
+            {
+
+                <div class="table-responsive mb-4">
+
+                    <table class="table table-striped align-middle text-center">
+
+                        <thead class="table-light">
+
+                            <tr>
+
+                                <th scope="col" class="text-start">Associate</th>
+
+                                <th scope="col">Tardy</th>
+
+                                <th scope="col">Left Early</th>
+
+                                <th scope="col">Call Off</th>
+
+                                <th scope="col">No Call/No Show</th>
+
+                                <th scope="col">Sick</th>
+
+                                <th scope="col">Vacation</th>
+
+                                <th scope="col">Personal</th>
+
+                                <th scope="col">Bereavement</th>
+
+                                <th scope="col">Total</th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            @foreach (var row in Model.SummaryRows)
+
                             {
-                                <div class="d-flex flex-wrap gap-2">
-                                    @if (Model.SelectedEmployeeDetailDate.HasValue)
-                                    {
-                                        <a class="btn btn-sm btn-outline-primary"
+
+                                var isSelected = Model.SelectedEmployeeId.HasValue && Model.SelectedEmployeeId.Value == row.MasterEmployeeId;
+
+                                <tr class="@(isSelected ? "table-active" : string.Empty)">
+
+                                    <td class="text-start position-relative">
+
+                                        <div class="fw-semibold">@row.EmployeeName</div>
+
+                                        <div class="small text-muted">@row.DepartmentName &middot; @row.Position</div>
+
+                                        <a class="stretched-link"
+
                                            asp-action="Index"
+
                                            asp-route-filterMode="@Model.Filter.Mode"
+
                                            asp-route-month="@Model.Filter.MonthValue"
+
                                            asp-route-startDate="@filterStartValue"
+
                                            asp-route-endDate="@filterEndValue"
+
+                                           asp-route-selectedEmployeeId="@row.MasterEmployeeId"
+
                                            asp-route-gridMonth="@Model.MonthlyGrid.MonthValue"
+
                                            asp-route-gridRangeMode="@gridRangeModeValue"
+
                                            asp-route-gridRangeStart="@gridRangeStartMonthValue"
+
                                            asp-route-gridRangeEnd="@gridRangeEndMonthValue"
-                                           asp-route-selectedEmployeeId="@Model.SelectedEmployeeId">
-                                            Show Entire Range
+
+                                           asp-route-detailDate="@detailDateValue"
+
+                                           asp-fragment="attendanceDetails">
+
+                                            View details for @row.EmployeeName
+
                                         </a>
-                                    }
-                                    <a class="btn btn-sm btn-outline-secondary"
-                                       asp-action="Index"
-                                       asp-route-filterMode="@Model.Filter.Mode"
-                                       asp-route-month="@Model.Filter.MonthValue"
-                                       asp-route-startDate="@filterStartValue"
-                                       asp-route-endDate="@filterEndValue"
-                                       asp-route-gridMonth="@Model.MonthlyGrid.MonthValue"
-                                       asp-route-gridRangeMode="@gridRangeModeValue"
-                                       asp-route-gridRangeStart="@gridRangeStartMonthValue"
-                                       asp-route-gridRangeEnd="@gridRangeEndMonthValue">
-                                        Clear Selection
-                                    </a>
-                                </div>
+
+                                    </td>
+
+                                    <td>@row.TardyCount</td>
+
+                                    <td>@row.LeftEarlyCount</td>
+
+                                    <td>@row.CallOffCount</td>
+
+                                    <td>@row.NoCallNoShowCount</td>
+
+                                    <td>@row.SickCount</td>
+
+                                    <td>@row.VacationCount</td>
+
+                                    <td>@row.PersonalCount</td>
+
+                                    <td>@row.BereavementCount</td>
+
+                                    <td class="fw-semibold">@row.TotalCount</td>
+
+                                </tr>
+
                             }
-                        </div>
-                        @if (!Model.SelectedEmployeeId.HasValue)
-                        {
-                            <p class="text-muted mb-0">Select an associate above to review their detailed attendance history.</p>
-                        }
-                        else if (!Model.SelectedEmployeeDetails.Any())
-                        {
-                            if (Model.SelectedEmployeeDetailDate.HasValue)
-                            {
-                                <p class="text-muted mb-0">No attendance entries recorded for @Model.SelectedEmployeeDisplayName on @Model.SelectedEmployeeDetailDate.Value.ToString("MMM d, yyyy").</p>
-                            }
-                            else
-                            {
-                                <p class="text-muted mb-0">No attendance entries recorded for @Model.SelectedEmployeeDisplayName within this range.</p>
-                            }
-                        }
-                        else
-                        {
-                            <p class="mb-3 fw-semibold">
-                                Showing entries for @Model.SelectedEmployeeDisplayName
-                                @if (Model.SelectedEmployeeDetailDate.HasValue)
-                                {
-                                    <span>(@Model.SelectedEmployeeDetailDate.Value.ToString("MMM d, yyyy"))</span>
-                                }
-                            </p>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-striped align-middle">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th scope="col">Date</th>
-                                            <th scope="col">Attendance Type</th>
-                                            <th scope="col">Department / Position</th>
-                                            <th scope="col">Logged</th>
-                                            <th scope="col" class="text-end">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var detail in Model.SelectedEmployeeDetails)
-                                        {
-                                            var createdAt = TimeZoneService.ConvertToUserTime(detail.CreatedAtUtc);
-                                            DateTime? updatedAt = detail.UpdatedAtUtc.HasValue ? TimeZoneService.ConvertToUserTime(detail.UpdatedAtUtc.Value) : null;
-                                            <tr>
-                                                <td>@detail.AttendanceDate.ToString("MMM d, yyyy")</td>
-                                                <td>@detail.AttendanceTypeDisplay</td>
-                                                <td>
-                                                    <div>@detail.DepartmentName</div>
-                                                    <div class="small text-muted">@detail.Position</div>
-                                                </td>
-                                                <td>
-                                                    <div>@createdAt.ToString("g")</div>
-                                                    <div class="small text-muted">By @detail.CreatedByDisplay</div>
-                                                    @if (updatedAt.HasValue)
-                                                    {
-                                                        <div class="small text-muted">Updated @updatedAt.Value.ToString("g")</div>
-                                                    }
-                                                </td>
-                                                <td class="text-end">
-                                                    <div class="btn-group btn-group-sm" role="group" aria-label="Attendance actions for @detail.AttendanceTypeDisplay">
-                                                        <a class="btn btn-outline-secondary"
-                                                           asp-action="Edit"
-                                                           asp-route-id="@detail.RecordId">
-                                                            Edit
-                                                        </a>
-                                                        <form asp-action="Delete"
-                                                              asp-route-id="@detail.RecordId"
-                                                              method="post"
-                                                              class="d-inline"
-                                                              onsubmit="return confirm('Delete this attendance record?');">
-                                                            @Html.AntiForgeryToken()
-                                                            <button type="submit" class="btn btn-outline-danger">Delete</button>
-                                                        </form>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
-                        }
-                    </div>
+
+                        </tbody>
+
+                    </table>
+
                 </div>
+
+            }
+
+
+
+            <div class="border-top pt-3" id="attendanceDetails">
+
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+
+                    <h3 class="h6 mb-0">Associate Details</h3>
+
+                    @if (Model.SelectedEmployeeId.HasValue)
+
+                    {
+
+                        <div class="d-flex flex-wrap gap-2">
+
+                            @if (Model.SelectedEmployeeDetailDate.HasValue)
+
+                            {
+
+                                <a class="btn btn-sm btn-outline-primary"
+
+                                   asp-action="Index"
+
+                                   asp-route-filterMode="@Model.Filter.Mode"
+
+                                   asp-route-month="@Model.Filter.MonthValue"
+
+                                   asp-route-startDate="@filterStartValue"
+
+                                   asp-route-endDate="@filterEndValue"
+
+                                   asp-route-gridMonth="@Model.MonthlyGrid.MonthValue"
+
+                                   asp-route-gridRangeMode="@gridRangeModeValue"
+
+                                   asp-route-gridRangeStart="@gridRangeStartMonthValue"
+
+                                   asp-route-gridRangeEnd="@gridRangeEndMonthValue"
+
+                                   asp-route-selectedEmployeeId="@Model.SelectedEmployeeId">
+
+                                    Show Entire Range
+
+                                </a>
+
+                            }
+
+                            <a class="btn btn-sm btn-outline-secondary"
+
+                               asp-action="Index"
+
+                               asp-route-filterMode="@Model.Filter.Mode"
+
+                               asp-route-month="@Model.Filter.MonthValue"
+
+                               asp-route-startDate="@filterStartValue"
+
+                               asp-route-endDate="@filterEndValue"
+
+                               asp-route-gridMonth="@Model.MonthlyGrid.MonthValue"
+
+                               asp-route-gridRangeMode="@gridRangeModeValue"
+
+                               asp-route-gridRangeStart="@gridRangeStartMonthValue"
+
+                               asp-route-gridRangeEnd="@gridRangeEndMonthValue">
+
+                                Clear Selection
+
+                            </a>
+
+                        </div>
+
+                    }
+
+                </div>
+
+                @if (!Model.SelectedEmployeeId.HasValue)
+
+                {
+
+                    <p class="text-muted mb-0">Select an associate above to review their detailed attendance history.</p>
+
+                }
+
+                else if (!Model.SelectedEmployeeDetails.Any())
+
+                {
+
+                    if (Model.SelectedEmployeeDetailDate.HasValue)
+
+                    {
+
+                        <p class="text-muted mb-0">No attendance entries recorded for @Model.SelectedEmployeeDisplayName on @Model.SelectedEmployeeDetailDate.Value.ToString("MMM d, yyyy").</p>
+
+                    }
+
+                    else
+
+                    {
+
+                        <p class="text-muted mb-0">No attendance entries recorded for @Model.SelectedEmployeeDisplayName within this range.</p>
+
+                    }
+
+                }
+
+                else
+
+                {
+
+                    <p class="mb-3 fw-semibold">
+
+                        Showing entries for @Model.SelectedEmployeeDisplayName
+
+                        @if (Model.SelectedEmployeeDetailDate.HasValue)
+
+                        {
+
+                            <span>(@Model.SelectedEmployeeDetailDate.Value.ToString("MMM d, yyyy"))</span>
+
+                        }
+
+                    </p>
+
+                    <div class="table-responsive">
+
+                        <table class="table table-sm table-striped align-middle">
+
+                            <thead class="table-light">
+
+                                <tr>
+
+                                    <th scope="col">Date</th>
+
+                                    <th scope="col">Attendance Type</th>
+
+                                    <th scope="col">Department / Position</th>
+
+                                    <th scope="col">Logged</th>
+
+                                    <th scope="col" class="text-end">Actions</th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody>
+
+                                @foreach (var detail in Model.SelectedEmployeeDetails)
+
+                                {
+
+                                    var createdAt = TimeZoneService.ConvertToUserTime(detail.CreatedAtUtc);
+
+                                    DateTime? updatedAt = detail.UpdatedAtUtc.HasValue ? TimeZoneService.ConvertToUserTime(detail.UpdatedAtUtc.Value) : null;
+
+                                    <tr>
+
+                                    <td>@detail.AttendanceDate.ToString("MMM d, yyyy")</td>
+
+                                    <td>
+
+                                        <div>@detail.AttendanceTypeDisplay</div>
+
+                                        @if (!string.IsNullOrWhiteSpace(detail.Details))
+
+                                        {
+
+                                            <div class="small text-muted">Details: @detail.Details</div>
+
+                                        }
+
+                                    </td>
+
+                                    <td>
+
+                                        <div>@detail.DepartmentName</div>
+
+                                        <div class="small text-muted">@detail.Position</div>
+
+                                    </td>
+
+                                    <td>
+
+                                        <div>@createdAt.ToString("g")</div>
+
+                                        <div class="small text-muted">By @detail.CreatedByDisplay</div>
+
+                                        @if (updatedAt.HasValue)
+
+                                        {
+
+                                            <div class="small text-muted">Updated @updatedAt.Value.ToString("g")</div>
+
+                                        }
+
+                                    </td>
+
+                                    <td class="text-end">
+
+                                        <div class="btn-group btn-group-sm" role="group" aria-label="Attendance actions for @detail.AttendanceTypeDisplay">
+
+                                            <a class="btn btn-outline-secondary"
+
+                                               asp-action="Edit"
+
+                                               asp-route-id="@detail.RecordId">
+
+                                                Edit
+
+                                            </a>
+
+                                            <form asp-action="Delete"
+
+                                                  asp-route-id="@detail.RecordId"
+
+                                                  method="post"
+
+                                                  class="d-inline"
+
+                                                  onsubmit="return confirm('Delete this attendance record?');">
+
+                                                @Html.AntiForgeryToken()
+
+                                                <button type="submit" class="btn btn-outline-danger">Delete</button>
+
+                                            </form>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                }
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                }
+
             </div>
+
         </div>
+
     </div>
+
+
 }
 
 @section Scripts {
@@ -539,23 +795,22 @@ else
             updateRangeVisibility();
             rangeModeSelect?.addEventListener('change', updateRangeVisibility);
 
-            const detailPanel = document.getElementById('attendanceGridDetailPanel');
-            const detailBody = detailPanel?.querySelector('[data-detail-body]');
-            const detailEmployee = detailPanel?.querySelector('[data-detail-employee]');
-            const detailDate = detailPanel?.querySelector('[data-detail-date]');
-            const detailAddButton = detailPanel?.querySelector('[data-detail-add]');
-            const detailCloseButton = detailPanel?.querySelector('[data-detail-close]');
+            const detailOverlay = document.getElementById('attendanceDetailOverlay');
+            const detailPanel = detailOverlay?.querySelector('.attendance-detail-panel');
+            const detailBody = detailOverlay?.querySelector('[data-detail-body]');
+            const detailEmployee = detailOverlay?.querySelector('[data-detail-employee]');
+            const detailDate = detailOverlay?.querySelector('[data-detail-date]');
+            const detailAddButton = detailOverlay?.querySelector('[data-detail-add]');
+            const detailCloseButton = detailOverlay?.querySelector('[data-detail-close]');
             let detailTarget = null;
 
             function hideDetailPanel() {
-                if (!detailPanel || detailPanel.classList.contains('d-none')) {
+                if (!detailOverlay || detailOverlay.classList.contains('d-none')) {
                     detailTarget = null;
                     return;
                 }
-                detailPanel.classList.add('d-none');
-                detailPanel.style.top = '';
-                detailPanel.style.left = '';
-                detailPanel.style.visibility = '';
+                detailOverlay.classList.add('d-none');
+                document.body.classList.remove('attendance-detail-open');
                 detailTarget = null;
             }
 
@@ -595,46 +850,32 @@ else
                     }
                     entryEl.appendChild(createdLine);
 
+                    if (entry.details) {
+                        const detailText = document.createElement('div');
+                        detailText.className = 'attendance-detail-entry__details';
+                        detailText.textContent = entry.details;
+                        entryEl.appendChild(detailText);
+                    }
+
                     detailBody.appendChild(entryEl);
                 });
             }
 
-            function positionDetailPanel(target) {
-                if (!detailPanel) {
-                    return;
-                }
-                detailPanel.classList.remove('d-none');
-                detailPanel.style.visibility = 'hidden';
-                const rect = target.getBoundingClientRect();
-                const panelRect = detailPanel.getBoundingClientRect();
-                let top = window.scrollY + rect.bottom + 8;
-                let left = window.scrollX + rect.left;
-                if (left + panelRect.width > window.scrollX + window.innerWidth - 16) {
-                    left = window.scrollX + window.innerWidth - panelRect.width - 16;
-                }
-                if (top + panelRect.height > window.scrollY + window.innerHeight - 16) {
-                    top = window.scrollY + rect.top - panelRect.height - 8;
-                    if (top < window.scrollY + 16) {
-                        top = window.scrollY + 16;
-                    }
-                }
-                if (left < 16) {
-                    left = 16;
-                }
-                detailPanel.style.top = `${top}px`;
-                detailPanel.style.left = `${left}px`;
-                detailPanel.style.visibility = 'visible';
-            }
-
             function showDetailPanel(button, entries) {
-                if (!detailPanel || !detailEmployee || !detailDate) {
+                if (!detailOverlay || !detailPanel || !detailEmployee || !detailDate) {
                     return;
                 }
                 detailTarget = button;
                 detailEmployee.textContent = button.getAttribute('data-employee-name') || 'Employee';
                 detailDate.textContent = button.getAttribute('data-date-display') || button.getAttribute('data-date') || '';
                 renderDetailEntries(entries);
-                positionDetailPanel(button);
+                detailOverlay.classList.remove('d-none');
+                document.body.classList.add('attendance-detail-open');
+                try {
+                    detailPanel.focus({ preventScroll: true });
+                } catch {
+                    detailPanel.focus();
+                }
                 detailAddButton?.setAttribute('data-employee-id', button.getAttribute('data-employee-id') || '');
                 detailAddButton?.setAttribute('data-date', button.getAttribute('data-date') || '');
             }
@@ -642,6 +883,7 @@ else
             function prefillAttendanceForm(employeeId, date, employeeName) {
                 const employeeSelect = document.getElementById('Form_MasterEmployeeId');
                 const dateInput = document.getElementById('Form_AttendanceDate');
+                const detailsInput = document.getElementById('Form_Details');
                 const form = document.getElementById('attendanceLogForm');
                 if (employeeSelect && employeeId) {
                     employeeSelect.value = employeeId;
@@ -650,6 +892,9 @@ else
                 if (dateInput && date) {
                     dateInput.value = date;
                     dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (detailsInput) {
+                    detailsInput.value = '';
                 }
                 form?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 const typeSelect = document.getElementById('Form_AttendanceType');
@@ -679,17 +924,16 @@ else
             });
 
             detailCloseButton?.addEventListener('click', hideDetailPanel);
-            document.addEventListener('click', function (event) {
-                if (!detailPanel || detailPanel.classList.contains('d-none')) {
-                    return;
+            detailOverlay?.addEventListener('click', function (event) {
+                if (event.target === detailOverlay) {
+                    hideDetailPanel();
                 }
-                if (detailPanel.contains(event.target) || (detailTarget && detailTarget.contains(event.target))) {
-                    return;
-                }
-                hideDetailPanel();
             });
-            window.addEventListener('scroll', hideDetailPanel, { passive: true });
-            window.addEventListener('resize', hideDetailPanel);
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    hideDetailPanel();
+                }
+            });
         })();
     </script>
 }

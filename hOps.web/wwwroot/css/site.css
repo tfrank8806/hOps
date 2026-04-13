@@ -2717,16 +2717,35 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     margin-bottom: 0.15rem;
 }
 
+.attendance-detail-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    background-color: rgba(15, 23, 42, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.attendance-detail-overlay.d-none {
+    display: none;
+}
+
+body.attendance-detail-open {
+    overflow: hidden;
+}
+
 .attendance-detail-panel {
-    position: absolute;
-    width: 320px;
-    max-width: calc(100vw - 2rem);
+    position: relative;
+    width: min(420px, 100%);
+    max-height: 80vh;
+    overflow-y: auto;
     background-color: #fff;
     border: 1px solid rgba(15, 23, 42, 0.12);
     border-radius: 0.75rem;
     box-shadow: 0 25px 45px rgba(15, 23, 42, 0.25);
     padding: 1rem;
-    z-index: 1050;
 }
 
 .attendance-detail-panel__title {
@@ -2759,6 +2778,12 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 .attendance-detail-entry__meta {
     font-size: 0.85rem;
     color: #475467;
+}
+
+.attendance-detail-entry__details {
+    margin-top: 0.35rem;
+    font-size: 0.88rem;
+    color: #1d2939;
 }
 
 .mpr-log-table tbody tr:nth-child(even) {

@@ -41,6 +41,9 @@ namespace hOps.web.Models
         [Required]
         public AttendanceRecordType AttendanceType { get; set; }
 
+        [StringLength(2000)]
+        public string? Details { get; set; }
+
         [Required]
         public string CreatedByUserId { get; set; } = string.Empty;
         public ApplicationUser CreatedByUser { get; set; } = null!;

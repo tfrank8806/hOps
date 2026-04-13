@@ -23,6 +23,10 @@ namespace hOps.web.ViewModels.Attendance
         [Display(Name = "Attendance Type")]
         public AttendanceRecordType? AttendanceType { get; set; }
 
+        [Display(Name = "Details")]
+        [StringLength(2000)]
+        public string? Details { get; set; }
+
         public IEnumerable<SelectListItem> EmployeeOptions { get; set; } = new List<SelectListItem>();
         public IEnumerable<SelectListItem> AttendanceTypeOptions { get; set; } = new List<SelectListItem>();
     }
@@ -53,6 +57,7 @@ namespace hOps.web.ViewModels.Attendance
         public DateTime AttendanceDate { get; set; }
         public AttendanceRecordType AttendanceType { get; set; }
         public string AttendanceTypeDisplay { get; set; } = string.Empty;
+        public string Details { get; set; } = string.Empty;
         public DateTime CreatedAtUtc { get; set; }
         public DateTime? UpdatedAtUtc { get; set; }
         public string CreatedByDisplay { get; set; } = string.Empty;
@@ -135,6 +140,7 @@ namespace hOps.web.ViewModels.Attendance
         public string Position { get; set; } = string.Empty;
         public string CreatedByDisplay { get; set; } = string.Empty;
         public DateTime CreatedAtUtc { get; set; }
+        public string Details { get; set; } = string.Empty;
     }
 
     public class AttendanceGridDayTotalViewModel

@@ -34,6 +34,11 @@
         </select>
         <span class="text-danger" asp-validation-for="AttendanceType"></span>
     </div>
+    <div class="mb-4">
+        <label class="form-label" asp-for="Details"></label>
+        <input class="form-control" asp-for="Details" placeholder="Optional notes" />
+        <span class="text-danger" asp-validation-for="Details"></span>
+    </div>
     <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary">Save Changes</button>
         <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
