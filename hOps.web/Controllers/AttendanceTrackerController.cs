@@ -47,7 +47,7 @@ namespace hOps.web.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(string? filterMode, string? month, DateTime? startDate, DateTime? endDate, int? selectedEmployeeId, string? gridMonth)
+        public async Task<IActionResult> Index(string? filterMode, string? month, DateTime? startDate, DateTime? endDate, int? selectedEmployeeId, string? gridMonth, DateTime? detailDate)
         {
             var property = ViewBag.CurrentProperty as Property;
             var status = TempData["AttendanceStatus"] as string;
@@ -59,7 +59,7 @@ namespace hOps.web.Controllers
                 CustomStartDate = startDate,
                 CustomEndDate = endDate
             };
-            var viewModel = await BuildTrackerViewModelAsync(property, null, filter, selectedEmployeeId, status, error, gridMonth);
+            var viewModel = await BuildTrackerViewModelAsync(property, null, filter, selectedEmployeeId, status, error, gridMonth, detailDate);
             return View(viewModel);
         }
 
@@ -76,7 +76,7 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null, null, null, null);
+                var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null, null, null, null, null);
                 return View(nameof(Index), invalidViewModel);
             }
 
@@ -88,7 +88,7 @@ namespace hOps.web.Controllers
             if (employee == null)
             {
                 ModelState.AddModelError(nameof(model.MasterEmployeeId), "Select a valid employee for this property.");
-                var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null, null, null, null);
+                var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null, null, null, null, null);
                 return View(nameof(Index), invalidViewModel);
             }
 
@@ -250,7 +250,8 @@ namespace hOps.web.Controllers
             int? selectedEmployeeId,
             string? statusMessage,
             string? errorMessage,
-            string? gridMonth)
+            string? gridMonth,
+            DateTime? detailDate)
         {
             var form = formOverride ?? new AttendanceRecordFormViewModel();
             if (!form.AttendanceDate.HasValue)
@@ -282,6 +283,7 @@ namespace hOps.web.Controllers
 
             viewModel.SummaryRows = await LoadAttendanceSummaryAsync(property.Id, filter.RangeStartDate, filter.RangeEndDate);
             viewModel.MonthlyGrid = await BuildMonthlyGridAsync(property.Id, gridMonth);
+            viewModel.SelectedEmployeeDetailDate = detailDate?.Date;
 
             if (selectedEmployeeId.HasValue)
             {
@@ -290,11 +292,13 @@ namespace hOps.web.Controllers
                 {
                     viewModel.SelectedEmployeeId = selectedSummary.MasterEmployeeId;
                     viewModel.SelectedEmployeeDisplayName = selectedSummary.EmployeeName;
+                    var detailRangeStart = detailDate?.Date ?? filter.RangeStartDate;
+                    var detailRangeEnd = detailDate?.Date ?? filter.RangeEndDate;
                     viewModel.SelectedEmployeeDetails = await LoadAttendanceDetailsAsync(
                         property.Id,
                         selectedSummary.MasterEmployeeId,
-                        filter.RangeStartDate,
-                        filter.RangeEndDate);
+                        detailRangeStart,
+                        detailRangeEnd);
                 }
             }
 
@@ -413,6 +417,22 @@ namespace hOps.web.Controllers
                 row.TotalCount++;
                 dayTotalsArray[dayIndex].TotalCount++;
                 grandTotal++;
+            }
+
+            foreach (var row in rows)
+            {
+                foreach (var cell in row.Cells)
+                {
+                    if (!cell.HasEntries)
+                    {
+                        continue;
+                    }
+
+                    var summary = cell.Entries
+                        .GroupBy(entry => entry.Label)
+                        .Select(group => $"{group.Key} ({group.Count()})");
+                    cell.Tooltip = string.Join(", ", summary);
+                }
             }
 
             return new AttendanceMonthlyGridViewModel

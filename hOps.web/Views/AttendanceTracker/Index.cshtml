@@ -6,6 +6,7 @@
     var hasEmployees = Model.Form.EmployeeOptions.Any();
     var filterStartValue = Model.Filter.CustomStartDate?.ToString("yyyy-MM-dd");
     var filterEndValue = Model.Filter.CustomEndDate?.ToString("yyyy-MM-dd");
+    var detailDateValue = Model.SelectedEmployeeDetailDate?.ToString("yyyy-MM-dd");
 }
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
@@ -63,6 +64,10 @@ else
                     <input type="hidden" name="month" value="@Model.Filter.MonthValue" />
                     <input type="hidden" name="startDate" value="@filterStartValue" />
                     <input type="hidden" name="endDate" value="@filterEndValue" />
+                    @if (!string.IsNullOrEmpty(detailDateValue))
+                    {
+                        <input type="hidden" name="detailDate" value="@detailDateValue" />
+                    }
                     @if (Model.SelectedEmployeeId.HasValue)
                     {
                         <input type="hidden" name="selectedEmployeeId" value="@Model.SelectedEmployeeId" />
@@ -101,19 +106,36 @@ else
                                     @for (var i = 0; i < Model.MonthlyGrid.Days.Count; i++)
                                     {
                                         var cell = row.Cells[i];
-                                        <td class="attendance-grid-cell">
+                                        var dayValue = Model.MonthlyGrid.Days[i];
+                                        <td class="attendance-grid-cell position-relative">
                                             @if (cell.HasEntries)
                                             {
-                                                <div class="attendance-grid-cell-codes">
-                                                    @foreach (var entry in cell.Entries)
-                                                    {
-                                                        var pillClass = entry.IsExcused ? "attendance-grid-pill--excused" : "attendance-grid-pill--unexcused";
-                                                        <span class="attendance-grid-pill @pillClass"
-                                                              title="@entry.Label">
-                                                            @entry.Code
-                                                        </span>
-                                                    }
-                                                </div>
+                                                var tooltipText = string.IsNullOrWhiteSpace(cell.Tooltip)
+                                                    ? string.Join(", ", cell.Entries.Select(e => e.Label))
+                                                    : cell.Tooltip;
+                                                <a class="attendance-grid-cell-link stretched-link"
+                                                   asp-action="Index"
+                                                   asp-route-filterMode="@Model.Filter.Mode"
+                                                   asp-route-month="@Model.Filter.MonthValue"
+                                                   asp-route-startDate="@filterStartValue"
+                                                   asp-route-endDate="@filterEndValue"
+                                                   asp-route-gridMonth="@Model.MonthlyGrid.MonthValue"
+                                                   asp-route-selectedEmployeeId="@row.MasterEmployeeId"
+                                                   asp-route-detailDate="@dayValue.ToString("yyyy-MM-dd")"
+                                                   asp-fragment="attendanceDetails"
+                                                   data-bs-toggle="tooltip"
+                                                   data-bs-placement="top"
+                                                   data-bs-title="@tooltipText">
+                                                    <div class="attendance-grid-cell-codes">
+                                                        @foreach (var entry in cell.Entries)
+                                                        {
+                                                            var pillClass = entry.IsExcused ? "attendance-grid-pill--excused" : "attendance-grid-pill--unexcused";
+                                                            <span class="attendance-grid-pill @pillClass">
+                                                                @entry.Code
+                                                            </span>
+                                                        }
+                                                    </div>
+                                                </a>
                                             }
                                             else
                                             {
@@ -255,6 +277,10 @@ else
                             <button type="submit" class="btn btn-outline-primary w-100">Apply Filters</button>
                         </div>
                         <input type="hidden" name="gridMonth" value="@Model.MonthlyGrid.MonthValue" />
+                        @if (!string.IsNullOrEmpty(detailDateValue))
+                        {
+                            <input type="hidden" name="detailDate" value="@detailDateValue" />
+                        }
                         @if (Model.SelectedEmployeeId.HasValue)
                         {
                             <input type="hidden" name="selectedEmployeeId" value="@Model.SelectedEmployeeId" />
@@ -298,7 +324,9 @@ else
                                                    asp-route-startDate="@filterStartValue"
                                                    asp-route-endDate="@filterEndValue"
                                                    asp-route-selectedEmployeeId="@row.MasterEmployeeId"
-                                                   asp-route-gridMonth="@Model.MonthlyGrid.MonthValue">
+                                                   asp-route-gridMonth="@Model.MonthlyGrid.MonthValue"
+                                                   asp-route-detailDate="@detailDateValue"
+                                                   asp-fragment="attendanceDetails">
                                                     View details for @row.EmployeeName
                                                 </a>
                                             </td>
@@ -318,20 +346,35 @@ else
                         </div>
                     }
 
-                    <div class="border-top pt-3">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="border-top pt-3" id="attendanceDetails">
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                             <h3 class="h6 mb-0">Associate Details</h3>
                             @if (Model.SelectedEmployeeId.HasValue)
                             {
-                                <a class="btn btn-sm btn-outline-secondary"
-                                   asp-action="Index"
-                                   asp-route-filterMode="@Model.Filter.Mode"
-                                   asp-route-month="@Model.Filter.MonthValue"
-                                   asp-route-startDate="@filterStartValue"
-                                   asp-route-endDate="@filterEndValue"
-                                   asp-route-gridMonth="@Model.MonthlyGrid.MonthValue">
-                                    Clear Selection
-                                </a>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @if (Model.SelectedEmployeeDetailDate.HasValue)
+                                    {
+                                        <a class="btn btn-sm btn-outline-primary"
+                                           asp-action="Index"
+                                           asp-route-filterMode="@Model.Filter.Mode"
+                                           asp-route-month="@Model.Filter.MonthValue"
+                                           asp-route-startDate="@filterStartValue"
+                                           asp-route-endDate="@filterEndValue"
+                                           asp-route-gridMonth="@Model.MonthlyGrid.MonthValue"
+                                           asp-route-selectedEmployeeId="@Model.SelectedEmployeeId">
+                                            Show Entire Range
+                                        </a>
+                                    }
+                                    <a class="btn btn-sm btn-outline-secondary"
+                                       asp-action="Index"
+                                       asp-route-filterMode="@Model.Filter.Mode"
+                                       asp-route-month="@Model.Filter.MonthValue"
+                                       asp-route-startDate="@filterStartValue"
+                                       asp-route-endDate="@filterEndValue"
+                                       asp-route-gridMonth="@Model.MonthlyGrid.MonthValue">
+                                        Clear Selection
+                                    </a>
+                                </div>
                             }
                         </div>
                         @if (!Model.SelectedEmployeeId.HasValue)
@@ -340,11 +383,24 @@ else
                         }
                         else if (!Model.SelectedEmployeeDetails.Any())
                         {
-                            <p class="text-muted mb-0">No attendance entries recorded for @Model.SelectedEmployeeDisplayName within this range.</p>
+                            if (Model.SelectedEmployeeDetailDate.HasValue)
+                            {
+                                <p class="text-muted mb-0">No attendance entries recorded for @Model.SelectedEmployeeDisplayName on @Model.SelectedEmployeeDetailDate.Value.ToString("MMM d, yyyy").</p>
+                            }
+                            else
+                            {
+                                <p class="text-muted mb-0">No attendance entries recorded for @Model.SelectedEmployeeDisplayName within this range.</p>
+                            }
                         }
                         else
                         {
-                            <p class="mb-3 fw-semibold">Showing entries for @Model.SelectedEmployeeDisplayName</p>
+                            <p class="mb-3 fw-semibold">
+                                Showing entries for @Model.SelectedEmployeeDisplayName
+                                @if (Model.SelectedEmployeeDetailDate.HasValue)
+                                {
+                                    <span>(@Model.SelectedEmployeeDetailDate.Value.ToString("MMM d, yyyy"))</span>
+                                }
+                            </p>
                             <div class="table-responsive">
                                 <table class="table table-sm table-striped align-middle">
                                     <thead class="table-light">
@@ -408,4 +464,12 @@ else
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var tooltipTriggerList = Array.prototype.slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+                new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+    </script>
 }

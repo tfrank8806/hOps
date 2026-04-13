@@ -89,6 +89,7 @@ namespace hOps.web.ViewModels.Attendance
         public int? SelectedEmployeeId { get; set; }
         public string? SelectedEmployeeDisplayName { get; set; }
         public AttendanceMonthlyGridViewModel MonthlyGrid { get; set; } = new AttendanceMonthlyGridViewModel();
+        public DateTime? SelectedEmployeeDetailDate { get; set; }
     }
 
     public class AttendanceMonthlyGridViewModel
@@ -118,6 +119,7 @@ namespace hOps.web.ViewModels.Attendance
         public DateTime Date { get; set; }
         public List<AttendanceGridEntryViewModel> Entries { get; set; } = new();
         public bool HasEntries => Entries.Count > 0;
+        public string Tooltip { get; set; } = string.Empty;
     }
 
     public class AttendanceGridEntryViewModel

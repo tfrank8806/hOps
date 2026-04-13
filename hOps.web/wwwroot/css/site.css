@@ -2638,6 +2638,19 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     padding: 0.5rem;
 }
 
+.attendance-grid-cell-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    padding: 0.15rem 0.25rem;
+    border-radius: 0.35rem;
+}
+
+.attendance-grid-cell-link:focus-visible {
+    outline: 2px solid rgba(37, 99, 235, 0.5);
+    outline-offset: 2px;
+}
+
 .attendance-grid-cell-codes {
     display: flex;
     flex-direction: column;
