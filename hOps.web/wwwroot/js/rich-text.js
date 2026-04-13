@@ -437,6 +437,32 @@
         let sectionsContainer = null;
         let searchInput = null;
         let currentQuery = '';
+        // Keep the caret position alive when clicking the emoji toggle from a mouse/touch device.
+        const pointerDownEvent = (typeof window !== 'undefined' && 'PointerEvent' in window) ? 'pointerdown' : 'mousedown';
+
+        function preserveSelectionBeforeToggle(event) {
+            if (event.type === 'pointerdown') {
+                if (event.pointerType === 'mouse' && typeof event.button === 'number' && event.button !== 0) {
+                    return;
+                }
+            } else if (event.type === 'mousedown' && typeof event.button === 'number' && event.button !== 0) {
+                return;
+            }
+
+            if (event.cancelable) {
+                event.preventDefault();
+            }
+
+            activeSelectionContext = context;
+            captureEditorSelection(context);
+        }
+
+        if (pointerDownEvent === 'pointerdown') {
+            toggle.addEventListener(pointerDownEvent, preserveSelectionBeforeToggle);
+        } else {
+            toggle.addEventListener(pointerDownEvent, preserveSelectionBeforeToggle);
+            toggle.addEventListener('touchstart', preserveSelectionBeforeToggle, { passive: false });
+        }
 
         function showEmojiStatus(message) {
             menu.innerHTML = '';
