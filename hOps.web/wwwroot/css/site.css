@@ -2610,6 +2610,8 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 }
 
 .attendance-grid-table {
+    --attendance-grid-name-width: 220px;
+    --attendance-grid-total-width: 90px;
     min-width: 720px;
     white-space: nowrap;
 }
@@ -2618,6 +2620,7 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 .attendance-grid-table td {
     text-align: center;
     vertical-align: middle;
+    background-color: #fff;
 }
 
 .attendance-grid-day {
@@ -2626,29 +2629,29 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 }
 
 .attendance-grid-name {
-    min-width: 220px;
-    background-color: #fff;
+    min-width: var(--attendance-grid-name-width);
 }
 
 .attendance-grid-total {
-    min-width: 70px;
+    min-width: var(--attendance-grid-total-width);
 }
 
 .attendance-grid-cell {
-    padding: 0.5rem;
+    padding: 0;
 }
 
-.attendance-grid-cell-link {
-    display: block;
-    color: inherit;
-    text-decoration: none;
-    padding: 0.15rem 0.25rem;
-    border-radius: 0.35rem;
+.attendance-grid-cell-button {
+    width: 100%;
+    height: 100%;
+    padding: 0.35rem 0.25rem;
+    border: none;
+    background: transparent;
+    border-radius: 0;
 }
 
-.attendance-grid-cell-link:focus-visible {
+.attendance-grid-cell-button:focus-visible {
     outline: 2px solid rgba(37, 99, 235, 0.5);
-    outline-offset: 2px;
+    outline-offset: -2px;
 }
 
 .attendance-grid-cell-codes {
@@ -2688,15 +2691,74 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
     gap: 1rem;
 }
 
-.attendance-grid-table .sticky-col {
+.attendance-grid-sticky-name {
     position: sticky;
     left: 0;
-    z-index: 2;
+    z-index: 3;
+    background-color: #fff;
 }
 
-.attendance-grid-table thead .sticky-col,
-.attendance-grid-table tfoot .sticky-col {
+.attendance-grid-sticky-total {
+    position: sticky;
+    left: var(--attendance-grid-name-width);
     z-index: 3;
+    background-color: #fff;
+    border-left: 1px solid rgba(148, 163, 184, 0.5);
+}
+
+.attendance-grid-table thead .attendance-grid-sticky-name,
+.attendance-grid-table thead .attendance-grid-sticky-total,
+.attendance-grid-table tfoot .attendance-grid-sticky-name,
+.attendance-grid-table tfoot .attendance-grid-sticky-total {
+    z-index: 4;
+}
+
+.attendance-grid-range-form .form-label {
+    margin-bottom: 0.15rem;
+}
+
+.attendance-detail-panel {
+    position: absolute;
+    width: 320px;
+    max-width: calc(100vw - 2rem);
+    background-color: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 0.75rem;
+    box-shadow: 0 25px 45px rgba(15, 23, 42, 0.25);
+    padding: 1rem;
+    z-index: 1050;
+}
+
+.attendance-detail-panel__title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.attendance-detail-panel__body {
+    max-height: 260px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 0.75rem 0;
+}
+
+.attendance-detail-entry {
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.65rem;
+}
+
+.attendance-detail-entry__header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.35rem;
+}
+
+.attendance-detail-entry__meta {
+    font-size: 0.85rem;
+    color: #475467;
 }
 
 .mpr-log-table tbody tr:nth-child(even) {

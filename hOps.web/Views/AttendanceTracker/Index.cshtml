@@ -1,5 +1,6 @@
 @model hOps.web.ViewModels.Attendance.AttendanceTrackerViewModel
 @using hOps.web.ViewModels.Attendance
+@using System.Text.Json
 @{
     ViewData["Title"] = "Attendance Tracker";
     ViewData["MainContainerClass"] = "main-inner--wide";
@@ -7,6 +8,11 @@
     var filterStartValue = Model.Filter.CustomStartDate?.ToString("yyyy-MM-dd");
     var filterEndValue = Model.Filter.CustomEndDate?.ToString("yyyy-MM-dd");
     var detailDateValue = Model.SelectedEmployeeDetailDate?.ToString("yyyy-MM-dd");
+    var gridRangeModeValue = Model.MonthlyGrid.RangeFilter.Mode ?? AttendanceGridRangeModes.Month;
+    var gridMonthValue = Model.MonthlyGrid.MonthValue;
+    var gridRangeStartMonthValue = Model.MonthlyGrid.RangeFilter.StartMonthValue ?? string.Empty;
+    var gridRangeEndMonthValue = Model.MonthlyGrid.RangeFilter.EndMonthValue ?? string.Empty;
+    var entryJsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 }
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
@@ -46,19 +52,46 @@ else
         <div class="card-body">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                 <div>
-                    <h2 class="h5 mb-1">Monthly Attendance Grid</h2>
-                    <div class="text-muted small">@Model.MonthlyGrid.MonthDisplay</div>
+                    <h2 class="h5 mb-1">Attendance Grid</h2>
+                    <div class="text-muted small">@Model.MonthlyGrid.RangeDisplay</div>
                 </div>
-                <form method="get" class="attendance-grid-month-form">
-                    <label class="form-label small text-muted d-block" for="gridMonthInput">Select Month</label>
-                    <div class="d-flex gap-2">
+                <form method="get" class="row gy-2 gx-3 align-items-end attendance-grid-range-form">
+                    <div class="col-12 col-md-auto">
+                        <label class="form-label small text-muted" for="gridRangeMode">Range</label>
+                        <select class="form-select form-select-sm" id="gridRangeMode" name="gridRangeMode">
+                            <option value="@AttendanceGridRangeModes.Month" selected="@(gridRangeModeValue == AttendanceGridRangeModes.Month ? "selected" : null)">Month</option>
+                            <option value="@AttendanceGridRangeModes.MultiMonth" selected="@(gridRangeModeValue == AttendanceGridRangeModes.MultiMonth ? "selected" : null)">Multiple Months</option>
+                            <option value="@AttendanceGridRangeModes.YearToDate" selected="@(gridRangeModeValue == AttendanceGridRangeModes.YearToDate ? "selected" : null)">Year to Date</option>
+                            <option value="@AttendanceGridRangeModes.AllTime" selected="@(gridRangeModeValue == AttendanceGridRangeModes.AllTime ? "selected" : null)">All Time</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-auto" data-grid-range="month">
+                        <label class="form-label small text-muted" for="gridMonthInput">Month</label>
                         <input type="month"
-                               class="form-control"
+                               class="form-control form-control-sm"
                                id="gridMonthInput"
                                name="gridMonth"
-                               value="@Model.MonthlyGrid.MonthValue"
+                               value="@gridMonthValue"
                                max="9999-12" />
-                        <button type="submit" class="btn btn-outline-primary">Update</button>
+                    </div>
+                    <div class="col-12 col-md-auto" data-grid-range="multi">
+                        <label class="form-label small text-muted" for="gridRangeStartInput">Start Month</label>
+                        <input type="month"
+                               class="form-control form-control-sm"
+                               id="gridRangeStartInput"
+                               name="gridRangeStart"
+                               value="@gridRangeStartMonthValue" />
+                    </div>
+                    <div class="col-12 col-md-auto" data-grid-range="multi">
+                        <label class="form-label small text-muted" for="gridRangeEndInput">End Month</label>
+                        <input type="month"
+                               class="form-control form-control-sm"
+                               id="gridRangeEndInput"
+                               name="gridRangeEnd"
+                               value="@gridRangeEndMonthValue" />
+                    </div>
+                    <div class="col-12 col-md-auto">
+                        <button type="submit" class="btn btn-outline-primary btn-sm w-100">Apply</button>
                     </div>
                     <input type="hidden" name="filterMode" value="@Model.Filter.Mode" />
                     <input type="hidden" name="month" value="@Model.Filter.MonthValue" />
@@ -85,7 +118,8 @@ else
                     <table class="table table-bordered align-middle attendance-grid-table">
                         <thead class="table-light">
                             <tr>
-                                <th scope="col" class="attendance-grid-name sticky-col text-start">Employee</th>
+                                <th scope="col" class="attendance-grid-name attendance-grid-sticky-name text-start">Employee</th>
+                                <th scope="col" class="attendance-grid-total attendance-grid-sticky-total text-center">Total</th>
                                 @foreach (var day in Model.MonthlyGrid.Days)
                                 {
                                     <th scope="col" class="attendance-grid-day">
@@ -93,68 +127,61 @@ else
                                         <div class="small text-muted">@day.ToString("ddd")</div>
                                     </th>
                                 }
-                                <th scope="col" class="attendance-grid-total text-center">Total</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var row in Model.MonthlyGrid.Rows)
                             {
                                 <tr>
-                                    <th scope="row" class="attendance-grid-name sticky-col text-start">
+                                    <th scope="row" class="attendance-grid-name attendance-grid-sticky-name text-start">
                                         <div class="fw-semibold">@row.EmployeeName</div>
                                     </th>
+                                    <td class="attendance-grid-total attendance-grid-sticky-total fw-semibold">@row.TotalCount</td>
                                     @for (var i = 0; i < Model.MonthlyGrid.Days.Count; i++)
                                     {
                                         var cell = row.Cells[i];
                                         var dayValue = Model.MonthlyGrid.Days[i];
-                                        <td class="attendance-grid-cell position-relative">
-                                            @if (cell.HasEntries)
-                                            {
-                                                var tooltipText = string.IsNullOrWhiteSpace(cell.Tooltip)
-                                                    ? string.Join(", ", cell.Entries.Select(e => e.Label))
-                                                    : cell.Tooltip;
-                                                <a class="attendance-grid-cell-link stretched-link"
-                                                   asp-action="Index"
-                                                   asp-route-filterMode="@Model.Filter.Mode"
-                                                   asp-route-month="@Model.Filter.MonthValue"
-                                                   asp-route-startDate="@filterStartValue"
-                                                   asp-route-endDate="@filterEndValue"
-                                                   asp-route-gridMonth="@Model.MonthlyGrid.MonthValue"
-                                                   asp-route-selectedEmployeeId="@row.MasterEmployeeId"
-                                                   asp-route-detailDate="@dayValue.ToString("yyyy-MM-dd")"
-                                                   asp-fragment="attendanceDetails"
-                                                   data-bs-toggle="tooltip"
-                                                   data-bs-placement="top"
-                                                   data-bs-title="@tooltipText">
-                                                    <div class="attendance-grid-cell-codes">
+                                        var tooltipText = cell.HasEntries ? (string.IsNullOrWhiteSpace(cell.Tooltip) ? string.Join(", ", cell.Entries.Select(e => e.Label)) : cell.Tooltip) : string.Empty;
+                                        var entryPayload = JsonSerializer.Serialize(cell.Entries, entryJsonOptions);
+                                        <td class="attendance-grid-cell">
+                                            <button type="button"
+                                                    class="attendance-grid-cell-button @(cell.HasEntries ? "has-entries" : "is-empty")"
+                                                    data-grid-cell
+                                                    data-employee-id="@row.MasterEmployeeId"
+                                                    data-employee-name="@row.EmployeeName"
+                                                    data-date="@dayValue.ToString("yyyy-MM-dd")"
+                                                    data-date-display="@dayValue.ToString("MMM d, yyyy")"
+                                                    data-entries='@Html.Raw(entryPayload)'
+                                                    data-has-entries="@(cell.HasEntries ? "true" : "false")"
+                                                    @(cell.HasEntries && !string.IsNullOrEmpty(tooltipText) ? $"data-bs-toggle=\"tooltip\" data-bs-placement=\"top\" data-bs-title=\"{tooltipText}\"" : string.Empty)>
+                                                <div class="attendance-grid-cell-codes">
+                                                    @if (cell.HasEntries)
+                                                    {
                                                         @foreach (var entry in cell.Entries)
                                                         {
                                                             var pillClass = entry.IsExcused ? "attendance-grid-pill--excused" : "attendance-grid-pill--unexcused";
-                                                            <span class="attendance-grid-pill @pillClass">
-                                                                @entry.Code
-                                                            </span>
+                                                            <span class="attendance-grid-pill @pillClass">@entry.Code</span>
                                                         }
-                                                    </div>
-                                                </a>
-                                            }
-                                            else
-                                            {
-                                                <span class="text-muted small">&ndash;</span>
-                                            }
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted small">&ndash;</span>
+                                                    }
+                                                </div>
+                                            </button>
                                         </td>
                                     }
-                                    <td class="attendance-grid-total fw-semibold">@row.TotalCount</td>
                                 </tr>
                             }
                         </tbody>
                         <tfoot class="table-light">
                             <tr>
-                                <th scope="row" class="attendance-grid-name sticky-col text-start">Daily total</th>
+                                <th scope="row" class="attendance-grid-name attendance-grid-sticky-name text-start">Daily total</th>
+                                <td class="attendance-grid-total attendance-grid-sticky-total fw-semibold">@Model.MonthlyGrid.GrandTotal</td>
                                 @foreach (var dayTotal in Model.MonthlyGrid.DayTotals)
                                 {
                                     <td class="attendance-grid-total">@dayTotal.TotalCount</td>
                                 }
-                                <td class="attendance-grid-total fw-semibold">@Model.MonthlyGrid.GrandTotal</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -186,6 +213,20 @@ else
                         </div>
                     </div>
                 </div>
+
+                <div id="attendanceGridDetailPanel" class="attendance-detail-panel d-none" role="dialog" aria-live="polite">
+                    <div class="attendance-detail-panel__header d-flex justify-content-between align-items-start gap-3">
+                        <div>
+                            <div class="attendance-detail-panel__title" data-detail-employee></div>
+                            <div class="small text-muted" data-detail-date></div>
+                        </div>
+                        <button type="button" class="btn-close" aria-label="Close details" data-detail-close></button>
+                    </div>
+                    <div class="attendance-detail-panel__body" data-detail-body></div>
+                    <div class="attendance-detail-panel__footer d-flex justify-content-end">
+                        <button type="button" class="btn btn-sm btn-primary" data-detail-add>+ Add Attendance</button>
+                    </div>
+                </div>
             }
         </div>
     </div>
@@ -201,7 +242,7 @@ else
                             Add employees to the master employee list before logging attendance.
                         </div>
                     }
-                    <form asp-action="Create" method="post" novalidate>
+                    <form asp-action="Create" method="post" novalidate id="attendanceLogForm">
                         @Html.AntiForgeryToken()
                         <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
                         <div class="mb-3">
@@ -277,6 +318,9 @@ else
                             <button type="submit" class="btn btn-outline-primary w-100">Apply Filters</button>
                         </div>
                         <input type="hidden" name="gridMonth" value="@Model.MonthlyGrid.MonthValue" />
+                        <input type="hidden" name="gridRangeMode" value="@gridRangeModeValue" />
+                        <input type="hidden" name="gridRangeStart" value="@gridRangeStartMonthValue" />
+                        <input type="hidden" name="gridRangeEnd" value="@gridRangeEndMonthValue" />
                         @if (!string.IsNullOrEmpty(detailDateValue))
                         {
                             <input type="hidden" name="detailDate" value="@detailDateValue" />
@@ -325,6 +369,9 @@ else
                                                    asp-route-endDate="@filterEndValue"
                                                    asp-route-selectedEmployeeId="@row.MasterEmployeeId"
                                                    asp-route-gridMonth="@Model.MonthlyGrid.MonthValue"
+                                                   asp-route-gridRangeMode="@gridRangeModeValue"
+                                                   asp-route-gridRangeStart="@gridRangeStartMonthValue"
+                                                   asp-route-gridRangeEnd="@gridRangeEndMonthValue"
                                                    asp-route-detailDate="@detailDateValue"
                                                    asp-fragment="attendanceDetails">
                                                     View details for @row.EmployeeName
@@ -361,6 +408,9 @@ else
                                            asp-route-startDate="@filterStartValue"
                                            asp-route-endDate="@filterEndValue"
                                            asp-route-gridMonth="@Model.MonthlyGrid.MonthValue"
+                                           asp-route-gridRangeMode="@gridRangeModeValue"
+                                           asp-route-gridRangeStart="@gridRangeStartMonthValue"
+                                           asp-route-gridRangeEnd="@gridRangeEndMonthValue"
                                            asp-route-selectedEmployeeId="@Model.SelectedEmployeeId">
                                             Show Entire Range
                                         </a>
@@ -371,7 +421,10 @@ else
                                        asp-route-month="@Model.Filter.MonthValue"
                                        asp-route-startDate="@filterStartValue"
                                        asp-route-endDate="@filterEndValue"
-                                       asp-route-gridMonth="@Model.MonthlyGrid.MonthValue">
+                                       asp-route-gridMonth="@Model.MonthlyGrid.MonthValue"
+                                       asp-route-gridRangeMode="@gridRangeModeValue"
+                                       asp-route-gridRangeStart="@gridRangeStartMonthValue"
+                                       asp-route-gridRangeEnd="@gridRangeEndMonthValue">
                                         Clear Selection
                                     </a>
                                 </div>
@@ -465,11 +518,178 @@ else
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            var tooltipTriggerList = Array.prototype.slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        (function () {
+            const tooltipTriggerList = Array.prototype.slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
             tooltipTriggerList.forEach(function (tooltipTriggerEl) {
                 new bootstrap.Tooltip(tooltipTriggerEl);
             });
-        });
+
+            const rangeModeSelect = document.getElementById('gridRangeMode');
+            const rangeSections = document.querySelectorAll('[data-grid-range]');
+            function updateRangeVisibility() {
+                if (!rangeModeSelect) {
+                    return;
+                }
+                const mode = rangeModeSelect.value;
+                rangeSections.forEach(section => {
+                    const targetMode = section.getAttribute('data-grid-range');
+                    section.classList.toggle('d-none', mode !== targetMode);
+                });
+            }
+            updateRangeVisibility();
+            rangeModeSelect?.addEventListener('change', updateRangeVisibility);
+
+            const detailPanel = document.getElementById('attendanceGridDetailPanel');
+            const detailBody = detailPanel?.querySelector('[data-detail-body]');
+            const detailEmployee = detailPanel?.querySelector('[data-detail-employee]');
+            const detailDate = detailPanel?.querySelector('[data-detail-date]');
+            const detailAddButton = detailPanel?.querySelector('[data-detail-add]');
+            const detailCloseButton = detailPanel?.querySelector('[data-detail-close]');
+            let detailTarget = null;
+
+            function hideDetailPanel() {
+                if (!detailPanel || detailPanel.classList.contains('d-none')) {
+                    detailTarget = null;
+                    return;
+                }
+                detailPanel.classList.add('d-none');
+                detailPanel.style.top = '';
+                detailPanel.style.left = '';
+                detailPanel.style.visibility = '';
+                detailTarget = null;
+            }
+
+            function renderDetailEntries(entries) {
+                if (!detailBody) {
+                    return;
+                }
+                detailBody.textContent = '';
+                entries.forEach(entry => {
+                    const entryEl = document.createElement('div');
+                    entryEl.className = 'attendance-detail-entry';
+
+                    const header = document.createElement('div');
+                    header.className = 'attendance-detail-entry__header';
+                    const pill = document.createElement('span');
+                    pill.className = 'attendance-grid-pill ' + (entry.isExcused ? 'attendance-grid-pill--excused' : 'attendance-grid-pill--unexcused');
+                    pill.textContent = entry.code;
+                    const typeLabel = document.createElement('span');
+                    typeLabel.textContent = entry.attendanceTypeDisplay || entry.label;
+                    typeLabel.className = 'fw-semibold';
+                    header.appendChild(pill);
+                    header.appendChild(typeLabel);
+                    entryEl.appendChild(header);
+
+                    const roleLine = document.createElement('div');
+                    roleLine.className = 'attendance-detail-entry__meta';
+                    roleLine.textContent = `${entry.departmentName || 'Unassigned'} · ${entry.position || 'Unassigned'}`;
+                    entryEl.appendChild(roleLine);
+
+                    const createdLine = document.createElement('div');
+                    createdLine.className = 'attendance-detail-entry__meta';
+                    if (entry.createdAtUtc) {
+                        const createdAt = new Date(entry.createdAtUtc);
+                        createdLine.textContent = `Logged ${createdAt.toLocaleString()} by ${entry.createdByDisplay || 'Unknown'}`;
+                    } else {
+                        createdLine.textContent = `Logged by ${entry.createdByDisplay || 'Unknown'}`;
+                    }
+                    entryEl.appendChild(createdLine);
+
+                    detailBody.appendChild(entryEl);
+                });
+            }
+
+            function positionDetailPanel(target) {
+                if (!detailPanel) {
+                    return;
+                }
+                detailPanel.classList.remove('d-none');
+                detailPanel.style.visibility = 'hidden';
+                const rect = target.getBoundingClientRect();
+                const panelRect = detailPanel.getBoundingClientRect();
+                let top = window.scrollY + rect.bottom + 8;
+                let left = window.scrollX + rect.left;
+                if (left + panelRect.width > window.scrollX + window.innerWidth - 16) {
+                    left = window.scrollX + window.innerWidth - panelRect.width - 16;
+                }
+                if (top + panelRect.height > window.scrollY + window.innerHeight - 16) {
+                    top = window.scrollY + rect.top - panelRect.height - 8;
+                    if (top < window.scrollY + 16) {
+                        top = window.scrollY + 16;
+                    }
+                }
+                if (left < 16) {
+                    left = 16;
+                }
+                detailPanel.style.top = `${top}px`;
+                detailPanel.style.left = `${left}px`;
+                detailPanel.style.visibility = 'visible';
+            }
+
+            function showDetailPanel(button, entries) {
+                if (!detailPanel || !detailEmployee || !detailDate) {
+                    return;
+                }
+                detailTarget = button;
+                detailEmployee.textContent = button.getAttribute('data-employee-name') || 'Employee';
+                detailDate.textContent = button.getAttribute('data-date-display') || button.getAttribute('data-date') || '';
+                renderDetailEntries(entries);
+                positionDetailPanel(button);
+                detailAddButton?.setAttribute('data-employee-id', button.getAttribute('data-employee-id') || '');
+                detailAddButton?.setAttribute('data-date', button.getAttribute('data-date') || '');
+            }
+
+            function prefillAttendanceForm(employeeId, date, employeeName) {
+                const employeeSelect = document.getElementById('Form_MasterEmployeeId');
+                const dateInput = document.getElementById('Form_AttendanceDate');
+                const form = document.getElementById('attendanceLogForm');
+                if (employeeSelect && employeeId) {
+                    employeeSelect.value = employeeId;
+                    employeeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (dateInput && date) {
+                    dateInput.value = date;
+                    dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                form?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                const typeSelect = document.getElementById('Form_AttendanceType');
+                typeSelect?.focus();
+            }
+
+            const cellButtons = document.querySelectorAll('[data-grid-cell]');
+            cellButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    const entries = JSON.parse(button.getAttribute('data-entries') || '[]');
+                    const hasEntries = entries.length > 0;
+                    if (!hasEntries) {
+                        hideDetailPanel();
+                        prefillAttendanceForm(button.getAttribute('data-employee-id'), button.getAttribute('data-date'), button.getAttribute('data-employee-name'));
+                        return;
+                    }
+                    showDetailPanel(button, entries);
+                });
+            });
+
+            detailAddButton?.addEventListener('click', function () {
+                if (!detailTarget) {
+                    return;
+                }
+                prefillAttendanceForm(detailTarget.getAttribute('data-employee-id'), detailTarget.getAttribute('data-date'), detailTarget.getAttribute('data-employee-name'));
+                hideDetailPanel();
+            });
+
+            detailCloseButton?.addEventListener('click', hideDetailPanel);
+            document.addEventListener('click', function (event) {
+                if (!detailPanel || detailPanel.classList.contains('d-none')) {
+                    return;
+                }
+                if (detailPanel.contains(event.target) || (detailTarget && detailTarget.contains(event.target))) {
+                    return;
+                }
+                hideDetailPanel();
+            });
+            window.addEventListener('scroll', hideDetailPanel, { passive: true });
+            window.addEventListener('resize', hideDetailPanel);
+        })();
     </script>
 }

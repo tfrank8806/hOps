@@ -94,14 +94,15 @@ namespace hOps.web.ViewModels.Attendance
 
     public class AttendanceMonthlyGridViewModel
     {
-        public DateTime MonthStart { get; set; }
-        public DateTime MonthEnd { get; set; }
+        public DateTime RangeStart { get; set; }
+        public DateTime RangeEnd { get; set; }
+        public string RangeDisplay { get; set; } = string.Empty;
         public string MonthValue { get; set; } = string.Empty;
-        public string MonthDisplay => MonthStart.ToString("MMMM yyyy");
         public List<DateTime> Days { get; set; } = new();
         public List<AttendanceGridRowViewModel> Rows { get; set; } = new();
         public List<AttendanceGridDayTotalViewModel> DayTotals { get; set; } = new();
         public List<AttendanceCodeLegendItemViewModel> LegendItems { get; set; } = new();
+        public AttendanceGridRangeFilterViewModel RangeFilter { get; set; } = new AttendanceGridRangeFilterViewModel();
         public int GrandTotal { get; set; }
         public bool HasEmployees => Rows.Count > 0;
     }
@@ -128,7 +129,12 @@ namespace hOps.web.ViewModels.Attendance
         public AttendanceRecordType AttendanceType { get; set; }
         public string Code { get; set; } = string.Empty;
         public string Label { get; set; } = string.Empty;
+        public string AttendanceTypeDisplay { get; set; } = string.Empty;
         public bool IsExcused { get; set; }
+        public string DepartmentName { get; set; } = string.Empty;
+        public string Position { get; set; } = string.Empty;
+        public string CreatedByDisplay { get; set; } = string.Empty;
+        public DateTime CreatedAtUtc { get; set; }
     }
 
     public class AttendanceGridDayTotalViewModel
@@ -143,5 +149,23 @@ namespace hOps.web.ViewModels.Attendance
         public string Code { get; set; } = string.Empty;
         public string Label { get; set; } = string.Empty;
         public bool IsExcused { get; set; }
+    }
+
+    public static class AttendanceGridRangeModes
+    {
+        public const string Month = "month";
+        public const string MultiMonth = "multi";
+        public const string YearToDate = "ytd";
+        public const string AllTime = "all";
+    }
+
+    public class AttendanceGridRangeFilterViewModel
+    {
+        public string Mode { get; set; } = AttendanceGridRangeModes.Month;
+        public string MonthValue { get; set; } = string.Empty;
+        public string? StartMonthValue { get; set; }
+        public string? EndMonthValue { get; set; }
+        public DateTime RangeStart { get; set; }
+        public DateTime RangeEnd { get; set; }
     }
 }
