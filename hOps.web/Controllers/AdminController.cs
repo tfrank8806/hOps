@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 
 namespace hOps.web.Controllers
@@ -22,6 +23,7 @@ namespace hOps.web.Controllers
     {
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IEmailSender _emailSender;
+        private readonly ILogger<AdminController> _logger;
         private const string ExternalLoginUrl = "https://www.guestquest.net/Identity/Account/Login";
         private const int AccessRequestsPageSize = 100;
 
@@ -29,11 +31,13 @@ namespace hOps.web.Controllers
             ApplicationDbContext db,
             UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager,
-            IEmailSender emailSender)
+            IEmailSender emailSender,
+            ILogger<AdminController> logger)
             : base(db, userManager)
         {
             _roleManager = roleManager;
             _emailSender = emailSender;
+            _logger = logger;
         }
 
         // Admin landing
@@ -184,7 +188,9 @@ namespace hOps.web.Controllers
                 LastName = input.LastName!,
                 MobilePhone = input.MobilePhone,
                 PhoneNumber = input.MobilePhone,
-                MustChangePassword = true
+                MustChangePassword = true,
+                IsActive = true,
+                DeactivatedAtUtc = null
             };
 
             var tempPassword = GenerateTemporaryPassword();
@@ -293,16 +299,118 @@ GuestQuest Admin Team
                 }
             }
 
-            var deleteResult = await _userManager.DeleteAsync(targetUser);
-            if (!deleteResult.Succeeded)
+            try
             {
-                var error = deleteResult.Errors.Select(e => e.Description).FirstOrDefault() ?? "Unable to delete user.";
-                TempData["AdminUsersError"] = error;
+                var deleteResult = await _userManager.DeleteAsync(targetUser);
+                if (!deleteResult.Succeeded)
+                {
+                    var error = deleteResult.Errors.Select(e => e.Description).FirstOrDefault() ?? "Unable to delete user.";
+                    TempData["AdminUsersError"] = error;
+                }
+                else
+                {
+                    var label = targetUser.Email ?? targetUser.UserName ?? "user";
+                    TempData["AdminUsersMessage"] = $"Deleted user {label}.";
+                }
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogWarning(ex, "Unable to delete user {UserId} due to related records.", userId);
+                TempData["AdminUsersError"] = "This user has existing activity (logs, work orders, etc.) and cannot be deleted without removing those references. Consider revoking access instead.";
+            }
+
+            return RedirectToAction(nameof(Users));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public Task<IActionResult> DeactivateUser(string userId) => ChangeUserActivationAsync(userId, deactivate: true);
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public Task<IActionResult> ReactivateUser(string userId) => ChangeUserActivationAsync(userId, deactivate: false);
+
+        private async Task<IActionResult> ChangeUserActivationAsync(string userId, bool deactivate)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                TempData["AdminUsersError"] = "Invalid user.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser == null)
+            {
+                return Challenge();
+            }
+
+            if (string.Equals(currentUser.Id, userId, StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["AdminUsersError"] = deactivate
+                    ? "You cannot deactivate your own account."
+                    : "You cannot reactivate your own account.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var targetUser = await _userManager.FindByIdAsync(userId);
+            if (targetUser == null)
+            {
+                TempData["AdminUsersError"] = "User not found.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var currentRoles = await _userManager.GetRolesAsync(currentUser);
+            var targetRoles = await _userManager.GetRolesAsync(targetUser);
+            var isAdmin = currentRoles.Contains("Admin");
+
+            if (!isAdmin)
+            {
+                if (targetRoles.Contains("Admin"))
+                {
+                    TempData["AdminUsersError"] = "You do not have permission to manage this user.";
+                    return RedirectToAction(nameof(Users));
+                }
+
+                var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(currentUser.Id);
+                var targetPropertyIds = await _context.UserPropertyAccesses
+                    .Where(upa => upa.ApplicationUserId == targetUser.Id)
+                    .Select(upa => upa.PropertyId)
+                    .Distinct()
+                    .ToListAsync();
+
+                if (!targetPropertyIds.Any() || !targetPropertyIds.All(accessiblePropertyIds.Contains))
+                {
+                    TempData["AdminUsersError"] = "You do not have permission to manage this user.";
+                    return RedirectToAction(nameof(Users));
+                }
+            }
+
+            if (deactivate && !targetUser.IsActive)
+            {
+                TempData["AdminUsersError"] = "User is already deactivated.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            if (!deactivate && targetUser.IsActive)
+            {
+                TempData["AdminUsersError"] = "User is already active.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            targetUser.IsActive = !deactivate;
+            targetUser.DeactivatedAtUtc = deactivate ? DateTime.UtcNow : null;
+
+            var updateResult = await _userManager.UpdateAsync(targetUser);
+            if (!updateResult.Succeeded)
+            {
+                TempData["AdminUsersError"] = updateResult.Errors.Select(e => e.Description).FirstOrDefault() ?? "Unable to update user.";
             }
             else
             {
                 var label = targetUser.Email ?? targetUser.UserName ?? "user";
-                TempData["AdminUsersMessage"] = $"Deleted user {label}.";
+                TempData["AdminUsersMessage"] = deactivate
+                    ? $"User {label} has been deactivated."
+                    : $"User {label} has been reactivated.";
             }
 
             return RedirectToAction(nameof(Users));
@@ -663,6 +771,16 @@ HotelOps Admin Team
                     canReset = propertyIds.Count == 0 || accessiblePropertyIds.Overlaps(propertyIds);
                 }
 
+                var canManageActivation = false;
+                if (isAdmin)
+                {
+                    canManageActivation = u.Id != currentUser.Id;
+                }
+                else if (u.Id != currentUser.Id && !roles.Contains("Admin"))
+                {
+                    canManageActivation = propertyIds.Count == 0 || accessiblePropertyIds.Overlaps(propertyIds);
+                }
+
                 userViewModels.Add(new UserWithAccessViewModel
                 {
                     Id = u.Id,
@@ -673,6 +791,9 @@ HotelOps Admin Team
                     PropertyIds = propertyIds,
                     CanDelete = canDelete,
                     CanResetPassword = canReset,
+                    CanDeactivate = canManageActivation && u.IsActive,
+                    CanReactivate = canManageActivation && !u.IsActive,
+                    IsActive = u.IsActive,
                     LastLoginAtUtc = u.LastLoginAtUtc
                 });
             }
@@ -933,7 +1054,9 @@ HotelOps Admin Team
                 FirstName = request.FirstName,
                 LastName = request.LastName,
                 MobilePhone = request.MobilePhone,
-                MustChangePassword = true
+                MustChangePassword = true,
+                IsActive = true,
+                DeactivatedAtUtc = null
             };
 
             var tempPassword = GenerateTemporaryPassword();

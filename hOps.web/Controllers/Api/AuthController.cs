@@ -50,6 +50,11 @@ namespace hOps.web.Controllers.Api
                 return Unauthorized(new { error = "Password reset required before using the mobile app." });
             }
 
+            if (!user.IsActive)
+            {
+                return Unauthorized(new { error = "Account has been deactivated. Contact an administrator." });
+            }
+
             var passwordResult = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
             if (!passwordResult.Succeeded)
             {

@@ -13,6 +13,9 @@ namespace hOps.web.Models
         public IList<int> PropertyIds { get; set; } = new List<int>();
         public bool CanDelete { get; set; }
         public bool CanResetPassword { get; set; }
+        public bool CanDeactivate { get; set; }
+        public bool CanReactivate { get; set; }
+        public bool IsActive { get; set; } = true;
         public DateTime? LastLoginAtUtc { get; set; }
     }
 }

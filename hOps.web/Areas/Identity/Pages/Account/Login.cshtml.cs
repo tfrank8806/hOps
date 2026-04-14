@@ -82,20 +82,29 @@ namespace hOps.web.Areas.Identity.Pages.Account
                 return Page();
             }
 
-            var result = await _signInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: true);
+            var user = await _userManager.FindByEmailAsync(Input.Email);
+            if (user == null)
+            {
+                ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+                return Page();
+            }
+
+            if (!user.IsActive)
+            {
+                ModelState.AddModelError(string.Empty, "This account has been deactivated. Please contact your administrator.");
+                return Page();
+            }
+
+            var result = await _signInManager.PasswordSignInAsync(user, Input.Password, Input.RememberMe, lockoutOnFailure: true);
             if (result.Succeeded)
             {
-                var user = await _userManager.FindByEmailAsync(Input.Email);
-                if (user != null)
-                {
-                    user.LastLoginAtUtc = DateTime.UtcNow;
-                    await _userManager.UpdateAsync(user);
+                user.LastLoginAtUtc = DateTime.UtcNow;
+                await _userManager.UpdateAsync(user);
 
-                    if (user.MustChangePassword)
-                    {
-                        _logger.LogInformation("Redirecting user {UserId} to forced password change.", user.Id);
-                        return RedirectToPage("./ForceChangePassword");
-                    }
+                if (user.MustChangePassword)
+                {
+                    _logger.LogInformation("Redirecting user {UserId} to forced password change.", user.Id);
+                    return RedirectToPage("./ForceChangePassword");
                 }
 
                 _logger.LogInformation("User {Email} logged in.", Input.Email);

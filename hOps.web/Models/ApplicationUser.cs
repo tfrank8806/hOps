@@ -14,6 +14,8 @@ namespace hOps.web.Models
         public string? ProfilePhotoPath { get; set; }
 
         public bool MustChangePassword { get; set; } = false;
+        public bool IsActive { get; set; } = true;
+        public DateTime? DeactivatedAtUtc { get; set; }
 
         public bool EmailOnMessage { get; set; } = false;
         public bool EmailOnMention { get; set; } = false;

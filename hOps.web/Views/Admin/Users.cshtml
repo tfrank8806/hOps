@@ -41,6 +41,7 @@
                 <th>Email</th>
                 <th>First Name</th>
                 <th>Last Name</th>
+                <th>Status</th>
                 <th>Roles</th>
                 <th>Properties</th>
                 <th class="text-nowrap">Last Login</th>
@@ -69,6 +70,16 @@
                         <td>@user.Email</td>
                         <td>@user.FirstName</td>
                         <td>@user.LastName</td>
+                        <td>
+                            @if (user.IsActive)
+                            {
+                                <span class="badge text-bg-success-subtle">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Inactive</span>
+                            }
+                        </td>
                         <td>@string.Join(", ", user.Roles)</td>
                         <td>
                             @if (propertyNames.Any())
@@ -115,6 +126,48 @@
                                     <button type="button" class="btn btn-sm btn-warning" disabled>
                                         Reset Password
                                     </button>
+                                }
+                                @if (user.IsActive)
+                                {
+                                    if (user.CanDeactivate)
+                                    {
+                                        <form asp-action="DeactivateUser" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="userId" value="@user.Id" />
+                                            <button type="submit"
+                                                    class="btn btn-sm btn-outline-warning"
+                                                    onclick="return confirm('Deactivate user @user.Email? They will no longer be able to sign in.');">
+                                                Deactivate
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-warning" disabled>
+                                            Deactivate
+                                        </button>
+                                    }
+                                }
+                                else
+                                {
+                                    if (user.CanReactivate)
+                                    {
+                                        <form asp-action="ReactivateUser" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="userId" value="@user.Id" />
+                                            <button type="submit"
+                                                    class="btn btn-sm btn-outline-success"
+                                                    onclick="return confirm('Reactivate user @user.Email? They will be able to sign in again.');">
+                                                Reactivate
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-success" disabled>
+                                            Reactivate
+                                        </button>
+                                    }
                                 }
                                 @if (user.CanDelete)
                                 {
