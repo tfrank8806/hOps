@@ -438,18 +438,26 @@
         .workorders-form-card {
             display: flex;
             flex-direction: column;
-            height: 100%;
+            min-height: 100%;
+            position: relative;
         }
 
         .workorders-form-card .card-body {
             flex: 1 1 auto;
             overflow: visible;
+            padding-bottom: 1.25rem;
         }
 
         .workorders-form-actions {
             margin-top: 1rem;
-            padding-top: 0.75rem;
+            padding-top: 1rem;
+            padding-bottom: 0.75rem;
             border-top: 1px solid rgba(15, 23, 42, 0.08);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #fff 45%);
+            position: sticky;
+            bottom: 0;
+            z-index: 2;
+            box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.08);
         }
 
         .workorders-form-column {
@@ -483,18 +491,6 @@
             .workorders-form-card .card-body {
                 overflow-y: auto;
                 padding-right: 0.5rem;
-                padding-bottom: 1.25rem;
-            }
-
-            .workorders-form-actions {
-                position: sticky;
-                bottom: 0;
-                background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #fff 45%);
-                margin-top: 1.25rem;
-                padding-top: 1rem;
-                padding-bottom: 0.75rem;
-                border-top: 1px solid rgba(15, 23, 42, 0.08);
-                box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.08);
             }
         }
 
