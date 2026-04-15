@@ -189,9 +189,6 @@
             syncToTextarea(context);
         });
         editor.addEventListener('blur', () => {
-            if (activeSelectionContext === context) {
-                activeSelectionContext = null;
-            }
             captureEditorSelection(context);
             syncToTextarea(context);
         });
@@ -568,6 +565,26 @@
                 item.textContent = entry.char;
                 const ariaLabel = entry.displayLabel || entry.shortcode || entry.char;
                 item.setAttribute('aria-label', `Insert ${ariaLabel}`);
+                const preserveSelectionBeforeInsert = (event) => {
+                    if (event.type === 'pointerdown') {
+                        if (event.pointerType === 'mouse' && typeof event.button === 'number' && event.button !== 0) {
+                            return;
+                        }
+                    } else if (event.type === 'mousedown' && typeof event.button === 'number' && event.button !== 0) {
+                        return;
+                    }
+
+                    if (event.cancelable) {
+                        event.preventDefault();
+                    }
+                };
+
+                if (pointerDownEvent === 'pointerdown') {
+                    item.addEventListener(pointerDownEvent, preserveSelectionBeforeInsert);
+                } else {
+                    item.addEventListener(pointerDownEvent, preserveSelectionBeforeInsert);
+                    item.addEventListener('touchstart', preserveSelectionBeforeInsert, { passive: false });
+                }
                 item.addEventListener('click', (event) => {
                     event.preventDefault();
                     insertEmoji(context, entry.char);
@@ -897,13 +914,15 @@
             return;
         }
 
-        focusEditor(context);
+        const hasSelection = focusEditor(context);
 
-        let inserted = replaceSelectionWithText(context.editor, emoji);
-        if (!inserted) {
-            if (placeCaretAtEnd(context.editor)) {
+        let inserted = false;
+        if (hasSelection) {
+            inserted = replaceSelectionWithText(context.editor, emoji);
+        }
+
+        if (!inserted && placeCaretAtEnd(context.editor)) {
                 inserted = replaceSelectionWithText(context.editor, emoji);
-            }
         }
 
         if (!inserted) {
@@ -1075,10 +1094,18 @@
 
     function focusEditor(context) {
         const editor = context.editor;
+        const hadSelection = selectionBelongsToEditor(editor);
         if (document.activeElement !== editor) {
-            editor.focus();
+            try {
+                editor.focus({ preventScroll: true });
+            } catch {
+                editor.focus();
+            }
         }
-        restoreEditorSelection(context);
+        if (hadSelection) {
+            return true;
+        }
+        return restoreEditorSelection(context);
     }
 
     function populateEditorFromMarkup(context) {
@@ -1195,9 +1222,23 @@
 
     function restoreEditorSelection(context) {
         if (!context || !context.editor || !context.selectionState) {
-            return;
+            return false;
         }
-        restoreSelectionState(context.editor, context.selectionState);
+        return restoreSelectionState(context.editor, context.selectionState);
+    }
+
+    function selectionBelongsToEditor(editor) {
+        if (!editor) {
+            return false;
+        }
+
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) {
+            return false;
+        }
+
+        const range = selection.getRangeAt(0);
+        return editor.contains(range.startContainer) && editor.contains(range.endContainer);
     }
 
     function normalizeEditorDom(root) {
@@ -1374,22 +1415,23 @@
 
     function restoreSelectionState(root, savedState) {
         if (!savedState) {
-            return;
+            return false;
         }
         const selection = window.getSelection();
         if (!selection) {
-            return;
+            return false;
         }
         const startNode = locateSelectionNode(root, savedState.start);
         const endNode = locateSelectionNode(root, savedState.end);
         if (!startNode || !endNode) {
-            return;
+            return false;
         }
         const range = document.createRange();
         range.setStart(startNode, Math.min(savedState.start.offset, getNodeLength(startNode)));
         range.setEnd(endNode, Math.min(savedState.end.offset, getNodeLength(endNode)));
         selection.removeAllRanges();
         selection.addRange(range);
+        return true;
     }
 
     function locateSelectionNode(root, descriptor) {
