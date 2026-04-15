@@ -1,0 +1,15 @@
+@model hOps.web.ViewModels.PassOnLogDetailsViewModel
+
+@if (Model.NextLogId.HasValue)
+{
+    <a asp-action="Details" asp-route-id="@Model.NextLogId.Value" class="btn btn-outline-primary">
+        Next (Newer)
+    </a>
+}
+@if (Model.PreviousLogId.HasValue)
+{
+    <a asp-action="Details" asp-route-id="@Model.PreviousLogId.Value" class="btn btn-outline-primary">
+        Previous (Older)
+    </a>
+}
+<a asp-action="Index" class="btn btn-outline-secondary">Back to Logs</a>

@@ -25,19 +25,7 @@
             </div>
         </div>
         <div class="d-flex gap-2 flex-wrap passon-details-actions">
-            @if (Model.NextLogId.HasValue)
-            {
-                <a asp-action="Details" asp-route-id="@Model.NextLogId.Value" class="btn btn-outline-primary">
-                    Next (Newer)
-                </a>
-            }
-            @if (Model.PreviousLogId.HasValue)
-            {
-                <a asp-action="Details" asp-route-id="@Model.PreviousLogId.Value" class="btn btn-outline-primary">
-                    Previous (Older)
-                </a>
-            }
-            <a asp-action="Index" class="btn btn-outline-secondary">Back to Logs</a>
+            <partial name="_PassOnLogNavigation" model="Model" />
             @if (Model.CanEdit)
             {
                 <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
@@ -57,6 +45,9 @@
     </div>
     <div class="card-body passon-details-card__body log-body rich-text-output">
         @Html.Raw(RichTextRenderer.ToHtml(Model.Body))
+        <div class="passon-details-bottom-nav not-rich-text">
+            <partial name="_PassOnLogNavigation" model="Model" />
+        </div>
     </div>
 </div>
 
@@ -198,6 +189,20 @@
             display: inline-flex;
         }
 
+        .passon-details-bottom-nav {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: center;
+            padding-top: 1rem;
+            margin-top: 1.5rem;
+            border-top: 1px solid rgba(13, 110, 253, 0.12);
+        }
+
+        .passon-details-bottom-nav .btn {
+            max-width: 100%;
+        }
+
         @@media (min-width: 768px) {
             .passon-details-card {
                 max-height: calc(100vh - var(--main-header-height, 72px) - (var(--space-card, 1.5rem) * 2) - 1rem);
@@ -208,6 +213,12 @@
                 overflow-y: auto;
                 padding-right: 0.75rem;
                 scrollbar-gutter: stable;
+            }
+        }
+
+        @@media (max-width: 575.98px) {
+            .passon-details-bottom-nav .btn {
+                flex: 1 1 100%;
             }
         }
 
