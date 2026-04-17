@@ -164,7 +164,8 @@
             textarea,
             editor,
             wrapper,
-            selectionState: null
+            selectionState: null,
+            selectionRange: null
         };
 
         const toolbar = buildToolbar(context);
@@ -1200,10 +1201,7 @@
         ensureEditorHasContent(editor);
         if (shouldRestoreSelection) {
             restoreSelectionState(editor, selectionState);
-            if (selectionState) {
-                const refreshedState = saveSelectionState(editor);
-                context.selectionState = refreshedState || selectionState;
-            }
+            captureEditorSelection(context);
         }
         const markup = htmlToMarkup(editor);
         textarea.value = markup;
@@ -1214,6 +1212,10 @@
         if (!context || !context.editor) {
             return;
         }
+        const liveRange = cloneSelectionRange(context.editor);
+        if (liveRange) {
+            context.selectionRange = liveRange;
+        }
         const state = saveSelectionState(context.editor);
         if (state) {
             context.selectionState = state;
@@ -1221,7 +1223,13 @@
     }
 
     function restoreEditorSelection(context) {
-        if (!context || !context.editor || !context.selectionState) {
+        if (!context || !context.editor) {
+            return false;
+        }
+        if (restoreClonedSelectionRange(context.editor, context.selectionRange)) {
+            return true;
+        }
+        if (!context.selectionState) {
             return false;
         }
         return restoreSelectionState(context.editor, context.selectionState);
@@ -1396,6 +1404,44 @@
             start: describeSelectionPosition(root, range.startContainer, range.startOffset),
             end: describeSelectionPosition(root, range.endContainer, range.endOffset)
         };
+    }
+
+    function cloneSelectionRange(root) {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) {
+            return null;
+        }
+
+        const range = selection.getRangeAt(0);
+        if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) {
+            return null;
+        }
+
+        return range.cloneRange();
+    }
+
+    function restoreClonedSelectionRange(root, savedRange) {
+        if (!root || !savedRange) {
+            return false;
+        }
+
+        if (!root.contains(savedRange.startContainer) || !root.contains(savedRange.endContainer)) {
+            return false;
+        }
+
+        const selection = window.getSelection();
+        if (!selection) {
+            return false;
+        }
+
+        try {
+            const range = savedRange.cloneRange();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     function describeSelectionPosition(root, node, offset) {
