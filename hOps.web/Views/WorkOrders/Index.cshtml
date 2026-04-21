@@ -836,7 +836,7 @@
                                href="@($"{Url.Action("Edit", new { id = order.Id })}{filterQueryString}")">
                                 Edit
                             </a>
-                            @if (Model.CanManageWorkOrders)
+                            @if (Model.CanUpdateWorkOrderStatus)
                             {
                                 var advanceUrl = $"{Url.Action("AdvanceStatus", new { id = order.Id })}{filterQueryString}";
                                 <form method="post" action="@advanceUrl" class="workorder-progress-form">

@@ -21,6 +21,7 @@ namespace hOps.web.ViewModels.WorkOrders
         public int? EditingWorkOrderId { get; set; }
         public bool IsEditing => EditingWorkOrderId.HasValue;
         public bool CanManageWorkOrders { get; set; }
+        public bool CanUpdateWorkOrderStatus { get; set; }
         public List<DepartmentWorkOrderSummaryViewModel> DepartmentSummaries { get; set; } = new();
     }
 

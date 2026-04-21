@@ -503,16 +503,16 @@ namespace hOps.web.Controllers
         public async Task<IActionResult> AdvanceStatus(int id, string? status, string? completionNotes)
         {
             var user = await _userManager.GetUserAsync(User);
-            var roles = user != null
-                ? await _userManager.GetRolesAsync(user)
-                : new List<string>();
-
-            if (!HasManagementPrivileges(roles))
+            if (user == null)
             {
-                return Forbid();
+                return Challenge();
             }
 
             var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+            if (!accessiblePropertyIds.Any())
+            {
+                return Forbid();
+            }
 
             var workOrder = await _context.WorkOrders
                 .Include(w => w.Properties)
@@ -1225,6 +1225,7 @@ namespace hOps.web.Controllers
                 : new List<string>();
             var canManage = HasManagementPrivileges(userRoles);
             var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+            var canUpdateStatus = accessiblePropertyIds.Any();
             var statuses = WorkOrderStatusOptions.All;
             var statusColorMap = statuses.ToDictionary(s => s.Key, s => s.ColorHex, StringComparer.OrdinalIgnoreCase);
             var defaultStatus = _configuration.GetValue<string>("WorkOrders:DefaultStatus") ?? statuses.First().Key;
@@ -1561,6 +1562,7 @@ namespace hOps.web.Controllers
                 StatusColorMap = statusColorMap,
                 EditingWorkOrderId = form?.Id,
                 CanManageWorkOrders = canManage,
+                CanUpdateWorkOrderStatus = canUpdateStatus,
                 DepartmentSummaries = departmentSummaries
             };
 
