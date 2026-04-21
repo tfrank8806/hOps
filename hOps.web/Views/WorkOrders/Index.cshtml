@@ -444,8 +444,21 @@
 
         .workorders-form-card .card-body {
             flex: 1 1 auto;
-            overflow: visible;
             padding-bottom: 1.25rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .workorders-form {
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+
+        .workorders-form-fields {
+            flex: 1 1 auto;
+            min-height: 0;
         }
 
         .workorders-form-actions {
@@ -488,7 +501,7 @@
                 max-height: 100%;
             }
 
-            .workorders-form-card .card-body {
+            .workorders-form-fields {
                 overflow-y: auto;
                 padding-right: 0.5rem;
             }
@@ -948,10 +961,11 @@
                     }
                 </div>
                 <div class="card-body">
-                    <form asp-action="@formAction" asp-route-id="@formRouteId" method="post" enctype="multipart/form-data">
+                    <form asp-action="@formAction" asp-route-id="@formRouteId" method="post" enctype="multipart/form-data" class="workorders-form">
                         @Html.AntiForgeryToken()
-                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-                        <input type="hidden" asp-for="Form.Id" />
+                        <div class="workorders-form-fields">
+                            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                            <input type="hidden" asp-for="Form.Id" />
                         <div class="mb-3">
                             <label asp-for="Form.Status" class="form-label"></label>
                             <select asp-for="Form.Status" class="form-select">
@@ -1128,6 +1142,7 @@
                             var soleProperty = Model.PropertyOptions[0];
                             <input type="hidden" name="Form.SelectedPropertyIds" value="@soleProperty.Id" />
                         }
+                        </div>
                         <div class="workorders-form-actions">
                             <button type="submit" class="btn btn-primary w-100">@submitLabel</button>
                         </div>
