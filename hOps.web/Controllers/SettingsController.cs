@@ -118,7 +118,7 @@ namespace hOps.web.Controllers
             return RedirectToAction(actionName);
         }
 
-        // � Departments CRUD �
+        // Ã¢â‚¬â€ Departments CRUD Ã¢â‚¬â€
 
         public async Task<IActionResult> Departments(int? propertyId = null, bool onlyGlobal = false)
         {
@@ -346,7 +346,7 @@ namespace hOps.web.Controllers
             return RedirectToSettingsList(nameof(Departments), propertyId, onlyGlobal);
         }
 
-        // � WorkOrderTypes CRUD �
+        // Ã¢â‚¬â€ WorkOrderTypes CRUD Ã¢â‚¬â€
 
         public async Task<IActionResult> WorkOrderTypes(int? propertyId = null, bool onlyGlobal = false)
         {
@@ -568,7 +568,7 @@ namespace hOps.web.Controllers
             return RedirectToSettingsList(nameof(WorkOrderTypes), propertyId, onlyGlobal);
         }
 
-        // � PhonebookTypes CRUD �
+        // Ã¢â‚¬â€ PhonebookTypes CRUD Ã¢â‚¬â€
 
         public async Task<IActionResult> PhonebookTypes(int? propertyId = null, bool onlyGlobal = false)
         {
@@ -795,7 +795,7 @@ namespace hOps.web.Controllers
             return RedirectToSettingsList(nameof(PhonebookTypes), propertyId, onlyGlobal);
         }
 
-        // � CalendarCategories CRUD �
+        // Ã¢â‚¬â€ CalendarCategories CRUD Ã¢â‚¬â€
 
         public async Task<IActionResult> CalendarCategories(int? propertyId = null, bool onlyGlobal = false)
         {
@@ -1252,14 +1252,12 @@ namespace hOps.web.Controllers
 
             foreach (var room in rooms)
             {
-                var csvLine = string.Join("","", new[]
-                {
-                    EscapeCsv(room.RoomNumber),
-                    EscapeCsv(room.Abbreviation),
-                    EscapeCsv(room.RoomType),
-                    EscapeCsv(room.Floor.ToString()),
-                    EscapeCsv(room.Description)
-                });
+                var csvLine = BuildCsvLine(
+                    room.RoomNumber,
+                    room.Abbreviation,
+                    room.RoomType,
+                    room.Floor.ToString(),
+                    room.Description);
 
                 builder.AppendLine(csvLine);
             }
@@ -1560,11 +1558,7 @@ namespace hOps.web.Controllers
 
             foreach (var task in tasks)
             {
-                builder.AppendLine(string.Join("","", new[]
-                {
-                    EscapeCsv(task.Task),
-                    EscapeCsv(task.Description)
-                }));
+                builder.AppendLine(BuildCsvLine(task.Task, task.Description));
             }
 
             var fileName = $"deep-clean-checklist-property-{propertyId}.csv";
@@ -1607,6 +1601,10 @@ namespace hOps.web.Controllers
             return needsQuotes ? $"\"{sanitized}\"" : sanitized;
         }
 
+        private static string BuildCsvLine(params string?[] values)
+        {
+            return string.Join(",", values.Select(EscapeCsv));
+        }
         // - Layout Editor & Save -
 
         public async Task<IActionResult> LayoutEditor(int? propertyId = null, int? floor = null)
