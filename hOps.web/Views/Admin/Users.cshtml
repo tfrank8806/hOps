@@ -6,6 +6,32 @@
     var selectedPropertyIds = new HashSet<int>(Model.CreateUser.PropertyIds ?? new List<int>());
     var selectedRoles = new HashSet<string>(Model.CreateUser.SelectedRoles ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
     var showCreateErrors = !ViewData.ModelState.IsValid && ViewData.ModelState.Keys.Any(k => k.StartsWith("CreateUser", StringComparison.OrdinalIgnoreCase));
+    var sortDirection = string.Equals(Model.SortDirection, "desc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc";
+    Func<string, string> getNextDirection = column =>
+    {
+        var isCurrent = string.Equals(Model.SortBy, column, StringComparison.OrdinalIgnoreCase);
+        return isCurrent && sortDirection == "asc" ? "desc" : "asc";
+    };
+    Func<string, string> getSortIndicator = column =>
+    {
+        if (!string.Equals(Model.SortBy, column, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return sortDirection == "desc" ? "▼" : "▲";
+    };
+    var sortLinkClass = "text-reset text-decoration-none d-inline-flex align-items-center gap-1";
+    var sortableColumns = new[]
+    {
+        new { Key = "email", Label = "Email", ThClass = "" },
+        new { Key = "firstname", Label = "First Name", ThClass = "" },
+        new { Key = "lastname", Label = "Last Name", ThClass = "" },
+        new { Key = "status", Label = "Status", ThClass = "" },
+        new { Key = "roles", Label = "Roles", ThClass = "" },
+        new { Key = "properties", Label = "Properties", ThClass = "" },
+        new { Key = "lastlogin", Label = "Last Login", ThClass = "text-nowrap" }
+    };
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -38,13 +64,26 @@
     <table class="table table-striped align-middle">
         <thead>
             <tr>
-                <th>Email</th>
-                <th>First Name</th>
-                <th>Last Name</th>
-                <th>Status</th>
-                <th>Roles</th>
-                <th>Properties</th>
-                <th class="text-nowrap">Last Login</th>
+                @foreach (var column in sortableColumns)
+                {
+                    var indicator = getSortIndicator(column.Key);
+                    var nextDirection = getNextDirection(column.Key);
+                    var thClass = string.IsNullOrEmpty(column.ThClass) ? null : column.ThClass;
+                    var isCurrentSort = string.Equals(Model.SortBy, column.Key, StringComparison.OrdinalIgnoreCase);
+                    var ariaSort = isCurrentSort ? (sortDirection == "desc" ? "descending" : "ascending") : null;
+                    <th class="@thClass" aria-sort="@ariaSort">
+                        <a asp-action="Users"
+                           asp-route-sortBy="@column.Key"
+                           asp-route-sortDirection="@nextDirection"
+                           class="@sortLinkClass">
+                            @column.Label
+                            @if (!string.IsNullOrEmpty(indicator))
+                            {
+                                <span class="sort-indicator">@indicator</span>
+                            }
+                        </a>
+                    </th>
+                }
                 <th class="text-nowrap">Actions</th>
             </tr>
         </thead>
@@ -52,7 +91,7 @@
             @if (!Model.Users.Any())
             {
                 <tr>
-                    <td colspan="7" class="text-center py-4">No users found.</td>
+                    <td colspan="8" class="text-center py-4">No users found.</td>
                 </tr>
             }
             else

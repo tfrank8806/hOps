@@ -47,14 +47,14 @@ namespace hOps.web.Controllers
         }
 
         // List all users + roles + property access
-        public async Task<IActionResult> Users()
+        public async Task<IActionResult> Users(string? sortBy = null, string? sortDirection = null)
         {
             var currentUser = await _userManager.GetUserAsync(User);
             if (currentUser == null)
                 return Challenge();
 
             var currentRoles = await _userManager.GetRolesAsync(currentUser);
-            var vm = await BuildAdminUsersViewModelAsync(currentUser, currentRoles, null);
+            var vm = await BuildAdminUsersViewModelAsync(currentUser, currentRoles, null, sortBy, sortDirection);
 
             return View(vm);
         }
@@ -704,8 +704,12 @@ HotelOps Admin Team
         private async Task<AdminUsersPageViewModel> BuildAdminUsersViewModelAsync(
             ApplicationUser currentUser,
             IList<string> currentRoles,
-            AdminCreateUserInputModel? formInput)
+            AdminCreateUserInputModel? formInput,
+            string? sortBy = null,
+            string? sortDirection = null)
         {
+            var normalizedSortBy = NormalizeAdminUsersSortBy(sortBy);
+            var normalizedSortDirection = NormalizeSortDirection(sortDirection);
             var isAdmin = currentRoles.Contains("Admin");
             HashSet<int> accessiblePropertyIds = new();
             if (!isAdmin)
@@ -822,6 +826,7 @@ HotelOps Admin Team
                 .ToListAsync();
 
             var propertyNameLookup = propertyOptions.ToDictionary(p => p.Id, p => p.DisplayLabel);
+            var sortedUsers = SortAdminUsers(userViewModels, propertyNameLookup, normalizedSortBy, normalizedSortDirection);
 
             var availableRoles = await _roleManager.Roles
                 .Where(r => r.Name != null)
@@ -838,13 +843,124 @@ HotelOps Admin Team
 
             return new AdminUsersPageViewModel
             {
-                Users = userViewModels,
+                Users = sortedUsers,
                 CreateUser = formInput ?? new AdminCreateUserInputModel(),
                 AvailableProperties = propertyOptions,
                 AvailableRoles = availableRoles,
                 PropertyNameLookup = propertyNameLookup,
-                CanManageRoles = isAdmin || currentRoles.Contains("Manager")
+                CanManageRoles = isAdmin || currentRoles.Contains("Manager"),
+                SortBy = normalizedSortBy,
+                SortDirection = normalizedSortDirection
             };
+        }
+
+        private static string NormalizeAdminUsersSortBy(string? sortBy)
+        {
+            if (string.IsNullOrWhiteSpace(sortBy))
+            {
+                return "email";
+            }
+
+            return sortBy.Trim().ToLowerInvariant() switch
+            {
+                "firstname" => "firstname",
+                "lastname" => "lastname",
+                "status" => "status",
+                "roles" => "roles",
+                "properties" => "properties",
+                "lastlogin" => "lastlogin",
+                _ => "email"
+            };
+        }
+
+        private static string NormalizeSortDirection(string? sortDirection)
+        {
+            return string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc";
+        }
+
+        private static List<UserWithAccessViewModel> SortAdminUsers(
+            IEnumerable<UserWithAccessViewModel> users,
+            IReadOnlyDictionary<int, string> propertyLookup,
+            string sortBy,
+            string sortDirection)
+        {
+            var descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+
+            string PropertyDisplay(UserWithAccessViewModel user)
+            {
+                if (user.PropertyIds == null || user.PropertyIds.Count == 0)
+                {
+                    return string.Empty;
+                }
+
+                var names = user.PropertyIds
+                    .Select(id => propertyLookup.TryGetValue(id, out var name) ? name : id.ToString())
+                    .ToList();
+
+                return string.Join(", ", names);
+            }
+
+            string RolesDisplay(UserWithAccessViewModel user)
+            {
+                if (user.Roles == null || user.Roles.Count == 0)
+                {
+                    return string.Empty;
+                }
+
+                return string.Join(", ", user.Roles);
+            }
+
+            IOrderedEnumerable<UserWithAccessViewModel> ordered;
+            switch (sortBy)
+            {
+                case "firstname":
+                    ordered = descending
+                        ? users.OrderByDescending(u => u.FirstName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                        : users.OrderBy(u => u.FirstName ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+                    ordered = ordered.ThenBy(u => u.LastName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                                     .ThenBy(u => u.Email ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+                    break;
+                case "lastname":
+                    ordered = descending
+                        ? users.OrderByDescending(u => u.LastName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                        : users.OrderBy(u => u.LastName ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+                    ordered = ordered.ThenBy(u => u.FirstName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                                     .ThenBy(u => u.Email ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+                    break;
+                case "status":
+                    ordered = descending
+                        ? users.OrderByDescending(u => u.IsActive ? 0 : 1)
+                        : users.OrderBy(u => u.IsActive ? 0 : 1);
+                    ordered = ordered.ThenBy(u => u.Email ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+                    break;
+                case "roles":
+                    ordered = descending
+                        ? users.OrderByDescending(RolesDisplay, StringComparer.OrdinalIgnoreCase)
+                        : users.OrderBy(RolesDisplay, StringComparer.OrdinalIgnoreCase);
+                    ordered = ordered.ThenBy(u => u.Email ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+                    break;
+                case "properties":
+                    ordered = descending
+                        ? users.OrderByDescending(PropertyDisplay, StringComparer.OrdinalIgnoreCase)
+                        : users.OrderBy(PropertyDisplay, StringComparer.OrdinalIgnoreCase);
+                    ordered = ordered.ThenBy(u => u.Email ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+                    break;
+                case "lastlogin":
+                    ordered = descending
+                        ? users.OrderByDescending(u => u.LastLoginAtUtc ?? DateTime.MinValue)
+                        : users.OrderBy(u => u.LastLoginAtUtc ?? DateTime.MinValue);
+                    ordered = ordered.ThenBy(u => u.Email ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+                    break;
+                default:
+                    ordered = descending
+                        ? users.OrderByDescending(u => u.Email ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                        : users.OrderBy(u => u.Email ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+                    ordered = ordered.ThenBy(u => u.FirstName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                                     .ThenBy(u => u.LastName ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+                    break;
+            }
+
+            return ordered.ToList();
         }
 
         private async Task<HashSet<int>> GetAccessiblePropertyIdsAsync(string applicationUserId)

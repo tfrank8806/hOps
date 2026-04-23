@@ -16,6 +16,10 @@ namespace hOps.web.ViewModels.Admin
         public Dictionary<int, string> PropertyNameLookup { get; set; } = new();
 
         public bool CanManageRoles { get; set; }
+
+        public string SortBy { get; set; } = "email";
+
+        public string SortDirection { get; set; } = "asc";
     }
 
     public class AdminCreateUserInputModel
