@@ -985,27 +985,47 @@
             return best.key;
         };
 
+        let resizeInProgress = false;
         const beginResize = (widget, axis, pointerDownEvent) => {
             if (!widget) {
                 return;
             }
 
             pointerDownEvent.preventDefault();
+            pointerDownEvent.stopPropagation();
             const startX = pointerDownEvent.clientX;
             const startY = pointerDownEvent.clientY;
             const initialSpan = Number(widget.dataset.customSpan || widget.dataset.gridSpan || getDefaultSpanForSize(widget.dataset.widgetSize));
             const initialHeight = Number(widget.dataset.gridHeight || getDefaultHeight(widget));
-            const gridRect = grid.getBoundingClientRect();
-            const usableWidth = gridRect.width - COLUMN_GAP * (MAX_COLUMNS - 1);
-            const columnWidth = (MAX_COLUMNS > 0 ? usableWidth / MAX_COLUMNS : gridRect.width) || (gridRect.width / Math.max(1, MAX_COLUMNS));
+            const geometry = getGridGeometry();
+            if (!geometry || !geometry.rect) {
+                return;
+            }
+            const gridRect = geometry.rect;
+            const baseColumnWidth = geometry.columnWidth > 0
+                ? geometry.columnWidth
+                : (gridRect.width / Math.max(1, MAX_COLUMNS));
             const lockWidth = widget.dataset.lockWidth === 'true';
             const allowHorizontal = axis === 'horizontal' || axis === 'both';
             const allowVertical = axis === 'vertical' || axis === 'both';
+            resizeInProgress = true;
+            widget.classList.add('home-widget--resizing');
+            const activePointerId = pointerDownEvent.pointerId;
+            if (pointerDownEvent.target?.setPointerCapture && activePointerId !== undefined) {
+                try {
+                    pointerDownEvent.target.setPointerCapture(activePointerId);
+                } catch {
+                    // ignore pointer capture failures
+                }
+            }
 
             const handlePointerMove = (event) => {
-                if (!lockWidth && allowHorizontal) {
+                if (!resizeInProgress) {
+                    return;
+                }
+                if (!lockWidth && allowHorizontal && baseColumnWidth > 0) {
                     const deltaX = event.clientX - startX;
-                    const rawSpan = initialSpan + (deltaX / columnWidth);
+                    const rawSpan = initialSpan + (deltaX / baseColumnWidth);
                     const constrained = clampSpan(rawSpan);
                     const snapped = clampSpan(Math.round(constrained));
                     const sizeKey = getNearestSizeKey(snapped);
@@ -1023,9 +1043,18 @@
             };
 
             const stopResize = () => {
+                if (pointerDownEvent.target?.releasePointerCapture && activePointerId !== undefined) {
+                    try {
+                        pointerDownEvent.target.releasePointerCapture(activePointerId);
+                    } catch {
+                        // ignore pointer capture release failures
+                    }
+                }
                 document.removeEventListener('pointermove', handlePointerMove);
                 document.removeEventListener('pointerup', stopResize);
                 document.removeEventListener('pointercancel', stopResize);
+                widget.classList.remove('home-widget--resizing');
+                resizeInProgress = false;
                 persistLayoutSnapshot();
             };
 
@@ -1034,23 +1063,24 @@
             document.addEventListener('pointercancel', stopResize);
         };
 
-        grid.querySelectorAll('[data-resize-handle]').forEach(handle => {
-            handle.addEventListener('pointerdown', (event) => {
-                if (!isEditing) {
-                    return;
-                }
-                const widget = handle.closest('.home-widget');
-                if (!widget) {
-                    return;
-                }
-
-                const axis = handle.dataset.resizeAxis || 'both';
-                beginResize(widget, axis, event);
-            });
+        grid.addEventListener('pointerdown', (event) => {
+            if (!isEditing) {
+                return;
+            }
+            const handle = event.target.closest('[data-resize-handle]');
+            if (!handle || !grid.contains(handle)) {
+                return;
+            }
+            const widget = handle.closest('.home-widget');
+            if (!widget) {
+                return;
+            }
+            const axis = handle.dataset.resizeAxis || 'both';
+            beginResize(widget, axis, event);
         });
 
         grid.addEventListener('dragstart', (event) => {
-            if (!isEditing) {
+            if (!isEditing || resizeInProgress) {
                 event.preventDefault();
                 return;
             }

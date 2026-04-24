@@ -1707,19 +1707,56 @@ body.dm-new-conversation-open .direct-messages-page .direct-message-composer {
 
 .home-widget__resizer {
     position: absolute;
-    right: 0.35rem;
-    bottom: 0.35rem;
-    width: 1.1rem;
-    height: 1.1rem;
-    border: calc(1px * var(--ui-scale)) solid rgba(108, 117, 125, 0.6);
-    border-radius: 0.2rem;
-    background: linear-gradient(135deg, rgba(108, 117, 125, 0.12), rgba(248, 249, 250, 0.9));
+    right: 0.4rem;
+    bottom: 0.4rem;
+    width: 1.3rem;
+    height: 1.3rem;
+    border: calc(1px * var(--ui-scale)) solid rgba(108, 117, 125, 0.55);
+    border-radius: 0.35rem;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(233, 236, 239, 0.85));
+    box-shadow: 0 2px 6px rgba(33, 37, 41, 0.12);
     cursor: se-resize;
+    z-index: 2;
+    pointer-events: none;
     display: none;
 }
 
 .home-dashboard--editing .home-widget__resizer {
     display: block;
+    pointer-events: auto;
+}
+
+.home-widget__resizer::before,
+.home-widget__resizer::after {
+    content: "";
+    position: absolute;
+    right: 0.25rem;
+    height: calc(2px * var(--ui-scale));
+    background-color: rgba(108, 117, 125, 0.65);
+    border-radius: calc(1px * var(--ui-scale));
+    transform: rotate(45deg);
+    transform-origin: right bottom;
+}
+
+.home-widget__resizer::before {
+    width: 0.95rem;
+    bottom: 0.25rem;
+}
+
+.home-widget__resizer::after {
+    width: 0.65rem;
+    bottom: 0.05rem;
+}
+
+.home-widget__resizer:focus-visible {
+    outline: calc(2px * var(--ui-scale)) solid rgba(13, 110, 253, 0.45);
+    outline-offset: calc(1px * var(--ui-scale));
+}
+
+.home-widget--resizing {
+    user-select: none;
+    cursor: se-resize;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
 }
 
 .home-widget-row--top .home-widget-card {
