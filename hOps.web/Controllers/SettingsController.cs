@@ -1085,7 +1085,9 @@ namespace hOps.web.Controllers
                 .Where(r => r.Id > 0)
                 .ToDictionary(r => r.Id);
 
-            foreach (var existing in existingRooms.ToList())
+            var roomsToDeleteIds = new List<int>();
+
+            foreach (var existing in existingRooms)
             {
                 if (incomingById.TryGetValue(existing.Id, out var updated))
                 {
@@ -1099,7 +1101,20 @@ namespace hOps.web.Controllers
                 }
                 else
                 {
+                    roomsToDeleteIds.Add(existing.Id);
                     _db.Rooms.Remove(existing);
+                }
+            }
+
+            if (roomsToDeleteIds.Count > 0)
+            {
+                var layoutsToDelete = await _db.RoomLayouts
+                    .Where(layout => layout.RoomId.HasValue && roomsToDeleteIds.Contains(layout.RoomId.Value))
+                    .ToListAsync();
+
+                if (layoutsToDelete.Count > 0)
+                {
+                    _db.RoomLayouts.RemoveRange(layoutsToDelete);
                 }
             }
 
