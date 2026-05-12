@@ -34,6 +34,34 @@ public class BaseController : Controller
 
         try
         {
+            var languagePreferenceService = httpContext.RequestServices.GetRequiredService<hOps.web.Services.Localization.ILanguagePreferenceService>();
+            var translationService = httpContext.RequestServices.GetRequiredService<hOps.web.Services.Localization.ITranslationService>();
+            var cancellationToken = httpContext.RequestAborted;
+            var preferredLanguage = await languagePreferenceService.GetPreferredLanguageAsync(User, cancellationToken);
+            httpContext.Items["ActiveLanguage"] = preferredLanguage;
+
+            if (string.IsNullOrWhiteSpace(languagePreferenceService.GetPreferredLanguageFromCookie()))
+            {
+                languagePreferenceService.SetPreferredLanguageCookie(preferredLanguage);
+            }
+            ViewBag.ActiveLanguage = preferredLanguage;
+            ViewBag.DefaultLanguage = translationService.DefaultLanguage;
+            ViewBag.SupportedLanguages = translationService.SupportedLanguages;
+            ViewBag.ActiveLanguageDisplayName = translationService.SupportedLanguages
+                .FirstOrDefault(l => string.Equals(l.Code, preferredLanguage, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? "English";
+        }
+        catch (Exception ex)
+        {
+            LogLayoutError(httpContext, ex, "Failed to determine preferred language for {Path}", httpContext?.Request.Path.Value ?? "(unknown)");
+            ViewBag.ActiveLanguage = hOps.web.Localization.LanguageConstants.English;
+            ViewBag.DefaultLanguage = hOps.web.Localization.LanguageConstants.English;
+            ViewBag.SupportedLanguages = hOps.web.Localization.LanguageConstants.SupportedLanguages;
+            ViewBag.ActiveLanguageDisplayName = "English";
+            httpContext.Items["ActiveLanguage"] = hOps.web.Localization.LanguageConstants.English;
+        }
+
+        try
+        {
             var user = await _userManager.GetUserAsync(User);
             if (user != null)
             {

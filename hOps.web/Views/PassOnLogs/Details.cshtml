@@ -1,7 +1,11 @@
 @using hOps.web.Utilities
 @model hOps.web.ViewModels.PassOnLogDetailsViewModel
 @{
-    ViewData["Title"] = Model.Title;
+    var activeLanguage = Html.GetActiveLanguage();
+    var isDefaultLanguage = string.Equals(activeLanguage, LanguageConstants.English, StringComparison.OrdinalIgnoreCase);
+    var displayTitle = !isDefaultLanguage && !string.IsNullOrWhiteSpace(Model.TranslatedTitle) ? Model.TranslatedTitle : Model.Title;
+    var displayBody = !isDefaultLanguage && !string.IsNullOrWhiteSpace(Model.TranslatedBody) ? Model.TranslatedBody : Model.Body;
+    ViewData["Title"] = displayTitle;
 }
 
 <div class="card mb-4 passon-details-card">
@@ -11,7 +15,7 @@
                 <partial name="_UserAvatar" model="Model.CreatorAvatar" />
             </div>
             <div>
-                <h2 class="mb-2">@Model.Title</h2>
+                <h2 class="mb-2">@displayTitle</h2>
                 @{
                     var createdLocal = TimeZoneService.ConvertToUserTime(Model.CreatedAt);
                     var updatedLocal = Model.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(Model.UpdatedAt.Value) : (DateTime?)null;
@@ -44,7 +48,7 @@
         </div>
     </div>
     <div class="card-body passon-details-card__body log-body rich-text-output">
-        @Html.Raw(RichTextRenderer.ToHtml(Model.Body))
+        @Html.Raw(RichTextRenderer.ToHtml(displayBody))
         <div class="passon-details-bottom-nav not-rich-text">
             <partial name="_PassOnLogNavigation" model="Model" />
         </div>
@@ -86,12 +90,15 @@
                                     <div class="flex-grow-1">
                                         @{
                                             var commentLocal = TimeZoneService.ConvertToUserTime(comment.CreatedAt);
+                                            var commentBody = !isDefaultLanguage && !string.IsNullOrWhiteSpace(comment.TranslatedBody)
+                                                ? comment.TranslatedBody
+                                                : comment.Body;
                                         }
                                         <div class="passon-comment__header">
                                             <div class="fw-semibold mb-0">@comment.CreatorName</div>
                                             <div class="text-muted small">@commentLocal.ToString("g")</div>
                                         </div>
-                                        <div class="passon-comment__body rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(comment.Body))</div>
+                                        <div class="passon-comment__body rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(commentBody))</div>
                                     </div>
                                 </div>
                             </li>

@@ -54,6 +54,7 @@ namespace hOps.web.Data
         public DbSet<PassOnLogComment> PassOnLogComments { get; set; }
         public DbSet<PassOnLogView> PassOnLogViews { get; set; }
         public DbSet<PassOnLogAttachment> PassOnLogAttachments { get; set; }
+        public DbSet<TranslatedText> TranslatedTexts { get; set; }
         public DbSet<DirectMessageConversation> DirectMessageConversations { get; set; }
         public DbSet<DirectMessage> DirectMessages { get; set; }
         public DbSet<UserNotification> UserNotifications { get; set; }
@@ -1378,6 +1379,42 @@ namespace hOps.web.Data
                 .WithMany()
                 .HasForeignKey(e => e.CreatedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<TranslatedText>()
+                .Property(t => t.EntityType)
+                .HasMaxLength(100);
+
+            builder.Entity<TranslatedText>()
+                .Property(t => t.EntityId)
+                .HasMaxLength(64);
+
+            builder.Entity<TranslatedText>()
+                .Property(t => t.Field)
+                .HasMaxLength(64);
+
+            builder.Entity<TranslatedText>()
+                .Property(t => t.SourceLanguage)
+                .HasMaxLength(5);
+
+            builder.Entity<TranslatedText>()
+                .Property(t => t.TargetLanguage)
+                .HasMaxLength(5);
+
+            builder.Entity<TranslatedText>()
+                .Property(t => t.SourceTextHash)
+                .HasMaxLength(128);
+
+            builder.Entity<TranslatedText>()
+                .Property(t => t.TranslatedTextValue)
+                .HasColumnType("TEXT");
+
+            builder.Entity<TranslatedText>()
+                .HasIndex(t => new { t.EntityType, t.EntityId, t.Field, t.TargetLanguage })
+                .HasDatabaseName("IX_TranslatedText_Lookup");
+
+            builder.Entity<TranslatedText>()
+                .HasIndex(t => new { t.SourceTextHash, t.TargetLanguage })
+                .HasDatabaseName("IX_TranslatedText_Hash");
         }
     }
 }

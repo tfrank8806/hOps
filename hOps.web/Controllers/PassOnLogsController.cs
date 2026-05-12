@@ -12,9 +12,12 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
+using hOps.web.Services.Localization;
 
 namespace hOps.web.Controllers
 {
@@ -28,6 +31,7 @@ namespace hOps.web.Controllers
         private readonly IPassOnLogNotificationService _notificationService;
         private readonly ILogger<PassOnLogsController> _logger;
         private readonly IWebHostEnvironment _environment;
+        private readonly ITranslationService _translationService;
 
         public PassOnLogsController(
             ApplicationDbContext context,
@@ -35,13 +39,15 @@ namespace hOps.web.Controllers
             MentionService mentionService,
             IPassOnLogNotificationService notificationService,
             ILogger<PassOnLogsController> logger,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            ITranslationService translationService)
             : base(context, userManager)
         {
             _mentionService = mentionService;
             _notificationService = notificationService;
             _logger = logger;
             _environment = environment;
+            _translationService = translationService;
         }
 
         public async Task<IActionResult> Index([FromQuery] PassOnLogFiltersViewModel? filters)
@@ -185,6 +191,15 @@ namespace hOps.web.Controllers
             if (filters.ShowUnreadOnly)
             {
                 logItems = logItems.Where(item => item.IsUnread).ToList();
+            }
+
+            var activeLanguage = GetActiveLanguage();
+            if (!string.Equals(activeLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase))
+            {
+                var cancellationToken = HttpContext?.RequestAborted ?? CancellationToken.None;
+                var translationTasks = logItems
+                    .Select(item => TranslateListItemAsync(item, activeLanguage, cancellationToken));
+                await Task.WhenAll(translationTasks);
             }
 
             var model = new PassOnLogIndexViewModel
@@ -500,6 +515,7 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
+            var activeLanguage = GetActiveLanguage();
             var log = await _context.PassOnLogs
                 .AsSplitQuery()
                 .Include(l => l.CreatedBy)
@@ -550,6 +566,7 @@ namespace hOps.web.Controllers
 
             var canDelete = User.IsInRole("Admin") || User.IsInRole("Manager");
             var model = BuildDetailsViewModel(log, currentUser.Id, nextLogId, previousLogId, canDelete);
+            await ApplyTranslationsAsync(model, activeLanguage, HttpContext?.RequestAborted ?? CancellationToken.None);
 
             return View(model);
         }
@@ -564,6 +581,7 @@ namespace hOps.web.Controllers
                 return Challenge();
             }
 
+            var activeLanguage = GetActiveLanguage();
             var log = await _context.PassOnLogs
                 .AsSplitQuery()
                 .Include(l => l.CreatedBy)
@@ -600,6 +618,7 @@ namespace hOps.web.Controllers
                 var modelWithErrors = BuildDetailsViewModel(log, currentUser.Id, nextLogId, previousLogId, canDelete);
                 modelWithErrors.NewComment = input;
                 modelWithErrors.NewComment.ReturnUrl = input.ReturnUrl;
+                await ApplyTranslationsAsync(modelWithErrors, activeLanguage, HttpContext?.RequestAborted ?? CancellationToken.None);
                 return View("Details", modelWithErrors);
             }
 
@@ -1047,6 +1066,84 @@ namespace hOps.web.Controllers
             int? previousLogId = olderCandidate == 0 ? null : olderCandidate;
 
             return (nextLogId, previousLogId);
+        }
+
+        private string GetActiveLanguage()
+        {
+            if (HttpContext?.Items != null &&
+                HttpContext.Items.TryGetValue("ActiveLanguage", out var value) &&
+                value is string code &&
+                !string.IsNullOrWhiteSpace(code))
+            {
+                return code;
+            }
+
+            return _translationService.DefaultLanguage;
+        }
+
+        private async Task TranslateListItemAsync(PassOnLogListItemViewModel item, string targetLanguage, CancellationToken cancellationToken)
+        {
+            var entityId = item.Id.ToString(CultureInfo.InvariantCulture);
+            item.TranslatedTitle = await _translationService.TranslateDynamicAsync(
+                "PassOnLog",
+                entityId,
+                "Title",
+                item.Title,
+                _translationService.DefaultLanguage,
+                targetLanguage,
+                cancellationToken);
+
+            item.TranslatedPreview = await _translationService.TranslateDynamicAsync(
+                "PassOnLog",
+                entityId,
+                "Preview",
+                item.Preview,
+                _translationService.DefaultLanguage,
+                targetLanguage,
+                cancellationToken);
+        }
+
+        private async Task ApplyTranslationsAsync(PassOnLogDetailsViewModel model, string targetLanguage, CancellationToken cancellationToken)
+        {
+            if (model == null || string.Equals(targetLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var entityId = model.Id.ToString(CultureInfo.InvariantCulture);
+
+            model.TranslatedTitle = await _translationService.TranslateDynamicAsync(
+                "PassOnLog",
+                entityId,
+                "Title",
+                model.Title,
+                _translationService.DefaultLanguage,
+                targetLanguage,
+                cancellationToken);
+
+            model.TranslatedBody = await _translationService.TranslateDynamicAsync(
+                "PassOnLog",
+                entityId,
+                "Body",
+                model.Body,
+                _translationService.DefaultLanguage,
+                targetLanguage,
+                cancellationToken);
+
+            var commentTasks = model.Comments
+                .Select(async comment =>
+                {
+                    comment.TranslatedBody = await _translationService.TranslateDynamicAsync(
+                        "PassOnLogComment",
+                        comment.Id.ToString(CultureInfo.InvariantCulture),
+                        "Body",
+                        comment.Body,
+                        _translationService.DefaultLanguage,
+                        targetLanguage,
+                        cancellationToken);
+                });
+
+            await Task.WhenAll(commentTasks);
         }
 
         private sealed class UploadedAttachmentInfo

@@ -2,6 +2,8 @@ using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Hubs;
 using hOps.web.Services;
+using hOps.web.Localization;
+using hOps.web.Services.Localization;
 using hOps.web.Options;
 using hOps.web.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -22,6 +24,9 @@ using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+using Microsoft.AspNetCore.Localization;
+using System.Globalization;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 var forceSqlite = ShouldForceSqlite(builder.Configuration);
@@ -301,6 +306,17 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+builder.Services.AddLocalization();
+var supportedCultureInfos = LanguageConstants.SupportedLanguages
+    .Select(language => new CultureInfo(language.Code))
+    .ToList();
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture(LanguageConstants.English);
+    options.SupportedCultures = supportedCultureInfos;
+    options.SupportedUICultures = supportedCultureInfos;
+    options.ApplyCurrentCultureToResponseHeaders = true;
+});
 builder.Services.Configure<MvcOptions>(options =>
 {
     options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
@@ -311,6 +327,10 @@ builder.Services.Configure<CaptchaOptions>(builder.Configuration.GetSection("Cap
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddHttpClient<ICaptchaValidator, GoogleRecaptchaValidator>();
 builder.Services.AddSingleton(supabaseStorageOptions);
+builder.Services.AddSingleton<StaticTranslationStore>();
+builder.Services.AddSingleton<IExternalTranslationProvider, NoOpTranslationProvider>();
+builder.Services.AddScoped<ITranslationService, TranslationService>();
+builder.Services.AddScoped<ILanguagePreferenceService, LanguagePreferenceService>();
 
 var jwtSettings = builder.Configuration.GetSection("Authentication:Jwt").Get<JwtOptions>() ?? new JwtOptions();
 var jwtSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SigningKey));
@@ -364,6 +384,9 @@ builder.Services.AddHttpsRedirection(options =>
 });
 
 var app = builder.Build();
+
+var localizationOptions = app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value;
+app.UseRequestLocalization(localizationOptions);
 
 // ----------------------
 // 2. Migrate DB & Seed Roles/Admin User

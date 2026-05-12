@@ -382,3 +382,5 @@ C:\hops\hOps.web.Tests\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.Abstrac
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\Microsoft.Extensions.Hosting.Abstractions.dll
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\System.Security.Cryptography.Xml.dll
 C:\hops\hOps.web.Tests\bin\Debug\net8.0\test.json
+C:\hops\hOps.web.Tests\bin\Debug\net8.0\Localization\static.en.json
+C:\hops\hOps.web.Tests\bin\Debug\net8.0\Localization\static.es.json

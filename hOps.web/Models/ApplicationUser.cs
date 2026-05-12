@@ -48,5 +48,6 @@ namespace hOps.web.Models
         public ICollection<UserToDoItem> ToDoItems { get; set; } = new List<UserToDoItem>();
 
         public string TimeZoneId { get; set; } = DefaultTimeZoneProvider.NormalizeForStorage(null);
+        public string PreferredLanguage { get; set; } = "en";
     }
 }

@@ -28,6 +28,24 @@ button,
     z-index: 1300;
 }
 
+.language-toggle__code {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: rgba(15, 30, 67, 0.08);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.language-select-option[aria-current="true"] {
+    font-weight: 600;
+}
+
 .popover,
 .tooltip {
     z-index: 1400;

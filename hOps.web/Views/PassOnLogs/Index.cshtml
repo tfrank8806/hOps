@@ -1,6 +1,8 @@
 @model hOps.web.ViewModels.PassOnLogIndexViewModel
 @{ 
-    ViewData["Title"] = "Pass On Logs";
+    var activeLanguage = Html.GetActiveLanguage();
+    var isDefaultLanguage = string.Equals(activeLanguage, LanguageConstants.English, StringComparison.OrdinalIgnoreCase);
+    ViewData["Title"] = Html.Localize("Pass On Logs");
     ViewData["MainContainerClass"] = "main-inner--wide";
     var hasActiveFilters =
         Model.Filters.StartDate.HasValue ||
@@ -11,7 +13,21 @@
         !string.Equals(Model.Filters.SortOrder, "newest", StringComparison.OrdinalIgnoreCase) ||
         Model.Filters.ShowUnreadOnly;
     var filterCollapseClass = hasActiveFilters ? "collapse show" : "collapse";
-    var filterToggleText = hasActiveFilters ? "Hide Filters" : "Show Filters";
+    var hideFiltersText = Html.Localize("Hide Filters");
+    var showFiltersText = Html.Localize("Show Filters");
+    var filterToggleText = hasActiveFilters ? hideFiltersText : showFiltersText;
+    var sortLabel = Html.Localize("Sort");
+    var fromLabel = Html.Localize("From");
+    var toLabel = Html.Localize("To");
+    var creatorLabel = Html.Localize("Creator");
+    var propertyLabel = Html.Localize("Property");
+    var keywordLabel = Html.Localize("Keyword");
+    var allCreatorsLabel = Html.Localize("All creators");
+    var allPropertiesLabel = Html.Localize("All properties");
+    var searchPlaceholder = Html.Localize("Search title or body");
+    var unreadOnlyLabel = Html.Localize("Unread only");
+    var resetLabel = Html.Localize("Reset");
+    var applyLabel = Html.Localize("Apply");
 }
 
 @section Scripts {
@@ -23,9 +39,12 @@
                 return;
             }
 
+            const hideLabel = toggleButton.getAttribute('data-hide-label') || 'Hide Filters';
+            const showLabel = toggleButton.getAttribute('data-show-label') || 'Show Filters';
+
             const updateLabel = () => {
                 const isShown = collapseElement.classList.contains('show');
-                toggleButton.textContent = isShown ? 'Hide Filters' : 'Show Filters';
+                toggleButton.textContent = isShown ? hideLabel : showLabel;
                 toggleButton.setAttribute('aria-expanded', isShown ? 'true' : 'false');
             };
 
@@ -37,7 +56,7 @@
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <h2 class="mb-0">Pass On Logs</h2>
+    <h2 class="mb-0">@Html.Localize("Pass On Logs")</h2>
     <div class="d-flex align-items-center gap-2">
         <button class="btn btn-outline-secondary"
                 type="button"
@@ -45,12 +64,14 @@
                 data-bs-target="#passOnLogFilters"
                 aria-expanded="@(hasActiveFilters ? "true" : "false")"
                 aria-controls="passOnLogFilters"
-                id="passOnLogFiltersToggle">
+                id="passOnLogFiltersToggle"
+                data-hide-label="@hideFiltersText"
+                data-show-label="@showFiltersText">
             @filterToggleText
         </button>
         @if (Model.CanCreateLog)
         {
-            <a asp-action="Create" class="btn btn-primary">New Log</a>
+            <a asp-action="Create" class="btn btn-primary">@Html.Localize("New Log")</a>
         }
     </div>
 </div>
@@ -64,30 +85,30 @@
     <div class="card-body">
         <div class="row g-3 align-items-end">
             <div class="col-sm-6 col-md-3 col-lg-2">
-                <label class="form-label" for="SortOrder">Sort</label>
+                <label class="form-label" for="SortOrder">@sortLabel</label>
                 <select class="form-select" id="SortOrder" name="SortOrder">
                     @foreach (var option in Model.Filters.SortOptions)
                     {
-                        <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
+                        <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@Html.Localize(option.Text)</option>
                     }
                 </select>
             </div>
             <div class="col-sm-6 col-md-3 col-lg-2">
-                <label class="form-label" for="StartDate">From</label>
+                <label class="form-label" for="StartDate">@fromLabel</label>
                 <input type="date" class="form-control" id="StartDate" name="StartDate" value="@Model.Filters.StartDate?.ToString("yyyy-MM-dd")" />
             </div>
             <div class="col-sm-6 col-md-3 col-lg-2">
-                <label class="form-label" for="EndDate">To</label>
+                <label class="form-label" for="EndDate">@toLabel</label>
                 <input type="date" class="form-control" id="EndDate" name="EndDate" value="@Model.Filters.EndDate?.ToString("yyyy-MM-dd")" />
             </div>
             <div class="col-sm-6 col-md-6 col-lg-3">
-                <label class="form-label" for="CreatorIds">Creator</label>
+                <label class="form-label" for="CreatorIds">@creatorLabel</label>
                 <select class="form-select js-checkbox-multiselect"
                         id="CreatorIds"
                         name="CreatorIds"
                         multiple
-                        data-placeholder="All creators"
-                        data-all-label="All creators">
+                        data-placeholder="@allCreatorsLabel"
+                        data-all-label="@allCreatorsLabel">
                     @foreach (var option in Model.Filters.CreatorOptions)
                     {
                         if (string.IsNullOrWhiteSpace(option.Value))
@@ -99,13 +120,13 @@
                 </select>
             </div>
             <div class="col-sm-6 col-md-6 col-lg-3">
-                <label class="form-label" for="PropertyIds">Property</label>
+                <label class="form-label" for="PropertyIds">@propertyLabel</label>
                 <select class="form-select js-checkbox-multiselect"
                         id="PropertyIds"
                         name="PropertyIds"
                         multiple
-                        data-placeholder="All properties"
-                        data-all-label="All properties">
+                        data-placeholder="@allPropertiesLabel"
+                        data-all-label="@allPropertiesLabel">
                     @foreach (var property in Model.Filters.PropertyOptions)
                     {
                         var label = string.IsNullOrWhiteSpace(property.Code)
@@ -116,8 +137,8 @@
                 </select>
             </div>
             <div class="col-12 col-lg-4">
-                <label class="form-label" for="SearchTerm">Keyword</label>
-                <input type="text" class="form-control" id="SearchTerm" name="SearchTerm" value="@Model.Filters.SearchTerm" placeholder="Search title or body" />
+                <label class="form-label" for="SearchTerm">@keywordLabel</label>
+                <input type="text" class="form-control" id="SearchTerm" name="SearchTerm" value="@Model.Filters.SearchTerm" placeholder="@searchPlaceholder" />
             </div>
             <div class="col-sm-6 col-md-3 col-lg-2 d-flex align-items-center">
                 <div class="form-check mt-4 pt-2">
@@ -128,26 +149,33 @@
                            name="ShowUnreadOnly"
                            value="true"
                            @(Model.Filters.ShowUnreadOnly ? "checked" : null) />
-                    <label class="form-check-label" for="ShowUnreadOnly">Unread only</label>
+                    <label class="form-check-label" for="ShowUnreadOnly">@unreadOnlyLabel</label>
                 </div>
             </div>
         </div>
     </div>
     <div class="card-footer d-flex justify-content-end gap-2">
-        <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
-        <button type="submit" class="btn btn-primary">Apply</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">@resetLabel</a>
+        <button type="submit" class="btn btn-primary">@applyLabel</button>
     </div>
 </form>
 
 @if (!Model.Logs.Any())
 {
-    <div class="alert alert-info">No logs matched the selected filters.</div>
+    <div class="alert alert-info">@Html.Localize("No logs matched the selected filters.")</div>
 }
 else
 {
     <div class="list-group">
         @foreach (var log in Model.Logs)
         {
+            var displayTitle = !isDefaultLanguage && !string.IsNullOrWhiteSpace(log.TranslatedTitle) ? log.TranslatedTitle : log.Title;
+            var displayPreview = !isDefaultLanguage && !string.IsNullOrWhiteSpace(log.TranslatedPreview) ? log.TranslatedPreview : log.Preview;
+            var byLabel = Html.Localize("By");
+            var unreadLabel = Html.Localize("Unread");
+            var propertiesLabel = Html.Localize("Properties:");
+            var commentLabel = log.CommentCount == 1 ? Html.Localize("comment") : Html.Localize("comments");
+            var createdLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
             <a asp-action="Details" asp-route-id="@log.Id" class="list-group-item list-group-item-action log-list-item @(log.IsUnread ? "log-unread" : string.Empty)">
                 <div class="d-flex gap-3 align-items-start">
                     <div class="flex-shrink-0">
@@ -156,22 +184,19 @@ else
                     <div class="flex-grow-1">
                         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                             <div>
-                                <h5 class="mb-1">@log.Title</h5>
-                                @{
-                                    var createdLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
-                                }
-                                <div class="text-muted small">By @log.CreatorName • @createdLocal.ToString("g")</div>
+                                <h5 class="mb-1">@displayTitle</h5>
+                                <div class="text-muted small">@byLabel @log.CreatorName • @createdLocal.ToString("g")</div>
                             </div>
                             @if (log.IsUnread)
                             {
-                                <span class="badge bg-primary align-self-start">Unread</span>
+                                <span class="badge bg-primary align-self-start">@unreadLabel</span>
                             }
                         </div>
-                        <p class="mb-2 text-muted">@log.Preview</p>
+                        <p class="mb-2 text-muted">@displayPreview</p>
                         <div class="d-flex flex-wrap gap-2 small text-muted">
-                            <span><strong>Properties:</strong> @string.Join(", ", log.PropertyNames)</span>
+                            <span><strong>@propertiesLabel</strong> @string.Join(", ", log.PropertyNames)</span>
                             <span class="text-secondary">•</span>
-                            <span>@log.CommentCount comment@(log.CommentCount == 1 ? string.Empty : "s")</span>
+                            <span>@log.CommentCount @commentLabel</span>
                         </div>
                     </div>
                 </div>

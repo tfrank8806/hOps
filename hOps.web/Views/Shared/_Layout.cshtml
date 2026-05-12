@@ -62,6 +62,7 @@
     var rawAvatarModel = ViewBag.CurrentUserAvatar as UserAvatarViewModel;
     var fallbackProfileName = rawAvatarModel?.Name ?? (User?.Identity?.Name ?? "My Profile");
     var todayDisplay = TimeZoneService.ConvertToUserTime(DateTime.UtcNow).ToString("dddd, MMM d");
+    var activeLanguageForDocument = (ViewBag.ActiveLanguage as string ?? LanguageConstants.English).ToLowerInvariant();
     var profileAvatarModel = rawAvatarModel != null
         ? new UserAvatarViewModel
         {
@@ -82,7 +83,7 @@
     }
 }
 <!DOCTYPE html>
-<html>
+<html lang="@activeLanguageForDocument">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -100,12 +101,9 @@
 <body data-user-authenticated="@userAuthenticated" data-sidebar-managed="true">
     <div class="ui-scale-wrapper">
     <a class="skip-link" href="#mainContent">Skip to main content</a>
-    @if (SignInManager.IsSignedIn(User))
-    {
-        <form id="globalAntiforgeryForm" method="post" class="d-none">
-            @Html.AntiForgeryToken()
-        </form>
-    }
+    <form id="globalAntiforgeryForm" method="post" class="d-none">
+        @Html.AntiForgeryToken()
+    </form>
     <header class="main-header">
         <div class="container-fluid py-2">
             <div class="main-header__top d-flex align-items-center justify-content-between gap-3 flex-wrap">
@@ -125,6 +123,42 @@
                 <ul class="nav align-items-center">
                 <li class="nav-item me-3 text-muted small d-none d-lg-block">
                     @todayDisplay
+                </li>
+                @{
+                    var supportedLanguages = (IEnumerable<LanguageOption>)(ViewBag.SupportedLanguages ?? LanguageConstants.SupportedLanguages);
+                    var activeLanguageCode = (ViewBag.ActiveLanguage as string ?? LanguageConstants.English).ToLowerInvariant();
+                    var activeLanguageName = ViewBag.ActiveLanguageDisplayName as string ?? "English";
+                }
+                <li class="nav-item dropdown me-2" id="languageMenu" data-active-language="@activeLanguageCode">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center gap-2"
+                       href="#"
+                       role="button"
+                       data-bs-toggle="dropdown"
+                       aria-expanded="false"
+                       id="languageMenuToggle"
+                       data-language-menu
+                       aria-label="@T.Translate("Change language", activeLanguageCode, "Change language")">
+                        <span class="language-toggle__code" aria-hidden="true">@activeLanguageCode.ToUpperInvariant()</span>
+                        <span class="d-none d-md-inline">@activeLanguageName</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="languageMenuToggle">
+                        @foreach (var option in supportedLanguages)
+                        {
+                            var isActiveLanguage = string.Equals(option.Code, activeLanguageCode, StringComparison.OrdinalIgnoreCase);
+                            <li>
+                                <button class="dropdown-item d-flex align-items-center justify-content-between language-select-option"
+                                        type="button"
+                                        data-language-code="@option.Code"
+                                        @(isActiveLanguage ? "aria-current=\"true\"" : null)>
+                                    <span>@option.DisplayName</span>
+                                    @if (isActiveLanguage)
+                                    {
+                                        <span class="badge bg-primary">@T.Translate("Active", activeLanguageCode, "Active")</span>
+                                    }
+                                </button>
+                            </li>
+                        }
+                    </ul>
                 </li>
                 @if (SignInManager.IsSignedIn(User))
                 {
@@ -851,6 +885,64 @@
             let hotelLayoutLoading = false;
             let hotelLayoutHideTimer;
             let hideHotelLayoutPanel = () => {};
+            const languageMenu = document.getElementById('languageMenu');
+            const LANGUAGE_STORAGE_KEY = 'hops.lang';
+
+            if (languageMenu) {
+                const activeLanguage = languageMenu.dataset.activeLanguage || '';
+
+                if (activeLanguage) {
+                    document.documentElement.setAttribute('lang', activeLanguage);
+                    try {
+                        localStorage.setItem(LANGUAGE_STORAGE_KEY, activeLanguage);
+                    } catch (storageError) {
+                        console.warn('Unable to persist language preference to localStorage', storageError);
+                    }
+                }
+
+                const languageButtons = Array.from(languageMenu.querySelectorAll('.language-select-option'));
+                languageButtons.forEach(button => {
+                    button.addEventListener('click', async () => {
+                        const selectedLanguage = button.getAttribute('data-language-code');
+                        if (!selectedLanguage || button.getAttribute('aria-current') === 'true') {
+                            return;
+                        }
+
+                        button.disabled = true;
+                        button.classList.add('pe-none');
+                        try {
+                            const response = await fetch('/Localization/SetLanguage', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+                                    'RequestVerificationToken': antiForgeryToken || ''
+                                },
+                                body: new URLSearchParams({ languageCode: selectedLanguage })
+                            });
+
+                            if (!response.ok) {
+                                throw new Error(`Language update failed: ${response.status}`);
+                            }
+
+                            const payload = await response.json();
+                            const normalizedLanguage = (payload && payload.language) || selectedLanguage;
+
+                            try {
+                                localStorage.setItem(LANGUAGE_STORAGE_KEY, normalizedLanguage);
+                            } catch (storageError) {
+                                console.warn('Unable to persist language preference', storageError);
+                            }
+
+                            document.documentElement.setAttribute('lang', normalizedLanguage);
+                            window.location.reload();
+                        } catch (error) {
+                            console.error('Failed to update language preference', error);
+                            button.disabled = false;
+                            button.classList.remove('pe-none');
+                        }
+                    });
+                });
+            }
 
             if (bookmarkMenu && bookmarkMenuContent) {
                 const toggle = document.getElementById('bookmarkMenuToggle');
