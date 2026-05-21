@@ -1,22 +1,23 @@
+@using System.Globalization
 @model hOps.web.ViewModels.SiteVisit.SiteVisitTemplateManagerViewModel
 @{
-    ViewData["Title"] = "Site Visit Templates";
+    ViewData["Title"] = Html.Localize("Site Visit Templates");
 }
 
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
     <div>
-        <p class="text-uppercase text-muted fw-semibold small mb-1">Checklist library</p>
-        <h1 class="h2 mb-2">Site Visit Templates</h1>
+        <p class="text-uppercase text-muted fw-semibold small mb-1">@Html.Localize("Checklist library")</p>
+        <h1 class="h2 mb-2">@Html.Localize("Site Visit Templates")</h1>
         <p class="text-muted mb-0">
-            Upload CSV files with your recurring checkpoints and reuse them when kicking off a new site visit.
+            @Html.Localize("Upload CSV files with your recurring checkpoints and reuse them when kicking off a new site visit.")
         </p>
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a asp-action="DownloadBlankTemplate" class="btn btn-outline-secondary">
-            Download blank template
+            @Html.Localize("Download blank template")
         </a>
         <a asp-action="Index" class="btn btn-primary">
-            Back to Site Visit
+            @Html.Localize("Back to Site Visit")
         </a>
     </div>
 </div>
@@ -35,30 +36,37 @@
     <div class="col-lg-7">
         <div class="card h-100">
             <div class="card-body">
-                <h2 class="h5 mb-3">Saved templates</h2>
+                <h2 class="h5 mb-3">@Html.Localize("Saved templates")</h2>
                 @if (Model.Templates.Any())
                 {
                     <div class="list-group list-group-flush">
                         @foreach (var template in Model.Templates)
                         {
+                            var templateId = template.Id.ToString(CultureInfo.InvariantCulture);
+                            var translatedName = await Html.DisplayTranslatedTextAsync("SiteVisitTemplate", templateId, "Name", template.Name);
+                            var translatedDescription = string.IsNullOrWhiteSpace(template.Description)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("SiteVisitTemplate", templateId, "Description", template.Description ?? string.Empty);
+                            var itemLabel = template.ItemCount == 1 ? Html.Localize("item") : Html.Localize("items");
+                            var lastUpdated = template.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy", CultureInfo.CurrentCulture);
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                                     <div>
-                                        <div class="fw-semibold">@template.Name</div>
-                                        @if (!string.IsNullOrWhiteSpace(template.Description))
+                                        <div class="fw-semibold">@translatedName</div>
+                                        @if (!string.IsNullOrWhiteSpace(translatedDescription))
                                         {
-                                            <div class="text-muted small">@template.Description</div>
+                                            <div class="text-muted small">@translatedDescription</div>
                                         }
                                     </div>
                                     <span class="badge bg-light text-dark">
-                                        @template.ItemCount @((template.ItemCount == 1 ? "item" : "items"))
+                                        @template.ItemCount @itemLabel
                                     </span>
                                 </div>
                                 <div class="text-muted small mt-2 d-flex flex-wrap gap-3">
-                                    <span>Last updated @template.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy")</span>
+                                    <span>@Html.Localize("Last updated") @lastUpdated</span>
                                     @if (!string.IsNullOrWhiteSpace(template.CreatedByName))
                                     {
-                                        <span>Created by @template.CreatedByName</span>
+                                        <span>@Html.Localize("Created by") @template.CreatedByName</span>
                                     }
                                 </div>
                             </div>
@@ -68,7 +76,7 @@
                 else
                 {
                     <div class="alert alert-info mb-0">
-                        No templates yet. Upload a CSV on the right to get started.
+                        @Html.Localize("No templates yet. Upload a CSV on the right to get started.")
                     </div>
                 }
             </div>
@@ -77,10 +85,15 @@
     <div class="col-lg-5">
         <div class="card h-100">
             <div class="card-body">
-                <h2 class="h5 mb-3">Upload CSV template</h2>
+                <h2 class="h5 mb-3">@Html.Localize("Upload CSV template")</h2>
                 <p class="text-muted small">
-                    CSV format: columns <code>Section</code> and <code>Title</code> (section may be blank) with one checklist item per row.
-                    Up to 200 rows are supported.
+                    @Html.Localize("CSV format: columns")
+                    <code>Section</code>
+                    @Html.Localize("and")
+                    <code>Title</code>
+                    @Html.Localize("(section may be blank) with one checklist item per row.")
+                    <br />
+                    @Html.Localize("Up to 200 rows are supported.")
                 </p>
                 <form asp-action="UploadTemplate" method="post" enctype="multipart/form-data" class="vstack gap-3">
                     @Html.AntiForgeryToken()
@@ -98,13 +111,13 @@
                         <label asp-for="Upload.CsvFile" class="form-label"></label>
                         <input asp-for="Upload.CsvFile" type="file" class="form-control" accept=".csv,text/csv" />
                         <div class="form-text">
-                            CSV files up to 2&nbsp;MB. We'll trim blank lines and duplicate entries automatically.
-                            Use the same section name for consecutive items to group them together.
+                            @Html.Localize("CSV files up to 2 MB. We'll trim blank lines and duplicate entries automatically.")
+                            @Html.Localize("Use the same section name for consecutive items to group them together.")
                         </div>
                         <span asp-validation-for="Upload.CsvFile" class="text-danger small"></span>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">
-                        Upload template
+                        @Html.Localize("Upload template")
                     </button>
                 </form>
             </div>

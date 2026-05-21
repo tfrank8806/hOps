@@ -1,26 +1,36 @@
+﻿@using System.Globalization
 @model hOps.web.ViewModels.Home.HomeIndexViewModel
 
 @{
     var calendar = Model.CalendarMonth ?? new hOps.web.ViewModels.Home.CalendarMonthViewModel();
     var weeks = calendar.Weeks ?? new List<hOps.web.ViewModels.Home.CalendarMonthWeekViewModel>();
     var hasData = weeks.Any();
-    var weekdayLabels = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+    var weekdayLabels = new[]
+    {
+        Html.Localize("Sun"),
+        Html.Localize("Mon"),
+        Html.Localize("Tue"),
+        Html.Localize("Wed"),
+        Html.Localize("Thu"),
+        Html.Localize("Fri"),
+        Html.Localize("Sat")
+    };
 }
 
 <div class="card shadow-sm h-100 home-widget-card home-widget-card--fill calendar-month-widget-card">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2 home-widget-card__header">
         <div>
-            <h2 class="h6 mb-0">Calendar Month</h2>
-            <small class="text-muted">@(!string.IsNullOrWhiteSpace(calendar.MonthLabel) ? calendar.MonthLabel : DateTime.UtcNow.ToString("MMMM yyyy"))</small>
+            <h2 class="h6 mb-0">@Html.Localize("Calendar Month")</h2>
+            <small class="text-muted">@(!string.IsNullOrWhiteSpace(calendar.MonthLabel) ? calendar.MonthLabel : DateTime.UtcNow.ToString("MMMM yyyy", CultureInfo.CurrentCulture))</small>
         </div>
         <a class="btn btn-sm btn-outline-primary" asp-controller="Calendar" asp-action="Index">
-            Open Calendar
+            @Html.Localize("Open Calendar")
         </a>
     </div>
     <div class="card-body home-widget-card__body">
         @if (!hasData)
         {
-            <p class="text-muted mb-0">No calendar data available yet. Create an event to populate the month view.</p>
+            <p class="text-muted mb-0">@Html.Localize("No calendar data available yet. Create an event to populate the month view.")</p>
         }
         else
         {
@@ -128,7 +138,7 @@
         }
     }
 </style>
-            <div class="calendar-month-widget" aria-label="Monthly calendar">
+            <div class="calendar-month-widget" aria-label='@Html.Localize("Monthly calendar")'>
                 <div class="calendar-month-widget__weekdays" aria-hidden="true">
                     @foreach (var label in weekdayLabels)
                     {
@@ -159,21 +169,21 @@
                                     <span class="calendar-month-day__date">@day.Date.Day</span>
                                     @if (day.IsToday)
                                     {
-                                        <span class="calendar-month-day__today-pill">Today</span>
+                                        <span class="calendar-month-day__today-pill">@Html.Localize("Today")</span>
                                     }
                                 </div>
                                 <div class="calendar-month-day__badges">
                                     @if (!displayBadges.Any())
                                     {
-                                        <span class="calendar-month-day__empty-note">No events</span>
+                                        <span class="calendar-month-day__empty-note">@Html.Localize("No events")</span>
                                     }
                                     else
                                     {
                                         foreach (var badge in displayBadges)
                                         {
                                             var label = string.IsNullOrWhiteSpace(badge.CategoryName)
-                                                ? "Event"
-                                                : badge.CategoryName;
+                                                ? Html.Localize("Event")
+                                                : Html.Localize(badge.CategoryName);
                                             if (!string.IsNullOrWhiteSpace(badge.LinkUrl))
                                             {
                                                 <a class="calendar-month-day__badge"
@@ -195,8 +205,9 @@
 
                                         if (overflow > 0)
                                         {
+                                            var overflowTitle = string.Format(CultureInfo.CurrentCulture, Html.Localize("{0} more events"), overflow);
                                             <span class="calendar-month-day__badge calendar-month-day__badge--more"
-                                                  title="@($"{overflow} more events")">
+                                                  title="@overflowTitle">
                                                 +@overflow
                                             </span>
                                         }
@@ -210,3 +221,4 @@
         }
     </div>
 </div>
+

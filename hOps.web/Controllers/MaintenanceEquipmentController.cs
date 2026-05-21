@@ -2,8 +2,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
@@ -12,6 +14,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using hOps.web.Services.Localization;
 
 namespace hOps.web.Controllers
 {
@@ -25,12 +28,29 @@ namespace hOps.web.Controllers
         private const string EquipmentDetailsView = "~/Views/Maintenance/Equipment/Details.cshtml";
 
         private readonly ApplicationDbContext _db;
+        private readonly ITranslationService _translationService;
 
-        public MaintenanceEquipmentController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public MaintenanceEquipmentController(
+            ApplicationDbContext context,
+            UserManager<ApplicationUser> userManager,
+            ITranslationService translationService)
             : base(context, userManager)
         {
             _db = context;
+            _translationService = translationService;
         }
+
+        private string GetActiveLanguage()
+            => HttpContext?.Items?["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+
+        private bool IsDefaultLanguage(string language)
+            => string.Equals(language, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+
+        private string Translate(string key, string? fallback = null)
+            => _translationService.Translate(key, GetActiveLanguage(), fallback ?? key);
+
+        private CancellationToken RequestCancellationToken
+            => HttpContext?.RequestAborted ?? CancellationToken.None;
 
         [HttpGet("")]
         public async Task<IActionResult> Index()
@@ -38,7 +58,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["EquipmentError"] = "Select a property to view equipment.";
+                TempData["EquipmentError"] = Translate("Select a property to view equipment.");
                 return RedirectToAction("Index", "Home");
             }
 
@@ -90,7 +110,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["EquipmentError"] = "Select a property before adding equipment.";
+                TempData["EquipmentError"] = Translate("Select a property before adding equipment.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -116,7 +136,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["EquipmentError"] = "Select a property before adding equipment.";
+                TempData["EquipmentError"] = Translate("Select a property before adding equipment.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -158,7 +178,7 @@ namespace hOps.web.Controllers
             _db.EquipmentItems.Add(entity);
             await _db.SaveChangesAsync();
 
-            TempData["EquipmentMessage"] = "Equipment item created.";
+            TempData["EquipmentMessage"] = Translate("Equipment item created.");
             return RedirectToAction(nameof(Details), new { id = entity.Id });
         }
 
@@ -168,7 +188,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["EquipmentError"] = "Select a property to view equipment.";
+                TempData["EquipmentError"] = Translate("Select a property to view equipment.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -223,7 +243,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["EquipmentError"] = "Select a property before editing equipment.";
+                TempData["EquipmentError"] = Translate("Select a property before editing equipment.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -275,7 +295,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["EquipmentError"] = "Select a property before editing equipment.";
+                TempData["EquipmentError"] = Translate("Select a property before editing equipment.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -324,7 +344,7 @@ namespace hOps.web.Controllers
 
             await _db.SaveChangesAsync();
 
-            TempData["EquipmentMessage"] = "Equipment item updated.";
+            TempData["EquipmentMessage"] = Translate("Equipment item updated.");
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -334,7 +354,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["EquipmentError"] = "Select a property before editing equipment.";
+                TempData["EquipmentError"] = Translate("Select a property before editing equipment.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -355,14 +375,14 @@ namespace hOps.web.Controllers
 
             if (entity == null)
             {
-                TempData["EquipmentError"] = "Equipment item not found.";
+                TempData["EquipmentError"] = Translate("Equipment item not found.");
                 return RedirectToAction(nameof(Index));
             }
 
             _db.EquipmentItems.Remove(entity);
             await _db.SaveChangesAsync();
 
-            TempData["EquipmentMessage"] = "Equipment item deleted.";
+            TempData["EquipmentMessage"] = Translate("Equipment item deleted.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -372,7 +392,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["EquipmentError"] = "Select a property before exporting equipment.";
+                TempData["EquipmentError"] = Translate("Select a property before exporting equipment.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -388,25 +408,192 @@ namespace hOps.web.Controllers
                 .ThenBy(e => e.Category)
                 .ToListAsync();
 
+            var activeLanguage = GetActiveLanguage();
+            var isDefaultLanguage = IsDefaultLanguage(activeLanguage);
+            var cancellationToken = RequestCancellationToken;
+
+            var headers = new[]
+            {
+                "Name",
+                "Category",
+                "Location",
+                "Brand",
+                "Model",
+                "Serial Number",
+                "Vendor Name",
+                "Vendor Phone",
+                "Vendor Email",
+                "Installed On",
+                "Warranty Ends",
+                "Notes"
+            };
+
             var builder = new StringBuilder();
-            builder.AppendLine("Name,Category,Location,Brand,Model,Serial Number,Vendor Name,Vendor Phone,Vendor Email,Installed On,Warranty Ends,Notes");
+            var translatedHeaders = headers
+                .Select(header => Csv(_translationService.Translate(header, activeLanguage, header)));
+            builder.AppendLine(string.Join(",", translatedHeaders));
+
             foreach (var item in items)
             {
-                builder.AppendLine(string.Join(",", new[]
+                var name = item.Name ?? string.Empty;
+                var category = item.Category ?? string.Empty;
+                var location = item.Location ?? string.Empty;
+                var brand = item.Brand ?? string.Empty;
+                var model = item.Model ?? string.Empty;
+                var serialNumber = item.SerialNumber ?? string.Empty;
+                var vendorName = item.VendorName ?? string.Empty;
+                var notes = item.Notes ?? string.Empty;
+
+                if (!isDefaultLanguage)
                 {
-                    Csv(item.Name),
-                    Csv(item.Category),
-                    Csv(item.Location),
-                    Csv(item.Brand),
-                    Csv(item.Model),
-                    Csv(item.SerialNumber),
-                    Csv(item.VendorName),
+                    var entityId = item.Id.ToString(CultureInfo.InvariantCulture);
+
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "EquipmentItem",
+                            entityId,
+                            "Name",
+                            name,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            name = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(category))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "EquipmentItem",
+                            entityId,
+                            "Category",
+                            category,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            category = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(location))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "EquipmentItem",
+                            entityId,
+                            "Location",
+                            location,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            location = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(brand))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "EquipmentItem",
+                            entityId,
+                            "Brand",
+                            brand,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            brand = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(model))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "EquipmentItem",
+                            entityId,
+                            "Model",
+                            model,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            model = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(serialNumber))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "EquipmentItem",
+                            entityId,
+                            "SerialNumber",
+                            serialNumber,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            serialNumber = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(vendorName))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "EquipmentItem",
+                            entityId,
+                            "VendorName",
+                            vendorName,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            vendorName = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(notes))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "EquipmentItem",
+                            entityId,
+                            "Notes",
+                            notes,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            notes = translated;
+                        }
+                    }
+                }
+
+                var row = new[]
+                {
+                    Csv(name),
+                    Csv(category),
+                    Csv(location),
+                    Csv(brand),
+                    Csv(model),
+                    Csv(serialNumber),
+                    Csv(vendorName),
                     Csv(item.VendorPhone),
                     Csv(item.VendorEmail),
                     Csv(item.InstalledOn?.ToString("yyyy-MM-dd")),
                     Csv(item.WarrantyEndsOn?.ToString("yyyy-MM-dd")),
-                    Csv(item.Notes)
-                }));
+                    Csv(notes)
+                };
+
+                builder.AppendLine(string.Join(",", row));
             }
 
             var fileName = $"{SanitizeFileName(property.Name)}-equipment-{DateTime.UtcNow:yyyyMMdd}.csv";

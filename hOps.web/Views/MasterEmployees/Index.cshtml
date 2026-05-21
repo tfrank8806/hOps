@@ -1,47 +1,69 @@
+@using System.Globalization
+@using System.Text.Encodings.Web
 @model hOps.web.ViewModels.MasterEmployees.MasterEmployeeListViewModel
 @{
-    ViewData["Title"] = "Master Employee List";
+    ViewData["Title"] = Html.Localize("Master Employee List");
     ViewData["MainContainerClass"] = "main-inner--wide";
+    var currentProperty = ViewBag.CurrentProperty as hOps.web.Models.Property;
+    var propertyNameDisplay = string.Empty;
+    if (!string.IsNullOrWhiteSpace(Model.PropertyName))
+    {
+        if (currentProperty != null)
+        {
+            var propertyContent = await Html.DisplayTranslatedTextAsync(
+                "Property",
+                currentProperty.Id.ToString(CultureInfo.InvariantCulture),
+                "Name",
+                currentProperty.Name ?? string.Empty);
+            propertyNameDisplay = propertyContent.ToString();
+        }
+        else
+        {
+            propertyNameDisplay = Model.PropertyName ?? string.Empty;
+        }
+    }
 }
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
     <div>
-        <h1 class="h3 mb-0">Master Employee List</h1>
-        @if (!string.IsNullOrWhiteSpace(Model.PropertyName))
+        <h1 class="h3 mb-0">@Html.Localize("Master Employee List")</h1>
+        @if (!string.IsNullOrWhiteSpace(propertyNameDisplay))
         {
-            <div class="text-muted small">Property: @Model.PropertyName</div>
+            <div class="text-muted small">
+                @string.Format(CultureInfo.InvariantCulture, Html.Localize("Property: {0}").ToString(), propertyNameDisplay)
+            </div>
         }
     </div>
     @if (Model.HasPropertySelected)
     {
-        <a class="btn btn-primary" asp-action="Create">Add Employee</a>
+        <a class="btn btn-primary" asp-action="Create">@Html.Localize("Add Employee")</a>
     }
 </div>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
     <div class="alert alert-success alert-dismissible fade show" role="alert">
-        @Model.StatusMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        @Html.Localize(Model.StatusMessage, Model.StatusMessage ?? string.Empty)
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Html.Localize("Close")"></button>
     </div>
 }
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
 {
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        @Model.ErrorMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        @Html.Localize(Model.ErrorMessage, Model.ErrorMessage ?? string.Empty)
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Html.Localize("Close")"></button>
     </div>
 }
 
 @if (!Model.HasPropertySelected)
 {
     <div class="alert alert-info">
-        Select a property to begin managing your master employee list.
+        @Html.Localize("Select a property to begin managing your master employee list.")
     </div>
 }
 else if (!Model.Employees.Any())
 {
-    <p class="text-muted mb-0">No employees have been added for this property yet.</p>
+    <p class="text-muted mb-0">@Html.Localize("No employees have been added for this property yet.")</p>
 }
 else
 {
@@ -49,30 +71,54 @@ else
         <table class="table table-striped align-middle">
             <thead class="table-light">
                 <tr>
-                    <th scope="col">Employee</th>
-                    <th scope="col">Department</th>
-                    <th scope="col">Position</th>
-                    <th scope="col" class="text-end">Actions</th>
+                    <th scope="col">@Html.Localize("Employee")</th>
+                    <th scope="col">@Html.Localize("Department")</th>
+                    <th scope="col">@Html.Localize("Position")</th>
+                    <th scope="col" class="text-end">@Html.Localize("Actions")</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var employee in Model.Employees)
                 {
+                    var departmentDisplay = string.Empty;
+                    if (employee.DepartmentId.HasValue)
+                    {
+                        var departmentContent = await Html.DisplayTranslatedTextAsync(
+                            "Department",
+                            employee.DepartmentId.Value.ToString(CultureInfo.InvariantCulture),
+                            "Name",
+                            employee.DepartmentName ?? string.Empty);
+                        departmentDisplay = departmentContent.ToString();
+                    }
+                    else
+                    {
+                        departmentDisplay = Html.Localize("Unassigned").ToString();
+                    }
+
+                    var positionContent = await Html.DisplayTranslatedTextAsync(
+                        "MasterEmployee",
+                        employee.Id.ToString(CultureInfo.InvariantCulture),
+                        "Position",
+                        employee.Position ?? string.Empty);
+                    var positionDisplay = positionContent.ToString();
+
+                    var employeeDisplayName = employee.DisplayName;
+                    var employeeDisplayNameJs = JavaScriptEncoder.Default.Encode(employeeDisplayName);
                     <tr>
-                        <td>@employee.DisplayName</td>
-                        <td>@employee.DepartmentName</td>
-                        <td>@employee.Position</td>
+                        <td>@employeeDisplayName</td>
+                        <td>@departmentDisplay</td>
+                        <td>@positionDisplay</td>
                         <td class="text-end">
-                            <div class="btn-group btn-group-sm" role="group" aria-label="Employee actions">
+                            <div class="btn-group btn-group-sm" role="group" aria-label="@Html.Localize("Employee actions")">
                                 <a class="btn btn-outline-secondary"
                                    asp-action="Edit"
-                                   asp-route-id="@employee.Id">Edit</a>
+                                   asp-route-id="@employee.Id">@Html.Localize("Edit")</a>
                                 <form asp-action="Delete"
                                       asp-route-id="@employee.Id"
                                       method="post"
                                       class="d-inline"
-                                      onsubmit="return confirm('Delete @employee.DisplayName from this property?');">
-                                    <button type="submit" class="btn btn-outline-danger">Delete</button>
+                                      onsubmit="return confirm(window.hopsTranslate('MasterEmployees.DeleteConfirm', 'Delete {0} from this property?').replace('{0}', '@employeeDisplayNameJs'));">
+                                    <button type="submit" class="btn btn-outline-danger">@Html.Localize("Delete")</button>
                                 </form>
                             </div>
                         </td>

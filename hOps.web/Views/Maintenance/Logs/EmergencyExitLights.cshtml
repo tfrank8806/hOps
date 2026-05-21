@@ -1,37 +1,45 @@
 @model hOps.web.ViewModels.Maintenance.EmergencyLightTestingIndexViewModel
+@using System.Globalization
 @{
-    ViewData["Title"] = "Emergency / Exit Light Testing Log";
+    ViewData["Title"] = Html.Localize("Emergency / Exit Light Testing Log");
     var message = ViewBag.EmergencyLightLogMessage as string;
     var error = ViewBag.EmergencyLightLogError as string;
     var localNow = ViewBag.LocalNow is DateTime dt ? dt : TimeZoneService.ConvertToUserTime(DateTime.UtcNow);
     var defaultDate = localNow.ToString("yyyy-MM-dd");
+    var propertyIdString = Model.PropertyId.ToString(CultureInfo.InvariantCulture);
+    string BuildLocationEntityId(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? $"{propertyIdString}:Location"
+            : $"{propertyIdString}:{value.Trim()}";
 }
 
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
-            <h2 class="mb-0">Emergency / Exit Light Testing Log</h2>
-            <p class="text-muted mb-0 small">@Model.PropertyName — record monthly validations for each location.</p>
+            <h2 class="mb-0">@Html.Localize("Emergency / Exit Light Testing Log")</h2>
+            <p class="text-muted mb-0 small">
+                @Model.PropertyName &mdash; @Html.Localize("Record monthly validations for each location.")
+            </p>
         </div>
         <div class="d-flex gap-2">
-            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to Maintenance Logs</a>
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">@Html.Localize("Back to Maintenance Logs")</a>
         </div>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(message))
     {
-        <div class="alert alert-success">@message</div>
+        <div class="alert alert-success">@Html.Localize(message)</div>
     }
 
     @if (!string.IsNullOrWhiteSpace(error))
     {
-        <div class="alert alert-danger">@error</div>
+        <div class="alert alert-danger">@Html.Localize(error)</div>
     }
 
     <div class="card mb-4 shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <strong class="mb-0">Record Testing</strong>
-            <small class="text-muted">Capture the tested location and the date the inspection was completed.</small>
+            <strong class="mb-0">@Html.Localize("Record Testing")</strong>
+            <small class="text-muted">@Html.Localize("Capture the tested location and the date the inspection was completed.")</small>
         </div>
         <div class="card-body">
             <form asp-action="RecordEmergencyExitLightTest" method="post" class="row g-3">
@@ -39,7 +47,9 @@
                 <fieldset @(Model.CanRecord ? null : "disabled")>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label for="emergencyLocation" class="form-label">Location *</label>
+                            <label for="emergencyLocation" class="form-label">
+                                @Html.Localize("Location") <span class="text-danger">*</span>
+                            </label>
                             <input type="text"
                                    class="form-control"
                                    id="emergencyLocation"
@@ -47,7 +57,7 @@
                                    list="emergencyLocationOptions"
                                    maxlength="160"
                                    required />
-                            <div class="form-text">Enter the public-area location that was tested (lobby, corridor, stairwell, etc.).</div>
+                            <div class="form-text">@Html.Localize("Enter the public-area location that was tested (lobby, corridor, stairwell, etc.).")</div>
                             @if (Model.SavedLocations.Count > 0)
                             {
                                 <datalist id="emergencyLocationOptions">
@@ -56,11 +66,13 @@
                                         <option value="@savedLocation"></option>
                                     }
                                 </datalist>
-                                <div class="form-text">Previously logged locations appear as suggestions.</div>
+                                <div class="form-text">@Html.Localize("Previously logged locations appear as suggestions.")</div>
                             }
                         </div>
                         <div class="col-md-3 col-xl-2">
-                            <label for="emergencyTestDate" class="form-label">Testing date *</label>
+                            <label for="emergencyTestDate" class="form-label">
+                                @Html.Localize("Testing date") <span class="text-danger">*</span>
+                            </label>
                             <input type="date"
                                    class="form-control"
                                    id="emergencyTestDate"
@@ -69,10 +81,10 @@
                                    required />
                         </div>
                         <div class="col-12 d-flex gap-2 align-items-center">
-                            <button type="submit" class="btn btn-primary">Record Test</button>
+                            <button type="submit" class="btn btn-primary">@Html.Localize("Record Test")</button>
                             @if (!Model.CanRecord)
                             {
-                                <small class="text-muted">Only managers can record testing.</small>
+                                <small class="text-muted">@Html.Localize("Only managers can record testing.")</small>
                             }
                         </div>
                     </div>
@@ -83,18 +95,18 @@
 
     <div class="card mb-4 shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <strong class="mb-0">Location Status</strong>
-            <small class="text-muted">Each location should be tested at least once every 30 days.</small>
+            <strong class="mb-0">@Html.Localize("Location Status")</strong>
+            <small class="text-muted">@Html.Localize("Each location should be tested at least once every 30 days.")</small>
         </div>
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>Location</th>
-                        <th>Last tested</th>
-                        <th>Last tester</th>
-                        <th>Status</th>
-                        <th>Next due</th>
+                        <th>@Html.Localize("Location")</th>
+                        <th>@Html.Localize("Last tested")</th>
+                        <th>@Html.Localize("Last tester")</th>
+                        <th>@Html.Localize("Status")</th>
+                        <th>@Html.Localize("Next due")</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -102,7 +114,7 @@
                     {
                         <tr>
                             <td colspan="5" class="text-center text-muted py-4">
-                                No testing has been recorded for this property yet.
+                                @Html.Localize("No testing has been recorded for this property yet.")
                             </td>
                         </tr>
                     }
@@ -116,12 +128,18 @@
                                     ? "badge bg-warning text-dark"
                                     : "badge bg-success";
                             var badgeText = status.IsOverdue
-                                ? "Overdue"
+                                ? Html.Localize("Overdue")
                                 : status.IsDueSoon
-                                    ? "Due soon"
-                                    : "Current";
+                                    ? Html.Localize("Due soon")
+                                    : Html.Localize("Current");
                             <tr>
-                                <td class="fw-semibold">@status.Location</td>
+                                <td class="fw-semibold">
+                                    @await Html.DisplayTranslatedTextAsync(
+                                        "EmergencyLightTest",
+                                        BuildLocationEntityId(status.Location),
+                                        "Location",
+                                        status.Location ?? string.Empty)
+                                </td>
                                 <td>
                                     @if (status.LastTestDate.HasValue)
                                     {
@@ -154,17 +172,17 @@
 
     <div class="card shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <strong class="mb-0">Recent Tests</strong>
-            <small class="text-muted">Latest 50 records.</small>
+            <strong class="mb-0">@Html.Localize("Recent Tests")</strong>
+            <small class="text-muted">@Html.Localize("Latest 50 records.")</small>
         </div>
         <div class="table-responsive">
             <table class="table table-striped mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>Location</th>
-                        <th>Tested on</th>
-                        <th>Logged by</th>
-                        <th>Logged at</th>
+                        <th>@Html.Localize("Location")</th>
+                        <th>@Html.Localize("Tested on")</th>
+                        <th>@Html.Localize("Logged by")</th>
+                        <th>@Html.Localize("Logged at")</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -172,7 +190,7 @@
                     {
                         <tr>
                             <td colspan="4" class="text-center text-muted py-4">
-                                No tests have been logged yet.
+                                @Html.Localize("No tests have been logged yet.")
                             </td>
                         </tr>
                     }
@@ -183,7 +201,13 @@
                             var testedLocal = TimeZoneService.ConvertToUserTime(entry.TestDate).ToString("MMM d, yyyy");
                             var loggedLocal = TimeZoneService.ConvertToUserTime(entry.CreatedAtUtc).ToString("MMM d, h:mm tt");
                             <tr>
-                                <td class="fw-semibold">@entry.Location</td>
+                                <td class="fw-semibold">
+                                    @await Html.DisplayTranslatedTextAsync(
+                                        "EmergencyLightTest",
+                                        BuildLocationEntityId(entry.Location),
+                                        "Location",
+                                        entry.Location ?? string.Empty)
+                                </td>
                                 <td>@testedLocal</td>
                                 <td>@(entry.CreatedByName ?? "--")</td>
                                 <td>@loggedLocal</td>

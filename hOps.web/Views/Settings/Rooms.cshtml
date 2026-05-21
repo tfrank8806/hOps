@@ -1,37 +1,50 @@
 @model List<hOps.web.Models.Room>
+@using System.Globalization
 @{
-    ViewData["Title"] = "Rooms Editor";
+    ViewData["Title"] = Html.Localize("Settings.Rooms.Title", "Rooms Editor").ToString();
     int propertyId = ViewBag.PropertyId;
     var allProps = ViewBag.AllProperties as List<hOps.web.Models.Property> ?? new List<hOps.web.Models.Property>();
-    string propertyName = ViewBag.PropertyName as string ?? $"Property {propertyId}";
+    var propertyNameRaw = ViewBag.PropertyName as string ?? string.Empty;
+    var propertyIdString = propertyId.ToString(CultureInfo.InvariantCulture);
+    var propertyNameTranslated = await Html.DisplayTranslatedTextAsync("Property", propertyIdString, "Name", propertyNameRaw);
+    var propertyName = string.IsNullOrWhiteSpace(propertyNameTranslated)
+        ? (string.IsNullOrWhiteSpace(propertyNameRaw)
+            ? string.Format(CultureInfo.CurrentCulture, Html.Localize("Settings.Rooms.PropertyFallback", "Property {0}").ToString(), propertyId)
+            : propertyNameRaw)
+        : propertyNameTranslated;
 }
 
-<h2>Rooms Editor for @propertyName</h2>
+<h2>@string.Format(CultureInfo.CurrentCulture, Html.Localize("Settings.Rooms.Heading", "Rooms Editor for {0}").ToString(), propertyName)</h2>
 
 @if (TempData["RoomsMissing"] is string missingMessage)
 {
-    <div class="alert alert-warning">@missingMessage</div>
+    <div class="alert alert-warning">@Html.Localize(missingMessage, missingMessage)</div>
 }
 
 @if (TempData["RoomsMessage"] is string successMessage)
 {
-    <div class="alert alert-success">@successMessage</div>
+    <div class="alert alert-success">@Html.Localize(successMessage, successMessage)</div>
 }
 
 @if (allProps.Count > 1)
 {
     <div class="mb-3">
-        <label>Select Property: </label>
+        <label class="form-label me-2" for="propertySelect">@Html.Localize("Settings.Rooms.SelectProperty", "Select Property:")</label>
         <select id="propertySelect" class="form-select" style="width:auto; display:inline-block;">
             @foreach (var prop in allProps)
             {
+                var propIdString = prop.Id.ToString(CultureInfo.InvariantCulture);
+                var propNameRaw = prop.Name ?? string.Empty;
+                var propNameTranslated = await Html.DisplayTranslatedTextAsync("Property", propIdString, "Name", propNameRaw);
+                var propDisplayName = string.IsNullOrWhiteSpace(propNameTranslated) ? propNameRaw : propNameTranslated;
+                var optionUrl = Url.Action("Rooms", "Settings", new { propertyId = prop.Id });
                 if (prop.Id == propertyId)
                 {
-                    <option selected value="@Url.Action("Rooms", "Settings", new { propertyId = prop.Id })">@prop.Name</option>
+                    <option selected value="@optionUrl">@propDisplayName</option>
                 }
                 else
                 {
-                    <option value="@Url.Action("Rooms", "Settings", new { propertyId = prop.Id })">@prop.Name</option>
+                    <option value="@optionUrl">@propDisplayName</option>
                 }
             }
         </select>
@@ -40,17 +53,17 @@
 
 <div class="card mb-4">
     <div class="card-body">
-        <h4 class="h5 mb-3">Import / Export</h4>
+        <h4 class="h5 mb-3">@Html.Localize("Settings.Rooms.ImportExportHeading", "Import / Export")</h4>
         <form asp-action="ImportRooms" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
             <input type="hidden" name="propertyId" value="@propertyId" />
             <div class="col-md-6">
-                <label for="roomsCsvFile" class="form-label">Import rooms via CSV</label>
+                <label for="roomsCsvFile" class="form-label">@Html.Localize("Settings.Rooms.ImportCsvLabel", "Import rooms via CSV")</label>
                 <input type="file" id="roomsCsvFile" name="csvFile" accept=".csv" class="form-control" />
             </div>
             <div class="col-md-6 d-flex flex-wrap align-items-center gap-2">
-                <button type="submit" class="btn btn-primary">Import CSV</button>
-                <a asp-action="DownloadRoomsCsv" asp-route-propertyId="@propertyId" class="btn btn-outline-primary">Download Current Rooms</a>
-                <a asp-action="DownloadRoomsTemplate" class="btn btn-outline-secondary">Download Template</a>
+                <button type="submit" class="btn btn-primary">@Html.Localize("Settings.Rooms.ImportCsvButton", "Import CSV")</button>
+                <a asp-action="DownloadRoomsCsv" asp-route-propertyId="@propertyId" class="btn btn-outline-primary">@Html.Localize("Settings.Rooms.DownloadCurrent", "Download Current Rooms")</a>
+                <a asp-action="DownloadRoomsTemplate" class="btn btn-outline-secondary">@Html.Localize("Settings.Rooms.DownloadTemplate", "Download Template")</a>
             </div>
         </form>
     </div>
@@ -60,8 +73,8 @@
     <input type="hidden" name="propertyId" value="@propertyId" />
 
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <button type="button" class="btn btn-secondary js-add-row" data-insert-position="top">+ Add Row</button>
-        <button type="submit" class="btn btn-success">Save Rooms</button>
+        <button type="button" class="btn btn-secondary js-add-row" data-insert-position="top">@Html.Localize("Settings.Rooms.AddRowTop", "+ Add Row")</button>
+        <button type="submit" class="btn btn-success">@Html.Localize("Settings.Rooms.SaveRooms", "Save Rooms")</button>
     </div>
 
     <table class="table table-bordered table-striped" id="roomsTable">
@@ -69,30 +82,30 @@
             <tr>
                 <th>
                     <button type="button" class="btn btn-link p-0 text-decoration-none table-sort" data-sort-key="RoomNumber" data-sort-type="text">
-                        Room Number <span class="sort-indicator ms-1 small text-muted"></span>
+                        @Html.Localize("Settings.Rooms.Header.RoomNumber", "Room Number") <span class="sort-indicator ms-1 small text-muted"></span>
                     </button>
                 </th>
                 <th>
                     <button type="button" class="btn btn-link p-0 text-decoration-none table-sort" data-sort-key="Abbreviation" data-sort-type="text">
-                        Abbreviation <span class="sort-indicator ms-1 small text-muted"></span>
+                        @Html.Localize("Settings.Rooms.Header.Abbreviation", "Abbreviation") <span class="sort-indicator ms-1 small text-muted"></span>
                     </button>
                 </th>
                 <th>
                     <button type="button" class="btn btn-link p-0 text-decoration-none table-sort" data-sort-key="RoomType" data-sort-type="text">
-                        Room Type <span class="sort-indicator ms-1 small text-muted"></span>
+                        @Html.Localize("Settings.Rooms.Header.RoomType", "Room Type") <span class="sort-indicator ms-1 small text-muted"></span>
                     </button>
                 </th>
                 <th>
                     <button type="button" class="btn btn-link p-0 text-decoration-none table-sort" data-sort-key="Floor" data-sort-type="number">
-                        Floor <span class="sort-indicator ms-1 small text-muted"></span>
+                        @Html.Localize("Settings.Rooms.Header.Floor", "Floor") <span class="sort-indicator ms-1 small text-muted"></span>
                     </button>
                 </th>
                 <th>
                     <button type="button" class="btn btn-link p-0 text-decoration-none table-sort" data-sort-key="Description" data-sort-type="text">
-                        Description <span class="sort-indicator ms-1 small text-muted"></span>
+                        @Html.Localize("Settings.Rooms.Header.Description", "Description") <span class="sort-indicator ms-1 small text-muted"></span>
                     </button>
                 </th>
-                <th style="width:220px;">Maintenance / Actions</th>
+                <th style="width:220px;">@Html.Localize("Settings.Rooms.Header.Actions", "Maintenance / Actions")</th>
             </tr>
         </thead>
         <tbody>
@@ -105,7 +118,7 @@
                         <input name="rooms[@i].RoomNumber" value="@Model[i].RoomNumber" class="form-control" />
                     </td>
                     <td class="w-15">
-                        <input name="rooms[@i].Abbreviation" value="@Model[i].Abbreviation" class="form-control text-uppercase" maxlength="3" placeholder="2-3 chars" />
+                        <input name="rooms[@i].Abbreviation" value="@Model[i].Abbreviation" class="form-control text-uppercase" maxlength="3" placeholder='@Html.Localize("Settings.Rooms.Placeholder.Abbreviation", "2-3 chars")' />
                     </td>
                     <td class="w-20">
                         <input name="rooms[@i].RoomType" value="@Model[i].RoomType" class="form-control" />
@@ -122,16 +135,16 @@
                                 <div class="form-check form-check-inline mb-0">
                                     <input class="form-check-input" type="checkbox" name="rooms[@i].IncludeInPreventiveMaintenance" value="true" @(Model[i].IncludeInPreventiveMaintenance ? "checked" : null) id="room-@i-pm">
                                     <input type="hidden" name="rooms[@i].IncludeInPreventiveMaintenance" value="false" />
-                                    <label class="form-check-label" for="room-@i-pm">PM</label>
+                                    <label class="form-check-label" for="room-@i-pm">@Html.Localize("Settings.Rooms.Flag.PM", "PM")</label>
                                 </div>
                                 <div class="form-check form-check-inline mb-0">
                                     <input class="form-check-input" type="checkbox" name="rooms[@i].IncludeInDeepClean" value="true" @(Model[i].IncludeInDeepClean ? "checked" : null) id="room-@i-dc">
                                     <input type="hidden" name="rooms[@i].IncludeInDeepClean" value="false" />
-                                    <label class="form-check-label" for="room-@i-dc">Deep Clean</label>
+                                    <label class="form-check-label" for="room-@i-dc">@Html.Localize("Settings.Rooms.Flag.DeepClean", "Deep Clean")</label>
                                 </div>
                             </div>
                             <div>
-                                <button type="button" class="btn btn-danger btn-sm btn-delete-row">Delete</button>
+                                <button type="button" class="btn btn-danger btn-sm btn-delete-row">@Html.Localize("Settings.Rooms.DeleteRow", "Delete")</button>
                             </div>
                         </div>
                     </td>
@@ -142,28 +155,28 @@
                 <td>
                     <input type="hidden" name="rooms[#].Id" value="0" />
                     <input type="hidden" name="rooms[#].PropertyId" value="@propertyId" />
-                    <input name="rooms[#].RoomNumber" class="form-control" placeholder="Room #" />
+                    <input name="rooms[#].RoomNumber" class="form-control" placeholder='@Html.Localize("Settings.Rooms.Placeholder.RoomNumber", "Room #")' />
                 </td>
-                <td><input name="rooms[#].Abbreviation" class="form-control text-uppercase" maxlength="3" placeholder="2-3 chars" /></td>
-                <td><input name="rooms[#].RoomType" class="form-control" placeholder="Room Type" /></td>
-                <td><input name="rooms[#].Floor" class="form-control" placeholder="Floor" /></td>
-                <td><input name="rooms[#].Description" class="form-control" placeholder="Description" /></td>
+                <td><input name="rooms[#].Abbreviation" class="form-control text-uppercase" maxlength="3" placeholder='@Html.Localize("Settings.Rooms.Placeholder.Abbreviation", "2-3 chars")' /></td>
+                <td><input name="rooms[#].RoomType" class="form-control" placeholder='@Html.Localize("Settings.Rooms.Placeholder.RoomType", "Room Type")' /></td>
+                <td><input name="rooms[#].Floor" class="form-control" placeholder='@Html.Localize("Settings.Rooms.Placeholder.Floor", "Floor")' /></td>
+                <td><input name="rooms[#].Description" class="form-control" placeholder='@Html.Localize("Settings.Rooms.Placeholder.Description", "Description")' /></td>
                 <td class="align-middle">
                         <div class="d-flex flex-column gap-2">
                             <div class="d-flex flex-wrap gap-3 align-items-center">
                                 <div class="form-check form-check-inline mb-0">
                                     <input class="form-check-input" type="checkbox" name="rooms[#].IncludeInPreventiveMaintenance" value="true" checked />
                                     <input type="hidden" name="rooms[#].IncludeInPreventiveMaintenance" value="false" />
-                                    <label class="form-check-label">PM</label>
+                                    <label class="form-check-label">@Html.Localize("Settings.Rooms.Flag.PM", "PM")</label>
                                 </div>
                                 <div class="form-check form-check-inline mb-0">
                                     <input class="form-check-input" type="checkbox" name="rooms[#].IncludeInDeepClean" value="true" checked />
                                     <input type="hidden" name="rooms[#].IncludeInDeepClean" value="false" />
-                                    <label class="form-check-label">Deep Clean</label>
+                                    <label class="form-check-label">@Html.Localize("Settings.Rooms.Flag.DeepClean", "Deep Clean")</label>
                                 </div>
                             </div>
                             <div>
-                                <button type="button" class="btn btn-danger btn-sm btn-delete-row">Delete</button>
+                                <button type="button" class="btn btn-danger btn-sm btn-delete-row">@Html.Localize("Settings.Rooms.DeleteRow", "Delete")</button>
                             </div>
                         </div>
                 </td>
@@ -172,8 +185,8 @@
     </table>
 
     <div class="d-flex justify-content-between align-items-center gap-2 mt-3">
-        <button type="button" class="btn btn-secondary js-add-row" data-insert-position="bottom">+ Add Row</button>
-        <button type="submit" class="btn btn-success">Save Rooms</button>
+        <button type="button" class="btn btn-secondary js-add-row" data-insert-position="bottom">@Html.Localize("Settings.Rooms.AddRowBottom", "+ Add Row")</button>
+        <button type="submit" class="btn btn-success">@Html.Localize("Settings.Rooms.SaveRooms", "Save Rooms")</button>
     </div>
 
 </form>

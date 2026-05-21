@@ -1,8 +1,9 @@
 @model hOps.web.ViewModels.Attendance.AttendanceTrackerViewModel
 @using hOps.web.ViewModels.Attendance
+@using System.Globalization
 @using System.Text.Json
 @{
-    ViewData["Title"] = "Attendance Tracker";
+    ViewData["Title"] = Html.Localize("Attendance Tracker");
     ViewData["MainContainerClass"] = "main-inner--wide";
     var hasEmployees = Model.Form.EmployeeOptions.Any();
     var filterStartValue = Model.Filter.CustomStartDate?.ToString("yyyy-MM-dd");
@@ -17,10 +18,10 @@
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
     <div>
-        <h1 class="h3 mb-0">Attendance Tracker</h1>
+        <h1 class="h3 mb-0">@Html.Localize("Attendance Tracker")</h1>
         @if (!string.IsNullOrWhiteSpace(Model.PropertyName))
         {
-            <div class="text-muted small">Property: @Model.PropertyName</div>
+            <div class="text-muted small">@Html.Localize("Property"): @Model.PropertyName</div>
         }
     </div>
 </div>
@@ -29,32 +30,32 @@
 {
     <div class="alert alert-success alert-dismissible fade show" role="alert">
         @Model.StatusMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Html.Localize("Close")"></button>
     </div>
 }
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
 {
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
         @Model.ErrorMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Html.Localize("Close")"></button>
     </div>
 }
 
 @if (!Model.HasPropertySelected)
 {
     <div class="alert alert-info mb-0">
-        Select a property to begin logging attendance events.
+        @Html.Localize("Select a property to begin logging attendance events.")
     </div>
 }
 else
 {
     <div class="card mb-4">
         <div class="card-body">
-            <h2 class="h5 mb-3">Log Attendance</h2>
+            <h2 class="h5 mb-3">@Html.Localize("Log Attendance")</h2>
             @if (!hasEmployees)
             {
                 <div class="alert alert-warning small mb-3" role="alert">
-                    Add employees to the master employee list before logging attendance.
+                    @Html.Localize("Add employees to the master employee list before logging attendance.")
                 </div>
             }
             <form asp-action="Create" method="post" novalidate id="attendanceLogForm">
@@ -64,7 +65,7 @@ else
                     <div class="col-12 col-xl-3">
                         <label class="form-label" asp-for="Form.MasterEmployeeId"></label>
                         <select class="form-select" asp-for="Form.MasterEmployeeId" asp-items="Model.Form.EmployeeOptions">
-                            <option value="">Select employee</option>
+                            <option value="">@Html.Localize("Select employee")</option>
                         </select>
                         <span class="text-danger" asp-validation-for="Form.MasterEmployeeId"></span>
                     </div>
@@ -76,17 +77,17 @@ else
                     <div class="col-12 col-sm-6 col-xl-2">
                         <label class="form-label" asp-for="Form.AttendanceType"></label>
                         <select class="form-select" asp-for="Form.AttendanceType" asp-items="Model.Form.AttendanceTypeOptions">
-                            <option value="">Select type</option>
+                            <option value="">@Html.Localize("Select type")</option>
                         </select>
                         <span class="text-danger" asp-validation-for="Form.AttendanceType"></span>
                     </div>
                     <div class="col-12 col-xl-3">
                         <label class="form-label" asp-for="Form.Details"></label>
-                        <input class="form-control" asp-for="Form.Details" placeholder="Optional notes" />
+                        <input class="form-control" asp-for="Form.Details" placeholder="@Html.Localize("Optional notes")" />
                         <span class="text-danger" asp-validation-for="Form.Details"></span>
                     </div>
                     <div class="col-12 col-xl-auto">
-                        <button type="submit" class="btn btn-primary w-100" @(hasEmployees ? "" : "disabled")>Save Attendance</button>
+                        <button type="submit" class="btn btn-primary w-100" @(hasEmployees ? "" : "disabled")>@Html.Localize("Save Attendance")</button>
                     </div>
                 </div>
             </form>
@@ -97,21 +98,21 @@ else
         <div class="card-body">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                 <div>
-                    <h2 class="h5 mb-1">Attendance Grid</h2>
+                    <h2 class="h5 mb-1">@Html.Localize("Attendance Grid")</h2>
                     <div class="text-muted small">@Model.MonthlyGrid.RangeDisplay</div>
                 </div>
                 <form method="get" class="row gy-2 gx-3 align-items-end attendance-grid-range-form">
                     <div class="col-12 col-md-auto">
-                        <label class="form-label small text-muted" for="gridRangeMode">Range</label>
+                        <label class="form-label small text-muted" for="gridRangeMode">@Html.Localize("Range")</label>
                         <select class="form-select form-select-sm" id="gridRangeMode" name="gridRangeMode">
-                            <option value="@AttendanceGridRangeModes.Month" selected="@(gridRangeModeValue == AttendanceGridRangeModes.Month ? "selected" : null)">Month</option>
-                            <option value="@AttendanceGridRangeModes.MultiMonth" selected="@(gridRangeModeValue == AttendanceGridRangeModes.MultiMonth ? "selected" : null)">Multiple Months</option>
-                            <option value="@AttendanceGridRangeModes.YearToDate" selected="@(gridRangeModeValue == AttendanceGridRangeModes.YearToDate ? "selected" : null)">Year to Date</option>
-                            <option value="@AttendanceGridRangeModes.AllTime" selected="@(gridRangeModeValue == AttendanceGridRangeModes.AllTime ? "selected" : null)">All Time</option>
+                            <option value="@AttendanceGridRangeModes.Month" selected="@(gridRangeModeValue == AttendanceGridRangeModes.Month ? "selected" : null)">@Html.Localize("Month")</option>
+                            <option value="@AttendanceGridRangeModes.MultiMonth" selected="@(gridRangeModeValue == AttendanceGridRangeModes.MultiMonth ? "selected" : null)">@Html.Localize("Multiple Months")</option>
+                            <option value="@AttendanceGridRangeModes.YearToDate" selected="@(gridRangeModeValue == AttendanceGridRangeModes.YearToDate ? "selected" : null)">@Html.Localize("Year to Date")</option>
+                            <option value="@AttendanceGridRangeModes.AllTime" selected="@(gridRangeModeValue == AttendanceGridRangeModes.AllTime ? "selected" : null)">@Html.Localize("All Time")</option>
                         </select>
                     </div>
                     <div class="col-12 col-md-auto" data-grid-range="month">
-                        <label class="form-label small text-muted" for="gridMonthInput">Month</label>
+                        <label class="form-label small text-muted" for="gridMonthInput">@Html.Localize("Month")</label>
                         <input type="month"
                                class="form-control form-control-sm"
                                id="gridMonthInput"
@@ -120,7 +121,7 @@ else
                                max="9999-12" />
                     </div>
                     <div class="col-12 col-md-auto" data-grid-range="multi">
-                        <label class="form-label small text-muted" for="gridRangeStartInput">Start Month</label>
+                        <label class="form-label small text-muted" for="gridRangeStartInput">@Html.Localize("Start Month")</label>
                         <input type="month"
                                class="form-control form-control-sm"
                                id="gridRangeStartInput"
@@ -128,7 +129,7 @@ else
                                value="@gridRangeStartMonthValue" />
                     </div>
                     <div class="col-12 col-md-auto" data-grid-range="multi">
-                        <label class="form-label small text-muted" for="gridRangeEndInput">End Month</label>
+                        <label class="form-label small text-muted" for="gridRangeEndInput">@Html.Localize("End Month")</label>
                         <input type="month"
                                class="form-control form-control-sm"
                                id="gridRangeEndInput"
@@ -136,7 +137,7 @@ else
                                value="@gridRangeEndMonthValue" />
                     </div>
                     <div class="col-12 col-md-auto">
-                        <button type="submit" class="btn btn-outline-primary btn-sm w-100">Apply</button>
+                        <button type="submit" class="btn btn-outline-primary btn-sm w-100">@Html.Localize("Apply")</button>
                     </div>
                     <input type="hidden" name="filterMode" value="@Model.Filter.Mode" />
                     <input type="hidden" name="month" value="@Model.Filter.MonthValue" />
@@ -155,7 +156,7 @@ else
 
             @if (!Model.MonthlyGrid.HasEmployees)
             {
-                <p class="text-muted mb-0">Add employees to the master list to start visualizing attendance.</p>
+                <p class="text-muted mb-0">@Html.Localize("Add employees to the master list to start visualizing attendance.")</p>
             }
             else
             {
@@ -163,8 +164,8 @@ else
                     <table class="table table-bordered align-middle attendance-grid-table">
                         <thead class="table-light">
                             <tr>
-                                <th scope="col" class="attendance-grid-name attendance-grid-sticky-name text-start">Employee</th>
-                                <th scope="col" class="attendance-grid-total attendance-grid-sticky-total text-center">Total</th>
+                                <th scope="col" class="attendance-grid-name attendance-grid-sticky-name text-start">@Html.Localize("Employee")</th>
+                                <th scope="col" class="attendance-grid-total attendance-grid-sticky-total text-center">@Html.Localize("Total")</th>
                                 @foreach (var day in Model.MonthlyGrid.Days)
                                 {
                                     <th scope="col" class="attendance-grid-day">
@@ -221,7 +222,7 @@ else
                         </tbody>
                         <tfoot class="table-light">
                             <tr>
-                                <th scope="row" class="attendance-grid-name attendance-grid-sticky-name text-start">Daily total</th>
+                                <th scope="row" class="attendance-grid-name attendance-grid-sticky-name text-start">@Html.Localize("Daily total")</th>
                                 <td class="attendance-grid-total attendance-grid-sticky-total fw-semibold">@Model.MonthlyGrid.GrandTotal</td>
                                 @foreach (var dayTotal in Model.MonthlyGrid.DayTotals)
                                 {
@@ -234,7 +235,7 @@ else
 
                 <div class="attendance-grid-legend mt-4">
                     <div>
-                        <div class="text-uppercase small text-muted fw-semibold mb-2">Unexcused</div>
+                        <div class="text-uppercase small text-muted fw-semibold mb-2">@Html.Localize("Unexcused")</div>
                         <div class="d-flex flex-wrap gap-3">
                             @foreach (var legend in Model.MonthlyGrid.LegendItems.Where(l => !l.IsExcused))
                             {
@@ -246,7 +247,7 @@ else
                         </div>
                     </div>
                     <div>
-                        <div class="text-uppercase small text-muted fw-semibold mb-2">Excused</div>
+                        <div class="text-uppercase small text-muted fw-semibold mb-2">@Html.Localize("Excused")</div>
                         <div class="d-flex flex-wrap gap-3">
                             @foreach (var legend in Model.MonthlyGrid.LegendItems.Where(l => l.IsExcused))
                             {
@@ -266,11 +267,11 @@ else
                                 <div class="attendance-detail-panel__title" data-detail-employee></div>
                                 <div class="small text-muted" data-detail-date></div>
                             </div>
-                            <button type="button" class="btn-close" aria-label="Close details" data-detail-close></button>
+                            <button type="button" class="btn-close" aria-label="@Html.Localize("Close details")" data-detail-close></button>
                         </div>
                         <div class="attendance-detail-panel__body" data-detail-body></div>
                         <div class="attendance-detail-panel__footer d-flex justify-content-end">
-                            <button type="button" class="btn btn-sm btn-primary" data-detail-add>+ Add Attendance</button>
+                            <button type="button" class="btn btn-sm btn-primary" data-detail-add>+ @Html.Localize("Add Attendance")</button>
                         </div>
                     </div>
                 </div>
@@ -284,11 +285,11 @@ else
 
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
 
-                <h2 class="h5 mb-0">Attendance History</h2>
+                <h2 class="h5 mb-0">@Html.Localize("Attendance History")</h2>
 
                 <div class="small text-muted">
 
-                    Range: @Model.Filter.RangeStartDate.ToString("MMM d, yyyy") – @Model.Filter.RangeEndDate.ToString("MMM d, yyyy")
+                    @Html.Localize("Range"): @Model.Filter.RangeStartDate.ToString("MMM d, yyyy") – @Model.Filter.RangeEndDate.ToString("MMM d, yyyy")
 
                 </div>
 
@@ -300,13 +301,13 @@ else
 
                 <div class="col-12 col-md-3">
 
-                    <label class="form-label" for="filterMode">Filter Mode</label>
+                    <label class="form-label" for="filterMode">@Html.Localize("Filter Mode")</label>
 
                     <select class="form-select" id="filterMode" name="filterMode">
 
-                        <option value="@AttendanceHistoryFilterModes.Month" selected="@(Model.Filter.Mode == AttendanceHistoryFilterModes.Month ? "selected" : null)">Month</option>
+                        <option value="@AttendanceHistoryFilterModes.Month" selected="@(Model.Filter.Mode == AttendanceHistoryFilterModes.Month ? "selected" : null)">@Html.Localize("Month")</option>
 
-                        <option value="@AttendanceHistoryFilterModes.Custom" selected="@(Model.Filter.Mode == AttendanceHistoryFilterModes.Custom ? "selected" : null)">Custom Range</option>
+                        <option value="@AttendanceHistoryFilterModes.Custom" selected="@(Model.Filter.Mode == AttendanceHistoryFilterModes.Custom ? "selected" : null)">@Html.Localize("Custom Range")</option>
 
                     </select>
 
@@ -314,7 +315,7 @@ else
 
                 <div class="col-12 col-md-3">
 
-                    <label class="form-label" for="monthInput">Month</label>
+                    <label class="form-label" for="monthInput">@Html.Localize("Month")</label>
 
                     <input type="month"
 
@@ -326,13 +327,13 @@ else
 
                            value="@Model.Filter.MonthValue">
 
-                    <div class="form-text">Used when the filter mode is Month.</div>
+                    <div class="form-text">@Html.Localize("Used when the filter mode is Month.")</div>
 
                 </div>
 
                 <div class="col-12 col-md-3">
 
-                    <label class="form-label" for="startDateInput">Start Date</label>
+                    <label class="form-label" for="startDateInput">@Html.Localize("Start Date")</label>
 
                     <input type="date"
 
@@ -348,7 +349,7 @@ else
 
                 <div class="col-12 col-md-3">
 
-                    <label class="form-label" for="endDateInput">End Date</label>
+                    <label class="form-label" for="endDateInput">@Html.Localize("End Date")</label>
 
                     <input type="date"
 
@@ -364,7 +365,7 @@ else
 
                 <div class="col-12 col-md-2">
 
-                    <button type="submit" class="btn btn-outline-primary w-100">Apply Filters</button>
+                    <button type="submit" class="btn btn-outline-primary w-100">@Html.Localize("Apply Filters")</button>
 
                 </div>
 
@@ -400,7 +401,7 @@ else
 
             {
 
-                <p class="text-muted mb-0">No attendance activity was found for this date range.</p>
+                <p class="text-muted mb-0">@Html.Localize("No attendance activity was found for this date range.")</p>
 
             }
 
@@ -416,25 +417,25 @@ else
 
                             <tr>
 
-                                <th scope="col" class="text-start">Associate</th>
+                                <th scope="col" class="text-start">@Html.Localize("Associate")</th>
 
-                                <th scope="col">Tardy</th>
+                                <th scope="col">@Html.Localize("Tardy")</th>
 
-                                <th scope="col">Left Early</th>
+                                <th scope="col">@Html.Localize("Left Early")</th>
 
-                                <th scope="col">Call Off</th>
+                                <th scope="col">@Html.Localize("Call Off")</th>
 
-                                <th scope="col">No Call/No Show</th>
+                                <th scope="col">@Html.Localize("No Call/No Show")</th>
 
-                                <th scope="col">Sick</th>
+                                <th scope="col">@Html.Localize("Sick")</th>
 
-                                <th scope="col">Vacation</th>
+                                <th scope="col">@Html.Localize("Vacation")</th>
 
-                                <th scope="col">Personal</th>
+                                <th scope="col">@Html.Localize("Personal")</th>
 
-                                <th scope="col">Bereavement</th>
+                                <th scope="col">@Html.Localize("Bereavement")</th>
 
-                                <th scope="col">Total</th>
+                                <th scope="col">@Html.Localize("Total")</th>
 
                             </tr>
 
@@ -482,7 +483,7 @@ else
 
                                            asp-fragment="attendanceDetails">
 
-                                            View details for @row.EmployeeName
+                                        @string.Format(CultureInfo.InvariantCulture, Html.Localize("View details for {0}").ToString(), row.EmployeeName)
 
                                         </a>
 
@@ -524,7 +525,7 @@ else
 
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
 
-                    <h3 class="h6 mb-0">Associate Details</h3>
+                    <h3 class="h6 mb-0">@Html.Localize("Associate Details")</h3>
 
                     @if (Model.SelectedEmployeeId.HasValue)
 
@@ -558,7 +559,7 @@ else
 
                                    asp-route-selectedEmployeeId="@Model.SelectedEmployeeId">
 
-                                    Show Entire Range
+                                    @Html.Localize("Show Entire Range")
 
                                 </a>
 
@@ -584,7 +585,7 @@ else
 
                                asp-route-gridRangeEnd="@gridRangeEndMonthValue">
 
-                                Clear Selection
+                                @Html.Localize("Clear Selection")
 
                             </a>
 
@@ -598,7 +599,7 @@ else
 
                 {
 
-                    <p class="text-muted mb-0">Select an associate above to review their detailed attendance history.</p>
+                    <p class="text-muted mb-0">@Html.Localize("Select an associate above to review their detailed attendance history.")</p>
 
                 }
 
@@ -610,7 +611,13 @@ else
 
                     {
 
-                        <p class="text-muted mb-0">No attendance entries recorded for @Model.SelectedEmployeeDisplayName on @Model.SelectedEmployeeDetailDate.Value.ToString("MMM d, yyyy").</p>
+                        <p class="text-muted mb-0">
+                            @string.Format(
+                                CultureInfo.InvariantCulture,
+                                Html.Localize("No attendance entries recorded for {0} on {1}.").ToString(),
+                                Model.SelectedEmployeeDisplayName,
+                                Model.SelectedEmployeeDetailDate.Value.ToString("MMM d, yyyy"))
+                        </p>
 
                     }
 
@@ -618,7 +625,12 @@ else
 
                     {
 
-                        <p class="text-muted mb-0">No attendance entries recorded for @Model.SelectedEmployeeDisplayName within this range.</p>
+                        <p class="text-muted mb-0">
+                            @string.Format(
+                                CultureInfo.InvariantCulture,
+                                Html.Localize("No attendance entries recorded for {0} within this range.").ToString(),
+                                Model.SelectedEmployeeDisplayName)
+                        </p>
 
                     }
 
@@ -629,17 +641,13 @@ else
                 {
 
                     <p class="mb-3 fw-semibold">
-
-                        Showing entries for @Model.SelectedEmployeeDisplayName
-
+                        @string.Format(CultureInfo.InvariantCulture, Html.Localize("Showing entries for {0}").ToString(), Model.SelectedEmployeeDisplayName)
                         @if (Model.SelectedEmployeeDetailDate.HasValue)
-
                         {
-
-                            <span>(@Model.SelectedEmployeeDetailDate.Value.ToString("MMM d, yyyy"))</span>
-
+                            <span>
+                                @string.Format(CultureInfo.InvariantCulture, Html.Localize("({0})").ToString(), Model.SelectedEmployeeDetailDate.Value.ToString("MMM d, yyyy"))
+                            </span>
                         }
-
                     </p>
 
                     <div class="table-responsive">
@@ -649,17 +657,11 @@ else
                             <thead class="table-light">
 
                                 <tr>
-
-                                    <th scope="col">Date</th>
-
-                                    <th scope="col">Attendance Type</th>
-
-                                    <th scope="col">Department / Position</th>
-
-                                    <th scope="col">Logged</th>
-
-                                    <th scope="col" class="text-end">Actions</th>
-
+                                    <th scope="col">@Html.Localize("Date")</th>
+                                    <th scope="col">@Html.Localize("Attendance Type")</th>
+                                    <th scope="col">@Html.Localize("Department / Position")</th>
+                                    <th scope="col">@Html.Localize("Logged")</th>
+                                    <th scope="col" class="text-end">@Html.Localize("Actions")</th>
                                 </tr>
 
                             </thead>
@@ -686,7 +688,10 @@ else
 
                                         {
 
-                                            <div class="small text-muted">Details: @detail.Details</div>
+                                            <div class="small text-muted">
+                                                @Html.Localize("Details"):
+                                                @await Html.DisplayTranslatedTextAsync("AttendanceRecord", detail.RecordId.ToString(CultureInfo.InvariantCulture), "Details", detail.Details ?? string.Empty)
+                                            </div>
 
                                         }
 
@@ -704,50 +709,38 @@ else
 
                                         <div>@createdAt.ToString("g")</div>
 
-                                        <div class="small text-muted">By @detail.CreatedByDisplay</div>
+                                        <div class="small text-muted">
+                                            @string.Format(CultureInfo.InvariantCulture, Html.Localize("By {0}").ToString(), detail.CreatedByDisplay)
+                                        </div>
 
                                         @if (updatedAt.HasValue)
 
                                         {
 
-                                            <div class="small text-muted">Updated @updatedAt.Value.ToString("g")</div>
+                                            <div class="small text-muted">
+                                                @string.Format(CultureInfo.InvariantCulture, Html.Localize("Updated {0}").ToString(), updatedAt.Value.ToString("g"))
+                                            </div>
 
                                         }
 
                                     </td>
 
                                     <td class="text-end">
-
-                                        <div class="btn-group btn-group-sm" role="group" aria-label="Attendance actions for @detail.AttendanceTypeDisplay">
-
+                                        <div class="btn-group btn-group-sm" role="group" aria-label="@string.Format(CultureInfo.InvariantCulture, Html.Localize("Attendance actions for {0}").ToString(), detail.AttendanceTypeDisplay)">
                                             <a class="btn btn-outline-secondary"
-
                                                asp-action="Edit"
-
                                                asp-route-id="@detail.RecordId">
-
-                                                Edit
-
+                                                @Html.Localize("Edit")
                                             </a>
-
                                             <form asp-action="Delete"
-
                                                   asp-route-id="@detail.RecordId"
-
                                                   method="post"
-
                                                   class="d-inline"
-
-                                                  onsubmit="return confirm('Delete this attendance record?');">
-
+                                                  onsubmit="return confirm(window.hopsTranslate('AttendanceConfirmDelete', 'Delete this attendance record?'));">
                                                 @Html.AntiForgeryToken()
-
-                                                <button type="submit" class="btn btn-outline-danger">Delete</button>
-
+                                                <button type="submit" class="btn btn-outline-danger">@Html.Localize("Delete")</button>
                                             </form>
-
                                         </div>
-
                                     </td>
 
                                 </tr>
@@ -775,6 +768,13 @@ else
     <partial name="_ValidationScriptsPartial" />
     <script>
         (function () {
+            const t = (key, fallback = key) => {
+                if (typeof window.hopsTranslate === 'function') {
+                    return window.hopsTranslate(key, fallback);
+                }
+                return typeof fallback === 'string' && fallback.length ? fallback : key;
+            };
+
             const tooltipTriggerList = Array.prototype.slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
             tooltipTriggerList.forEach(function (tooltipTriggerEl) {
                 new bootstrap.Tooltip(tooltipTriggerEl);
@@ -818,6 +818,10 @@ else
                 if (!detailBody) {
                     return;
                 }
+                const unassignedLabel = t('Unassigned');
+                const unknownLabel = t('Unknown');
+                const loggedLabel = t('Logged');
+                const byLabel = t('by');
                 detailBody.textContent = '';
                 entries.forEach(entry => {
                     const entryEl = document.createElement('div');
@@ -837,23 +841,24 @@ else
 
                     const roleLine = document.createElement('div');
                     roleLine.className = 'attendance-detail-entry__meta';
-                    roleLine.textContent = `${entry.departmentName || 'Unassigned'} · ${entry.position || 'Unassigned'}`;
+                    roleLine.textContent = `${entry.departmentName || unassignedLabel} · ${entry.position || unassignedLabel}`;
                     entryEl.appendChild(roleLine);
 
                     const createdLine = document.createElement('div');
                     createdLine.className = 'attendance-detail-entry__meta';
                     if (entry.createdAtUtc) {
                         const createdAt = new Date(entry.createdAtUtc);
-                        createdLine.textContent = `Logged ${createdAt.toLocaleString()} by ${entry.createdByDisplay || 'Unknown'}`;
+                        createdLine.textContent = `${loggedLabel} ${createdAt.toLocaleString()} ${byLabel} ${entry.createdByDisplay || unknownLabel}`;
                     } else {
-                        createdLine.textContent = `Logged by ${entry.createdByDisplay || 'Unknown'}`;
+                        createdLine.textContent = `${loggedLabel} ${byLabel} ${entry.createdByDisplay || unknownLabel}`;
                     }
                     entryEl.appendChild(createdLine);
 
-                    if (entry.details) {
+                    const detailsText = entry.translatedDetails || entry.details;
+                    if (detailsText) {
                         const detailText = document.createElement('div');
                         detailText.className = 'attendance-detail-entry__details';
-                        detailText.textContent = entry.details;
+                        detailText.textContent = detailsText;
                         entryEl.appendChild(detailText);
                     }
 
@@ -866,7 +871,7 @@ else
                     return;
                 }
                 detailTarget = button;
-                detailEmployee.textContent = button.getAttribute('data-employee-name') || 'Employee';
+                detailEmployee.textContent = button.getAttribute('data-employee-name') || t('Employee');
                 detailDate.textContent = button.getAttribute('data-date-display') || button.getAttribute('data-date') || '';
                 renderDetailEntries(entries);
                 detailOverlay.classList.remove('d-none');

@@ -4,9 +4,13 @@
         return;
     }
 
+    const translate = typeof window.hopsTranslate === 'function'
+        ? window.hopsTranslate
+        : (key, fallback) => (typeof fallback === 'string' && fallback.length ? fallback : key);
+
     function createBubble(data) {
         const payload = {
-            title: data?.title ?? data?.Title ?? 'Notification',
+            title: data?.title ?? data?.Title ?? translate('Shared.Notifications.DefaultTitle', 'Notification'),
             message: data?.message ?? data?.Message ?? '',
             url: data?.url ?? data?.Url ?? '',
             type: (data?.type ?? data?.Type ?? 'info').toLowerCase()

@@ -1,32 +1,105 @@
+﻿@using System.Collections.Generic
 @using Microsoft.AspNetCore.Mvc.Rendering
 @using System.Linq
 @model hOps.web.ViewModels.Documents.DocumentsIndexViewModel
 @inject Microsoft.AspNetCore.Mvc.Rendering.IHtmlHelper<dynamic> Html
 @{
-    ViewData["Title"] = "Documents";
+    ViewData["Title"] = Html.Localize("Documents");
     ViewData["MainContainerClass"] = "main-inner--wide";
     var hasPropertyAccess = Model.HasPropertyAccess;
+
+    var propertyDisplayMap = new Dictionary<int, string>();
+    var propertyCodeMap = new Dictionary<int, string>();
+    foreach (var option in Model.PropertyOptions)
+    {
+        var translatedName = await Html.DisplayTranslatedTextAsync("Property", option.Id.ToString(), "Name", option.Name ?? string.Empty);
+        propertyDisplayMap[option.Id] = translatedName;
+        propertyCodeMap[option.Id] = option.Code ?? string.Empty;
+    }
+    string FormatPropertyLabel(hOps.web.ViewModels.Documents.DocumentPropertyOptionViewModel option)
+    {
+        var displayName = propertyDisplayMap.TryGetValue(option.Id, out var translated) ? translated : option.Name;
+        return string.IsNullOrWhiteSpace(option.Code) ? displayName : $"{displayName} ({option.Code})";
+    }
+    var propertyOptionMap = Model.PropertyOptions.ToDictionary(option => option.Id);
     var propertySelectList = Model.PropertyOptions
-        .Select(option => new SelectListItem($"{option.Name} ({option.Code})", option.Id.ToString(), Model.Form.PropertyId == option.Id))
+        .Select(option => new SelectListItem(FormatPropertyLabel(option), option.Id.ToString(), Model.Form.PropertyId == option.Id))
         .ToList();
+
+    var folderDisplayMap = new Dictionary<int, string>();
+    foreach (var option in Model.FolderOptions)
+    {
+        folderDisplayMap[option.Id] = await Html.DisplayTranslatedTextAsync("DocumentFolder", option.Id.ToString(), "Name", option.Name ?? string.Empty);
+    }
     string FormatFolderLabel(hOps.web.ViewModels.Documents.DocumentFolderOptionViewModel option)
     {
         var prefix = option.Level > 0 ? $"{new string('-', option.Level * 2)} " : string.Empty;
-        return $"{prefix}{option.Name}";
+        var displayName = folderDisplayMap.TryGetValue(option.Id, out var translated) ? translated : option.Name;
+        return $"{prefix}{displayName}";
     }
+    var noFolderText = Html.Localize("Documents.NoFolderOption", "-- No folder --");
+    var topLevelText = Html.Localize("Documents.TopLevelOption", "-- Top level --");
     var folderSelectList = new List<SelectListItem>
     {
-        new SelectListItem("-- No folder --", string.Empty, !Model.Form.FolderId.HasValue)
+        new SelectListItem(noFolderText, string.Empty, !Model.Form.FolderId.HasValue)
     };
     folderSelectList.AddRange(Model.FolderOptions
         .Select(option => new SelectListItem(FormatFolderLabel(option), option.Id.ToString(), option.IsSelected)));
 
     var parentFolderSelectList = new List<SelectListItem>
     {
-        new SelectListItem("-- Top level --", string.Empty, !Model.FolderForm.ParentFolderId.HasValue)
+        new SelectListItem(topLevelText, string.Empty, !Model.FolderForm.ParentFolderId.HasValue)
     };
     parentFolderSelectList.AddRange(Model.FolderOptions
         .Select(option => new SelectListItem(FormatFolderLabel(option), option.Id.ToString(), Model.FolderForm.ParentFolderId == option.Id)));
+
+    var folderPropertyDisplayMap = new Dictionary<int, string>();
+    foreach (var option in Model.FolderPropertyOptions)
+    {
+        folderPropertyDisplayMap[option.Id] = await Html.DisplayTranslatedTextAsync("Property", option.Id.ToString(), "Name", option.Name ?? string.Empty);
+    }
+    foreach (var option in Model.SelectedFolderPropertyOptions)
+    {
+        if (!folderPropertyDisplayMap.ContainsKey(option.Id))
+        {
+            folderPropertyDisplayMap[option.Id] = await Html.DisplayTranslatedTextAsync("Property", option.Id.ToString(), "Name", option.Name ?? string.Empty);
+        }
+    }
+    string FormatFolderPropertyLabel(hOps.web.ViewModels.Documents.DocumentPropertyOptionViewModel option)
+    {
+        var displayName = folderPropertyDisplayMap.TryGetValue(option.Id, out var translated) ? translated : option.Name;
+        return string.IsNullOrWhiteSpace(option.Code) ? displayName : $"{displayName} ({option.Code})";
+    }
+    string GetFolderDisplayName(int id, string fallback)
+        => folderDisplayMap.TryGetValue(id, out var translated) ? translated : fallback;
+    string GetPropertyDisplayName(int id, string fallbackName, string fallbackCode = "")
+    {
+        var translated = propertyDisplayMap.TryGetValue(id, out var name) ? name : fallbackName;
+        var code = propertyCodeMap.TryGetValue(id, out var storedCode) ? storedCode : fallbackCode;
+        return string.IsNullOrWhiteSpace(code) ? translated : $"{translated} ({code})";
+    }
+
+    foreach (var folder in Model.FolderTree)
+    {
+        if (!folderDisplayMap.ContainsKey(folder.Id))
+        {
+            folderDisplayMap[folder.Id] = await Html.DisplayTranslatedTextAsync("DocumentFolder", folder.Id.ToString(), "Name", folder.Name ?? string.Empty);
+        }
+    }
+    foreach (var breadcrumb in Model.SelectedFolderBreadcrumb)
+    {
+        if (breadcrumb.FolderId.HasValue && !folderDisplayMap.ContainsKey(breadcrumb.FolderId.Value))
+        {
+            folderDisplayMap[breadcrumb.FolderId.Value] = await Html.DisplayTranslatedTextAsync("DocumentFolder", breadcrumb.FolderId.Value.ToString(), "Name", breadcrumb.Name ?? string.Empty);
+        }
+    }
+    foreach (var child in Model.ChildFolders)
+    {
+        if (!folderDisplayMap.ContainsKey(child.Id))
+        {
+            folderDisplayMap[child.Id] = await Html.DisplayTranslatedTextAsync("DocumentFolder", child.Id.ToString(), "Name", child.Name ?? string.Empty);
+        }
+    }
 
     var selectedFolderId = Model.SelectedFolderId;
     var showingUnassignedOnly = Model.ShowingUnassignedOnly;
@@ -72,19 +145,19 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 mb-0">Documents</h1>
+    <h1 class="h3 mb-0">@Html.Localize("Documents")</h1>
 </div>
 
 @if (TempData["DocumentSuccess"] is string successMessage)
 {
     <div class="alert alert-success" role="alert">
-        @successMessage
+        @Html.Localize(successMessage, successMessage)
     </div>
 }
 @if (TempData["DocumentError"] is string errorMessage)
 {
     <div class="alert alert-danger" role="alert">
-        @errorMessage
+        @Html.Localize(errorMessage, errorMessage)
     </div>
 }
 
@@ -93,7 +166,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
         <div class="vstack gap-4">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h2 class="h5 mb-0">Upload Document</h2>
+                    <h2 class="h5 mb-0">@Html.Localize("Upload Document")</h2>
                     <button class="btn btn-outline-secondary btn-sm"
                             type="button"
                             data-bs-toggle="collapse"
@@ -101,7 +174,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                             data-bs-target="#documents-upload-section"
                             aria-expanded="true"
                             aria-controls="documents-upload-section">
-                        <span class="collapse-toggle-text">Hide</span>
+                        <span class="collapse-toggle-text">@Html.Localize("Hide")</span>
                     </button>
                 </div>
                 <div class="collapse show" id="documents-upload-section">
@@ -121,7 +194,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                             </div>
 
                             <div class="mb-3">
-                                <label asp-for="Form.File" class="form-label">File</label>
+                                <label asp-for="Form.File" class="form-label">@Html.Localize("File")</label>
                                 <input asp-for="Form.File" class="form-control" type="file" />
                                 <span asp-validation-for="Form.File" class="text-danger"></span>
                             </div>
@@ -139,38 +212,38 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label d-block">Who can download?</label>
+                                <label class="form-label d-block">@Html.Localize("Who can download?")</label>
                                 <div class="vstack gap-2">
                                     <div class="form-check">
                                         <input class="form-check-input" type="radio" name="Form.AccessScope" id="accessScopePropertyOnly" value="@((int)DocumentAccessScope.PropertyOnly)" @(Model.Form.AccessScope == DocumentAccessScope.PropertyOnly ? "checked" : string.Empty) @(hasPropertyAccess ? string.Empty : "disabled") />
                                         <label class="form-check-label" for="accessScopePropertyOnly">
-                                            Users of a single property
+                                            @Html.Localize("Users of a single property")
                                         </label>
                                     </div>
                                     <div class="form-check">
                                         <input class="form-check-input" type="radio" name="Form.AccessScope" id="accessScopeSelected" value="@((int)DocumentAccessScope.SelectedProperties)" @(Model.Form.AccessScope == DocumentAccessScope.SelectedProperties ? "checked" : string.Empty) @(hasPropertyAccess ? string.Empty : "disabled") />
                                         <label class="form-check-label" for="accessScopeSelected">
-                                            Users of selected properties
+                                            @Html.Localize("Users of selected properties")
                                         </label>
                                     </div>
                                     <div class="form-check">
                                         <input class="form-check-input" type="radio" name="Form.AccessScope" id="accessScopeAll" value="@((int)DocumentAccessScope.AllUsers)" @(Model.Form.AccessScope == DocumentAccessScope.AllUsers ? "checked" : string.Empty) />
                                         <label class="form-check-label" for="accessScopeAll">
-                                            All users
+                                            @Html.Localize("All users")
                                         </label>
                                     </div>
                                 </div>
                                 <span asp-validation-for="Form.AccessScope" class="text-danger"></span>
                                 @if (!hasPropertyAccess)
                                 {
-                                    <div class="form-text">You do not have property access, so property-restricted options are unavailable.</div>
+                                    <div class="form-text">@Html.Localize("You do not have property access, so property-restricted options are unavailable.")</div>
                                 }
                             </div>
 
                             <div class="mb-3" id="propertyOnlyFields" style="display: none;">
-                                <label asp-for="Form.PropertyId" class="form-label">Property</label>
+                                <label asp-for="Form.PropertyId" class="form-label">@Html.Localize("Property")</label>
                                 <select asp-for="Form.PropertyId" class="form-select" asp-items="propertySelectList">
-                                    <option value="">-- Select property --</option>
+                                    <option value="">@Html.Localize("Documents.SelectPropertyOption", "-- Select property --")</option>
                                 </select>
                                 <span asp-validation-for="Form.PropertyId" class="text-danger"></span>
                             </div>
@@ -179,25 +252,25 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                 <span asp-validation-for="Form.SelectedPropertyIds" class="text-danger"></span>
                                 @if (Model.PropertyOptions.Count == 0)
                                 {
-                                    <p class="text-muted mb-0">No properties available.</p>
+                                    <p class="text-muted mb-0">@Html.Localize("No properties available.")</p>
                                 }
                                 else
                                 {
-                                    <div class="small text-muted mb-2">Select one or more properties.</div>
+                                    <div class="small text-muted mb-2">@Html.Localize("Select one or more properties.")</div>
                                     <div class="vstack gap-2">
                                         @foreach (var option in Model.PropertyOptions)
                                         {
                                             var checkboxId = $"propertyOption_{option.Id}";
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="Form.SelectedPropertyIds" id="@checkboxId" value="@option.Id" @(option.IsSelected ? "checked" : string.Empty) />
-                                                <label class="form-check-label" for="@checkboxId">@option.Name (@option.Code)</label>
+                                                <label class="form-check-label" for="@checkboxId">@FormatPropertyLabel(option)</label>
                                             </div>
                                         }
                                     </div>
                                 }
                             </div>
 
-                            <button type="submit" class="btn btn-primary w-100">Upload</button>
+                            <button type="submit" class="btn btn-primary w-100">@Html.Localize("Upload")</button>
                         </form>
                     </div>
                 </div>
@@ -206,7 +279,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-2">
-                        <h2 class="h5 mb-0">Folders</h2>
+                        <h2 class="h5 mb-0">@Html.Localize("Folders")</h2>
                         <span class="badge bg-light text-dark">@Model.TotalDocumentCount</span>
                     </div>
                     <button class="btn btn-outline-secondary btn-sm"
@@ -216,23 +289,23 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                             data-bs-target="#documents-folders-section"
                             aria-expanded="true"
                             aria-controls="documents-folders-section">
-                        <span class="collapse-toggle-text">Hide</span>
+                        <span class="collapse-toggle-text">@Html.Localize("Hide")</span>
                     </button>
                 </div>
                 <div class="collapse show" id="documents-folders-section">
                     <div class="card-body">
                         <div class="list-group list-group-flush mb-3">
                             <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(selectedFolderId == null && !showingUnassignedOnly ? "active" : string.Empty)" asp-action="Index" asp-route-sort="@safeSortField" asp-route-direction="@safeSortDirection" asp-route-search="@searchQuery">
-                                <span>All documents</span>
+                                <span>@Html.Localize("All documents")</span>
                                 <span class="badge bg-secondary">@Model.TotalDocumentCount</span>
                             </a>
                             <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(showingUnassignedOnly ? "active" : string.Empty)" asp-action="Index" asp-route-folderId="-1" asp-route-sort="@safeSortField" asp-route-direction="@safeSortDirection" asp-route-search="@searchQuery">
-                                <span>No folder</span>
+                                <span>@Html.Localize("No folder")</span>
                                 <span class="badge bg-secondary">@Model.UnassignedDocumentCount</span>
                             </a>
                             @if (Model.FolderTree.Count == 0)
                             {
-                                <div class="list-group-item text-muted">No folders yet.</div>
+                                <div class="list-group-item text-muted">@Html.Localize("No folders yet.")</div>
                             }
                             else
                             {
@@ -247,13 +320,13 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                        asp-route-direction="@safeSortDirection"
                                        asp-route-search="@searchQuery"
                                        style="padding-left:@paddingStyle;">
-                                        <span>@Html.Encode(folder.Name)</span>
+                                        <span>@Html.Encode(GetFolderDisplayName(folder.Id, folder.Name))</span>
                                         <span class="badge bg-secondary">@folder.DocumentCount</span>
                                     </a>
                                 }
                             }
                         </div>
-                        <h3 class="h6">Create Folder</h3>
+                        <h3 class="h6">@Html.Localize("Create Folder")</h3>
                         <form asp-action="CreateFolder" method="post" novalidate>
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="currentFolderId" value="@currentFolderRouteValueString" />
@@ -272,26 +345,26 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                 <span asp-validation-for="FolderForm.ParentFolderId" class="text-danger"></span>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label d-block">Visibility</label>
+                                <label class="form-label d-block">@Html.Localize("Visibility")</label>
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="FolderForm.Visibility" id="folderVisibilityGlobal" value="@((int)hOps.web.Models.DocumentFolderVisibility.Global)" @(Model.FolderForm.Visibility == hOps.web.Models.DocumentFolderVisibility.Global ? "checked" : string.Empty) />
                                     <label class="form-check-label" for="folderVisibilityGlobal">
-                                        All properties
+                                        @Html.Localize("All properties")
                                     </label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="FolderForm.Visibility" id="folderVisibilitySelected" value="@((int)hOps.web.Models.DocumentFolderVisibility.SelectedProperties)" @(Model.FolderForm.Visibility == hOps.web.Models.DocumentFolderVisibility.SelectedProperties ? "checked" : string.Empty) />
                                     <label class="form-check-label" for="folderVisibilitySelected">
-                                        Only selected properties
+                                        @Html.Localize("Only selected properties")
                                     </label>
                                 </div>
                                 <span asp-validation-for="FolderForm.Visibility" class="text-danger"></span>
                             </div>
                             <div class="mb-3 @(Model.FolderForm.Visibility == hOps.web.Models.DocumentFolderVisibility.SelectedProperties ? string.Empty : "d-none")" id="folderVisibilityProperties">
-                                <label class="form-label">Visible To</label>
+                                <label class="form-label">@Html.Localize("Visible To")</label>
                                 @if (!Model.FolderPropertyOptions.Any())
                                 {
-                                    <p class="text-muted small mb-0">No accessible properties available.</p>
+                                    <p class="text-muted small mb-0">@Html.Localize("No accessible properties available.")</p>
                                 }
                                 else
                                 {
@@ -300,13 +373,13 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                         var checkboxId = $"folderProperty_{option.Id}";
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" value="@option.Id" name="FolderForm.SelectedPropertyIds" id="@checkboxId" @(option.IsSelected ? "checked" : string.Empty) />
-                                            <label class="form-check-label" for="@checkboxId">@option.Name (@option.Code)</label>
+                                            <label class="form-check-label" for="@checkboxId">@FormatFolderPropertyLabel(option)</label>
                                         </div>
                                     }
                                 }
                                 <span asp-validation-for="FolderForm.SelectedPropertyIds" class="text-danger"></span>
                             </div>
-                            <button type="submit" class="btn btn-outline-primary w-100">Create Folder</button>
+                            <button type="submit" class="btn btn-outline-primary w-100">@Html.Localize("Create Folder")</button>
                         </form>
                     </div>
                 </div>
@@ -316,7 +389,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
             {
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h2 class="h5 mb-0">Manage Folder</h2>
+                        <h2 class="h5 mb-0">@Html.Localize("Manage Folder")</h2>
                         <button class="btn btn-outline-secondary btn-sm"
                                 type="button"
                                 data-bs-toggle="collapse"
@@ -324,7 +397,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                 data-bs-target="#documents-manage-section"
                                 aria-expanded="true"
                                 aria-controls="documents-manage-section">
-                            <span class="collapse-toggle-text">Hide</span>
+                            <span class="collapse-toggle-text">@Html.Localize("Hide")</span>
                         </button>
                     </div>
                     <div class="collapse show" id="documents-manage-section">
@@ -343,24 +416,24 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                     <span asp-validation-for="FolderSettingsForm.Name" class="text-danger"></span>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label d-block">Visibility</label>
+                                    <label class="form-label d-block">@Html.Localize("Visibility")</label>
                                     <div class="vstack gap-2">
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="FolderSettingsForm.Visibility" id="folderSettingsVisibilityGlobal" value="@((int)DocumentFolderVisibility.Global)" @(Model.FolderSettingsForm.Visibility == DocumentFolderVisibility.Global ? "checked" : string.Empty) />
-                                            <label class="form-check-label" for="folderSettingsVisibilityGlobal">Visible to all users</label>
+                                            <label class="form-check-label" for="folderSettingsVisibilityGlobal">@Html.Localize("Visible to all users")</label>
                                         </div>
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="FolderSettingsForm.Visibility" id="folderSettingsVisibilitySelected" value="@((int)DocumentFolderVisibility.SelectedProperties)" @(Model.FolderSettingsForm.Visibility == DocumentFolderVisibility.SelectedProperties ? "checked" : string.Empty) />
-                                            <label class="form-check-label" for="folderSettingsVisibilitySelected">Visible to selected properties</label>
+                                            <label class="form-check-label" for="folderSettingsVisibilitySelected">@Html.Localize("Visible to selected properties")</label>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="mb-3 @(Model.FolderSettingsForm.Visibility == DocumentFolderVisibility.SelectedProperties ? string.Empty : "d-none")" id="folderSettingsVisibilityProperties">
-                                    <label class="form-label">Visible To</label>
+                                    <label class="form-label">@Html.Localize("Visible To")</label>
                                     <div class="vstack gap-2">
                                         @if (!Model.SelectedFolderPropertyOptions.Any())
                                         {
-                                            <p class="text-muted small mb-0">Grant yourself access to at least one property to restrict folders.</p>
+                                            <p class="text-muted small mb-0">@Html.Localize("Grant yourself access to at least one property to restrict folders.")</p>
                                         }
                                         else
                                         {
@@ -369,7 +442,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                                 var checkboxId = $"selectedFolderProperty_{option.Id}";
                                                 <div class="form-check">
                                                     <input class="form-check-input" type="checkbox" value="@option.Id" name="FolderSettingsForm.SelectedPropertyIds" id="@checkboxId" @(option.IsSelected ? "checked" : string.Empty) />
-                                                    <label class="form-check-label" for="@checkboxId">@option.Name (@option.Code)</label>
+                                                    <label class="form-check-label" for="@checkboxId">@FormatFolderPropertyLabel(option)</label>
                                                 </div>
                                             }
                                         }
@@ -379,9 +452,9 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                 <input type="hidden" name="FolderSettingsForm.ApplyToDocuments" value="false" />
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" id="folderSettingsApply" name="FolderSettingsForm.ApplyToDocuments" value="true" @(Model.FolderSettingsForm.ApplyToDocuments ? "checked" : string.Empty) />
-                                    <label class="form-check-label" for="folderSettingsApply">Update all documents in this folder to use this visibility</label>
+                                    <label class="form-check-label" for="folderSettingsApply">@Html.Localize("Update all documents in this folder to use this visibility")</label>
                                 </div>
-                                <button type="submit" class="btn btn-primary w-100">Save Changes</button>
+                                <button type="submit" class="btn btn-primary w-100">@Html.Localize("Save Changes")</button>
                             </form>
                         </div>
                     </div>
@@ -393,18 +466,21 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-2">
-                    <h2 class="h5 mb-0">Available Documents</h2>
-                    <span class="badge bg-light text-dark">@Model.Documents.Count document@(Model.Documents.Count == 1 ? string.Empty : "s")</span>
+                    <h2 class="h5 mb-0">@Html.Localize("Available Documents")</h2>
+                    <span class="badge bg-light text-dark">@string.Format(Html.Localize("Documents.CountLabel", "{0} document(s)"), Model.Documents.Count)</span>
                 </div>
                 <nav aria-label="Folder path" class="flex-grow-1">
                     <ol class="breadcrumb mb-0 small">
                         @foreach (var crumb in Model.SelectedFolderBreadcrumb)
                         {
                             var routeFolderId = crumb.FolderId;
+                            var crumbDisplayName = crumb.FolderId.HasValue
+                                ? GetFolderDisplayName(crumb.FolderId.Value, crumb.Name ?? string.Empty)
+                                : Html.Localize(crumb.Name ?? string.Empty, crumb.Name ?? string.Empty);
                             <li class="breadcrumb-item @(crumb.IsCurrent ? "active" : string.Empty)">
                                 @if (crumb.IsCurrent)
                                 {
-                                    <span>@crumb.Name</span>
+                                    <span>@crumbDisplayName</span>
                                 }
                                 else
                                 {
@@ -413,7 +489,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                        asp-route-sort="@safeSortField"
                                        asp-route-direction="@safeSortDirection"
                                        asp-route-search="@searchQuery">
-                                        @crumb.Name
+                                        @crumbDisplayName
                                     </a>
                                 }
                             </li>
@@ -427,20 +503,20 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                     <input type="hidden" name="sort" value="@safeSortField" />
                     <input type="hidden" name="direction" value="@safeSortDirection" />
                     <div class="col-md">
-                        <label for="documentsSearch" class="form-label visually-hidden">Search documents</label>
-                        <input id="documentsSearch" class="form-control" type="search" name="search" value="@searchQuery" placeholder="Search by name, description, or folder" />
+                        <label for="documentsSearch" class="form-label visually-hidden">@Html.Localize("Search documents")</label>
+                        <input id="documentsSearch" class="form-control" type="search" name="search" value="@searchQuery" placeholder="@Html.Localize("Search by name, description, or folder")" />
                     </div>
                     <div class="col-auto d-flex gap-2">
-                        <button type="submit" class="btn btn-outline-primary">Search</button>
+                        <button type="submit" class="btn btn-outline-primary">@Html.Localize("Search")</button>
                         @if (!string.IsNullOrWhiteSpace(searchQuery))
                         {
-                            <a class="btn btn-link" asp-action="Index" asp-route-folderId="@currentFolderRouteValueString" asp-route-sort="@safeSortField" asp-route-direction="@safeSortDirection">Clear</a>
+                            <a class="btn btn-link" asp-action="Index" asp-route-folderId="@currentFolderRouteValueString" asp-route-sort="@safeSortField" asp-route-direction="@safeSortDirection">@Html.Localize("Clear")</a>
                         }
                     </div>
                 </form>
                 @if (Model.Documents.Count == 0 && !Model.ChildFolders.Any())
                 {
-                    <p class="text-muted mb-0">No documents have been uploaded yet.</p>
+                    <p class="text-muted mb-0">@Html.Localize("No documents have been uploaded yet.")</p>
                 }
                 else
                 {
@@ -455,11 +531,11 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                            asp-route-direction="@GetNextDirection("name")"
                                            asp-route-search="@searchQuery"
                                            class="text-decoration-none text-reset">
-                                            Document
+                                            @Html.Localize("Document")
                                             <span class="ms-1 text-muted small">@GetSortIndicator("name")</span>
                                         </a>
                                     </th>
-                                    <th scope="col" class="text-center">Type</th>
+                                    <th scope="col" class="text-center">@Html.Localize("Type")</th>
                                     <th scope="col" class="text-end">
                                         <a asp-action="Index"
                                            asp-route-folderId="@(showingUnassignedOnly ? -1 : selectedFolderId)"
@@ -467,11 +543,11 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                            asp-route-direction="@GetNextDirection("uploaded")"
                                            asp-route-search="@searchQuery"
                                            class="text-decoration-none text-reset">
-                                            Uploaded
+                                            @Html.Localize("Uploaded")
                                             <span class="ms-1 text-muted small">@GetSortIndicator("uploaded")</span>
                                         </a>
                                     </th>
-                                    <th scope="col" class="text-end">Actions</th>
+                                    <th scope="col" class="text-end">@Html.Localize("Actions")</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -479,6 +555,8 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                 {
                                     foreach (var child in Model.ChildFolders)
                                     {
+                                        var childDisplayName = GetFolderDisplayName(child.Id, child.Name ?? string.Empty);
+                                        var childDisplayPath = await Html.DisplayTranslatedTextAsync("DocumentFolderPath", child.Id.ToString(), "Path", child.DisplayPath ?? string.Empty);
                                         <tr class="table-light">
                                             <td>
                                                 <a asp-action="Index"
@@ -487,12 +565,12 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                                    asp-route-direction="@safeSortDirection"
                                                    asp-route-search="@Html.Encode(searchQuery)"
                                                    class="text-decoration-none text-reset">
-                                                    <span class="me-2" aria-hidden="true">📁</span><strong>@child.Name</strong>
+                                                    <span class="me-2" aria-hidden="true">&#128193;</span><strong>@childDisplayName</strong>
                                                 </a>
-                                                <div class="text-muted small">@child.DisplayPath</div>
+                                                <div class="text-muted small">@childDisplayPath</div>
                                             </td>
                                             <td class="text-center">
-                                                <span class="badge bg-light text-dark">Folder</span>
+                                                <span class="badge bg-light text-dark">@Html.Localize("Folder")</span>
                                             </td>
                                             <td class="text-end">
                                                 <span class="badge bg-secondary">@child.DocumentCount</span>
@@ -503,26 +581,60 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                                    asp-route-folderId="@child.Id"
                                                    asp-route-sort="@safeSortField"
                                                    asp-route-direction="@safeSortDirection"
-                                                   asp-route-search="@Html.Encode(searchQuery)">
-                                                    Open
-                                                </a>
+                                                   asp-route-search="@Html.Encode(searchQuery)">@Html.Localize("Open folder")</a>
                                             </td>
                                         </tr>
                                     }
                                 }
                                 @foreach (var doc in Model.Documents)
                                 {
+                                    var docDisplayName = await Html.DisplayTranslatedTextAsync("Document", doc.Id.ToString(), "DisplayName", doc.DisplayName ?? string.Empty);
+                                    var docDescription = string.IsNullOrWhiteSpace(doc.Description)
+                                        ? string.Empty
+                                        : await Html.DisplayTranslatedTextAsync("Document", doc.Id.ToString(), "Description", doc.Description ?? string.Empty);
+                                    var docAccessSummary = Html.Localize(doc.AccessSummary, doc.AccessSummary);
+                                    var docTargetPropertyNames = new List<string>();
+                                    if (doc.TargetPropertyIds.Count == doc.TargetProperties.Count)
+                                    {
+                                        for (var i = 0; i < doc.TargetProperties.Count; i++)
+                                        {
+                                            var propertyId = doc.TargetPropertyIds[i];
+                                            var fallback = doc.TargetProperties[i];
+                                            docTargetPropertyNames.Add(propertyId > 0 ? GetPropertyDisplayName(propertyId, fallback) : Html.Localize(fallback, fallback));
+                                        }
+                                    }
+                                    else if (doc.TargetPropertyIds.Count > 0)
+                                    {
+                                        foreach (var propertyId in doc.TargetPropertyIds)
+                                        {
+                                            if (propertyOptionMap.TryGetValue(propertyId, out var option))
+                                            {
+                                                docTargetPropertyNames.Add(GetPropertyDisplayName(propertyId, option.Name, option.Code));
+                                            }
+                                            else
+                                            {
+                                                docTargetPropertyNames.Add(GetPropertyDisplayName(propertyId, propertyDisplayMap.TryGetValue(propertyId, out var name) ? name : propertyId.ToString()));
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        foreach (var propertyLabel in doc.TargetProperties)
+                                        {
+                                            docTargetPropertyNames.Add(Html.Localize(propertyLabel, propertyLabel));
+                                        }
+                                    }
                                     <tr>
                                         <td>
-                                            <div class="fw-semibold doc-title">@doc.DisplayName</div>
+                                            <div class="fw-semibold doc-title">@docDisplayName</div>
                                             <div class="text-muted small">@doc.FileSizeDisplay</div>
-                                            @if (!string.IsNullOrWhiteSpace(doc.Description))
+                                            @if (!string.IsNullOrWhiteSpace(docDescription))
                                             {
-                                                <div class="text-muted small">Notes: @doc.Description</div>
+                                                <div class="text-muted small">@Html.Localize("Notes:") @docDescription</div>
                                             }
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-light text-dark">@doc.FileTypeDisplay</span>
+                                            <span class="badge bg-light text-dark">@Html.Localize(doc.FileTypeDisplay, doc.FileTypeDisplay)</span>
                                         </td>
                                         @{
                                             var uploadedLocal = TimeZoneService.ConvertToUserTime(doc.UploadedAtUtc);
@@ -533,7 +645,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                         </td>
                                         <td class="text-end">
                                             <div class="d-flex flex-column align-items-end gap-2">
-                                                <a class="btn btn-outline-primary btn-sm" asp-action="Download" asp-route-id="@doc.Id">Download</a>
+                                                <a class="btn btn-outline-primary btn-sm" asp-action="Download" asp-route-id="@doc.Id">@Html.Localize("Download")</a>
                                                 <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#docActions-@doc.Id" aria-expanded="false" aria-controls="docActions-@doc.Id">
                                                     More
                                                 </button>
@@ -553,14 +665,14 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                                             var moveFolderItems = Model.FolderOptions
                                                                 .Select(option => new SelectListItem(FormatFolderLabel(option), option.Id.ToString(), doc.FolderId == option.Id))
                                                                 .ToList();
-                                                            moveFolderItems.Insert(0, new SelectListItem("No folder", string.Empty, !doc.FolderId.HasValue));
+                                                            moveFolderItems.Insert(0, new SelectListItem(noFolderText, string.Empty, !doc.FolderId.HasValue));
                                                         }
-                                                        <label class="visually-hidden" for="moveFolderSelect-@doc.Id">Move to</label>
+                                                        <label class="visually-hidden" for="moveFolderSelect-@doc.Id">@Html.Localize("Move to")</label>
                                                         @Html.DropDownList("folderId", moveFolderItems, new { @class = "form-select form-select-sm", id = $"moveFolderSelect-{doc.Id}" })
-                                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Move</button>
+                                                        <button type="submit" class="btn btn-outline-secondary btn-sm">@Html.Localize("Move")</button>
                                                     </form>
                                                     <button class="btn btn-outline-secondary btn-sm w-100 mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#docVisibility-@doc.Id" aria-expanded="false" aria-controls="docVisibility-@doc.Id">
-                                                        Edit Visibility
+                                                        @Html.Localize("Edit Visibility")
                                                     </button>
                                                     <div class="collapse text-start" id="docVisibility-@doc.Id" data-bs-parent="#docActions-@doc.Id">
                                                     <form asp-action="UpdateDocumentVisibility" method="post" class="doc-visibility-form border rounded p-2 bg-light">
@@ -571,12 +683,12 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                                         <input type="hidden" name="currentDirection" value="@safeSortDirection" />
                                                         <input type="hidden" name="currentSearch" value="@searchQuery" />
                                                         <div class="alert alert-secondary small mb-3">
-                                                            <div class="fw-semibold mb-1">Current visibility</div>
-                                                            <div>@doc.AccessSummary</div>
-                                                            @if (doc.TargetProperties.Count > 0)
+                                                            <div class="fw-semibold mb-1">@Html.Localize("Current visibility")</div>
+                                                            <div>@docAccessSummary</div>
+                                                            @if (docTargetPropertyNames.Count > 0)
                                                             {
                                                                 <ul class="list-unstyled mb-0 mt-1">
-                                                                    @foreach (var propertyLabel in doc.TargetProperties)
+                                                                    @foreach (var propertyLabel in docTargetPropertyNames)
                                                                     {
                                                                         <li>@propertyLabel</li>
                                                                     }
@@ -584,49 +696,49 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                                             }
                                                         </div>
                                                         <div class="mb-2">
-                                                            <label class="form-label d-block mb-1">Visibility</label>
+                                                            <label class="form-label d-block mb-1">@Html.Localize("Visibility")</label>
                                                             <div class="vstack gap-1">
                                                                 <div class="form-check">
                                                                     <input class="form-check-input" type="radio" name="AccessScope" id="docVisibilityAll-@doc.Id" value="@((int)DocumentAccessScope.AllUsers)" @(doc.AccessScope == DocumentAccessScope.AllUsers ? "checked" : string.Empty) />
-                                                                    <label class="form-check-label" for="docVisibilityAll-@doc.Id">All users</label>
+                                                                    <label class="form-check-label" for="docVisibilityAll-@doc.Id">@Html.Localize("All users")</label>
                                                                 </div>
                                                                 <div class="form-check">
                                                                     <input class="form-check-input" type="radio" name="AccessScope" id="docVisibilityProperty-@doc.Id" value="@((int)DocumentAccessScope.PropertyOnly)" @(doc.AccessScope == DocumentAccessScope.PropertyOnly ? "checked" : string.Empty) />
-                                                                    <label class="form-check-label" for="docVisibilityProperty-@doc.Id">Single property</label>
+                                                                    <label class="form-check-label" for="docVisibilityProperty-@doc.Id">@Html.Localize("Single property")</label>
                                                                 </div>
                                                                 <div class="form-check">
                                                                     <input class="form-check-input" type="radio" name="AccessScope" id="docVisibilitySelected-@doc.Id" value="@((int)DocumentAccessScope.SelectedProperties)" @(doc.AccessScope == DocumentAccessScope.SelectedProperties ? "checked" : string.Empty) />
-                                                                    <label class="form-check-label" for="docVisibilitySelected-@doc.Id">Selected properties</label>
+                                                                    <label class="form-check-label" for="docVisibilitySelected-@doc.Id">@Html.Localize("Selected properties")</label>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                         <div class="mb-2 doc-visibility-single">
-                                                            <label class="form-label" for="docVisibilityPropertySelect-@doc.Id">Property</label>
+                                                            <label class="form-label" for="docVisibilityPropertySelect-@doc.Id">@Html.Localize("Property")</label>
                                                             <select class="form-select form-select-sm" id="docVisibilityPropertySelect-@doc.Id" name="PropertyId">
-                                                                <option value="">Select property</option>
+                                                                <option value="">@Html.Localize("Select property")</option>
                                                                 @foreach (var option in Model.PropertyOptions)
                                                                 {
-                                                                    <option value="@option.Id" selected="@(doc.AccessPropertyId == option.Id ? "selected" : null)">@option.Name (@option.Code)</option>
+                                                                    <option value="@option.Id" selected="@(doc.AccessPropertyId == option.Id ? "selected" : null)">@FormatPropertyLabel(option)</option>
                                                                 }
                                                             </select>
                                                         </div>
                                                         <div class="mb-2 doc-visibility-multi">
-                                                            <label class="form-label" for="docVisibilityMultiSelect-@doc.Id">Visible To</label>
+                                                            <label class="form-label" for="docVisibilityMultiSelect-@doc.Id">@Html.Localize("Visible To")</label>
                                                             @if (!Model.PropertyOptions.Any())
                                                             {
-                                                                <p class="text-muted small mb-0">No properties available.</p>
+                                                                <p class="text-muted small mb-0">@Html.Localize("No properties available.")</p>
                                                             }
                                                             else
                                                             {
                                                                 <select class="form-select form-select-sm" id="docVisibilityMultiSelect-@doc.Id" name="SelectedPropertyIds" multiple size="@(Math.Min(Model.PropertyOptions.Count, 6))">
                                                                     @foreach (var option in Model.PropertyOptions)
                                                                     {
-                                                                        <option value="@option.Id" selected="@(doc.TargetPropertyIds.Contains(option.Id) ? "selected" : null)">@option.Name (@option.Code)</option>
+                                                                        <option value="@option.Id" selected="@(doc.TargetPropertyIds.Contains(option.Id) ? "selected" : null)">@FormatPropertyLabel(option)</option>
                                                                     }
                                                                 </select>
                                                             }
                                                         </div>
-                                                        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                                                        <button type="submit" class="btn btn-primary btn-sm">@Html.Localize("Save")</button>
                                                     </form>
                                                     </div>
                                                     @if (Model.CanDeleteDocuments)
@@ -634,14 +746,14 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                                         <form asp-action="DeleteDocument"
                                                               method="post"
                                                               class="mt-3"
-                                                              onsubmit="return confirm('Delete this document permanently?');">
+                                                              onsubmit="return confirm(window.hopsTranslate('DocumentsDeleteConfirm', 'Delete this document permanently?'))">
                                                             @Html.AntiForgeryToken()
                                                             <input type="hidden" name="id" value="@doc.Id" />
                                                             <input type="hidden" name="currentFolderId" value="@currentFolderRouteValueString" />
                                                             <input type="hidden" name="currentSort" value="@safeSortField" />
                                                             <input type="hidden" name="currentDirection" value="@safeSortDirection" />
                                                             <input type="hidden" name="currentSearch" value="@searchQuery" />
-                                                            <button type="submit" class="btn btn-danger btn-sm w-100">Delete</button>
+                                                            <button type="submit" class="btn btn-danger btn-sm w-100">@Html.Localize("Delete")</button>
                                                         </form>
                                                     }
                                                 </div>
@@ -662,6 +774,11 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
     <partial name="_ValidationScriptsPartial" />
     <script>
         (function () {
+            const translate = typeof window.hopsTranslate === 'function'
+                ? window.hopsTranslate
+                : (key, fallback) => (typeof fallback === 'string' && fallback.length > 0 ? fallback : key);
+            const hideLabel = translate('Hide', 'Hide');
+            const showLabel = translate('Show', 'Show');
             const propertyOnlyFields = document.getElementById('propertyOnlyFields');
             const selectedPropertiesFields = document.getElementById('selectedPropertiesFields');
             const folderVisibilityFields = document.getElementById('folderVisibilityProperties');
@@ -682,7 +799,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                         return;
                     }
                     const isExpanded = target.classList.contains('show');
-                    textNode.textContent = isExpanded ? 'Hide' : 'Show';
+                    textNode.textContent = isExpanded ? hideLabel : showLabel;
                 };
                 target.addEventListener('shown.bs.collapse', updateLabel);
                 target.addEventListener('hidden.bs.collapse', updateLabel);
@@ -774,3 +891,27 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
         })();
     </script>
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

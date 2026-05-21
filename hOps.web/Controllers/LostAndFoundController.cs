@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using hOps.web.Services.Localization;
 
 namespace hOps.web.Controllers
 {
@@ -19,14 +20,24 @@ namespace hOps.web.Controllers
     public class LostAndFoundController : BaseController
     {
         private readonly IWebHostEnvironment _environment;
+        private readonly ITranslationService _translationService;
 
         public LostAndFoundController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            IWebHostEnvironment environment) : base(context, userManager)
+            IWebHostEnvironment environment,
+            ITranslationService translationService) : base(context, userManager)
         {
             _environment = environment;
+            _translationService = translationService;
         }
+
+        private string GetActiveLanguage()
+            => HttpContext?.Items?["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+
+        private string Translate(string key, string? fallback = null)
+            => _translationService.Translate(key, GetActiveLanguage(), fallback ?? key);
+
 
         [HttpGet]
         public async Task<IActionResult> Index([FromQuery] LostFoundFilterInput filters)
@@ -66,7 +77,7 @@ namespace hOps.web.Controllers
                 }
                 else
                 {
-                    ModelState.AddModelError("Submission.SelectedPropertyIds", "Please select at least one property.");
+                    ModelState.AddModelError("Submission.SelectedPropertyIds", Translate("Please select at least one property."));
                 }
             }
 
@@ -74,22 +85,22 @@ namespace hOps.web.Controllers
             {
                 if (!submission.DateFound.HasValue)
                 {
-                    ModelState.AddModelError("Submission.DateFound", "Date Found is required for found items.");
+                    ModelState.AddModelError("Submission.DateFound", Translate("Date Found is required for found items."));
                 }
                 if (string.IsNullOrWhiteSpace(submission.ItemFound))
                 {
-                    ModelState.AddModelError("Submission.ItemFound", "Please provide a description of the found item.");
+                    ModelState.AddModelError("Submission.ItemFound", Translate("Please provide a description of the found item."));
                 }
             }
             else if (submission.Type == LostFoundType.Lost)
             {
                 if (!submission.DateReportedLost.HasValue)
                 {
-                    ModelState.AddModelError("Submission.DateReportedLost", "Date Reported Lost is required for lost items.");
+                    ModelState.AddModelError("Submission.DateReportedLost", Translate("Date Reported Lost is required for lost items."));
                 }
                 if (string.IsNullOrWhiteSpace(submission.ItemLost))
                 {
-                    ModelState.AddModelError("Submission.ItemLost", "Please provide a description of the lost item.");
+                    ModelState.AddModelError("Submission.ItemLost", Translate("Please provide a description of the lost item."));
                 }
             }
 
@@ -192,7 +203,7 @@ namespace hOps.web.Controllers
 
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = "Lost & Found entry logged successfully.";
+            TempData["Success"] = Translate("Lost & Found entry logged successfully.");
 
             var redirectPropertyIds = targetPropertyIds.Any()
                 ? targetPropertyIds
@@ -247,7 +258,7 @@ namespace hOps.web.Controllers
             _context.LostFoundEntries.Update(entry);
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = "Entry status updated.";
+            TempData["Success"] = Translate("Entry status updated.");
             return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
         }
 
@@ -300,7 +311,7 @@ namespace hOps.web.Controllers
             _context.LostFoundEntries.Remove(entry);
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = "Lost & Found entry deleted.";
+            TempData["Success"] = Translate("Lost & Found entry deleted.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -329,11 +340,14 @@ namespace hOps.web.Controllers
 
             if (!ModelState.IsValid)
             {
-                TempData["Error"] = ModelState.Values
+                var firstError = ModelState.Values
                     .SelectMany(v => v.Errors)
                     .Select(e => e.ErrorMessage)
-                    .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m))
-                    ?? "Unable to update entry. Please verify the information and try again.";
+                    .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
+
+                TempData["Error"] = !string.IsNullOrWhiteSpace(firstError)
+                    ? Translate(firstError!, firstError)
+                    : Translate("Unable to update entry. Please verify the information and try again.");
                 return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
             }
 
@@ -341,12 +355,12 @@ namespace hOps.web.Controllers
             {
                 if (!input.DateFound.HasValue)
                 {
-                    TempData["Error"] = "Date Found is required for found items.";
+                    TempData["Error"] = Translate("Date Found is required for found items.");
                     return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
                 }
                 if (string.IsNullOrWhiteSpace(input.ItemFound))
                 {
-                    TempData["Error"] = "Please provide a description of the found item.";
+                    TempData["Error"] = Translate("Please provide a description of the found item.");
                     return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
                 }
 
@@ -365,12 +379,12 @@ namespace hOps.web.Controllers
             {
                 if (!input.DateReportedLost.HasValue)
                 {
-                    TempData["Error"] = "Date Reported Lost is required for lost items.";
+                    TempData["Error"] = Translate("Date Reported Lost is required for lost items.");
                     return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
                 }
                 if (string.IsNullOrWhiteSpace(input.ItemLost))
                 {
-                    TempData["Error"] = "Please provide a description of the lost item.";
+                    TempData["Error"] = Translate("Please provide a description of the lost item.");
                     return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
                 }
 
@@ -392,7 +406,7 @@ namespace hOps.web.Controllers
             _context.LostFoundEntries.Update(entry);
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = "Lost & Found entry updated.";
+            TempData["Success"] = Translate("Lost & Found entry updated.");
             return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
         }
 
@@ -408,7 +422,7 @@ namespace hOps.web.Controllers
 
             if (entryId == matchId)
             {
-                TempData["Error"] = "Please select a different entry to match.";
+                TempData["Error"] = Translate("Please select a different entry to match.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -426,7 +440,7 @@ namespace hOps.web.Controllers
 
             if (entry.PropertyId != match.PropertyId)
             {
-                TempData["Error"] = "Entries must belong to the same property.";
+                TempData["Error"] = Translate("Entries must belong to the same property.");
                 return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
             }
 
@@ -437,13 +451,13 @@ namespace hOps.web.Controllers
 
             if (entry.Type == match.Type)
             {
-                TempData["Error"] = "Lost items can only be matched with found items.";
+                TempData["Error"] = Translate("Lost items can only be matched with found items.");
                 return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
             }
 
             if (entry.Status != LostFoundStatus.Logged || match.Status != LostFoundStatus.Logged)
             {
-                TempData["Error"] = "Only logged entries can be matched.";
+                TempData["Error"] = Translate("Only logged entries can be matched.");
                 return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
             }
 
@@ -457,7 +471,7 @@ namespace hOps.web.Controllers
             _context.LostFoundEntries.Update(match);
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = "Entries matched successfully.";
+            TempData["Success"] = Translate("Entries matched successfully.");
             return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
         }
 
@@ -487,7 +501,7 @@ namespace hOps.web.Controllers
 
             if (!entry.MatchedEntryId.HasValue)
             {
-                TempData["Success"] = "Entry already unmatched.";
+                TempData["Success"] = Translate("Entry already unmatched.");
                 return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
             }
 
@@ -495,7 +509,7 @@ namespace hOps.web.Controllers
             _context.LostFoundEntries.Update(entry);
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = "Entries unmatched.";
+            TempData["Success"] = Translate("Entries unmatched.");
             return RedirectToAction(nameof(Index), new { propertyIds = new[] { entry.PropertyId } });
         }
 

@@ -1,4 +1,18 @@
 (() => {
+    const translate = typeof window.hopsTranslate === 'function'
+        ? window.hopsTranslate
+        : (key, fallback) => (typeof fallback === 'string' && fallback.length ? fallback : key);
+
+    const deliveredYesText = translate('MailLog.DeliveredYes', 'Yes');
+    const deliveredNoText = translate('MailLog.DeliveredNo', 'No');
+    const markPendingText = translate('MailLog.MarkPending', 'Mark Pending');
+    const markDeliveredText = translate('MailLog.MarkDelivered', 'Mark Delivered');
+    const savingText = translate('MailLog.Saving', 'Saving...');
+    const updateErrorText = translate('MailLog.UpdateError', 'Unable to update the package status. Please try again.');
+    const updateErrorShortText = translate('MailLog.UpdateErrorShort', 'Unable to update the package status.');
+    const serverUnexpectedText = translate('MailLog.ServerUnexpected', 'Server returned an unexpected status.');
+    const updateSuccessText = translate('MailLog.PackageUpdated', 'Package status updated.');
+
     function showAlert(type, message) {
         const container = document.getElementById('mailLogAlertContainer');
         if (!container) {
@@ -16,7 +30,7 @@
         closeButton.type = 'button';
         closeButton.className = 'btn-close';
         closeButton.setAttribute('data-bs-dismiss', 'alert');
-        closeButton.setAttribute('aria-label', 'Close');
+        closeButton.setAttribute('aria-label', translate('Close', 'Close'));
 
         alert.appendChild(closeButton);
         container.appendChild(alert);
@@ -29,7 +43,7 @@
 
         const badge = row.querySelector('.delivered-badge');
         if (badge) {
-            badge.textContent = payload.delivered ? 'Yes' : 'No';
+            badge.textContent = payload.delivered ? deliveredYesText : deliveredNoText;
             badge.classList.remove('text-bg-success', 'text-bg-secondary');
             badge.classList.add(payload.delivered ? 'text-bg-success' : 'text-bg-secondary');
         }
@@ -49,7 +63,7 @@
             const button = form.querySelector('.toggle-delivered-button');
             if (button) {
                 button.disabled = false;
-                button.textContent = payload.delivered ? 'Mark Pending' : 'Mark Delivered';
+                button.textContent = payload.delivered ? markPendingText : markDeliveredText;
                 button.classList.remove('btn-outline-success', 'btn-outline-warning');
                 button.classList.add(payload.delivered ? 'btn-outline-warning' : 'btn-outline-success');
             }
@@ -65,11 +79,13 @@
                 delete button.dataset.originalText;
             } else {
                 const currentState = button.classList.contains('btn-outline-warning');
-                button.textContent = currentState ? 'Mark Pending' : 'Mark Delivered';
+                button.textContent = currentState ? markPendingText : markDeliveredText;
             }
         }
 
-        const message = error?.message || 'Unable to update the package status. Please try again.';
+        const message = (error && typeof error.message === 'string' && error.message.trim())
+            ? error.message
+            : updateErrorText;
         showAlert('danger', message);
     }
 
@@ -85,7 +101,7 @@
                 if (button) {
                     button.dataset.originalText = button.textContent.trim();
                     button.disabled = true;
-                    button.textContent = 'Saving...';
+                    button.textContent = savingText;
                 }
 
                 try {
@@ -99,19 +115,19 @@
                     });
 
                     if (!response.ok) {
-                        throw new Error('Server returned an unexpected status.');
+                        throw new Error(serverUnexpectedText);
                     }
 
                     const payload = await response.json();
                     if (!payload?.success) {
-                        throw new Error(payload?.message || 'Unable to update the package status.');
+                        throw new Error(payload?.message || updateErrorShortText);
                     }
 
                     updateRow(row, payload);
                     if (button) {
                         delete button.dataset.originalText;
                     }
-                    showAlert('success', payload.message || 'Package status updated.');
+                    showAlert('success', payload.message || updateSuccessText);
                 } catch (error) {
                     handleError(row, button, error);
                 }

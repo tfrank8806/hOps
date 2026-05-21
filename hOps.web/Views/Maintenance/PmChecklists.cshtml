@@ -1,15 +1,25 @@
 @model hOps.web.ViewModels.Maintenance.MaintenancePmChecklistsPageViewModel
+@using System.Globalization
+@using System.Text.Json
+@using hOps.web.ViewModels.Maintenance
+
 @{
-    ViewData["Title"] = "PM Checklists";
+    ViewData["Title"] = Html.Localize("PM Checklists");
+    var editor = Model.ChecklistEditor ?? new MaintenancePmChecklistEditorViewModel();
+    var frequencyPerYear = Model.FrequencyPerYear;
+    var checklistCountLabel = Html.Localize(Model.Checklists.Count == 1 ? "checklist" : "checklists");
 }
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
-        <h2 class="mb-0">Preventive Maintenance Checklists</h2>
-        <p class="text-muted mb-0 small">Create and organize reusable PM templates for each property.</p>
+        <h2 class="mb-0">@Html.Localize("Preventive Maintenance Checklists")</h2>
+        <p class="text-muted mb-0 small">@Html.Localize("Create and organize reusable PM templates for each property.")</p>
     </div>
     <div class="d-flex gap-2">
-        <a asp-controller="PreventiveMaintenance" asp-action="Index" asp-route-checklistId="@Model.ChecklistEditor?.Id" class="btn btn-outline-secondary btn-sm">Back to PMs</a>
+        <a asp-controller="PreventiveMaintenance"
+           asp-action="Index"
+           asp-route-checklistId="@editor.Id"
+           class="btn btn-outline-secondary btn-sm">@Html.Localize("Back to PMs")</a>
     </div>
 </div>
 
@@ -26,14 +36,14 @@
 @if (Model.AccessibleProperties.Count > 1)
 {
     <form method="get" asp-action="PmChecklists" class="mb-4">
-        <label for="propertySelect" class="form-label">Property</label>
+        <label for="propertySelect" class="form-label">@Html.Localize("Property")</label>
         <select class="form-select" id="propertySelect" name="propertyId" onchange="this.form.submit()">
             @foreach (var property in Model.AccessibleProperties)
             {
                 <option value="@property.Id" selected="@(property.Id == Model.PropertyId ? "selected" : null)">@property.Name (@property.Code)</option>
             }
         </select>
-        @if (Model.ChecklistEditor?.Id is int editorChecklistId)
+        @if (editor.Id is int editorChecklistId)
         {
             <input type="hidden" name="checklistId" value="@editorChecklistId" />
         }
@@ -46,26 +56,27 @@
             @Html.AntiForgeryToken()
             <input type="hidden" name="propertyId" value="@Model.PropertyId" />
             <div class="col-md-4 col-sm-6">
-                <label for="pmFrequencyInput" class="form-label">PM frequency per year</label>
+                <label for="pmFrequencyInput" class="form-label">@Html.Localize("PM frequency per year")</label>
                 <input type="number"
                        class="form-control"
                        id="pmFrequencyInput"
                        name="frequencyPerYear"
-                       value="@(Model.FrequencyPerYear > 0 ? Model.FrequencyPerYear : 4)"
+                       value="@(frequencyPerYear > 0 ? frequencyPerYear : 4)"
                        min="1"
                        max="52"
                        required />
-                @if (Model.FrequencyPerYear > 0)
+                @if (frequencyPerYear > 0)
                 {
-                    <div class="form-text">Currently set to <strong>@Model.FrequencyPerYear</strong> PM cycles each year.</div>
+                    var frequencyText = string.Format(CultureInfo.InvariantCulture, Html.Localize("Currently set to {0} PM cycles each year."), frequencyPerYear);
+                    <div class="form-text">@frequencyText</div>
                 }
                 else
                 {
-                    <div class="form-text">Set how many PM cycles each room should complete annually (default is 4).</div>
+                    <div class="form-text">@Html.Localize("Set how many PM cycles each room should complete annually (default is 4).")</div>
                 }
             </div>
             <div class="col-md-3 col-sm-6">
-                <button type="submit" class="btn btn-primary mt-2 mt-sm-0">Save Frequency</button>
+                <button type="submit" class="btn btn-primary mt-2 mt-sm-0">@Html.Localize("Save Frequency")</button>
             </div>
         </form>
     </div>
@@ -75,89 +86,88 @@
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div>
-                <h5 class="mb-0">Import checklist from CSV</h5>
-                <div class="text-muted small">Upload tasks in bulk or start with the blank template.</div>
+                <h5 class="mb-0">@Html.Localize("Import checklist from CSV")</h5>
+                <div class="text-muted small">@Html.Localize("Upload tasks in bulk or start with the blank template.")</div>
             </div>
-            <a asp-action="DownloadChecklistTemplateCsv" class="btn btn-outline-secondary btn-sm">Download blank CSV</a>
+            <a asp-action="DownloadChecklistTemplateCsv" class="btn btn-outline-secondary btn-sm">@Html.Localize("Download blank CSV")</a>
         </div>
         <form asp-action="UploadChecklistTemplate" method="post" enctype="multipart/form-data" class="row g-3">
             @Html.AntiForgeryToken()
             <input type="hidden" asp-for="TemplateUpload.PropertyId" value="@Model.PropertyId" />
             <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
             <div class="col-md-6">
-                <label asp-for="TemplateUpload.Name" class="form-label"></label>
+                <label asp-for="TemplateUpload.Name" class="form-label">@Html.Localize("Checklist name")</label>
                 <input asp-for="TemplateUpload.Name" class="form-control" />
                 <span asp-validation-for="TemplateUpload.Name" class="text-danger small"></span>
             </div>
             <div class="col-md-3 col-sm-6">
-                <label asp-for="TemplateUpload.ChecklistType" class="form-label"></label>
+                <label asp-for="TemplateUpload.ChecklistType" class="form-label">@Html.Localize("Checklist type")</label>
                 <select asp-for="TemplateUpload.ChecklistType" class="form-select">
-                    <option value="Room">Room-based</option>
-                    <option value="Area">Area-based</option>
+                    <option value="Room">@Html.Localize("Room-based")</option>
+                    <option value="Area">@Html.Localize("Area-based")</option>
                 </select>
                 <span asp-validation-for="TemplateUpload.ChecklistType" class="text-danger small"></span>
             </div>
             <div class="col-12">
-                <label asp-for="TemplateUpload.AreaOptionsText" class="form-label"></label>
-                <textarea asp-for="TemplateUpload.AreaOptionsText" class="form-control" rows="2" placeholder="Lobby, Pool Deck, Fitness Center"></textarea>
-                <div class="form-text">Only used for area checklists. Separate values with commas.</div>
+                <label asp-for="TemplateUpload.AreaOptionsText" class="form-label">@Html.Localize("Suggested areas (Area checklists only)")</label>
+                <textarea asp-for="TemplateUpload.AreaOptionsText" class="form-control" rows="2" placeholder="@Html.Localize("Lobby, Pool Deck, Fitness Center")"></textarea>
+                <div class="form-text">@Html.Localize("Only used for area checklists. Separate values with commas.")</div>
                 <span asp-validation-for="TemplateUpload.AreaOptionsText" class="text-danger small"></span>
             </div>
             <div class="col-md-6">
-                <label asp-for="TemplateUpload.CsvFile" class="form-label"></label>
-                <input asp-for="TemplateUpload.CsvFile" type="file" class="form-control" accept=".csv,text/csv" />
-                <div class="form-text">Columns: Task, Description. Up to 500 rows.</div>
+                <label asp-for="TemplateUpload.CsvFile" class="form-label">@Html.Localize("Checklist CSV")</label>
+                <input asp-for="TemplateUpload.CsvFile" class="form-control" type="file" accept=".csv" />
                 <span asp-validation-for="TemplateUpload.CsvFile" class="text-danger small"></span>
             </div>
-            <div class="col-md-3 col-sm-6 align-self-end">
-                <button type="submit" class="btn btn-primary w-100">Import Checklist</button>
+            <div class="col-md-3 col-sm-6 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary">@Html.Localize("Upload CSV")</button>
             </div>
         </form>
     </div>
 </div>
 
-<div class="row gy-4">
+<div class="row g-4">
     <div class="col-lg-5">
         <div class="card shadow-sm">
             <div class="card-header">
-                <strong>@(Model.ChecklistEditor?.Id.HasValue == true ? "Edit Checklist" : "Create Checklist")</strong>
+                <strong>@Html.Localize(editor.Id.HasValue ? "Edit Checklist" : "Create Checklist")</strong>
             </div>
             <div class="card-body">
                 <form asp-action="SaveChecklist" method="post" class="vstack gap-3">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="PropertyId" value="@Model.PropertyId" />
-                    <input type="hidden" name="Id" value="@(Model.ChecklistEditor?.Id)" />
+                    <input type="hidden" name="Id" value="@editor.Id" />
                     <div>
-                        <label asp-for="ChecklistEditor.Name" class="form-label">Checklist name</label>
+                        <label asp-for="ChecklistEditor.Name" class="form-label">@Html.Localize("Checklist name")</label>
                         <input asp-for="ChecklistEditor.Name" name="Name" class="form-control" maxlength="160" required />
                         <span asp-validation-for="ChecklistEditor.Name" class="text-danger small"></span>
                     </div>
                     <div>
-                        <label asp-for="ChecklistEditor.ChecklistType" class="form-label">Checklist type</label>
-                        <select class="form-select" name="ChecklistType" id="checklistTypeSelect" @(Model.ChecklistEditor?.CanChangeType == false ? "disabled" : null)>
-                            <option value="Room" selected="@(Model.ChecklistEditor?.ChecklistType == PreventiveMaintenanceChecklistType.Room ? "selected" : null)">Room-based</option>
-                            <option value="Area" selected="@(Model.ChecklistEditor?.ChecklistType == PreventiveMaintenanceChecklistType.Area ? "selected" : null)">Area-based</option>
+                        <label asp-for="ChecklistEditor.ChecklistType" class="form-label">@Html.Localize("Checklist type")</label>
+                        <select class="form-select" name="ChecklistType" id="checklistTypeSelect" @(editor.CanChangeType ? null : "disabled")>
+                            <option value="Room" selected="@(editor.ChecklistType == PreventiveMaintenanceChecklistType.Room ? "selected" : null)">@Html.Localize("Room-based")</option>
+                            <option value="Area" selected="@(editor.ChecklistType == PreventiveMaintenanceChecklistType.Area ? "selected" : null)">@Html.Localize("Area-based")</option>
                         </select>
-                        @if (Model.ChecklistEditor?.CanChangeType == false)
+                        @if (!editor.CanChangeType)
                         {
-                            <input type="hidden" name="ChecklistType" value="@Model.ChecklistEditor?.ChecklistType" />
-                            <div class="form-text text-warning">Checklist type can’t be changed because sessions already exist.</div>
+                            <input type="hidden" name="ChecklistType" value="@editor.ChecklistType" />
+                            <div class="form-text text-warning">@Html.Localize("Checklist type can't be changed because sessions already exist.")</div>
                         }
                     </div>
-                    <div id="areaOptionsWrapper">
-                        <label class="form-label">Suggested areas</label>
-                        <textarea class="form-control" name="AreaOptionsText" id="areaOptionsText" rows="4" placeholder="e.g. Kitchen&#10;Laundry&#10;Patio">@Model.ChecklistEditor?.AreaOptionsText</textarea>
-                        <div class="form-text">Enter one area per line or separate using commas.</div>
+                    <div id="areaOptionsWrapper" @(editor.ChecklistType == PreventiveMaintenanceChecklistType.Area ? null : "hidden")>
+                        <label class="form-label" for="areaOptionsText">@Html.Localize("Suggested areas")</label>
+                        <textarea class="form-control" name="AreaOptionsText" id="areaOptionsText" rows="4" placeholder="@Html.Localize("e.g. Kitchen, Laundry, Patio")">@editor.AreaOptionsText</textarea>
+                        <div class="form-text">@Html.Localize("Enter one area per line or separate using commas.")</div>
                     </div>
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="IsActive" value="true" id="checklistActive" @(Model.ChecklistEditor?.IsActive != false ? "checked" : null) />
-                        <label class="form-check-label" for="checklistActive">Checklist is active</label>
+                        <input class="form-check-input" type="checkbox" name="IsActive" value="true" id="checklistActive" @(editor.IsActive ? "checked" : null) />
+                        <label class="form-check-label" for="checklistActive">@Html.Localize("Checklist is active")</label>
                     </div>
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">@((Model.ChecklistEditor?.Id.HasValue ?? false) ? "Save Changes" : "Create Checklist")</button>
-                        @if (Model.ChecklistEditor?.Id.HasValue == true)
+                        <button type="submit" class="btn btn-primary">@Html.Localize(editor.Id.HasValue ? "Save Changes" : "Create Checklist")</button>
+                        @if (editor.Id.HasValue)
                         {
-                            <a asp-action="PmChecklists" asp-route-propertyId="@Model.PropertyId" class="btn btn-outline-secondary">Start New</a>
+                            <a asp-action="PmChecklists" asp-route-propertyId="@Model.PropertyId" class="btn btn-outline-secondary">@Html.Localize("Start New")</a>
                         }
                     </div>
                 </form>
@@ -167,18 +177,18 @@
     <div class="col-lg-7">
         <div class="card shadow-sm h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <strong>Checklists</strong>
-                <span class="text-muted small">@Model.Checklists.Count @((Model.Checklists.Count == 1) ? "checklist" : "checklists")</span>
+                <strong>@Html.Localize("Checklists")</strong>
+                <span class="text-muted small">@Model.Checklists.Count @checklistCountLabel</span>
             </div>
             <div class="card-body p-0">
                 @if (!Model.Checklists.Any())
                 {
-                    <div class="p-4 text-center text-muted">No checklists yet. Use the form to create one.</div>
+                    <div class="p-4 text-center text-muted">@Html.Localize("No checklists yet. Use the form to create one.")</div>
                 }
                 else
                 {
                     <div class="px-4 py-2 border-bottom small text-muted">
-                        Drag the handle to reorder checklists. Order also controls the PM checklist dropdown on the Preventive Maintenance page.
+                        @Html.Localize("Drag the handle to reorder checklists. Order also controls the PM checklist dropdown on the Preventive Maintenance page.")
                     </div>
                     <div id="pmChecklistOrderStatus" class="px-4 py-2 border-bottom small text-muted" hidden></div>
                     <div class="table-responsive">
@@ -186,61 +196,94 @@
                             <thead class="table-light">
                                 <tr>
                                     <th style="width:40px;"></th>
-                                    <th>Name</th>
-                                    <th>Type</th>
-                                    <th>Tasks</th>
-                                    <th>Sessions</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Actions</th>
+                                    <th>@Html.Localize("Name")</th>
+                                    <th>@Html.Localize("Type")</th>
+                                    <th>@Html.Localize("Tasks")</th>
+                                    <th>@Html.Localize("Sessions")</th>
+                                    <th>@Html.Localize("Status")</th>
+                                    <th class="text-end">@Html.Localize("Actions")</th>
                                 </tr>
                             </thead>
                             <tbody id="pmChecklistTableBody" data-property-id="@Model.PropertyId">
                                 @foreach (var checklist in Model.Checklists)
                                 {
+                                    var checklistId = checklist.Id.ToString(CultureInfo.InvariantCulture);
+                                    var translatedName = await Html.DisplayTranslatedTextAsync(
+                                        "PmChecklist",
+                                        checklistId,
+                                        "Name",
+                                        checklist.Name ?? string.Empty);
+                                    var translatedAreas = new List<string>();
+                                    if (checklist.AreaOptions != null)
+                                    {
+                                        var areaIndex = 0;
+                                        foreach (var area in checklist.AreaOptions)
+                                        {
+                                            var translatedArea = await Html.DisplayTranslatedTextAsync(
+                                                "PmChecklistAreaOption",
+                                                $"{checklistId}:{areaIndex}",
+                                                "Value",
+                                                area ?? string.Empty);
+                                            if (!string.IsNullOrWhiteSpace(translatedArea))
+                                            {
+                                                translatedAreas.Add(translatedArea);
+                                            }
+                                            areaIndex++;
+                                        }
+                                    }
+                                    var deleteConfirm = Html.Localize("Delete this checklist? This cannot be undone.");
                                     <tr class="pm-checklist-row" data-checklist-id="@checklist.Id" draggable="true">
                                         <td class="text-center text-muted">
-                                            <span class="pm-checklist-drag-handle" title="Drag to reorder" style="cursor: move;">&#x2630;</span>
+                                            <span class="pm-checklist-drag-handle" title="@Html.Localize("Drag to reorder")" style="cursor: move;">&#x2630;</span>
                                         </td>
                                         <td>
-                                            <div class="fw-semibold">@checklist.Name</div>
-                                            @if (checklist.ChecklistType == PreventiveMaintenanceChecklistType.Area && checklist.AreaOptions.Any())
+                                            <div class="fw-semibold">@translatedName</div>
+                                            @if (checklist.ChecklistType == PreventiveMaintenanceChecklistType.Area && translatedAreas.Any())
                                             {
-                                                <div class="text-muted small">Areas: @string.Join(", ", checklist.AreaOptions)</div>
+                                                <div class="text-muted small">@Html.Localize("Areas:") @string.Join(", ", translatedAreas)</div>
                                             }
                                         </td>
-                                        <td>@(checklist.ChecklistType == PreventiveMaintenanceChecklistType.Area ? "Area" : "Room")</td>
+                                        <td>@Html.Localize(checklist.ChecklistType == PreventiveMaintenanceChecklistType.Area ? "Area" : "Room")</td>
                                         <td>@checklist.TaskCount</td>
                                         <td>@checklist.SessionCount</td>
                                         <td>
                                             @if (checklist.IsActive)
                                             {
-                                                <span class="badge bg-success">Active</span>
+                                                <span class="badge bg-success">@Html.Localize("Active")</span>
                                             }
                                             else
                                             {
-                                                <span class="badge bg-secondary">Inactive</span>
+                                                <span class="badge bg-secondary">@Html.Localize("Inactive")</span>
                                             }
                                         </td>
                                         <td class="text-end">
                                             <div class="btn-group btn-group-sm">
-                                                <a asp-action="PmChecklists" asp-route-propertyId="@Model.PropertyId" asp-route-checklistId="@checklist.Id" class="btn btn-outline-secondary">Edit</a>
-                                                <a asp-action="ChecklistTasks" asp-route-checklistId="@checklist.Id" asp-route-propertyId="@Model.PropertyId" class="btn btn-outline-primary">Tasks</a>
+                                                <a asp-action="PmChecklists"
+                                                   asp-route-propertyId="@Model.PropertyId"
+                                                   asp-route-checklistId="@checklist.Id"
+                                                   class="btn btn-outline-secondary">@Html.Localize("Edit")</a>
+                                                <a asp-action="ChecklistTasks"
+                                                   asp-route-checklistId="@checklist.Id"
+                                                   asp-route-propertyId="@Model.PropertyId"
+                                                   class="btn btn-outline-primary">@Html.Localize("Tasks")</a>
                                                 <form asp-action="ToggleChecklist" method="post" class="d-inline">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="propertyId" value="@Model.PropertyId" />
                                                     <input type="hidden" name="isActive" value="@(!checklist.IsActive)" />
                                                     <input type="hidden" name="id" value="@checklist.Id" />
-                                                    <button type="submit" class="btn btn-outline-secondary">@((checklist.IsActive ? "Deactivate" : "Activate"))</button>
+                                                    <button type="submit" class="btn btn-outline-secondary">
+                                                        @Html.Localize(checklist.IsActive ? "Deactivate" : "Activate")
+                                                    </button>
                                                 </form>
                                                 <form asp-action="DeleteChecklist"
                                                       asp-route-id="@checklist.Id"
                                                       method="post"
                                                       class="d-inline"
-                                                      onsubmit="return confirm('Delete this checklist? This cannot be undone.');">
+                                                      onsubmit="return confirm(@Html.Raw(JsonSerializer.Serialize(deleteConfirm)));">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="propertyId" value="@Model.PropertyId" />
                                                     <input type="hidden" name="id" value="@checklist.Id" />
-                                                    <button type="submit" class="btn btn-outline-danger">Delete</button>
+                                                    <button type="submit" class="btn btn-outline-danger">@Html.Localize("Delete")</button>
                                                 </form>
                                             </div>
                                         </td>
@@ -258,16 +301,16 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
-        (function () {
+        (() => {
             const typeSelect = document.getElementById('checklistTypeSelect');
             const areaWrapper = document.getElementById('areaOptionsWrapper');
 
-            function syncAreaVisibility() {
+            const syncAreaVisibility = () => {
                 if (!typeSelect || !areaWrapper) {
                     return;
                 }
                 areaWrapper.hidden = typeSelect.value !== 'Area';
-            }
+            };
 
             if (typeSelect) {
                 typeSelect.addEventListener('change', syncAreaVisibility);
@@ -275,7 +318,21 @@
             }
         })();
 
-        (function () {
+        (() => {
+            const t = (key, fallback = key) => {
+                if (typeof window.hopsTranslate === 'function') {
+                    return window.hopsTranslate(key, fallback);
+                }
+                return typeof fallback === 'string' && fallback.length ? fallback : key;
+            };
+
+            const format = (template, ...values) => {
+                if (typeof template !== 'string') {
+                    return '';
+                }
+                return values.reduce((acc, current, index) => acc.replace(`{${index}}`, current), template);
+            };
+
             const tableBody = document.getElementById('pmChecklistTableBody');
             if (!tableBody) {
                 return;
@@ -366,11 +423,11 @@
             async function persistOrder(order, serializedOrder) {
                 const token = getAntiForgeryToken();
                 if (!token) {
-                    setStatus('Missing security token. Refresh and try again.', 'error');
+                    setStatus(t('Missing security token. Refresh and try again.', 'Missing security token. Refresh and try again.'), 'error');
                     return;
                 }
 
-                setStatus('Saving order…', 'pending');
+                setStatus(t('Saving order...', 'Saving order...'), 'pending');
                 try {
                     const response = await fetch(reorderEndpoint, {
                         method: 'POST',
@@ -384,8 +441,8 @@
                         })
                     });
 
+                    let errorMessage = t('Unable to save order.', 'Unable to save order.');
                     if (!response.ok) {
-                        let errorMessage = 'Unable to save order.';
                         try {
                             const errorPayload = await response.json();
                             if (errorPayload?.error) {
@@ -399,14 +456,18 @@
 
                     const payload = await response.json();
                     if (!payload || payload.success !== true) {
-                        throw new Error('Unable to save order.');
+                        throw new Error(errorMessage);
                     }
 
                     lastSavedOrderJson = serializedOrder;
-                    setStatus('Order saved.', 'success');
+                    setStatus(t('Order saved.', 'Order saved.'), 'success');
                 } catch (error) {
                     console.error(error);
-                    setStatus(error?.message ?? 'Unable to save order.', 'error');
+                    const fallbackError = t('Unable to save order.', 'Unable to save order.');
+                    const message = (error && typeof error.message === 'string' && error.message.length)
+                        ? error.message
+                        : fallbackError;
+                    setStatus(message, 'error');
                 }
             }
 

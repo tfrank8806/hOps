@@ -1,6 +1,7 @@
+@using System.Globalization
 @model SiteVisitLogViewModel
 @{
-    ViewData["Title"] = "Site Visit Log";
+    ViewData["Title"] = Html.Localize("Site Visit Log");
     var activeEntryId = ViewBag.ActiveLogEntryId as int?;
     var statusClasses = new Dictionary<SiteVisitChecklistStatus, string>
     {
@@ -11,17 +12,17 @@
     };
     string StatusLabelText(SiteVisitChecklistStatus status) => status switch
     {
-        SiteVisitChecklistStatus.Compliant => "Compliant",
-        SiteVisitChecklistStatus.NeedsReview => "Needs Review",
-        SiteVisitChecklistStatus.NotCompliant => "Not Compliant",
-        SiteVisitChecklistStatus.NotReviewed => "Not Reviewed",
+        SiteVisitChecklistStatus.Compliant => Html.Localize("Compliant"),
+        SiteVisitChecklistStatus.NeedsReview => Html.Localize("Needs Review"),
+        SiteVisitChecklistStatus.NotCompliant => Html.Localize("Not Compliant"),
+        SiteVisitChecklistStatus.NotReviewed => Html.Localize("Not Reviewed"),
         _ => status.ToString()
     };
     string ProgressLabelText(SiteVisitProgressStatus status) => status switch
     {
-        SiteVisitProgressStatus.NotStarted => "Not Started",
-        SiteVisitProgressStatus.InProgress => "In Progress",
-        SiteVisitProgressStatus.Complete => "Complete",
+        SiteVisitProgressStatus.NotStarted => Html.Localize("Not Started"),
+        SiteVisitProgressStatus.InProgress => Html.Localize("In Progress"),
+        SiteVisitProgressStatus.Complete => Html.Localize("Complete"),
         _ => status.ToString()
     };
     string FieldValue(string fieldName, string? fallback) =>
@@ -41,13 +42,13 @@
 <div class="site-visit-log-page" data-log-list>
     <div class="site-visit-header">
         <div>
-            <p class="text-uppercase text-muted fw-semibold small mb-1">Property leadership log</p>
-            <h1 class="h2 mb-2">Site Visit Log</h1>
-            <p class="text-muted mb-0">Review recent visits and track follow-up progress for your property team.</p>
+            <p class="text-uppercase text-muted fw-semibold small mb-1">@Html.Localize("Property leadership log")</p>
+            <h1 class="h2 mb-2">@Html.Localize("Site Visit Log")</h1>
+            <p class="text-muted mb-0">@Html.Localize("Review recent visits and track follow-up progress for your property team.")</p>
         </div>
         <div class="d-flex gap-2">
             <a class="btn btn-outline-secondary" asp-controller="SiteVisit" asp-action="Index">
-                New Site Visit
+                @Html.Localize("New Site Visit")
             </a>
         </div>
     </div>
@@ -73,9 +74,9 @@
     {
         <div class="card border-0 shadow-sm site-visit-empty">
             <div class="card-body text-center py-5">
-                <h2 class="h5 mb-2">No site visits yet</h2>
-                <p class="text-muted mb-4">Share a site visit checklist to populate this log for your property.</p>
-                <a class="btn btn-primary" asp-controller="SiteVisit" asp-action="Index">Start a Site Visit</a>
+                <h2 class="h5 mb-2">@Html.Localize("No site visits yet")</h2>
+                <p class="text-muted mb-4">@Html.Localize("Share a site visit checklist to populate this log for your property.")</p>
+                <a class="btn btn-primary" asp-controller="SiteVisit" asp-action="Index">@Html.Localize("Start a Site Visit")</a>
             </div>
         </div>
     }
@@ -112,17 +113,28 @@
                                 <span class="@progressBadgeClass">@ProgressLabelText(progressValue)</span>
                             </div>
                             <div class="text-muted small">
-                                Visit date @entry.VisitDate.ToString("MMMM d, yyyy") · Lead @(string.IsNullOrWhiteSpace(entry.LeaderName) ? "Not specified" : entry.LeaderName)
+                                @Html.Localize("Visit date") @entry.VisitDate.ToString("D", CultureInfo.CurrentCulture)
+                                &middot;
+                                @Html.Localize("Lead")
+                                @(string.IsNullOrWhiteSpace(entry.LeaderName) ? Html.Localize("Not specified") : entry.LeaderName)
                             </div>
                         </div>
                         <div class="text-muted text-end small">
-                            <div>Created @createdAtLocal.ToString("MMM d, yyyy h:mm tt") by @(entry.CreatedByDisplayName ?? "Unknown")</div>
-                            <div>Updated @updatedAtLocal.ToString("MMM d, yyyy h:mm tt")</div>
+                            <div>
+                                @Html.Localize("Created")
+                                @createdAtLocal.ToString("MMM d, yyyy h:mm tt", CultureInfo.CurrentCulture)
+                                @Html.Localize("by")
+                                @(string.IsNullOrWhiteSpace(entry.CreatedByDisplayName) ? Html.Localize("Unknown") : entry.CreatedByDisplayName)
+                            </div>
+                            <div>
+                                @Html.Localize("Updated")
+                                @updatedAtLocal.ToString("MMM d, yyyy h:mm tt", CultureInfo.CurrentCulture)
+                            </div>
                         </div>
                     </div>
                     <div class="row g-3 mt-3">
                         <div class="col-md-4">
-                            <label class="form-label" for="assigned_@entry.Id">Assigned To</label>
+                            <label class="form-label" for="assigned_@entry.Id">@Html.Localize("Assigned To")</label>
                             <input class="form-control" id="assigned_@entry.Id" name="AssignedTo" value="@assignedValue" />
                             @if (isActive)
                             {
@@ -133,7 +145,7 @@
                             }
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label" for="progress_@entry.Id">Progress</label>
+                            <label class="form-label" for="progress_@entry.Id">@Html.Localize("Progress")</label>
                             <select class="form-select" id="progress_@entry.Id" name="ProgressStatus">
                                 @foreach (SiteVisitProgressStatus status in Enum.GetValues(typeof(SiteVisitProgressStatus)))
                                 {
@@ -142,9 +154,9 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label" for="recipients_@entry.Id">Send to</label>
-                            <input class="form-control" id="recipients_@entry.Id" name="RecipientEmails" value="@recipientsValue" placeholder="leader@brand.com, team@brand.com" />
-                            <div class="form-text">Separate multiple addresses with commas or line breaks.</div>
+                            <label class="form-label" for="recipients_@entry.Id">@Html.Localize("Send to")</label>
+                            <input class="form-control" id="recipients_@entry.Id" name="RecipientEmails" value="@recipientsValue" placeholder="@Html.Localize("leader@brand.com, team@brand.com")" />
+                            <div class="form-text">@Html.Localize("Separate multiple addresses with commas or line breaks.")</div>
                             @if (isActive)
                             {
                                 foreach (var error in FieldErrors(nameof(SiteVisitLogUpdateViewModel.RecipientEmails)))
@@ -154,7 +166,7 @@
                             }
                         </div>
                         <div class="col-12">
-                            <label class="form-label" for="completion_@entry.Id">Completion Notes</label>
+                            <label class="form-label" for="completion_@entry.Id">@Html.Localize("Completion Notes")</label>
                             <textarea class="form-control" id="completion_@entry.Id" name="CompletionNotes" rows="3" data-log-notes>@completionValue</textarea>
                             @if (isActive)
                             {
@@ -168,14 +180,14 @@
                     <div class="d-flex flex-wrap justify-content-between align-items-center mt-4 gap-2">
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary" name="SubmitAction" value="save">
-                                Save Progress
+                                @Html.Localize("Save Progress")
                             </button>
                             <button type="submit" class="btn btn-outline-primary" name="SubmitAction" value="email">
-                                Save &amp; Email Update
+                                @Html.Localize("Save & Email Update")
                             </button>
                         </div>
                         <button class="btn btn-link text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#checklist_@entry.Id" aria-expanded="false">
-                            Checklist details
+                            @Html.Localize("Checklist details")
                         </button>
                     </div>
                 </div>
@@ -184,26 +196,34 @@
                         <table class="table align-middle mb-0">
                             <thead>
                                 <tr>
-                                    <th style="width: 200px;">Section</th>
-                                    <th>Checklist Item</th>
-                                    <th style="width: 200px;">Status</th>
-                                    <th>Notes</th>
+                                    <th style="width: 200px;">@Html.Localize("Section")</th>
+                                    <th>@Html.Localize("Checklist Item")</th>
+                                    <th style="width: 200px;">@Html.Localize("Status")</th>
+                                    <th>@Html.Localize("Notes")</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var item in entry.Items)
                                 {
                                     var css = statusClasses.TryGetValue(item.Status, out var cls) ? cls : string.Empty;
+                                    var reportItemId = (item.ReportItemId ?? 0).ToString(CultureInfo.InvariantCulture);
+                                    var sectionDisplay = string.IsNullOrWhiteSpace(item.SectionName)
+                                        ? "-"
+                                        : await Html.DisplayTranslatedTextAsync("SiteVisitReportItem", reportItemId, "SectionName", item.SectionName ?? string.Empty);
+                                    var titleDisplay = await Html.DisplayTranslatedTextAsync("SiteVisitReportItem", reportItemId, "Title", item.Title ?? string.Empty);
+                                    var notesDisplay = string.IsNullOrWhiteSpace(item.Notes)
+                                        ? "-"
+                                        : await Html.DisplayTranslatedTextAsync("SiteVisitReportItem", reportItemId, "Notes", item.Notes ?? string.Empty);
                                     <tr>
-                                        <td>@(string.IsNullOrWhiteSpace(item.SectionName) ? "-" : item.SectionName)</td>
-                                        <td>@item.Title</td>
+                                        <td>@sectionDisplay</td>
+                                        <td>@titleDisplay</td>
                                         <td>
                                             <div class="d-flex align-items-center gap-2">
                                                 <span class="status-dot @(string.IsNullOrEmpty(css) ? string.Empty : css)"></span>
                                                 @StatusLabelText(item.Status)
                                             </div>
                                         </td>
-                                        <td>@(string.IsNullOrWhiteSpace(item.Notes) ? "-" : item.Notes)</td>
+                                        <td>@notesDisplay</td>
                                     </tr>
                                 }
                             </tbody>

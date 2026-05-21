@@ -1,16 +1,17 @@
 @using System.Collections.Generic
 @using hOps.web.ViewModels.SiteVisit
+@using System.Globalization
 @model SiteVisitPageViewModel
 @{
-    ViewData["Title"] = "Site Visit";
+    ViewData["Title"] = Html.Localize("Site Visit");
     Model.Items ??= new List<SiteVisitChecklistItemViewModel>();
     var nextIndex = Model.Items.Count;
     var statusMetadata = new (SiteVisitChecklistStatus Status, string Label, string Description, string Css)[]
     {
-        (SiteVisitChecklistStatus.NotReviewed, "Not Reviewed", "Not yet graded", string.Empty),
-        (SiteVisitChecklistStatus.Compliant, "Compliant", "Green - Fully compliant", "status-compliant"),
-        (SiteVisitChecklistStatus.NeedsReview, "Needs Review", "Yellow - Follow-up required", "status-needs-review"),
-        (SiteVisitChecklistStatus.NotCompliant, "Not Compliant", "Red - Immediate attention", "status-not-compliant")
+        (SiteVisitChecklistStatus.NotReviewed, Html.Localize("Not Reviewed"), Html.Localize("Not yet graded"), string.Empty),
+        (SiteVisitChecklistStatus.Compliant, Html.Localize("Compliant"), Html.Localize("Green - Fully compliant"), "status-compliant"),
+        (SiteVisitChecklistStatus.NeedsReview, Html.Localize("Needs Review"), Html.Localize("Yellow - Follow-up required"), "status-needs-review"),
+        (SiteVisitChecklistStatus.NotCompliant, Html.Localize("Not Compliant"), Html.Localize("Red - Immediate attention"), "status-not-compliant")
     };
 }
 
@@ -27,23 +28,23 @@
 <div class="site-visit-page">
     <div class="site-visit-header">
         <div>
-            <p class="text-uppercase text-muted fw-semibold small mb-1">Property leadership checklist</p>
-            <h1 class="h2 mb-2">Site Visit</h1>
+            <p class="text-uppercase text-muted fw-semibold small mb-1">@Html.Localize("Property leadership checklist")</p>
+            <h1 class="h2 mb-2">@Html.Localize("Site Visit")</h1>
             <p class="text-muted mb-0">
-                Capture observations, grade each focus area, and instantly share the completed checklist in Excel.
+                @Html.Localize("Capture observations, grade each focus area, and instantly share the completed checklist in Excel.")
             </p>
         </div>
         <div class="text-end">
             <div class="text-muted small">
-                <div>@(Model.PropertyName ?? (ViewBag.CurrentProperty?.Name as string) ?? "Property TBD")</div>
+                <div>@(Model.PropertyName ?? (ViewBag.CurrentProperty?.Name as string) ?? Html.Localize("Property TBD"))</div>
                 <div>@Model.VisitDate.ToString("D")</div>
             </div>
             <div class="d-flex flex-wrap gap-2 justify-content-end mt-2">
                 <a class="btn btn-outline-secondary btn-sm" asp-controller="SiteVisit" asp-action="Log">
-                    View Site Visit Log
+                    @Html.Localize("View Site Visit Log")
                 </a>
                 <a class="btn btn-outline-primary btn-sm" asp-controller="SiteVisit" asp-action="Templates">
-                    Manage Templates
+                    @Html.Localize("Manage Templates")
                 </a>
             </div>
         </div>
@@ -52,7 +53,7 @@
     @if (Model.SubmittedSuccessfully && !string.IsNullOrWhiteSpace(Model.SuccessMessage))
     {
         <div class="alert alert-success d-flex align-items-center gap-2" role="status">
-            <span class="fw-semibold">Success</span>
+            <span class="fw-semibold">@Html.Localize("Success")</span>
             <span>@Model.SuccessMessage</span>
         </div>
     }
@@ -66,12 +67,12 @@
         @Html.AntiForgeryToken()
         <div class="row g-4">
             <div class="col-12 col-xl-8 col-xxl-6 mx-auto">
-                <div class="card site-visit-card site-visit-overview-card h-100">
+                    <div class="card site-visit-card site-visit-overview-card h-100">
                     <div class="card-body">
-                        <h2 class="h5 mb-4">Visit overview</h2>
+                        <h2 class="h5 mb-4">@Html.Localize("Visit overview")</h2>
                         <div class="mb-3">
                             <label asp-for="PropertyName" class="form-label"></label>
-                            <input asp-for="PropertyName" class="form-control" placeholder="Property or asset name" />
+                            <input asp-for="PropertyName" class="form-control" placeholder="@Html.Localize("Property or asset name")" />
                             <span asp-validation-for="PropertyName" class="text-danger small"></span>
                         </div>
                         <div class="mb-3">
@@ -81,7 +82,7 @@
                         </div>
                         <div class="mb-3">
                             <label asp-for="LeaderName" class="form-label"></label>
-                            <input asp-for="LeaderName" class="form-control" placeholder="Leader completing the visit" />
+                            <input asp-for="LeaderName" class="form-control" placeholder="@Html.Localize("Leader completing the visit")" />
                             <span asp-validation-for="LeaderName" class="text-danger small"></span>
                         </div>
                         <div class="mb-0">
@@ -89,7 +90,7 @@
                             <textarea asp-for="SummaryNotes"
                                       rows="4"
                                       class="form-control"
-                                      placeholder="Optional high-level notes or action items"></textarea>
+                                      placeholder="@Html.Localize("Optional high-level notes or action items")"></textarea>
                             <span asp-validation-for="SummaryNotes" class="text-danger small"></span>
                         </div>
                     </div>
@@ -110,20 +111,35 @@
                                     <div>
                                         <label class="form-label form-label-sm fw-semibold text-uppercase text-muted small mb-1"
                                                for="templateIdSelect">
-                                            Checklist template
+                                            @Html.Localize("Checklist template")
                                         </label>
                                         <select class="form-select form-select-sm"
                                                 id="templateIdSelect"
                                                 name="templateId">
                                             @foreach (var option in Model.TemplateOptions)
                                             {
-                                                if (option.Selected)
+                                                var optionText = option.Text ?? string.Empty;
+                                                string renderedText;
+                                                if (!string.IsNullOrEmpty(option.Value) && int.TryParse(option.Value, out var optionTemplateId))
                                                 {
-                                                    <option value="@option.Value" selected="selected">@option.Text</option>
+                                                    renderedText = await Html.DisplayTranslatedTextAsync(
+                                                        "SiteVisitTemplate",
+                                                        optionTemplateId.ToString(CultureInfo.InvariantCulture),
+                                                        "DisplayName",
+                                                        optionText);
                                                 }
                                                 else
                                                 {
-                                                    <option value="@option.Value">@option.Text</option>
+                                                    renderedText = Html.Localize(optionText);
+                                                }
+
+                                                if (option.Selected)
+                                                {
+                                                    <option value="@option.Value" selected="selected">@renderedText</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@option.Value">@renderedText</option>
                                                 }
                                             }
                                         </select>
@@ -131,10 +147,10 @@
                                     <button type="submit"
                                             class="btn btn-sm btn-outline-primary"
                                             data-template-apply>
-                                        Apply template
+                                        @Html.Localize("Apply template")
                                     </button>
                                     <a asp-action="Templates" class="btn btn-link btn-sm text-decoration-none">
-                                        Manage templates
+                                        @Html.Localize("Manage templates")
                                     </a>
                                 </form>
                             </div>
@@ -142,26 +158,28 @@
                         else
                         {
                             <div class="alert alert-info small mb-0">
-                                Want to reuse this checklist later? <a asp-action="Templates" class="alert-link">Create a template</a> from a CSV upload.
+                                @Html.Localize("Want to reuse this checklist later?")
+                                <a asp-action="Templates" class="alert-link">@Html.Localize("Create a template")</a>
+                                @Html.Localize("from a CSV upload.")
                             </div>
                         }
                         <div class="site-visit-actions">
                             <div>
-                                <h2 class="h5 mb-1">Checklist</h2>
-                                <p class="text-muted mb-0">Update the focus areas below or add your own checkpoints.</p>
+                                <h2 class="h5 mb-1">@Html.Localize("Checklist")</h2>
+                                <p class="text-muted mb-0">@Html.Localize("Update the focus areas below or add your own checkpoints.")</p>
                             </div>
                             <button type="button" class="btn btn-outline-primary btn-sm" data-add-checklist-item>
-                                + Add checklist item
+                                + @Html.Localize("Add checklist item")
                             </button>
                         </div>
                         <div class="table-responsive">
                             <table class="table align-middle site-visit-table mb-0">
                                 <thead>
                                     <tr>
-                                        <th scope="col" style="width: 220px;">Section</th>
-                                        <th scope="col">Checklist Item</th>
-                                        <th scope="col" style="width: 220px;">Status</th>
-                                        <th scope="col">Notes</th>
+                                        <th scope="col" style="width: 220px;">@Html.Localize("Section")</th>
+                                        <th scope="col">@Html.Localize("Checklist Item")</th>
+                                        <th scope="col" style="width: 220px;">@Html.Localize("Status")</th>
+                                        <th scope="col">@Html.Localize("Notes")</th>
                                         <th scope="col" class="text-center" style="width: 50px;"></th>
                                     </tr>
                                 </thead>
@@ -173,15 +191,15 @@
                                         <tr data-checklist-row data-index="@i">
                                             <td>
                                                 <input type="hidden" name="Items.Index" value="@i" />
-                                                <input asp-for="Items[i].SectionName"
-                                                       class="form-control form-control-sm"
-                                                       placeholder="e.g. Grounds &amp; Landscaping" />
+                                            <input asp-for="Items[i].SectionName"
+                                                   class="form-control form-control-sm"
+                                                   placeholder="@Html.Localize("e.g. Grounds & Landscaping")" />
                                                 <span asp-validation-for="Items[i].SectionName" class="text-danger small"></span>
                                             </td>
                                             <td>
-                                                <input asp-for="Items[i].Title"
-                                                       class="form-control form-control-sm"
-                                                       placeholder="Enter checklist focus" />
+                                            <input asp-for="Items[i].Title"
+                                                   class="form-control form-control-sm"
+                                                   placeholder="@Html.Localize("Enter checklist focus")" />
                                                 <span asp-validation-for="Items[i].Title" class="text-danger small"></span>
                                             </td>
                                             <td>
@@ -203,15 +221,15 @@
                                                           rows="2"
                                                           class="form-control form-control-sm site-visit-notes"
                                                           data-notes-input
-                                                          placeholder="Document what you observed or next steps"></textarea>
+                                                          placeholder="@Html.Localize("Document what you observed or next steps")"></textarea>
                                                 <span asp-validation-for="Items[i].Notes" class="text-danger small"></span>
                                             </td>
                                             <td class="text-center">
                                                 <button type="button"
                                                         class="btn btn-link btn-sm text-danger"
-                                                        title="Remove item"
+                                                        title="@Html.Localize("Remove item")"
                                                         data-remove-row>
-                                                    Remove
+                                                    @Html.Localize("Remove")
                                                 </button>
                                             </td>
                                         </tr>
@@ -240,21 +258,21 @@
             <div class="col-xl-8">
                 <div class="card site-visit-card site-visit-email-card">
                     <div class="card-body">
-                        <h2 class="h5 mb-3">Share the completed checklist</h2>
+                        <h2 class="h5 mb-3">@Html.Localize("Share the completed checklist")</h2>
                         <div class="mb-3">
                             <label asp-for="RecipientEmails" class="form-label"></label>
-                            <input asp-for="RecipientEmails" class="form-control" placeholder="name1@brand.com, name2@brand.com" />
+                            <input asp-for="RecipientEmails" class="form-control" placeholder="@Html.Localize("name1@brand.com, name2@brand.com")" />
                             <div class="form-text">
-                                Enter one or more addresses separated by commas, semicolons, or line breaks. We'll email an Excel copy immediately.
+                                @Html.Localize("Enter one or more addresses separated by commas, semicolons, or line breaks. We'll email an Excel copy immediately.")
                             </div>
                             <span asp-validation-for="RecipientEmails" class="text-danger small"></span>
                         </div>
                         <div class="d-flex flex-wrap gap-2">
                             <button type="submit" class="btn btn-primary">
-                                Send checklist via email
+                                @Html.Localize("Send checklist via email")
                             </button>
                             <a asp-action="Index" class="btn btn-outline-secondary">
-                                Reset form
+                                @Html.Localize("Reset form")
                             </a>
                         </div>
                     </div>
@@ -270,12 +288,12 @@
             <input type="hidden" name="Items.Index" value="__index__" />
             <input class="form-control form-control-sm"
                    name="Items[__index__].SectionName"
-                   placeholder="e.g. Public Areas" />
+                   placeholder="@Html.Localize("e.g. Public Areas")" />
         </td>
         <td>
             <input class="form-control form-control-sm"
                    name="Items[__index__].Title"
-                   placeholder="Enter checklist focus" />
+                   placeholder="@Html.Localize("Enter checklist focus")" />
         </td>
         <td>
             <div class="d-flex align-items-center gap-2">
@@ -295,10 +313,10 @@
                       name="Items[__index__].Notes"
                       rows="2"
                       data-notes-input
-                      placeholder="Document what you observed or next steps"></textarea>
+                      placeholder="@Html.Localize("Document what you observed or next steps")"></textarea>
         </td>
         <td class="text-center">
-            <button type="button" class="btn btn-link btn-sm text-danger" data-remove-row>Remove</button>
+            <button type="button" class="btn btn-link btn-sm text-danger" data-remove-row>@Html.Localize("Remove")</button>
         </td>
     </tr>
 </template>

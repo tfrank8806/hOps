@@ -1,32 +1,103 @@
-@using System
+﻿@using System
+@using System.Collections.Generic
 @using System.Linq
 @using System.Text.Json
 @using Microsoft.AspNetCore.Mvc.Rendering
 @model hOps.web.ViewModels.LayoutEditorViewModel
 
 @{
-    ViewData["Title"] = "Layout Editor";
+    ViewData["Title"] = Html.Localize("Layout Editor");
     int propertyId = Model.PropertyId;
-    string propertyName = string.IsNullOrWhiteSpace(Model.PropertyName)
+    string basePropertyName = string.IsNullOrWhiteSpace(Model.PropertyName)
         ? $"Property {propertyId}"
         : Model.PropertyName;
+    string displayPropertyName = string.IsNullOrWhiteSpace(Model.PropertyName)
+        ? string.Format(Html.Localize("Property {0}"), propertyId)
+        : await Html.DisplayTranslatedTextAsync("Property", propertyId.ToString(), "Name", basePropertyName);
     int selFloor = Model.SelectedFloor;
     var floors = Model.AllFloors;
     var propertyOptions = Model.PropertyOptions ?? new List<SelectListItem>();
+    var propertyOptionDisplays = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var option in propertyOptions)
+    {
+        var optionValue = option.Value ?? string.Empty;
+        var optionText = option.Text ?? string.Empty;
+        var optionDisplay = await Html.DisplayTranslatedTextAsync("Property", optionValue, "Name", optionText);
+        propertyOptionDisplays[optionValue] = optionDisplay;
+    }
+
+    var roomLabelMetadata = new Dictionary<int, (string Raw, string Display)>();
+    foreach (var room in Model.Rooms)
+    {
+        var rawLabel = string.IsNullOrWhiteSpace(room.RoomNumber) ? $"Room {room.Id}" : room.RoomNumber;
+        var displayLabel = await Html.DisplayTranslatedTextAsync("Room", room.Id.ToString(), "RoomNumber", rawLabel);
+        roomLabelMetadata[room.Id] = (rawLabel, displayLabel);
+    }
+
+    var layoutsByFloorExport = new Dictionary<int, List<object>>();
+    foreach (var kvp in Model.LayoutsByFloor)
+    {
+        var projectedLayouts = new List<object>();
+        foreach (var layout in kvp.Value)
+        {
+            roomLabelMetadata.TryGetValue(layout.RoomId, out var layoutRoomMeta);
+            var baseLayoutRoomLabel = string.IsNullOrWhiteSpace(layoutRoomMeta.Raw)
+                ? Model.Rooms.FirstOrDefault(r => r.Id == layout.RoomId)?.RoomNumber ?? string.Empty
+                : layoutRoomMeta.Raw;
+            var normalizedShapeType = string.IsNullOrWhiteSpace(layout.ShapeType) ? "rectangle" : layout.ShapeType;
+            var isConnectorLayout = string.Equals(normalizedShapeType, "connector", StringComparison.OrdinalIgnoreCase);
+            var rawLayoutLabel = isConnectorLayout
+                ? (!string.IsNullOrWhiteSpace(layout.Label) ? layout.Label : "||")
+                : (!string.IsNullOrWhiteSpace(layout.Label)
+                    ? layout.Label
+                    : (!string.IsNullOrWhiteSpace(baseLayoutRoomLabel) ? baseLayoutRoomLabel : layout.RoomId.ToString()));
+            var displayLayoutLabel = rawLayoutLabel;
+            if (!isConnectorLayout)
+            {
+                var layoutEntityId = layout.Id > 0
+                    ? layout.Id.ToString()
+                    : $"{layout.PropertyId}-{layout.RoomId}-{layout.Floor}";
+                displayLayoutLabel = await Html.DisplayTranslatedTextAsync("LayoutRoomLayout", layoutEntityId, "Label", rawLayoutLabel);
+            }
+
+            projectedLayouts.Add(new
+            {
+                layout.Id,
+                layout.PropertyId,
+                layout.RoomId,
+                layout.Floor,
+                layout.X,
+                layout.Y,
+                layout.Width,
+                layout.Height,
+                layout.Label,
+                layout.ShapeType,
+                layout.ShapeData,
+                layout.TextRotation,
+                DisplayLabel = displayLayoutLabel
+            });
+        }
+
+        layoutsByFloorExport[kvp.Key] = projectedLayouts;
+    }
 }
 
 <div class="d-flex flex-column flex-xl-row align-items-xl-center justify-content-xl-between gap-3 mb-3">
-    <h2 class="h4 mb-0">Layout Editor</h2>
+    <h2 class="h4 mb-0">@Html.Localize("Layout Editor")</h2>
     <div class="d-flex align-items-center gap-2">
-        <label for="layoutPropertySelect" class="form-label mb-0">Property:</label>
+        <label for="layoutPropertySelect" class="form-label mb-0">@Html.Localize("Property"):</label>
         <select id="layoutPropertySelect" class="form-select form-select-sm" style="width:auto; min-width:240px;">
             @foreach (var option in propertyOptions)
             {
-                <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
+                var optionValue = option.Value ?? string.Empty;
+                var optionDisplay = propertyOptionDisplays.TryGetValue(optionValue, out var displayText)
+                    ? displayText
+                    : option.Text ?? string.Empty;
+                <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@optionDisplay</option>
             }
         </select>
     </div>
-    <div class="text-muted small">@propertyName - Floor @selFloor</div>
+    <div class="text-muted small">@string.Format(Html.Localize("{0} - Floor {1}"), displayPropertyName, selFloor)</div>
 </div>
 
 @section Styles {
@@ -218,82 +289,88 @@
 {
     <div class="mb-3 d-flex align-items-center flex-wrap gap-3">
         <div class="d-flex align-items-center gap-2">
-            <label for="floorSelect" class="mb-0">Floor:</label>
+        <label for="floorSelect" class="mb-0">@Html.Localize("Floor"):</label>
             <select id="floorSelect" class="form-select form-select-sm" style="width:auto;">
                 @foreach (var f in floors)
                 {
                     var url = Url.Action("LayoutEditor", "Settings", new { propertyId, floor = f });
                     if (f == selFloor)
                     {
-                        <option selected value="@url">Floor @f</option>
+                        <option selected value="@url">@string.Format(Html.Localize("Floor {0}"), f)</option>
                     }
                     else
                     {
-                        <option value="@url">Floor @f</option>
+                        <option value="@url">@string.Format(Html.Localize("Floor {0}"), f)</option>
                     }
                 }
             </select>
         </div>
         <div class="d-flex align-items-center gap-2">
-            <label for="ghostFloorSelect" class="mb-0">Ghost overlay:</label>
+            <label for="ghostFloorSelect" class="mb-0">@Html.Localize("Ghost overlay"):</label>
             <select id="ghostFloorSelect" class="form-select form-select-sm" style="width:auto;">
-                <option value="">None</option>
+                <option value="">@Html.Localize("None")</option>
                 @foreach (var f in floors)
                 {
                     if (f == selFloor)
                     {
                         continue;
                     }
-                    <option value="@f">Floor @f</option>
+                    <option value="@f">@string.Format(Html.Localize("Floor {0}"), f)</option>
                 }
             </select>
         </div>
-        <button id="btnAddFloor" class="btn btn-sm btn-outline-primary">+ Add Floor</button>
+        <button id="btnAddFloor" class="btn btn-sm btn-outline-primary">+ @Html.Localize("Add Floor")</button>
     </div>
 }
 
 <div class="layout-editor-controls mb-3">
     <div class="control-group form-check mb-0">
         <input class="form-check-input" type="checkbox" id="chkSnap" />
-        <label class="form-check-label" for="chkSnap">Snap to grid</label>
+        <label class="form-check-label" for="chkSnap">@Html.Localize("Snap to grid")</label>
     </div>
     <div class="control-group">
-        <button id="zoomInBtn" class="btn btn-sm btn-outline-secondary" type="button">+</button>
-        <button id="zoomOutBtn" class="btn btn-sm btn-outline-secondary" type="button">-</button>
+        <button id="zoomInBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-label="@Html.Localize("Zoom in")">+</button>
+        <button id="zoomOutBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-label="@Html.Localize("Zoom out")">-</button>
     </div>
     <div class="control-group">
-        <button id="togglePaletteBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-controls="palette" aria-expanded="true">Hide Palette</button>
+        <button id="togglePaletteBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-controls="palette" aria-expanded="true">@Html.Localize("Hide Palette")</button>
     </div>
     <div class="control-group">
-        <button id="undoBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>Undo</button>
-        <button id="redoBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>Redo</button>
+        <button id="undoBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>@Html.Localize("Undo")</button>
+        <button id="redoBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>@Html.Localize("Redo")</button>
     </div>
     <div class="ms-auto">
-        <button id="save-layout-btn" class="btn btn-primary">Save Layout</button>
+        <button id="save-layout-btn" class="btn btn-primary">@Html.Localize("Save Layout")</button>
     </div>
 </div>
 
 <div class="layout-editor-stage">
     <!-- Palette sidebar -->
     <div id="palette" class="layout-editor-palette">
-        <h4 class="mb-3">Palette</h4>
+        <h4 class="mb-3">@Html.Localize("Palette")</h4>
         <div class="palette-grid">
-            <div class="pal-shape" data-room-id="0" data-room-label="Custom" draggable="true">
-                Custom
+            <div class="pal-shape" data-room-id="0" data-room-label="@Html.Localize("Custom")" data-room-display-label="@Html.Localize("Custom")" draggable="true">
+                @Html.Localize("Custom")
             </div>
-            <div class="pal-shape pal-shape--connector pal-shape--connector-vertical" data-room-id="0" data-room-label="||" data-shape-type="connector" data-shape-data="vertical" data-multi-use="true" draggable="true" title="Connecting rooms (vertical)" aria-label="Connecting rooms (vertical)">
+            <div class="pal-shape pal-shape--connector pal-shape--connector-vertical" data-room-id="0" data-room-label="||" data-room-display-label="||" data-shape-type="connector" data-shape-data="vertical" data-multi-use="true" draggable="true" title="@Html.Localize("Connecting rooms (vertical)")" aria-label="@Html.Localize("Connecting rooms (vertical)")">
                 ||
             </div>
-            <div class="pal-shape pal-shape--connector pal-shape--connector-horizontal" data-room-id="0" data-room-label="||" data-shape-type="connector" data-shape-data="horizontal" data-multi-use="true" draggable="true" title="Connecting rooms (horizontal)" aria-label="Connecting rooms (horizontal)">
+            <div class="pal-shape pal-shape--connector pal-shape--connector-horizontal" data-room-id="0" data-room-label="||" data-room-display-label="||" data-shape-type="connector" data-shape-data="horizontal" data-multi-use="true" draggable="true" title="@Html.Localize("Connecting rooms (horizontal)")" aria-label="@Html.Localize("Connecting rooms (horizontal)")">
                 ||
             </div>
             @foreach (var room in Model.Rooms.Where(r => r.Floor == selFloor))
             {
+                roomLabelMetadata.TryGetValue(room.Id, out var labelInfo);
+                var roomRawLabel = string.IsNullOrWhiteSpace(labelInfo.Raw)
+                    ? (string.IsNullOrWhiteSpace(room.RoomNumber) ? $"Room {room.Id}" : room.RoomNumber)
+                    : labelInfo.Raw;
+                var roomDisplayLabel = string.IsNullOrWhiteSpace(labelInfo.Display) ? roomRawLabel : labelInfo.Display;
                 <div class="pal-shape"
                      data-room-id="@room.Id"
-                     data-room-label="@room.RoomNumber"
+                     data-room-label="@roomRawLabel"
+                     data-room-display-label="@roomDisplayLabel"
                      draggable="true">
-                    @room.RoomNumber
+                    @roomDisplayLabel
                 </div>
             }
         </div>
@@ -316,19 +393,31 @@
             <div id="ghost-layer" style="position:absolute; inset:0; pointer-events:none; z-index:0;"></div>
             @foreach (var layout in Model.Layouts)
             {
-                var baseLabel = Model.Rooms.FirstOrDefault(r => r.Id == layout.RoomId)?.RoomNumber;
+                roomLabelMetadata.TryGetValue(layout.RoomId, out var layoutRoomLabelInfo);
+                var baseRoomLabel = string.IsNullOrWhiteSpace(layoutRoomLabelInfo.Raw)
+                    ? Model.Rooms.FirstOrDefault(r => r.Id == layout.RoomId)?.RoomNumber
+                    : layoutRoomLabelInfo.Raw;
                 var shapeType = string.IsNullOrWhiteSpace(layout.ShapeType) ? "rectangle" : layout.ShapeType;
                 var shapeData = layout.ShapeData ?? string.Empty;
                 var isConnector = string.Equals(shapeType, "connector", StringComparison.OrdinalIgnoreCase);
-                var label = isConnector
+                var rawLabel = isConnector
                     ? (!string.IsNullOrWhiteSpace(layout.Label) ? layout.Label : "||")
-                    : (!string.IsNullOrWhiteSpace(layout.Label) ? layout.Label : (baseLabel ?? layout.RoomId.ToString()));
+                    : (!string.IsNullOrWhiteSpace(layout.Label) ? layout.Label : (!string.IsNullOrWhiteSpace(baseRoomLabel) ? baseRoomLabel : layout.RoomId.ToString()));
+                var displayLabel = rawLabel;
+                if (!isConnector)
+                {
+                    var layoutEntityId = layout.Id > 0
+                        ? layout.Id.ToString()
+                        : $"{layout.PropertyId}-{layout.RoomId}-{layout.Floor}";
+                    displayLabel = await Html.DisplayTranslatedTextAsync("LayoutRoomLayout", layoutEntityId, "Label", rawLabel);
+                }
                 var clipStyle = string.IsNullOrWhiteSpace(shapeData) ? string.Empty : $"clip-path:{shapeData}; -webkit-clip-path:{shapeData};";
                 var textRotation = layout.TextRotation;
                 <div class="room-box @(isConnector ? "room-box--connector" : string.Empty)"
                      data-layout-id="@layout.Id"
                      data-room-id="@layout.RoomId"
-                     data-room-label="@label"
+                     data-room-label="@rawLabel"
+                     data-room-display-label="@displayLabel"
                      data-shape-type="@shapeType"
                      data-shape-data="@shapeData"
                      data-text-rotation="@textRotation"
@@ -345,21 +434,21 @@
                              cursor:move; @clipStyle
                              --text-rotation:@($"{textRotation}deg");
                          ">
-                    <span class="room-label">@label</span>
+                    <span class="room-label">@displayLabel</span>
                     <div class="box-controls">
-                        <button class="btn btn-sm btn-light btn-customize-shape" title="Customize shape">Shape</button>
-                        <button class="btn btn-sm btn-light btn-move-back" title="Move back">Back</button>
-                        <select class="form-select form-select-sm text-rotation-select" title="Rotate text">
-                            <option value="0" selected>0°</option>
-                            <option value="45">45°</option>
-                            <option value="90">90°</option>
-                            <option value="135">135°</option>
-                            <option value="180">180°</option>
-                            <option value="225">225°</option>
-                            <option value="270">270°</option>
-                            <option value="315">315°</option>
+                        <button class="btn btn-sm btn-light btn-customize-shape" title="@Html.Localize("Customize shape")" aria-label="@Html.Localize("Customize shape")">@Html.Localize("Shape")</button>
+                        <button class="btn btn-sm btn-light btn-move-back" title="@Html.Localize("Move back to palette")" aria-label="@Html.Localize("Move back to palette")">@Html.Localize("Back")</button>
+                        <select class="form-select form-select-sm text-rotation-select" title="@Html.Localize("Rotate text")" aria-label="@Html.Localize("Rotate text")">
+                            <option value="0" selected>0&deg;</option>
+                            <option value="45">45&deg;</option>
+                            <option value="90">90&deg;</option>
+                            <option value="135">135&deg;</option>
+                            <option value="180">180&deg;</option>
+                            <option value="225">225&deg;</option>
+                            <option value="270">270&deg;</option>
+                            <option value="315">315&deg;</option>
                         </select>
-                        <button class="btn btn-sm btn-light btn-delete-shape" title="Delete">Delete</button>
+                        <button class="btn btn-sm btn-light btn-delete-shape" title="@Html.Localize("Delete shape")" aria-label="@Html.Localize("Delete shape")">@Html.Localize("Delete")</button>
                     </div>
                     <div class="resize-handle" style="
                             position:absolute; right:0; bottom:0;
@@ -374,27 +463,27 @@
 
 <div id="shapeDialogOverlay" class="shape-dialog-overlay">
     <div class="shape-dialog">
-        <h5>Customize Shape</h5>
+        <h5>@Html.Localize("Customize Shape")</h5>
         <div class="mb-3">
-            <label for="shapePresetSelect" class="form-label">Preset</label>
+            <label for="shapePresetSelect" class="form-label">@Html.Localize("Preset")</label>
             <select id="shapePresetSelect" class="form-select form-select-sm">
-                <option value="rectangle">Rectangle</option>
-                <option value="l-top-left">L - Top Left</option>
-                <option value="l-top-right">L - Top Right</option>
-                <option value="l-bottom-left">L - Bottom Left</option>
-                <option value="l-bottom-right">L - Bottom Right</option>
-                <option value="custom">Custom (clip-path)</option>
+                <option value="rectangle">@Html.Localize("Rectangle")</option>
+                <option value="l-top-left">@Html.Localize("L - Top Left")</option>
+                <option value="l-top-right">@Html.Localize("L - Top Right")</option>
+                <option value="l-bottom-left">@Html.Localize("L - Bottom Left")</option>
+                <option value="l-bottom-right">@Html.Localize("L - Bottom Right")</option>
+                <option value="custom">@Html.Localize("Custom (clip-path)")</option>
             </select>
         </div>
         <div class="mb-3">
-            <label for="shapeClipPathInput" class="form-label">CSS clip-path</label>
+            <label for="shapeClipPathInput" class="form-label">@Html.Localize("CSS clip-path")</label>
             <textarea id="shapeClipPathInput" class="form-control" rows="3"
-                      placeholder="polygon(0% 0%, 100% 0%, ...)"></textarea>
-            <small class="text-muted">Use CSS clip-path syntax to define advanced shapes.</small>
+                      placeholder="@Html.Localize("LayoutEditor.ClipPathPlaceholder")"></textarea>
+            <small class="text-muted">@Html.Localize("Use CSS clip-path syntax to define advanced shapes.")</small>
         </div>
         <div class="d-flex justify-content-end gap-2">
-            <button type="button" class="btn btn-secondary" id="shapeDialogCancel">Cancel</button>
-            <button type="button" class="btn btn-primary" id="shapeDialogApply">Apply</button>
+            <button type="button" class="btn btn-secondary" id="shapeDialogCancel">@Html.Localize("Cancel")</button>
+            <button type="button" class="btn btn-primary" id="shapeDialogApply">@Html.Localize("Apply")</button>
         </div>
     </div>
 </div>
@@ -402,6 +491,10 @@
 @section Scripts {
     <script>
         (function () {
+            const translate = typeof window.hopsTranslate === "function"
+                ? window.hopsTranslate
+                : (key, fallback) => (typeof fallback === "string" && fallback.length > 0 ? fallback : key);
+
             const propertySelect = document.getElementById("layoutPropertySelect");
             if (propertySelect) {
                 propertySelect.addEventListener("change", function () {
@@ -415,13 +508,37 @@
             const selectedFloor = @Model.SelectedFloor;
             const existingFloors = @Html.Raw(JsonSerializer.Serialize(Model.AllFloors ?? Enumerable.Empty<int>()));
             const baseLayoutUrl = '@Url.Action("LayoutEditor", "Settings")';
-            const layoutsByFloorRaw = @Html.Raw(JsonSerializer.Serialize(Model.LayoutsByFloor));
-            const roomLabelsRaw = @Html.Raw(JsonSerializer.Serialize(Model.Rooms.ToDictionary(r => r.Id, r => string.IsNullOrWhiteSpace(r.RoomNumber) ? $"Room {r.Id}" : r.RoomNumber)));
+            const layoutsByFloorRaw = @Html.Raw(JsonSerializer.Serialize(layoutsByFloorExport));
+            const roomLabelsRaw = @Html.Raw(JsonSerializer.Serialize(roomLabelMetadata.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Raw)));
+            const roomLabelDisplaysRaw = @Html.Raw(JsonSerializer.Serialize(roomLabelMetadata.ToDictionary(kvp => kvp.Key, kvp => string.IsNullOrWhiteSpace(kvp.Value.Display) ? kvp.Value.Raw : kvp.Value.Display)));
             const gridSize = 50;
             let scale = 1.0;
             const scaleStep = 0.1;
             const minScale = 0.5;
             const maxScale = 2.5;
+            const hidePaletteText = translate("LayoutEditor.HidePalette", "Hide Palette");
+            const showPaletteText = translate("LayoutEditor.ShowPalette", "Show Palette");
+            const addFloorPromptText = translate("LayoutEditor.AddFloorPrompt", "Enter the floor number to add:");
+            const invalidFloorNumberText = translate("LayoutEditor.InvalidFloorNumber", "Please enter a valid number for the floor.");
+            const floorExistsTemplate = translate("LayoutEditor.FloorExists", "Floor {0} already exists.");
+            const unableToAddFloorText = translate("LayoutEditor.UnableToAddFloor", "Unable to add the floor.");
+            const unexpectedAddFloorText = translate("LayoutEditor.AddFloorUnexpectedError", "An unexpected error occurred while adding the floor.");
+            const clipPathRequiredText = translate("LayoutEditor.ClipPathRequired", "Please provide a clip-path definition for the custom shape.");
+            const layoutSavedText = translate("LayoutEditor.LayoutSaved", "Layout saved!");
+            const saveErrorGenericText = translate("LayoutEditor.SaveErrorGeneric", "Error saving layout");
+            const savingText = translate("Saving...", "Saving...");
+            const saveLayoutText = translate("Save Layout", "Save Layout");
+            const newLabelPromptText = translate("LayoutEditor.NewLabelPrompt", "Enter new label:");
+            const saveFailedWithStatusTemplate = translate("LayoutEditor.SaveFailedWithStatus", "Save failed ({0}): {1}");
+            const saveFailedUnexpectedText = translate("LayoutEditor.SaveFailedUnexpected", "Save failed (unexpected response).");
+            const customizeShapeText = translate("Customize shape", "Customize shape");
+            const shapeButtonLabel = translate("Shape", "Shape");
+            const moveBackToPaletteText = translate("LayoutEditor.MoveBackToPalette", "Move back to palette");
+            const backButtonLabel = translate("Back", "Back");
+            const rotateTextLabel = translate("LayoutEditor.RotateText", "Rotate text");
+            const deleteShapeText = translate("LayoutEditor.DeleteShape", "Delete shape");
+            const deleteButtonLabel = translate("Delete", "Delete");
+            const rotationDegreesTemplate = translate("LayoutEditor.RotationDegrees", "{0}°");
 
             const wrapper = document.getElementById("editor-wrapper");
             const container = document.getElementById("editor-container");
@@ -485,7 +602,9 @@
             }
 
             const initialPaletteRooms = new Map();
+            const initialPaletteDisplayLabels = new Map();
             const paletteRoomLabels = new Map();
+            const paletteRoomDisplayLabels = new Map();
             const togglePaletteBtn = document.getElementById("togglePaletteBtn");
             let currentDragPayload = null;
 
@@ -494,8 +613,10 @@
                     return;
                 }
                 const collapsed = palette.classList.contains("is-collapsed");
-                togglePaletteBtn.textContent = collapsed ? "Show Palette" : "Hide Palette";
+                const buttonLabel = collapsed ? showPaletteText : hidePaletteText;
+                togglePaletteBtn.textContent = buttonLabel;
                 togglePaletteBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+                togglePaletteBtn.setAttribute("aria-label", buttonLabel);
                 palette.setAttribute("aria-hidden", collapsed ? "true" : "false");
             }
 
@@ -510,14 +631,20 @@
             if (palette) {
                 palette.querySelectorAll(".pal-shape").forEach(tile => {
                     const rid = tile.getAttribute("data-room-id");
-                    const label = tile.getAttribute("data-room-label") ?? tile.textContent ?? "";
+                    const rawLabel = tile.getAttribute("data-room-label") ?? tile.textContent ?? "";
+                    const displayLabel = tile.getAttribute("data-room-display-label") ?? tile.textContent ?? rawLabel;
                     if (!rid) {
                         return;
                     }
-                    const trimmedLabel = label.trim();
+                    const trimmedLabel = rawLabel.trim();
+                    const trimmedDisplayLabel = displayLabel.trim().length > 0 ? displayLabel.trim() : trimmedLabel;
+                    tile.setAttribute("data-room-label", trimmedLabel);
+                    tile.setAttribute("data-room-display-label", trimmedDisplayLabel);
                     paletteRoomLabels.set(rid, trimmedLabel);
+                    paletteRoomDisplayLabels.set(rid, trimmedDisplayLabel);
                     if (rid !== "0") {
                         initialPaletteRooms.set(rid, trimmedLabel);
+                        initialPaletteDisplayLabels.set(rid, trimmedDisplayLabel);
                     }
                 });
                 palette.querySelectorAll(".pal-shape").forEach(attachPaletteDragHandlers);
@@ -533,6 +660,7 @@
                     const payload = {
                         roomId: tile.getAttribute("data-room-id") ?? "0",
                         label: tile.getAttribute("data-room-label") ?? "",
+                        displayLabel: tile.getAttribute("data-room-display-label") ?? tile.textContent ?? "",
                         shapeType: tile.getAttribute("data-shape-type") ?? "",
                         shapeData: tile.getAttribute("data-shape-data") ?? "",
                         multiUse: tile.getAttribute("data-multi-use") === "true"
@@ -568,6 +696,7 @@
             }
 
             const roomLabelLookup = (roomLabelsRaw && typeof roomLabelsRaw === 'object') ? roomLabelsRaw : {};
+            const roomLabelDisplayLookup = (roomLabelDisplaysRaw && typeof roomLabelDisplaysRaw === 'object') ? roomLabelDisplaysRaw : {};
             const ghostStorageKey = `layoutGhostFloor_${propertyId}`;
 
             if (ghostFloorSelect && ghostLayer) {
@@ -608,17 +737,17 @@
                 addFloorBtn.addEventListener("click", async () => {
                     const currentFloors = Array.isArray(existingFloors) ? existingFloors : [];
                     const suggestedFloor = currentFloors.length ? Math.max(...currentFloors) + 1 : selectedFloor + 1;
-                    const response = prompt("Enter the floor number to add:", suggestedFloor.toString());
+                    const response = prompt(addFloorPromptText, suggestedFloor.toString());
                     if (response === null) {
                         return;
                     }
                     const floorNumber = parseInt(response, 10);
                     if (Number.isNaN(floorNumber)) {
-                        alert("Please enter a valid number for the floor.");
+                        alert(invalidFloorNumberText);
                         return;
                     }
                     if (currentFloors.includes(floorNumber)) {
-                        alert(`Floor ${floorNumber} already exists.`);
+                        alert(floorExistsTemplate.replace("{0}", String(floorNumber)));
                         return;
                     }
 
@@ -630,13 +759,13 @@
                         });
 
                         if (!result.ok) {
-                            alert('Unable to add the floor.');
+                            alert(unableToAddFloorText);
                             return;
                         }
 
                         window.location.href = `${baseLayoutUrl}?propertyId=${propertyId}&floor=${floorNumber}`;
                     } catch {
-                        alert('An unexpected error occurred while adding the floor.');
+                        alert(unexpectedAddFloorText);
                     }
                 });
             }
@@ -690,6 +819,7 @@
                     const existingLabel = (element.getAttribute("data-room-label") ?? "").trim();
                     if (existingLabel.length === 0) {
                         element.setAttribute("data-room-label", connectorSymbol);
+                        element.setAttribute("data-room-display-label", connectorSymbol);
                     }
 
                     const labelSpan = element.querySelector(".room-label");
@@ -717,7 +847,12 @@
                     }
                     placedRoomIds.add(rid);
                     if (entry.label && entry.label.trim().length > 0) {
-                        paletteRoomLabels.set(rid, entry.label.trim());
+                        const trimmed = entry.label.trim();
+                        paletteRoomLabels.set(rid, trimmed);
+                        const displayCandidate = roomLabelLookup && roomLabelLookup[rid] && roomLabelDisplayLookup && roomLabelDisplayLookup[rid] && trimmed === roomLabelLookup[rid]
+                            ? roomLabelDisplayLookup[rid]
+                            : trimmed;
+                        paletteRoomDisplayLabels.set(rid, displayCandidate);
                     }
                 });
 
@@ -732,10 +867,13 @@
                     if (placedRoomIds.has(rid)) {
                         return;
                     }
-                    const label = paletteRoomLabels.get(rid)
+                    const rawLabel = paletteRoomLabels.get(rid)
                         ?? initialPaletteRooms.get(rid)
                         ?? (roomLabelLookup && roomLabelLookup[rid] ? roomLabelLookup[rid] : `Room ${rid}`);
-                    moveBackToPalette(rid, label);
+                    const displayLabel = paletteRoomDisplayLabels.get(rid)
+                        ?? initialPaletteDisplayLabels.get(rid)
+                        ?? (roomLabelDisplayLookup && roomLabelDisplayLookup[rid] ? roomLabelDisplayLookup[rid] : rawLabel);
+                    moveBackToPalette(rid, rawLabel, displayLabel);
                 });
             }
 
@@ -920,6 +1058,9 @@
                 if (!layout) {
                     return "";
                 }
+                if (typeof layout.DisplayLabel === "string" && layout.DisplayLabel.trim().length > 0) {
+                    return layout.DisplayLabel;
+                }
                 if (typeof layout.Label === "string" && layout.Label.trim().length > 0) {
                     return layout.Label;
                 }
@@ -928,6 +1069,12 @@
                     return "";
                 }
                 const key = String(roomId);
+                if (Object.prototype.hasOwnProperty.call(roomLabelDisplayLookup, key)) {
+                    const display = roomLabelDisplayLookup[key];
+                    if (typeof display === "string" && display.trim().length > 0) {
+                        return display;
+                    }
+                }
                 if (Object.prototype.hasOwnProperty.call(roomLabelLookup, key)) {
                     const label = roomLabelLookup[key];
                     if (typeof label === "string" && label.trim().length > 0) {
@@ -1021,7 +1168,7 @@
                     if (selectedType === "custom") {
                         clipPath = shapeClipPathInput ? shapeClipPathInput.value.trim() : "";
                         if (clipPath.length === 0) {
-                            alert("Please provide a clip-path definition for the custom shape.");
+                            alert(clipPathRequiredText);
                             return;
                         }
                     } else {
@@ -1118,7 +1265,8 @@
                                 label: parts[1],
                                 shapeType: parts[2] ?? "",
                                 shapeData: parts[3] ?? "",
-                                multiUse: parts[4] === "true"
+                                multiUse: parts[4] === "true",
+                                displayLabel: parts[5] ?? parts[1]
                             };
                         }
                     }
@@ -1134,6 +1282,9 @@
                 }
                 if (payload.shapeData) {
                     options.shapeData = payload.shapeData;
+                }
+                if (payload.displayLabel) {
+                    options.displayLabel = payload.displayLabel;
                 }
                 addBox(rid, label, x, y, options);
 
@@ -1180,10 +1331,12 @@
                 const labelSpan = div.querySelector(".room-label");
                 if (labelSpan) {
                     labelSpan.addEventListener("dblclick", e => {
-                        const newLabel = prompt("Enter new label:", labelSpan.textContent ?? "");
+                        const newLabel = prompt(newLabelPromptText, labelSpan.textContent ?? "");
                         if (newLabel !== null) {
-                            labelSpan.textContent = newLabel;
-                            div.setAttribute("data-room-label", newLabel);
+                            const trimmed = newLabel.trim();
+                            labelSpan.textContent = trimmed;
+                            div.setAttribute("data-room-label", trimmed);
+                            div.setAttribute("data-room-display-label", trimmed);
                             recordState();
                         }
                         e.stopPropagation();
@@ -1194,7 +1347,9 @@
                     const roomId = div.getAttribute("data-room-id") ?? "0";
                     const currentLabel = div.getAttribute("data-room-label")
                         ?? (labelSpan ? labelSpan.textContent ?? "" : "");
-                    moveBackToPalette(roomId, currentLabel);
+                    const currentDisplayLabel = div.getAttribute("data-room-display-label")
+                        ?? (labelSpan ? labelSpan.textContent ?? "" : currentLabel);
+                    moveBackToPalette(roomId, currentLabel, currentDisplayLabel);
                     div.remove();
                     recordState();
                 };
@@ -1234,10 +1389,29 @@
 
             function addBox(roomId, roomLabel, x, y, options) {
                 const opts = options ?? {};
+                const normalizedRoomId = String(roomId ?? "0");
+                const rawLabel = typeof roomLabel === "string" ? roomLabel : "";
+                let displayLabel = typeof opts.displayLabel === "string" && opts.displayLabel.trim().length > 0
+                    ? opts.displayLabel
+                    : rawLabel;
+                const trimmedRawLabel = rawLabel.trim();
+                const hasLookup = roomLabelLookup && roomLabelLookup[normalizedRoomId] && roomLabelDisplayLookup && roomLabelDisplayLookup[normalizedRoomId];
+                if ((displayLabel.trim().length === 0 || displayLabel === rawLabel) && hasLookup) {
+                    const lookupRaw = roomLabelLookup[normalizedRoomId];
+                    if (lookupRaw === rawLabel) {
+                        displayLabel = roomLabelDisplayLookup[normalizedRoomId];
+                    }
+                }
+                if (displayLabel.trim().length === 0) {
+                    displayLabel = trimmedRawLabel;
+                }
+                const trimmedDisplayLabel = displayLabel.trim().length > 0 ? displayLabel.trim() : trimmedRawLabel;
+
                 const div = document.createElement("div");
                 div.classList.add("room-box");
-                div.setAttribute("data-room-id", roomId);
-                div.setAttribute("data-room-label", roomLabel);
+                div.setAttribute("data-room-id", normalizedRoomId);
+                div.setAttribute("data-room-label", trimmedRawLabel);
+                div.setAttribute("data-room-display-label", trimmedDisplayLabel);
                 const layoutId = typeof opts.layoutId === "number" ? opts.layoutId : 0;
                 div.setAttribute("data-layout-id", String(layoutId));
 
@@ -1259,7 +1433,7 @@
 
                 const span = document.createElement("span");
                 span.classList.add("room-label");
-                span.textContent = roomLabel;
+                span.textContent = trimmedDisplayLabel;
                 div.appendChild(span);
 
                 const controls = document.createElement("div");
@@ -1271,28 +1445,32 @@
                 controls.style.marginBottom = "4px";
                 const btnCustomize = document.createElement("button");
                 btnCustomize.classList.add("btn", "btn-sm", "btn-light", "btn-customize-shape");
-                btnCustomize.title = "Customize shape";
-                btnCustomize.textContent = "Shape";
+                btnCustomize.title = customizeShapeText;
+                btnCustomize.setAttribute("aria-label", customizeShapeText);
+                btnCustomize.textContent = shapeButtonLabel;
                 controls.appendChild(btnCustomize);
                 const btnMoveBack = document.createElement("button");
                 btnMoveBack.classList.add("btn", "btn-sm", "btn-light", "btn-move-back");
-                btnMoveBack.title = "Move back to palette";
-                btnMoveBack.textContent = "Back";
+                btnMoveBack.title = moveBackToPaletteText;
+                btnMoveBack.setAttribute("aria-label", moveBackToPaletteText);
+                btnMoveBack.textContent = backButtonLabel;
                 controls.appendChild(btnMoveBack);
                 const rotationSelect = document.createElement("select");
                 rotationSelect.classList.add("form-select", "form-select-sm", "text-rotation-select");
-                rotationSelect.title = "Rotate text";
+                rotationSelect.title = rotateTextLabel;
+                rotationSelect.setAttribute("aria-label", rotateTextLabel);
                 [0, 45, 90, 135, 180, 225, 270, 315].forEach(deg => {
                     const opt = document.createElement("option");
                     opt.value = String(deg);
-                    opt.textContent = `${deg}°`;
+                    opt.textContent = rotationDegreesTemplate.replace("{0}", String(deg));
                     rotationSelect.appendChild(opt);
                 });
                 controls.appendChild(rotationSelect);
                 const btnDel = document.createElement("button");
                 btnDel.classList.add("btn", "btn-sm", "btn-light", "btn-delete-shape");
-                btnDel.title = "Delete shape";
-                btnDel.textContent = "Delete";
+                btnDel.title = deleteShapeText;
+                btnDel.setAttribute("aria-label", deleteShapeText);
+                btnDel.textContent = deleteButtonLabel;
                 controls.appendChild(btnDel);
 
                 div.appendChild(controls);
@@ -1329,19 +1507,28 @@
                 }
             }
 
-            function moveBackToPalette(roomId, roomLabel) {
+            function moveBackToPalette(roomId, roomLabel, displayLabel) {
                 const pal = document.getElementById("palette");
                 if (!pal) {
                     return;
                 }
 
                 const key = String(roomId);
-                paletteRoomLabels.set(key, roomLabel);
+                const normalizedRaw = typeof roomLabel === "string" ? roomLabel : "";
+                const normalizedDisplay = (typeof displayLabel === "string" && displayLabel.trim().length > 0)
+                    ? displayLabel
+                    : normalizedRaw;
+                const trimmedRaw = normalizedRaw.trim();
+                const trimmedDisplay = normalizedDisplay.trim();
+                paletteRoomLabels.set(key, trimmedRaw);
+                paletteRoomDisplayLabels.set(key, trimmedDisplay.length > 0 ? trimmedDisplay : trimmedRaw);
 
                 const existing = pal.querySelector(`.pal-shape[data-room-id="${roomId}"]`);
                 if (existing) {
-                    existing.setAttribute("data-room-label", roomLabel);
-                    existing.textContent = roomLabel;
+                    existing.setAttribute("data-room-label", trimmedRaw);
+                    const displayValue = trimmedDisplay.length > 0 ? trimmedDisplay : trimmedRaw;
+                    existing.setAttribute("data-room-display-label", displayValue);
+                    existing.textContent = displayValue;
                     return;
                 }
 
@@ -1352,7 +1539,9 @@
                 const p = document.createElement("div");
                 p.classList.add("pal-shape");
                 p.setAttribute("data-room-id", roomId);
-                p.setAttribute("data-room-label", roomLabel);
+                p.setAttribute("data-room-label", trimmedRaw);
+                const displayValue = trimmedDisplay.length > 0 ? trimmedDisplay : trimmedRaw;
+                p.setAttribute("data-room-display-label", displayValue);
                 p.draggable = true;
                 p.style.width = "50px";
                 p.style.height = "50px";
@@ -1362,7 +1551,7 @@
                 p.style.alignItems = "center";
                 p.style.justifyContent = "center";
                 p.style.cursor = "grab";
-                p.textContent = roomLabel;
+                p.textContent = displayValue;
                 attachPaletteDragHandlers(p);
                 pal.appendChild(p);
             }
@@ -1515,7 +1704,7 @@
                 };
 
                 saveButton.disabled = true;
-                saveButton.textContent = "Saving...";
+                saveButton.textContent = savingText;
 
                 try {
                     const resp = await fetch('@Url.Action("SaveLayout", "Settings")', {
@@ -1526,12 +1715,17 @@
 
                     if (!resp.ok) {
                         const errorText = await resp.text();
-                        throw new Error(`Save failed (${resp.status}): ${errorText.substring(0, 200)}`);
+                        const formattedErrorText = errorText.substring(0, 200);
+                        throw new Error(
+                            saveFailedWithStatusTemplate
+                                .replace("{0}", String(resp.status))
+                                .replace("{1}", formattedErrorText)
+                        );
                     }
 
                     const result = await resp.json();
                     if (!result || result.success !== true) {
-                        throw new Error("Save failed (unexpected response).");
+                        throw new Error(saveFailedUnexpectedText);
                     }
 
                     if (Array.isArray(result.layouts)) {
@@ -1549,9 +1743,15 @@
                                 const trimmedLabel = layout.label.trim();
                                 if (trimmedLabel.length > 0) {
                                     box.setAttribute("data-room-label", trimmedLabel);
+                                    const normalizedRoomId = box.getAttribute("data-room-id") ?? "";
+                                    let updatedDisplayLabel = trimmedLabel;
+                                    if (roomLabelLookup && roomLabelLookup[normalizedRoomId] === trimmedLabel && roomLabelDisplayLookup && roomLabelDisplayLookup[normalizedRoomId]) {
+                                        updatedDisplayLabel = roomLabelDisplayLookup[normalizedRoomId];
+                                    }
+                                    box.setAttribute("data-room-display-label", updatedDisplayLabel);
                                     const labelSpan = box.querySelector(".room-label");
                                     if (labelSpan) {
-                                        labelSpan.textContent = trimmedLabel;
+                                        labelSpan.textContent = updatedDisplayLabel;
                                     }
                                 }
                             }
@@ -1590,19 +1790,22 @@
                     redoStack = [];
                     updateUndoRedoButtons();
 
-                    alert("Layout saved!");
+                    alert(layoutSavedText);
                 } catch (err) {
                     console.error(err);
-                    alert(err instanceof Error ? err.message : "Error saving layout");
+                    alert(err instanceof Error ? err.message : saveErrorGenericText);
                 } finally {
                     saveButton.disabled = false;
-                    saveButton.textContent = "Save Layout";
+                    saveButton.textContent = saveLayoutText;
                 }
             });
 
         })();
     </script>
 }
+
+
+
 
 
 

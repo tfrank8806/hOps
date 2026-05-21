@@ -1,7 +1,9 @@
+﻿@using System.Text.Encodings.Web
+@using System.Globalization
 @model hOps.web.ViewModels.Admin.AdminUsersPageViewModel
 
 @{
-    ViewData["Title"] = "Manage Users";
+    ViewData["Title"] = Html.Localize("Manage Users");
     var propertyLookup = Model.PropertyNameLookup ?? new Dictionary<int, string>();
     var selectedPropertyIds = new HashSet<int>(Model.CreateUser.PropertyIds ?? new List<int>());
     var selectedRoles = new HashSet<string>(Model.CreateUser.SelectedRoles ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
@@ -19,44 +21,44 @@
             return string.Empty;
         }
 
-        return sortDirection == "desc" ? "▼" : "▲";
+        return sortDirection == "desc" ? "↓" : "↑";
     };
     var sortLinkClass = "text-reset text-decoration-none d-inline-flex align-items-center gap-1";
     var sortableColumns = new[]
     {
-        new { Key = "email", Label = "Email", ThClass = "" },
-        new { Key = "firstname", Label = "First Name", ThClass = "" },
-        new { Key = "lastname", Label = "Last Name", ThClass = "" },
-        new { Key = "status", Label = "Status", ThClass = "" },
-        new { Key = "roles", Label = "Roles", ThClass = "" },
-        new { Key = "properties", Label = "Properties", ThClass = "" },
-        new { Key = "lastlogin", Label = "Last Login", ThClass = "text-nowrap" }
+        new { Key = "email", LabelKey = "Email", ThClass = "" },
+        new { Key = "firstname", LabelKey = "First Name", ThClass = "" },
+        new { Key = "lastname", LabelKey = "Last Name", ThClass = "" },
+        new { Key = "status", LabelKey = "Status", ThClass = "" },
+        new { Key = "roles", LabelKey = "Roles", ThClass = "" },
+        new { Key = "properties", LabelKey = "Properties", ThClass = "" },
+        new { Key = "lastlogin", LabelKey = "Last Login", ThClass = "text-nowrap" }
     };
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">Users</h2>
+    <h2 class="mb-0">@Html.Localize("Users")</h2>
     <button type="button"
             class="btn btn-primary"
             data-bs-toggle="modal"
             data-bs-target="#createUserModal">
-        Create User
+        @Html.Localize("Create User")
     </button>
 </div>
 
 @if (TempData["AdminUsersMessage"] is string successMessage)
 {
     <div class="alert alert-success alert-dismissible fade show" role="alert">
-        @successMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        @Html.Localize(successMessage, successMessage)
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Html.Localize("Close")"></button>
     </div>
 }
 
 @if (TempData["AdminUsersError"] is string errorMessage)
 {
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        @errorMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        @Html.Localize(errorMessage, errorMessage)
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Html.Localize("Close")"></button>
     </div>
 }
 
@@ -76,7 +78,7 @@
                            asp-route-sortBy="@column.Key"
                            asp-route-sortDirection="@nextDirection"
                            class="@sortLinkClass">
-                            @column.Label
+                            @Html.Localize(column.LabelKey)
                             @if (!string.IsNullOrEmpty(indicator))
                             {
                                 <span class="sort-indicator">@indicator</span>
@@ -84,27 +86,36 @@
                         </a>
                     </th>
                 }
-                <th class="text-nowrap">Actions</th>
+                <th class="text-nowrap">@Html.Localize("Actions")</th>
             </tr>
         </thead>
         <tbody>
             @if (!Model.Users.Any())
             {
                 <tr>
-                    <td colspan="8" class="text-center py-4">No users found.</td>
+                    <td colspan="8" class="text-center py-4">@Html.Localize("No users found.")</td>
                 </tr>
             }
             else
             {
                 foreach (var user in Model.Users)
                 {
-                    var propertyNames = user.PropertyIds != null && user.PropertyIds.Any()
-                        ? user.PropertyIds
-                            .Select(pid => propertyLookup.TryGetValue(pid, out var name)
-                                ? name
-                                : pid.ToString())
-                            .ToList()
-                        : new List<string>();
+                    var propertyNames = new List<string>();
+                    if (user.PropertyIds != null && user.PropertyIds.Any())
+                    {
+                        foreach (var pid in user.PropertyIds)
+                        {
+                            var fallbackName = propertyLookup.TryGetValue(pid, out var name)
+                                ? name ?? string.Empty
+                                : pid.ToString(CultureInfo.InvariantCulture);
+                            var translatedName = await Html.DisplayTranslatedTextAsync(
+                                "Property",
+                                pid.ToString(CultureInfo.InvariantCulture),
+                                "Name",
+                                fallbackName);
+                            propertyNames.Add(translatedName.ToString());
+                        }
+                    }
                     <tr>
                         <td>@user.Email</td>
                         <td>@user.FirstName</td>
@@ -112,14 +123,19 @@
                         <td>
                             @if (user.IsActive)
                             {
-                                <span class="badge text-bg-success-subtle">Active</span>
+                                <span class="badge text-bg-success-subtle">@Html.Localize("Active")</span>
                             }
                             else
                             {
-                                <span class="badge text-bg-secondary">Inactive</span>
+                                <span class="badge text-bg-secondary">@Html.Localize("Inactive")</span>
                             }
                         </td>
-                        <td>@string.Join(", ", user.Roles)</td>
+                        <td>
+                            @{
+                                var localizedRoles = user.Roles?.Select(role => Html.Localize(role, role).ToString()).ToList() ?? new List<string>();
+                            }
+                            @string.Join(", ", localizedRoles)
+                        </td>
                         <td>
                             @if (propertyNames.Any())
                             {
@@ -127,17 +143,17 @@
                             }
                             else
                             {
-                                <em>None</em>
+                                <em>@Html.Localize("None")</em>
                             }
                         </td>
                         <td class="text-nowrap">
                             @if (user.LastLoginAtUtc.HasValue)
                             {
-                                @TimeZoneService.ConvertToUserTime(user.LastLoginAtUtc.Value).ToString("g")
+                                @TimeZoneService.ConvertToUserTime(user.LastLoginAtUtc.Value).ToString("g", CultureInfo.CurrentCulture)
                             }
                             else
                             {
-                                <em>Never</em>
+                                <em>@Html.Localize("Never")</em>
                             }
                         </td>
                         <td>
@@ -146,7 +162,7 @@
                                    asp-controller="Admin"
                                    asp-route-userId="@user.Id"
                                    class="btn btn-sm btn-info">
-                                    Assign Properties
+                                    @Html.Localize("Assign Properties")
                                 </a>
                                 @if (user.CanResetPassword)
                                 {
@@ -155,15 +171,15 @@
                                         <input type="hidden" name="userId" value="@user.Id" />
                                         <button type="submit"
                                                 class="btn btn-sm btn-warning"
-                                                onclick="return confirm('Send a new temporary password to @user.Email?');">
-                                            Reset Password
+                                                onclick="return confirm(window.hopsTranslate('Admin.Users.ResetPasswordConfirm', 'Send a new temporary password to {0}?').replace('{0}', '@JavaScriptEncoder.Default.Encode(user.Email ?? string.Empty)'));">
+                                            @Html.Localize("Reset Password")
                                         </button>
                                     </form>
                                 }
                                 else
                                 {
                                     <button type="button" class="btn btn-sm btn-warning" disabled>
-                                        Reset Password
+                                        @Html.Localize("Reset Password")
                                     </button>
                                 }
                                 @if (user.IsActive)
@@ -175,15 +191,15 @@
                                             <input type="hidden" name="userId" value="@user.Id" />
                                             <button type="submit"
                                                     class="btn btn-sm btn-outline-warning"
-                                                    onclick="return confirm('Deactivate user @user.Email? They will no longer be able to sign in.');">
-                                                Deactivate
+                                                    onclick="return confirm(window.hopsTranslate('Admin.Users.DeactivateConfirm', 'Deactivate user {0}? They will no longer be able to sign in.').replace('{0}', '@JavaScriptEncoder.Default.Encode(user.Email ?? string.Empty)'));">
+                                                @Html.Localize("Deactivate")
                                             </button>
                                         </form>
                                     }
                                     else
                                     {
                                         <button type="button" class="btn btn-sm btn-outline-warning" disabled>
-                                            Deactivate
+                                            @Html.Localize("Deactivate")
                                         </button>
                                     }
                                 }
@@ -196,15 +212,15 @@
                                             <input type="hidden" name="userId" value="@user.Id" />
                                             <button type="submit"
                                                     class="btn btn-sm btn-outline-success"
-                                                    onclick="return confirm('Reactivate user @user.Email? They will be able to sign in again.');">
-                                                Reactivate
+                                                    onclick="return confirm(window.hopsTranslate('Admin.Users.ReactivateConfirm', 'Reactivate user {0}? They will be able to sign in again.').replace('{0}', '@JavaScriptEncoder.Default.Encode(user.Email ?? string.Empty)'));">
+                                                @Html.Localize("Reactivate")
                                             </button>
                                         </form>
                                     }
                                     else
                                     {
                                         <button type="button" class="btn btn-sm btn-outline-success" disabled>
-                                            Reactivate
+                                            @Html.Localize("Reactivate")
                                         </button>
                                     }
                                 }
@@ -215,15 +231,15 @@
                                         <input type="hidden" name="userId" value="@user.Id" />
                                         <button type="submit"
                                                 class="btn btn-sm btn-danger"
-                                                onclick="return confirm('Delete user @user.Email? This action cannot be undone.');">
-                                            Delete
+                                                onclick="return confirm(window.hopsTranslate('Admin.Users.DeleteConfirm', 'Delete user {0}? This action cannot be undone.').replace('{0}', '@JavaScriptEncoder.Default.Encode(user.Email ?? string.Empty)'));">
+                                            @Html.Localize("Delete")
                                         </button>
                                     </form>
                                 }
                                 else
                                 {
                                     <button type="button" class="btn btn-sm btn-danger" disabled>
-                                        Delete
+                                        @Html.Localize("Delete")
                                     </button>
                                 }
                             </div>
@@ -243,8 +259,8 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="createUserModalLabel">Create User</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="createUserModalLabel">@Html.Localize("Create User")</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@Html.Localize("Close")"></button>
             </div>
             <form asp-action="CreateUser" method="post" autocomplete="off">
                 @Html.AntiForgeryToken()
@@ -274,7 +290,7 @@
                         @if (Model.AvailableRoles.Any())
                         {
                             <div class="col-12">
-                                <label asp-for="CreateUser.SelectedRoles" class="form-label">Roles</label>
+                                <label asp-for="CreateUser.SelectedRoles" class="form-label">@Html.Localize("Roles")</label>
                                 <select asp-for="CreateUser.SelectedRoles"
                                         class="form-select"
                                         multiple
@@ -282,21 +298,29 @@
                                     @foreach (var role in Model.AvailableRoles)
                                     {
                                         <option value="@role" selected="@(selectedRoles.Contains(role) ? "selected" : null)">
-                                            @role
+                                            @Html.Localize(role, role)
                                         </option>
                                     }
                                 </select>
-                                <div class="form-text">Leave blank to assign the default User role.</div>
+                                <div class="form-text">@Html.Localize("Leave blank to assign the default User role.")</div>
                                 <span asp-validation-for="CreateUser.SelectedRoles" class="text-danger"></span>
                             </div>
                         }
                         @if (Model.AvailableProperties.Any())
                         {
                             <div class="col-12">
-                                <label class="form-label">Properties</label>
+                                <label class="form-label">@Html.Localize("Properties")</label>
                                 <div class="row g-2">
                                     @foreach (var property in Model.AvailableProperties)
                                     {
+                                        var translatedPropertyName = await Html.DisplayTranslatedTextAsync(
+                                            "Property",
+                                            property.Id.ToString(CultureInfo.InvariantCulture),
+                                            "Name",
+                                            property.Name ?? string.Empty);
+                                        var propertyLabel = string.IsNullOrWhiteSpace(property.Code)
+                                            ? translatedPropertyName.ToString()
+                                            : string.Format(CultureInfo.InvariantCulture, "{0} ({1})", translatedPropertyName, property.Code);
                                         <div class="col-md-6">
                                             <div class="form-check">
                                                 <input class="form-check-input"
@@ -306,7 +330,7 @@
                                                        id="createUserProperty_@property.Id"
                                                        @(selectedPropertyIds.Contains(property.Id) ? "checked" : null) />
                                                 <label class="form-check-label" for="createUserProperty_@property.Id">
-                                                    @property.DisplayLabel
+                                                    @propertyLabel
                                                 </label>
                                             </div>
                                         </div>
@@ -319,15 +343,15 @@
                         {
                             <div class="col-12">
                                 <div class="alert alert-warning mb-0">
-                                    You currently do not have property access to assign. You can still create the user without properties.
+                                    @Html.Localize("You currently do not have property access to assign. You can still create the user without properties.")
                                 </div>
                             </div>
                         }
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create User</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Html.Localize("Cancel")</button>
+                    <button type="submit" class="btn btn-primary">@Html.Localize("Create User")</button>
                 </div>
             </form>
         </div>
@@ -349,3 +373,9 @@
         </script>
     }
 }
+
+
+
+
+
+

@@ -1,23 +1,17 @@
 (() => {
+    const i18n = window.__STATIC_TRANSLATIONS || {};
     const t = (key, fallback = key) => {
-        if (typeof window.hopsTranslate === 'function') {
-            return window.hopsTranslate(key, fallback);
+        if (!key) {
+            return fallback;
         }
-        return key || fallback;
-    };
-
-    const localizeSentinel = (value, sentinel) => {
-        if (!value) {
-            return value;
+        const direct = i18n[key];
+        if (typeof direct === 'string' && direct.trim()) {
+            return direct;
         }
-
-        const normalizedValue = String(value).trim().toLowerCase();
-        const normalizedSentinel = String(sentinel).trim().toLowerCase();
-        if (normalizedValue === normalizedSentinel) {
-            return t(sentinel);
-        }
-
-        return value;
+        const match = Object.keys(i18n).find(
+            k => k.localeCompare(key, undefined, { sensitivity: 'accent' }) === 0
+        );
+        return match ? i18n[match] : fallback;
     };
 
     const modalEl = document.getElementById('workOrderDetailsModal');
@@ -119,10 +113,10 @@
     }
 
     function populateModal(data) {
-        setText(fields.title, data.issue || t('Work Order'));
+        setText(fields.title, data.issue || 'Work Order');
 
         if (fields.issue) {
-            fields.issue.innerHTML = data.issueHtml || escapeHtml(data.issue || t('No issue provided.'));
+            fields.issue.innerHTML = data.issueHtml || escapeHtml(data.issue || 'No issue provided.');
         }
 
         if (fields.details) {
@@ -131,7 +125,7 @@
             } else if (data.details) {
                 fields.details.textContent = data.details;
             } else {
-                fields.details.innerHTML = `<span class="text-muted">${t('No additional details provided.')}</span>`;
+                fields.details.innerHTML = '<span class="text-muted">No additional details provided.</span>';
             }
         }
 
@@ -152,31 +146,30 @@
         }
 
         setText(fields.location, data.location);
-        const departmentText = localizeSentinel(data.department, 'Unassigned');
-        const assigneeText = localizeSentinel(data.assignedTo, 'Unassigned');
-        setText(fields.department, departmentText, t('Unassigned'));
-        setText(fields.assignee, assigneeText, t('Unassigned'));
+        setText(fields.department, data.department, 'Unassigned');
+        setText(fields.assignee, data.assignedTo, 'Unassigned');
         setText(fields.dueDate, data.dueDateText);
         setText(fields.created, data.createdAtText);
-        setText(fields.creator, data.creator, t('Unknown'));
+        setText(fields.creator, data.creator, 'Unknown');
         setBadge(fields.status, data.statusLabel || data.status, data.statusColor);
         setBadge(fields.type, data.workOrderType, '', true);
 
         if (fields.properties) {
             const props = Array.isArray(data.properties) && data.properties.length
-                ? data.properties.join(', ') : t('Not assigned to a property yet.');
+                ? data.properties.join(', ')
+                : 'Not assigned to a property yet.';
             fields.properties.textContent = props;
         }
 
         if (fields.meta) {
             const metaParts = [];
             if (data.creator) {
-                metaParts.push(`${t('Created by')} ${data.creator}`);
+                metaParts.push(`Created by ${data.creator}`);
             }
             if (data.createdAtText) {
                 metaParts.push(data.createdAtText);
             }
-            fields.meta.textContent = metaParts.join(' \u2022 ');
+            fields.meta.textContent = metaParts.join(' • ');
         }
 
         renderAttachments(Array.isArray(data.attachments) ? data.attachments : []);
@@ -210,7 +203,7 @@
 
                 const img = document.createElement('img');
                 img.src = att.url;
-                img.alt = att.name || t('Attachment preview');
+                img.alt = att.name || 'Attachment preview';
                 img.className = 'workorder-attachment-img';
                 img.loading = 'lazy';
 
@@ -227,7 +220,7 @@
 
                 const nameEl = document.createElement('div');
                 nameEl.className = 'fw-semibold';
-                nameEl.textContent = att.name || t('Attachment');
+                nameEl.textContent = att.name || 'Attachment';
                 fileCard.appendChild(nameEl);
 
                 col.appendChild(fileCard);
@@ -242,7 +235,7 @@
                 openLink.target = '_blank';
                 openLink.rel = 'noopener';
                 openLink.className = 'btn btn-sm btn-outline-primary';
-                openLink.textContent = t('Open File');
+                openLink.textContent = 'Open File';
 
                 actions.appendChild(openLink);
                 col.appendChild(actions);
@@ -270,7 +263,7 @@
         }
 
         attachmentsModalBody.innerHTML = '';
-        attachmentsModalTitle.textContent = data.issue || t('Work Order Attachments');
+        attachmentsModalTitle.textContent = data.issue || 'Work Order Attachments';
 
         attachments.forEach(att => {
             const col = document.createElement('div');
@@ -285,7 +278,7 @@
 
                 const img = document.createElement('img');
                 img.src = att.url;
-                img.alt = att.name || t('Attachment preview');
+                img.alt = att.name || 'Attachment preview';
                 img.className = 'img-fluid rounded shadow-sm';
                 img.loading = 'lazy';
 
@@ -297,7 +290,7 @@
 
                 const title = document.createElement('div');
                 title.className = 'fw-semibold';
-                title.textContent = att.name || t('Attachment');
+                title.textContent = att.name || 'Attachment';
                 card.appendChild(title);
 
                 const link = document.createElement('a');
@@ -305,7 +298,7 @@
                 link.target = '_blank';
                 link.rel = 'noopener';
                 link.className = 'btn btn-sm btn-outline-primary align-self-start';
-                link.textContent = t('Open File');
+                link.textContent = 'Open File';
                 card.appendChild(link);
 
                 col.appendChild(card);
@@ -322,7 +315,7 @@
         return Boolean(target.closest('a, button, form, input, textarea, select, label, .workorder-action-group'));
     }
 
-    function setText(el, value, fallback = '\u2014') {
+    function setText(el, value, fallback = '—') {
         if (!el) {
             return;
         }
@@ -384,12 +377,12 @@
     function buildDetailsPopoverContent(row) {
         const data = getRowData(row);
         if (!data) {
-            return `<div class="text-muted small">${t('No details available.')}</div>`;
+            return '<div class="text-muted small">No details available.</div>';
         }
 
         const html = data.detailsHtml || (data.details ? escapeHtml(data.details) : '');
         if (!html) {
-            return `<div class="text-muted small">${t('No details available.')}</div>`;
+            return '<div class="text-muted small">No details available.</div>';
         }
 
         return `<div class="workorder-details-popover-content">${html}</div>`;
@@ -618,13 +611,4 @@
         addEntry();
     });
 })();
-
-
-
-
-
-
-
-
-
 

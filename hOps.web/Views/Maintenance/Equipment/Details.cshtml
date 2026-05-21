@@ -1,25 +1,45 @@
 @model hOps.web.ViewModels.Maintenance.MaintenanceEquipmentDetailsViewModel
+@using System.Globalization
+@using System.Text.Json
 
 @{
-    ViewData["Title"] = "Equipment Details";
+    var entityIdString = Model.Id.ToString(CultureInfo.InvariantCulture);
+    var translatedName = await Html.DisplayTranslatedTextAsync("EquipmentItem", entityIdString, "Name", Model.Name ?? string.Empty);
+    if (string.IsNullOrWhiteSpace(translatedName))
+    {
+        translatedName = Model.Name ?? string.Empty;
+    }
+
     var message = ViewBag.EquipmentMessage as string;
     var error = ViewBag.EquipmentError as string;
+    string category;
+    string location;
+    string brand;
+    string model;
+    string serialNumber;
+    string vendorName;
+    var vendorPhone = Model.VendorPhone ?? string.Empty;
+    var vendorEmail = Model.VendorEmail ?? string.Empty;
+    string notes;
+    var deleteConfirmJson = JsonSerializer.Serialize(Html.Localize("Delete this equipment item?"));
+
+    ViewData["Title"] = Html.Localize("Equipment Details");
 }
 
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between flex-wrap align-items-center mb-3 gap-2">
         <div>
-            <h2 class="mb-0">@Model.Name</h2>
+            <h2 class="mb-0">@translatedName</h2>
             <p class="text-muted mb-0">@Model.PropertyName</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to list</a>
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">@Html.Localize("Back to list")</a>
             @if (Model.CanManage)
             {
-                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary btn-sm">Edit</a>
-                <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this equipment item?');">
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary btn-sm">@Html.Localize("Edit")</a>
+                <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-inline" onsubmit="return confirm(@Html.Raw(deleteConfirmJson));">
                     @Html.AntiForgeryToken()
-                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                    <button type="submit" class="btn btn-outline-danger btn-sm">@Html.Localize("Delete")</button>
                 </form>
             }
         </div>
@@ -39,41 +59,98 @@
             <div class="card shadow-sm">
                 <div class="card-body">
                     <dl class="row mb-0">
-                        <dt class="col-sm-4">Category</dt>
-                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.Category) ? Model.Category : "—")</dd>
+                        @{
+                            category = string.IsNullOrWhiteSpace(Model.Category)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("EquipmentItem", entityIdString, "Category", Model.Category);
+                            if (string.IsNullOrWhiteSpace(category) && !string.IsNullOrWhiteSpace(Model.Category))
+                            {
+                                category = Model.Category;
+                            }
 
-                        <dt class="col-sm-4">Location</dt>
-                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.Location) ? Model.Location : "—")</dd>
+                            location = string.IsNullOrWhiteSpace(Model.Location)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("EquipmentItem", entityIdString, "Location", Model.Location);
+                            if (string.IsNullOrWhiteSpace(location) && !string.IsNullOrWhiteSpace(Model.Location))
+                            {
+                                location = Model.Location;
+                            }
 
-                        <dt class="col-sm-4">Brand</dt>
-                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.Brand) ? Model.Brand : "—")</dd>
+                            brand = string.IsNullOrWhiteSpace(Model.Brand)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("EquipmentItem", entityIdString, "Brand", Model.Brand);
+                            if (string.IsNullOrWhiteSpace(brand) && !string.IsNullOrWhiteSpace(Model.Brand))
+                            {
+                                brand = Model.Brand;
+                            }
 
-                        <dt class="col-sm-4">Model</dt>
-                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.Model) ? Model.Model : "—")</dd>
+                            model = string.IsNullOrWhiteSpace(Model.Model)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("EquipmentItem", entityIdString, "Model", Model.Model);
+                            if (string.IsNullOrWhiteSpace(model) && !string.IsNullOrWhiteSpace(Model.Model))
+                            {
+                                model = Model.Model;
+                            }
 
-                        <dt class="col-sm-4">Serial Number</dt>
-                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.SerialNumber) ? Model.SerialNumber : "—")</dd>
+                            serialNumber = string.IsNullOrWhiteSpace(Model.SerialNumber)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("EquipmentItem", entityIdString, "SerialNumber", Model.SerialNumber);
+                            if (string.IsNullOrWhiteSpace(serialNumber) && !string.IsNullOrWhiteSpace(Model.SerialNumber))
+                            {
+                                serialNumber = Model.SerialNumber;
+                            }
 
-                        <dt class="col-sm-4">Installed On</dt>
+                            vendorName = string.IsNullOrWhiteSpace(Model.VendorName)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("EquipmentItem", entityIdString, "VendorName", Model.VendorName);
+                            if (string.IsNullOrWhiteSpace(vendorName) && !string.IsNullOrWhiteSpace(Model.VendorName))
+                            {
+                                vendorName = Model.VendorName;
+                            }
+
+                            notes = string.IsNullOrWhiteSpace(Model.Notes)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("EquipmentItem", entityIdString, "Notes", Model.Notes);
+                            if (string.IsNullOrWhiteSpace(notes) && !string.IsNullOrWhiteSpace(Model.Notes))
+                            {
+                                notes = Model.Notes;
+                            }
+                        }
+                        <dt class="col-sm-4">@Html.Localize("Category")</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(category) ? category : "—")</dd>
+
+                        <dt class="col-sm-4">@Html.Localize("Location")</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(location) ? location : "—")</dd>
+
+                        <dt class="col-sm-4">@Html.Localize("Brand")</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(brand) ? brand : "—")</dd>
+
+                        <dt class="col-sm-4">@Html.Localize("Model")</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(model) ? model : "—")</dd>
+
+                        <dt class="col-sm-4">@Html.Localize("Serial Number")</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(serialNumber) ? serialNumber : "—")</dd>
+
+                        <dt class="col-sm-4">@Html.Localize("Installed On")</dt>
                         <dd class="col-sm-8">@Model.InstalledOn?.ToString("MMM d, yyyy") ?? "—"</dd>
 
-                        <dt class="col-sm-4">Warranty Ends</dt>
+                        <dt class="col-sm-4">@Html.Localize("Warranty Ends")</dt>
                         <dd class="col-sm-8">@Model.WarrantyEndsOn?.ToString("MMM d, yyyy") ?? "—"</dd>
 
-                        <dt class="col-sm-4">Vendor</dt>
-                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.VendorName) ? Model.VendorName : "—")</dd>
+                        <dt class="col-sm-4">@Html.Localize("Vendor")</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(vendorName) ? vendorName : "—")</dd>
 
-                        <dt class="col-sm-4">Vendor Phone</dt>
-                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.VendorPhone) ? Model.VendorPhone : "—")</dd>
+                        <dt class="col-sm-4">@Html.Localize("Vendor Phone")</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(vendorPhone) ? vendorPhone : "—")</dd>
 
-                        <dt class="col-sm-4">Vendor Email</dt>
-                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(Model.VendorEmail) ? Model.VendorEmail : "—")</dd>
+                        <dt class="col-sm-4">@Html.Localize("Vendor Email")</dt>
+                        <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(vendorEmail) ? vendorEmail : "—")</dd>
 
-                        <dt class="col-sm-4">Notes</dt>
+                        <dt class="col-sm-4">@Html.Localize("Notes")</dt>
                         <dd class="col-sm-8">
-                            @if (!string.IsNullOrWhiteSpace(Model.Notes))
+                            @if (!string.IsNullOrWhiteSpace(notes))
                             {
-                                <pre class="mb-0 bg-transparent border-0 p-0 text-wrap">@Model.Notes</pre>
+                                <pre class="mb-0 bg-transparent border-0 p-0 text-wrap">@notes</pre>
                             }
                             else
                             {
@@ -87,9 +164,9 @@
         <div class="col-lg-4">
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <h5 class="card-title">Audit</h5>
-                    <p class="mb-2"><strong>Created:</strong> @TimeZoneService.ConvertToUserTime(Model.CreatedAtUtc).ToString("g")</p>
-                    <p class="mb-0"><strong>Last Updated:</strong> @TimeZoneService.ConvertToUserTime(Model.UpdatedAtUtc).ToString("g")</p>
+                    <h5 class="card-title">@Html.Localize("Audit")</h5>
+                    <p class="mb-2"><strong>@Html.Localize("Created:")</strong> @TimeZoneService.ConvertToUserTime(Model.CreatedAtUtc).ToString("g")</p>
+                    <p class="mb-0"><strong>@Html.Localize("Last Updated:")</strong> @TimeZoneService.ConvertToUserTime(Model.UpdatedAtUtc).ToString("g")</p>
                 </div>
             </div>
         </div>

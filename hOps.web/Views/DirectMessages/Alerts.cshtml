@@ -1,10 +1,11 @@
 @using System.Collections.Generic
+@using System.Globalization
 @using System.Linq
 @using hOps.web.ViewModels.Messages
 @using hOps.web.Utilities
 @model hOps.web.ViewModels.Messages.AlertsPageViewModel
 @{
-    ViewData["Title"] = "Alerts";
+    ViewData["Title"] = Html.Localize("DirectMessages.Alerts.Title", "Alerts").ToString();
     ViewData["MainContainerClass"] = "main-inner--wide";
     ViewData["ContentSurfaceClass"] = "content-surface--flush";
     var categories = Model.Categories ?? new List<AlertCategoryViewModel>();
@@ -16,7 +17,7 @@
             new AlertCategoryViewModel
             {
                 Key = AlertCategoryHelper.OtherKey,
-                Label = "Alerts",
+                Label = Html.Localize("DirectMessages.Alerts.DefaultCategory", "Alerts").ToString(),
                 Alerts = Model.Alerts
             }
         };
@@ -65,11 +66,11 @@
 <div class="card shadow-sm">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
-            <h2 class="h5 mb-0">Alerts</h2>
+            <h2 class="h5 mb-0">@Html.Localize("DirectMessages.Alerts.Heading", "Alerts")</h2>
             <small class="text-muted">
                 @(Model.UnreadAlertCount == 0
-                    ? "All caught up"
-                    : $"{Model.UnreadAlertCount} unread")
+                    ? Html.Localize("DirectMessages.Alerts.AllCaughtUp", "All caught up")
+                    : string.Format(CultureInfo.CurrentCulture, Html.Localize("DirectMessages.Alerts.UnreadCount", "{0} unread").ToString(), Model.UnreadAlertCount))
             </small>
         </div>
         <div class="d-flex gap-2">
@@ -78,7 +79,7 @@
                 <button type="submit"
                         class="btn btn-outline-secondary btn-sm"
                         @(Model.UnreadAlertCount == 0 ? "disabled" : null)>
-                    Mark all as read
+                    @Html.Localize("DirectMessages.Alerts.MarkAllRead", "Mark all as read")
                 </button>
             </form>
             <form asp-controller="Notifications" asp-action="DeleteAll" method="post" class="d-inline-flex">
@@ -86,7 +87,7 @@
                 <button type="submit"
                         class="btn btn-outline-danger btn-sm"
                         @(hasAlerts ? null : "disabled")>
-                    Delete all
+                    @Html.Localize("DirectMessages.Alerts.DeleteAll", "Delete all")
                 </button>
             </form>
         </div>
@@ -94,7 +95,7 @@
     <div class="card-body">
         @if (!hasAlerts)
         {
-            <p class="text-muted mb-0">No alerts yet. New mentions and notifications will show up here.</p>
+            <p class="text-muted mb-0">@Html.Localize("DirectMessages.Alerts.Empty", "No alerts yet. New mentions and notifications will show up here.")</p>
         }
         else
         {
@@ -110,7 +111,9 @@
                         .OrderByDescending(a => a.CreatedAt)
                         .ToList();
                     var statusBadgeClass = category.UnreadCount > 0 ? "badge bg-warning text-dark" : "badge bg-secondary-subtle text-secondary";
-                    var statusText = category.UnreadCount > 0 ? $"{category.UnreadCount} unread" : "All read";
+                    var statusText = category.UnreadCount > 0
+                        ? string.Format(CultureInfo.CurrentCulture, Html.Localize("DirectMessages.Alerts.UnreadCount", "{0} unread").ToString(), category.UnreadCount)
+                        : Html.Localize("DirectMessages.Alerts.AllRead", "All read").ToString();
                     var categoryHasUnread = category.UnreadCount > 0;
                     var categoryHasAlerts = category.TotalCount > 0;
                     <div class="col" data-alert-category="@category.Key">
@@ -120,7 +123,9 @@
                                     <div>
                                         <div class="fw-semibold">@category.Label</div>
                                         <small class="text-muted">
-                                            @(category.TotalCount == 1 ? "1 alert" : $"{category.TotalCount} alerts")
+                                            @(category.TotalCount == 1
+                                                ? Html.Localize("DirectMessages.Alerts.SingleAlert", "1 alert")
+                                                : string.Format(CultureInfo.CurrentCulture, Html.Localize("DirectMessages.Alerts.AlertCount", "{0} alerts").ToString(), category.TotalCount))
                                         </small>
                                     </div>
                                     <span class="@statusBadgeClass">@statusText</span>
@@ -135,7 +140,7 @@
                                         <button type="submit"
                                                 class="btn btn-outline-secondary btn-sm"
                                                 @(categoryHasUnread ? null : "disabled")>
-                                            Mark all read
+                                            @Html.Localize("DirectMessages.Alerts.Button.MarkCategoryRead", "Mark all read")
                                         </button>
                                     </form>
                                     <form asp-controller="Notifications"
@@ -147,7 +152,7 @@
                                         <button type="submit"
                                                 class="btn btn-outline-danger btn-sm"
                                                 @(categoryHasAlerts ? null : "disabled")>
-                                            Delete all
+                                            @Html.Localize("DirectMessages.Alerts.DeleteAll", "Delete all")
                                         </button>
                                     </form>
                                 </div>
@@ -155,12 +160,12 @@
                             <div class="card-body d-flex flex-column gap-4">
                                 <div class="alert-list-section alert-list-section--unread">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="text-uppercase small text-muted">Unread</span>
+                                        <span class="text-uppercase small text-muted">@Html.Localize("DirectMessages.Alerts.Section.Unread", "Unread")</span>
                                         <span class="badge bg-warning-subtle text-warning">@unread.Count</span>
                                     </div>
                                     @if (!unread.Any())
                                     {
-                                        <p class="text-muted small mb-0">No unread alerts.</p>
+                                        <p class="text-muted small mb-0">@Html.Localize("DirectMessages.Alerts.NoUnread", "No unread alerts.")</p>
                                     }
                                     else
                                     {
@@ -175,8 +180,8 @@
                                                             <div class="text-muted small">@alert.CreatedAt.ToString("g")</div>
                                                         </div>
                                                         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                                                            <span class="badge rounded-pill @badgeClass">@((alert.Type ?? "alert").ToUpperInvariant())</span>
-                                                            <span class="badge bg-warning text-dark">Unread</span>
+                                                            <span class="badge rounded-pill @badgeClass">@((alert.Type ?? Html.Localize("DirectMessages.Alerts.BadgeDefault", "alert").ToString()).ToUpperInvariant())</span>
+                                                            <span class="badge bg-warning text-dark">@Html.Localize("DirectMessages.Alerts.BadgeUnread", "Unread")</span>
                                                             <div class="d-flex align-items-center gap-2">
                                                                 @if (!string.IsNullOrWhiteSpace(alert.LinkUrl))
                                                                 {
@@ -186,7 +191,7 @@
                                                                           method="post"
                                                                           class="d-inline">
                                                                         @Html.AntiForgeryToken()
-                                                                        <button type="submit" class="btn btn-outline-primary btn-sm">Open</button>
+                                                                        <button type="submit" class="btn btn-outline-primary btn-sm">@Html.Localize("DirectMessages.Alerts.Button.Open", "Open")</button>
                                                                     </form>
                                                                 }
                                                                 <form asp-controller="Notifications"
@@ -195,7 +200,7 @@
                                                                       method="post"
                                                                       class="d-inline">
                                                                     @Html.AntiForgeryToken()
-                                                                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                                                    <button type="submit" class="btn btn-outline-danger btn-sm">@Html.Localize("DirectMessages.Alerts.Button.Delete", "Delete")</button>
                                                                 </form>
                                                             </div>
                                                         </div>
@@ -211,12 +216,12 @@
                                 </div>
                                 <div class="alert-list-section alert-list-section--read mt-3">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="text-uppercase small text-muted">Read</span>
+                                        <span class="text-uppercase small text-muted">@Html.Localize("DirectMessages.Alerts.Section.Read", "Read")</span>
                                         <span class="badge bg-secondary-subtle text-secondary">@read.Count</span>
                                     </div>
                                     @if (!read.Any())
                                     {
-                                        <p class="text-muted small mb-0">No read alerts.</p>
+                                        <p class="text-muted small mb-0">@Html.Localize("DirectMessages.Alerts.NoRead", "No read alerts.")</p>
                                     }
                                     else
                                     {
@@ -231,8 +236,8 @@
                                                             <div class="text-muted small">@alert.CreatedAt.ToString("g")</div>
                                                         </div>
                                                         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                                                            <span class="badge rounded-pill @badgeClass">@((alert.Type ?? "alert").ToUpperInvariant())</span>
-                                                            <span class="badge bg-secondary text-white">Read</span>
+                                                            <span class="badge rounded-pill @badgeClass">@((alert.Type ?? Html.Localize("DirectMessages.Alerts.BadgeDefault", "alert").ToString()).ToUpperInvariant())</span>
+                                                            <span class="badge bg-secondary text-white">@Html.Localize("DirectMessages.Alerts.BadgeRead", "Read")</span>
                                                             <div class="d-flex align-items-center gap-2">
                                                                 @if (!string.IsNullOrWhiteSpace(alert.LinkUrl))
                                                                 {
@@ -242,7 +247,7 @@
                                                                           method="post"
                                                                           class="d-inline">
                                                                         @Html.AntiForgeryToken()
-                                                                        <button type="submit" class="btn btn-outline-primary btn-sm">Open</button>
+                                                                        <button type="submit" class="btn btn-outline-primary btn-sm">@Html.Localize("DirectMessages.Alerts.Button.Open", "Open")</button>
                                                                     </form>
                                                                 }
                                                                 <form asp-controller="Notifications"
@@ -251,7 +256,7 @@
                                                                       method="post"
                                                                       class="d-inline">
                                                                     @Html.AntiForgeryToken()
-                                                                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                                                    <button type="submit" class="btn btn-outline-danger btn-sm">@Html.Localize("DirectMessages.Alerts.Button.Delete", "Delete")</button>
                                                                 </form>
                                                             </div>
                                                         </div>

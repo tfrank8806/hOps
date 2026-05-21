@@ -7,10 +7,12 @@ using System.Linq;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
+using System.Threading;
 using ClosedXML.Excel;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
+using hOps.web.Services.Localization;
 using hOps.web.Models.SiteVisit;
 using hOps.web.ViewModels.SiteVisit;
 using Microsoft.AspNetCore.Authorization;
@@ -29,6 +31,7 @@ namespace hOps.web.Controllers
         private readonly IExtendedEmailSender _emailSender;
         private readonly HtmlEncoder _htmlEncoder;
         private readonly ILogger<SiteVisitController> _logger;
+        private readonly ITranslationService _translationService;
 
         private static readonly (string Section, string Title)[] DefaultChecklistEntries =
         {
@@ -58,18 +61,62 @@ namespace hOps.web.Controllers
             UserManager<ApplicationUser> userManager,
             IExtendedEmailSender emailSender,
             HtmlEncoder htmlEncoder,
-            ILogger<SiteVisitController> logger)
+            ILogger<SiteVisitController> logger,
+            ITranslationService translationService)
             : base(context, userManager)
         {
             _emailSender = emailSender;
             _htmlEncoder = htmlEncoder;
             _logger = logger;
+            _translationService = translationService;
+        }
+
+        private string GetActiveLanguage()
+        {
+            return HttpContext?.Items?["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+        }
+
+        private string Translate(string key, string? fallback = null)
+        {
+            var language = GetActiveLanguage();
+            return _translationService.Translate(key, language, fallback ?? key);
+        }
+
+        private async Task<string> TranslateDynamicAsync(
+            string entityType,
+            string entityId,
+            string field,
+            string? sourceText,
+            CancellationToken cancellationToken = default)
+        {
+            var text = sourceText ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            var targetLanguage = GetActiveLanguage();
+            if (string.Equals(targetLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase))
+            {
+                return text;
+            }
+
+            var translated = await _translationService.TranslateDynamicAsync(
+                entityType,
+                entityId,
+                field,
+                text,
+                _translationService.DefaultLanguage,
+                targetLanguage,
+                cancellationToken).ConfigureAwait(false);
+
+            return string.IsNullOrWhiteSpace(translated) ? text : translated;
         }
 
         [HttpGet]
         public async Task<IActionResult> Index(int? templateId = null)
         {
-            ViewData["Title"] = "Site Visit";
+            ViewData["Title"] = Translate("Site Visit");
             ViewData["MainContainerClass"] = "main-inner--wide";
 
             var templates = await LoadTemplatesAsync();
@@ -91,7 +138,7 @@ namespace hOps.web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Submit(SiteVisitPageViewModel model)
         {
-            ViewData["Title"] = "Site Visit";
+            ViewData["Title"] = Translate("Site Visit");
             ViewData["MainContainerClass"] = "main-inner--wide";
 
             NormalizeModel(model);
@@ -102,13 +149,13 @@ namespace hOps.web.Controllers
             var recipients = ParseRecipients(model.RecipientEmails, nameof(model.RecipientEmails), requireAtLeastOne: true);
             if (recipients.Count == 0)
             {
-                ModelState.AddModelError(nameof(model.RecipientEmails), "Enter at least one valid email address.");
+                ModelState.AddModelError(nameof(model.RecipientEmails), Translate("Enter at least one valid email address."));
                 isValid = false;
             }
 
             if (model.Items.Count == 0)
             {
-                ModelState.AddModelError(nameof(model.Items), "Please add at least one checklist item.");
+                ModelState.AddModelError(nameof(model.Items), Translate("Please add at least one checklist item."));
                 isValid = false;
             }
 
@@ -123,10 +170,24 @@ namespace hOps.web.Controllers
             var currentUser = await _userManager.GetUserAsync(User);
             var report = BuildReportEntity(model, recipients, currentProperty, currentUser);
 
-            var attachment = CreateWorkbookAttachment(report);
+            try
+            {
+                await _context.SiteVisitReports.AddAsync(report);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to persist site visit report for {Property}", report.PropertyName);
+                ModelState.AddModelError(string.Empty, Translate("We could not save the visit to the log. Please try again."));
+                await PopulateTemplateOptionsAsync(model);
+                EnsurePlaceholderRow(model);
+                return View("Index", model);
+            }
+
+            var attachment = await CreateWorkbookAttachmentAsync(report);
             var attachmentList = new[] { attachment };
             var subject = BuildEmailSubject(report);
-            var body = BuildEmailBody(report);
+            var body = await BuildEmailBodyAsync(report);
 
             var successCount = 0;
             foreach (var recipient in recipients)
@@ -144,27 +205,14 @@ namespace hOps.web.Controllers
 
             if (successCount == 0)
             {
-                ModelState.AddModelError(string.Empty, "We could not send the site visit email. Please verify the addresses and try again.");
+                ModelState.AddModelError(string.Empty, Translate("We could not send the site visit email. Please verify the addresses and try again."));
                 await PopulateTemplateOptionsAsync(model);
                 EnsurePlaceholderRow(model);
                 return View("Index", model);
             }
 
-            try
-            {
-                await _context.SiteVisitReports.AddAsync(report);
-                await _context.SaveChangesAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to persist site visit report for {Property}", report.PropertyName);
-                ModelState.AddModelError(string.Empty, "Your email was sent but we could not save the visit to the log.");
-                await PopulateTemplateOptionsAsync(model);
-                EnsurePlaceholderRow(model);
-                return View("Index", model);
-            }
-
-            var successText = $"Site visit checklist emailed to {successCount} recipient{(successCount == 1 ? string.Empty : "s")}.";
+            var successTemplate = Translate("Site visit checklist emailed to {0} recipient(s).", "Site visit checklist emailed to {0} recipient(s).");
+            var successText = string.Format(CultureInfo.CurrentCulture, successTemplate, successCount);
             TempData[SuccessTempDataKey] = successText;
 
             _logger.LogInformation("Site visit checklist emailed to {RecipientCount} recipient(s) for property {Property}", successCount, model.PropertyName ?? "(unspecified)");
@@ -175,7 +223,7 @@ namespace hOps.web.Controllers
         [HttpGet]
         public async Task<IActionResult> Templates()
         {
-            ViewData["Title"] = "Site Visit Templates";
+            ViewData["Title"] = Translate("Site Visit Templates");
             ViewData["MainContainerClass"] = "main-inner--wide";
 
             var viewModel = await BuildTemplateManagerViewModelAsync();
@@ -192,17 +240,17 @@ namespace hOps.web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UploadTemplate(SiteVisitTemplateUploadViewModel form)
         {
-            ViewData["Title"] = "Site Visit Templates";
+            ViewData["Title"] = Translate("Site Visit Templates");
             ViewData["MainContainerClass"] = "main-inner--wide";
 
             var parsedRows = new List<(string? Section, string Title)>();
             if (form.CsvFile == null || form.CsvFile.Length == 0)
             {
-                ModelState.AddModelError(nameof(form.CsvFile), "Select a CSV file to upload.");
+                ModelState.AddModelError(nameof(form.CsvFile), Translate("Select a CSV file to upload."));
             }
             else if (form.CsvFile.Length > TemplateFileSizeLimitBytes)
             {
-                ModelState.AddModelError(nameof(form.CsvFile), "The CSV file is too large. Limit uploads to 2 MB.");
+                ModelState.AddModelError(nameof(form.CsvFile), Translate("The CSV file is too large. Limit uploads to 2 MB."));
             }
 
             if (ModelState.IsValid && form.CsvFile != null)
@@ -212,12 +260,13 @@ namespace hOps.web.Controllers
                     parsedRows = await ParseTemplateCsvAsync(form.CsvFile);
                     if (parsedRows.Count == 0)
                     {
-                        ModelState.AddModelError(nameof(form.CsvFile), "The file did not contain any checklist rows.");
+                        ModelState.AddModelError(nameof(form.CsvFile), Translate("The file did not contain any checklist rows."));
                     }
                 }
-                catch (InvalidOperationException ex)
+                catch (InvalidOperationException)
                 {
-                    ModelState.AddModelError(nameof(form.CsvFile), ex.Message);
+                    var limitMessage = Translate("Templates can include up to {0} checklist rows.", "Templates can include up to {0} checklist rows.");
+                    ModelState.AddModelError(nameof(form.CsvFile), string.Format(CultureInfo.CurrentCulture, limitMessage, TemplateRowLimit));
                 }
             }
 
@@ -252,8 +301,9 @@ namespace hOps.web.Controllers
             await _context.SiteVisitTemplates.AddAsync(template);
             await _context.SaveChangesAsync();
 
-            var suffix = parsedRows.Count == 1 ? "item" : "items";
-            TempData[TemplateSuccessTempDataKey] = $"Template '{template.Name}' created with {parsedRows.Count} {suffix}.";
+            var itemLabel = parsedRows.Count == 1 ? Translate("item") : Translate("items");
+            var templateMessage = Translate("Template '{0}' created with {1} {2}.", "Template '{0}' created with {1} {2}.");
+            TempData[TemplateSuccessTempDataKey] = string.Format(CultureInfo.CurrentCulture, templateMessage, template.Name, parsedRows.Count, itemLabel);
 
             return RedirectToAction(nameof(Templates));
         }
@@ -262,10 +312,16 @@ namespace hOps.web.Controllers
         public IActionResult DownloadBlankTemplate()
         {
             var builder = new StringBuilder();
-            builder.AppendLine("Section,Title");
+            var sectionHeader = Translate("Section");
+            var titleHeader = Translate("Title");
+            builder.AppendLine($"{EscapeForCsv(sectionHeader)},{EscapeForCsv(titleHeader)}");
             foreach (var entry in DefaultChecklistEntries)
             {
-                builder.AppendLine($"{EscapeForCsv(entry.Section)},{EscapeForCsv(entry.Title)}");
+                var section = string.IsNullOrWhiteSpace(entry.Section)
+                    ? string.Empty
+                    : Translate(entry.Section, entry.Section);
+                var title = Translate(entry.Title, entry.Title);
+                builder.AppendLine($"{EscapeForCsv(section)},{EscapeForCsv(title)}");
             }
 
             static string EscapeForCsv(string? value)
@@ -286,7 +342,7 @@ namespace hOps.web.Controllers
         [HttpGet]
         public async Task<IActionResult> Log()
         {
-            ViewData["Title"] = "Site Visit Log";
+            ViewData["Title"] = Translate("Site Visit Log");
             ViewData["MainContainerClass"] = "main-inner--wide";
 
             if (TempData.TryGetValue(LogSuccessTempDataKey, out var message) && message is string alert)
@@ -303,7 +359,7 @@ namespace hOps.web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateLogEntry(SiteVisitLogUpdateViewModel model)
         {
-            ViewData["Title"] = "Site Visit Log";
+            ViewData["Title"] = Translate("Site Visit Log");
             ViewData["MainContainerClass"] = "main-inner--wide";
 
             var report = await _context.SiteVisitReports
@@ -312,7 +368,7 @@ namespace hOps.web.Controllers
 
             if (report == null)
             {
-                ModelState.AddModelError(string.Empty, "We could not find that site visit.");
+                ModelState.AddModelError(string.Empty, Translate("We could not find that site visit."));
                 ViewBag.ActiveLogEntryId = model.Id;
                 var missingViewModel = await BuildLogViewModelAsync(model.Id, model);
                 return View("Log", missingViewModel);
@@ -323,7 +379,7 @@ namespace hOps.web.Controllers
 
             if (requireRecipients && recipients.Count == 0)
             {
-                ModelState.AddModelError(nameof(model.RecipientEmails), "Enter at least one recipient before emailing an update.");
+                ModelState.AddModelError(nameof(model.RecipientEmails), Translate("Enter at least one recipient before emailing an update."));
             }
 
             if (!ModelState.IsValid)
@@ -343,10 +399,10 @@ namespace hOps.web.Controllers
 
             if (requireRecipients && recipients.Count > 0)
             {
-                var attachment = CreateWorkbookAttachment(report);
+                var attachment = await CreateWorkbookAttachmentAsync(report);
                 var attachmentList = new[] { attachment };
                 var subject = BuildEmailSubject(report);
-                var body = BuildEmailBody(report);
+                var body = await BuildEmailBodyAsync(report);
                 var successCount = 0;
 
                 foreach (var recipient in recipients)
@@ -364,17 +420,18 @@ namespace hOps.web.Controllers
 
                 if (successCount == 0)
                 {
-                    ModelState.AddModelError(string.Empty, "We could not send the updated site visit. Please try again.");
+                    ModelState.AddModelError(string.Empty, Translate("We could not send the updated site visit. Please try again."));
                     ViewBag.ActiveLogEntryId = model.Id;
                     var failureViewModel = await BuildLogViewModelAsync(model.Id, model);
                     return View("Log", failureViewModel);
                 }
 
-                TempData[LogSuccessTempDataKey] = $"Update emailed to {successCount} recipient{(successCount == 1 ? string.Empty : "s")}.";
+                var updateTemplate = Translate("Update emailed to {0} recipient(s).", "Update emailed to {0} recipient(s).");
+                TempData[LogSuccessTempDataKey] = string.Format(CultureInfo.CurrentCulture, updateTemplate, successCount);
             }
             else
             {
-                TempData[LogSuccessTempDataKey] = "Site visit progress saved.";
+                TempData[LogSuccessTempDataKey] = Translate("Site visit progress saved.");
             }
 
             return RedirectToAction(nameof(Log));
@@ -460,7 +517,7 @@ namespace hOps.web.Controllers
                 .ToList();
         }
 
-        private static List<SelectListItem> BuildTemplateSelectList(IEnumerable<SiteVisitTemplate> templates, int? selectedTemplateId)
+        private List<SelectListItem> BuildTemplateSelectList(IEnumerable<SiteVisitTemplate> templates, int? selectedTemplateId)
         {
             var options = new List<SelectListItem>
             {
@@ -475,7 +532,12 @@ namespace hOps.web.Controllers
             options.AddRange(templates.Select(template => new SelectListItem
             {
                 Value = template.Id.ToString(CultureInfo.InvariantCulture),
-                Text = $"{template.Name} ({template.Items.Count} {(template.Items.Count == 1 ? "item" : "items")})",
+                Text = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} ({1} {2})",
+                    template.Name,
+                    template.Items.Count,
+                    template.Items.Count == 1 ? "item" : "items"),
                 Selected = selectedTemplateId.HasValue && selectedTemplateId.Value == template.Id
             }));
 
@@ -743,6 +805,7 @@ namespace hOps.web.Controllers
                     .OrderBy(i => i.Id)
                     .Select(i => new SiteVisitChecklistItemViewModel
                     {
+                        ReportItemId = i.Id,
                         SectionName = i.SectionName,
                         Title = i.Title,
                         Status = i.Status,
@@ -831,7 +894,7 @@ namespace hOps.web.Controllers
             {
                 if (requireAtLeastOne)
                 {
-                    ModelState.AddModelError(modelStateKey, "Enter at least one email address.");
+                    ModelState.AddModelError(modelStateKey, Translate("Enter at least one email address."));
                 }
                 return recipients.ToList();
             }
@@ -850,7 +913,8 @@ namespace hOps.web.Controllers
 
                 if (!validator.IsValid(trimmed))
                 {
-                    ModelState.AddModelError(modelStateKey, $"'{trimmed}' is not a valid email address.");
+                    var invalidTemplate = Translate("'{0}' is not a valid email address.", "'{0}' is not a valid email address.");
+                    ModelState.AddModelError(modelStateKey, string.Format(CultureInfo.CurrentCulture, invalidTemplate, trimmed));
                     continue;
                 }
 
@@ -859,44 +923,86 @@ namespace hOps.web.Controllers
 
             if (requireAtLeastOne && recipients.Count == 0)
             {
-                ModelState.AddModelError(modelStateKey, "Enter at least one email address.");
+                ModelState.AddModelError(modelStateKey, Translate("Enter at least one email address."));
             }
 
             return recipients.ToList();
         }
 
-        private EmailAttachment CreateWorkbookAttachment(SiteVisitReport report)
+        private async Task<EmailAttachment> CreateWorkbookAttachmentAsync(SiteVisitReport report)
         {
-            using var workbook = new XLWorkbook();
-            var worksheet = workbook.Worksheets.Add("Site Visit");
+            var cancellationToken = HttpContext?.RequestAborted ?? CancellationToken.None;
+            var activeLanguage = GetActiveLanguage();
+            CultureInfo culture;
+            try
+            {
+                culture = CultureInfo.GetCultureInfo(activeLanguage);
+            }
+            catch (CultureNotFoundException)
+            {
+                culture = CultureInfo.CurrentCulture;
+            }
 
-            worksheet.Cell(1, 1).Value = "Site Visit Checklist";
+            var reportId = report.Id.ToString(CultureInfo.InvariantCulture);
+
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add(Translate("Site Visit"));
+
+            worksheet.Cell(1, 1).Value = Translate("Site Visit Checklist");
             worksheet.Cell(1, 1).Style.Font.Bold = true;
             worksheet.Range(1, 1, 1, 4).Merge();
 
-            worksheet.Cell(2, 1).Value = "Property";
-            worksheet.Cell(2, 2).Value = report.PropertyName ?? "Not specified";
-            worksheet.Cell(3, 1).Value = "Visit date";
-            worksheet.Cell(3, 2).Value = report.VisitDate.ToString("D");
-            worksheet.Cell(4, 1).Value = "Visit lead";
-            worksheet.Cell(4, 2).Value = string.IsNullOrWhiteSpace(report.LeaderName) ? "Not specified" : report.LeaderName;
-            worksheet.Cell(5, 1).Value = "Summary notes";
-            worksheet.Cell(5, 2).Value = report.SummaryNotes ?? "—";
+            var propertyLabel = Translate("Property");
+            var visitDateLabel = Translate("Visit date");
+            var visitLeadLabel = Translate("Visit lead");
+            var summaryLabel = Translate("Summary notes");
+            var assignedLabel = Translate("Assigned To");
+            var progressLabel = Translate("Progress");
+            var completionLabel = Translate("Completion Notes");
+            var sectionHeader = Translate("Section");
+            var itemHeader = Translate("Checklist Item");
+            var statusHeader = Translate("Status");
+            var notesHeader = Translate("Notes");
+            var notSpecified = Translate("Not specified");
+            var unassigned = Translate("Unassigned");
+            var noneValue = Translate("None");
+
+            worksheet.Cell(2, 1).Value = propertyLabel;
+            worksheet.Cell(2, 2).Value = string.IsNullOrWhiteSpace(report.PropertyName) ? notSpecified : report.PropertyName;
+
+            worksheet.Cell(3, 1).Value = visitDateLabel;
+            worksheet.Cell(3, 2).Value = report.VisitDate.ToString("D", culture);
+
+            worksheet.Cell(4, 1).Value = visitLeadLabel;
+            worksheet.Cell(4, 2).Value = string.IsNullOrWhiteSpace(report.LeaderName) ? notSpecified : report.LeaderName;
+
+            var summaryValue = string.IsNullOrWhiteSpace(report.SummaryNotes)
+                ? noneValue
+                : await TranslateDynamicAsync("SiteVisitReport", reportId, "SummaryNotes", report.SummaryNotes, cancellationToken);
+
+            worksheet.Cell(5, 1).Value = summaryLabel;
+            worksheet.Cell(5, 2).Value = summaryValue;
             worksheet.Range(5, 2, 5, 3).Merge();
 
-            worksheet.Cell(6, 1).Value = "Assigned To";
-            worksheet.Cell(6, 2).Value = string.IsNullOrWhiteSpace(report.AssignedTo) ? "Unassigned" : report.AssignedTo;
-            worksheet.Cell(7, 1).Value = "Progress";
+            worksheet.Cell(6, 1).Value = assignedLabel;
+            worksheet.Cell(6, 2).Value = string.IsNullOrWhiteSpace(report.AssignedTo) ? unassigned : report.AssignedTo;
+
+            worksheet.Cell(7, 1).Value = progressLabel;
             worksheet.Cell(7, 2).Value = ProgressLabel(report.ProgressStatus);
-            worksheet.Cell(8, 1).Value = "Completion Notes";
-            worksheet.Cell(8, 2).Value = string.IsNullOrWhiteSpace(report.CompletionNotes) ? "—" : report.CompletionNotes;
+
+            var completionValue = string.IsNullOrWhiteSpace(report.CompletionNotes)
+                ? noneValue
+                : await TranslateDynamicAsync("SiteVisitReport", reportId, "CompletionNotes", report.CompletionNotes, cancellationToken);
+
+            worksheet.Cell(8, 1).Value = completionLabel;
+            worksheet.Cell(8, 2).Value = completionValue;
             worksheet.Range(8, 2, 8, 3).Merge();
 
             var headerRow = 10;
-            worksheet.Cell(headerRow, 1).Value = "Section";
-            worksheet.Cell(headerRow, 2).Value = "Checklist Item";
-            worksheet.Cell(headerRow, 3).Value = "Status";
-            worksheet.Cell(headerRow, 4).Value = "Notes";
+            worksheet.Cell(headerRow, 1).Value = sectionHeader;
+            worksheet.Cell(headerRow, 2).Value = itemHeader;
+            worksheet.Cell(headerRow, 3).Value = statusHeader;
+            worksheet.Cell(headerRow, 4).Value = notesHeader;
             worksheet.Range(headerRow, 1, headerRow, 4).Style
                 .Font.SetBold()
                 .Fill.SetBackgroundColor(XLColor.FromHtml("#e9ecef"));
@@ -904,10 +1010,19 @@ namespace hOps.web.Controllers
             var row = headerRow + 1;
             foreach (var item in report.Items.OrderBy(i => i.Id))
             {
-                worksheet.Cell(row, 1).Value = item.SectionName ?? string.Empty;
-                worksheet.Cell(row, 2).Value = item.Title;
+                var itemId = item.Id.ToString(CultureInfo.InvariantCulture);
+                var sectionValue = string.IsNullOrWhiteSpace(item.SectionName)
+                    ? string.Empty
+                    : await TranslateDynamicAsync("SiteVisitReportItem", itemId, "SectionName", item.SectionName, cancellationToken);
+                var titleValue = await TranslateDynamicAsync("SiteVisitReportItem", itemId, "Title", item.Title, cancellationToken);
+                var notesValue = string.IsNullOrWhiteSpace(item.Notes)
+                    ? string.Empty
+                    : await TranslateDynamicAsync("SiteVisitReportItem", itemId, "Notes", item.Notes, cancellationToken);
+
+                worksheet.Cell(row, 1).Value = sectionValue;
+                worksheet.Cell(row, 2).Value = titleValue;
                 worksheet.Cell(row, 3).Value = StatusLabel(item.Status);
-                worksheet.Cell(row, 4).Value = item.Notes ?? string.Empty;
+                worksheet.Cell(row, 4).Value = notesValue;
 
                 XLColor? statusColor = item.Status switch
                 {
@@ -934,84 +1049,134 @@ namespace hOps.web.Controllers
             return new EmailAttachment(fileName, stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         }
 
-        private static string StatusLabel(SiteVisitChecklistStatus status)
+        private string StatusLabel(SiteVisitChecklistStatus status)
         {
             return status switch
             {
-                SiteVisitChecklistStatus.Compliant => "Compliant",
-                SiteVisitChecklistStatus.NeedsReview => "Needs Review",
-                SiteVisitChecklistStatus.NotCompliant => "Not Compliant",
-                SiteVisitChecklistStatus.NotReviewed => "Not Reviewed",
+                SiteVisitChecklistStatus.Compliant => Translate("Compliant"),
+                SiteVisitChecklistStatus.NeedsReview => Translate("Needs Review"),
+                SiteVisitChecklistStatus.NotCompliant => Translate("Not Compliant"),
+                SiteVisitChecklistStatus.NotReviewed => Translate("Not Reviewed"),
                 _ => status.ToString()
             };
         }
 
-        private static string ProgressLabel(SiteVisitProgressStatus status)
+        private string ProgressLabel(SiteVisitProgressStatus status)
         {
             return status switch
             {
-                SiteVisitProgressStatus.NotStarted => "Not Started",
-                SiteVisitProgressStatus.InProgress => "In Progress",
-                SiteVisitProgressStatus.Complete => "Complete",
+                SiteVisitProgressStatus.NotStarted => Translate("Not Started"),
+                SiteVisitProgressStatus.InProgress => Translate("In Progress"),
+                SiteVisitProgressStatus.Complete => Translate("Complete"),
                 _ => status.ToString()
             };
         }
 
         private string BuildEmailSubject(SiteVisitReport report)
         {
-            var property = string.IsNullOrWhiteSpace(report.PropertyName) ? "Property" : report.PropertyName;
-            return $"Site Visit Checklist - {property} ({report.VisitDate:MMM d, yyyy})";
+            var property = string.IsNullOrWhiteSpace(report.PropertyName) ? Translate("Property") : report.PropertyName;
+            var culture = CultureInfo.CurrentCulture;
+            try
+            {
+                culture = CultureInfo.GetCultureInfo(GetActiveLanguage());
+            }
+            catch (CultureNotFoundException)
+            {
+                // Fallback to current culture.
+            }
+
+            var visitDate = report.VisitDate.ToString("MMM d, yyyy", culture);
+            var template = Translate("Site Visit Checklist - {0} ({1})", "Site Visit Checklist - {0} ({1})");
+            return string.Format(CultureInfo.CurrentCulture, template, property, visitDate);
         }
 
-        private string BuildEmailBody(SiteVisitReport report)
+        private async Task<string> BuildEmailBodyAsync(SiteVisitReport report)
         {
+            var cancellationToken = HttpContext?.RequestAborted ?? CancellationToken.None;
+            var activeLanguage = GetActiveLanguage();
+            CultureInfo culture;
+            try
+            {
+                culture = CultureInfo.GetCultureInfo(activeLanguage);
+            }
+            catch (CultureNotFoundException)
+            {
+                culture = CultureInfo.CurrentCulture;
+            }
+
+            var reportId = report.Id.ToString(CultureInfo.InvariantCulture);
+
             var builder = new StringBuilder();
-            var property = Encode(report.PropertyName ?? "Not specified");
-            var leader = Encode(string.IsNullOrWhiteSpace(report.LeaderName) ? "Not specified" : report.LeaderName!);
-            var summary = EncodeWithBreaks(report.SummaryNotes);
-            var assignedTo = Encode(string.IsNullOrWhiteSpace(report.AssignedTo) ? "Unassigned" : report.AssignedTo!);
+            var property = Encode(report.PropertyName ?? Translate("Not specified"));
+            var visitDateDisplay = Encode(report.VisitDate.ToString("D", culture));
+            var leader = Encode(string.IsNullOrWhiteSpace(report.LeaderName) ? Translate("Not specified") : report.LeaderName!);
+            var assignedTo = Encode(string.IsNullOrWhiteSpace(report.AssignedTo) ? Translate("Unassigned") : report.AssignedTo!);
             var progress = Encode(ProgressLabel(report.ProgressStatus));
-            var completionNotes = EncodeWithBreaks(report.CompletionNotes);
+            var summary = string.IsNullOrWhiteSpace(report.SummaryNotes)
+                ? string.Empty
+                : EncodeWithBreaks(await TranslateDynamicAsync("SiteVisitReport", reportId, "SummaryNotes", report.SummaryNotes, cancellationToken));
+            var completionNotes = string.IsNullOrWhiteSpace(report.CompletionNotes)
+                ? string.Empty
+                : EncodeWithBreaks(await TranslateDynamicAsync("SiteVisitReport", reportId, "CompletionNotes", report.CompletionNotes, cancellationToken));
+
+            var introTemplate = Translate("Site visit summary for <strong>{0}</strong> on <strong>{1}</strong>.", "Site visit summary for <strong>{0}</strong> on <strong>{1}</strong>.");
+            var visitLeadLabel = Translate("Visit lead:");
+            var assignedLabel = Translate("Assigned to:");
+            var progressLabel = Translate("Progress:");
+            var summaryLabel = Translate("Summary:");
+            var completionLabel = Translate("Completion notes:");
+            var sectionHeader = Translate("Section");
+            var itemHeader = Translate("Checklist Item");
+            var statusHeader = Translate("Status");
+            var notesHeader = Translate("Notes");
+            var attachmentNote = Translate("The full checklist is attached as an Excel file.");
 
             builder.Append("<p>");
-            builder.Append($"Site visit summary for <strong>{property}</strong> on <strong>{report.VisitDate:D}</strong>.");
+            builder.AppendFormat(CultureInfo.InvariantCulture, introTemplate, property, visitDateDisplay);
             builder.Append("</p>");
             builder.Append("<ul>");
-            builder.Append($"<li><strong>Visit lead:</strong> {leader}</li>");
-            builder.Append($"<li><strong>Assigned to:</strong> {assignedTo}</li>");
-            builder.Append($"<li><strong>Progress:</strong> {progress}</li>");
+            builder.AppendFormat(CultureInfo.InvariantCulture, "<li><strong>{0}</strong> {1}</li>", visitLeadLabel, leader);
+            builder.AppendFormat(CultureInfo.InvariantCulture, "<li><strong>{0}</strong> {1}</li>", assignedLabel, assignedTo);
+            builder.AppendFormat(CultureInfo.InvariantCulture, "<li><strong>{0}</strong> {1}</li>", progressLabel, progress);
             if (!string.IsNullOrWhiteSpace(summary))
             {
-                builder.Append($"<li><strong>Summary:</strong> {summary}</li>");
+                builder.AppendFormat(CultureInfo.InvariantCulture, "<li><strong>{0}</strong> {1}</li>", summaryLabel, summary);
             }
             if (!string.IsNullOrWhiteSpace(completionNotes))
             {
-                builder.Append($"<li><strong>Completion notes:</strong> {completionNotes}</li>");
+                builder.AppendFormat(CultureInfo.InvariantCulture, "<li><strong>{0}</strong> {1}</li>", completionLabel, completionNotes);
             }
             builder.Append("</ul>");
 
             builder.Append("<table style=\"border-collapse:collapse;width:100%;max-width:800px;\">");
             builder.Append("<thead><tr>");
-            builder.Append("<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;width:160px;\">Section</th>");
-            builder.Append("<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;\">Item</th>");
-            builder.Append("<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;width:150px;\">Status</th>");
-            builder.Append("<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;\">Notes</th>");
+            builder.AppendFormat(CultureInfo.InvariantCulture, "<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;width:160px;\">{0}</th>", sectionHeader);
+            builder.AppendFormat(CultureInfo.InvariantCulture, "<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;\">{0}</th>", itemHeader);
+            builder.AppendFormat(CultureInfo.InvariantCulture, "<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;width:150px;\">{0}</th>", statusHeader);
+            builder.AppendFormat(CultureInfo.InvariantCulture, "<th style=\"text-align:left;border-bottom:2px solid #dee2e6;padding:8px;\">{0}</th>", notesHeader);
             builder.Append("</tr></thead><tbody>");
 
             foreach (var item in report.Items.OrderBy(i => i.Id))
             {
-                var notes = EncodeWithBreaks(item.Notes);
-                var section = string.IsNullOrWhiteSpace(item.SectionName) ? "&nbsp;" : Encode(item.SectionName);
+                var itemId = item.Id.ToString(CultureInfo.InvariantCulture);
+                var sectionValue = string.IsNullOrWhiteSpace(item.SectionName)
+                    ? "&nbsp;"
+                    : Encode(await TranslateDynamicAsync("SiteVisitReportItem", itemId, "SectionName", item.SectionName, cancellationToken));
+                var titleValue = Encode(await TranslateDynamicAsync("SiteVisitReportItem", itemId, "Title", item.Title, cancellationToken));
+                var notesValue = string.IsNullOrWhiteSpace(item.Notes)
+                    ? "&nbsp;"
+                    : EncodeWithBreaks(await TranslateDynamicAsync("SiteVisitReportItem", itemId, "Notes", item.Notes, cancellationToken));
+
                 builder.Append("<tr>");
-                builder.Append($"<td style=\"border-bottom:1px solid #f1f3f5;padding:8px;\">{section}</td>");
-                builder.Append($"<td style=\"border-bottom:1px solid #f1f3f5;padding:8px;\">{Encode(item.Title)}</td>");
-                builder.Append($"<td style=\"border-bottom:1px solid #f1f3f5;padding:8px;\">{StatusLabel(item.Status)}</td>");
-                builder.Append($"<td style=\"border-bottom:1px solid #f1f3f5;padding:8px;\">{(string.IsNullOrWhiteSpace(notes) ? "&nbsp;" : notes)}</td>");
+                builder.AppendFormat(CultureInfo.InvariantCulture, "<td style=\"border-bottom:1px solid #f1f3f5;padding:8px;\">{0}</td>", sectionValue);
+                builder.AppendFormat(CultureInfo.InvariantCulture, "<td style=\"border-bottom:1px solid #f1f3f5;padding:8px;\">{0}</td>", titleValue);
+                builder.AppendFormat(CultureInfo.InvariantCulture, "<td style=\"border-bottom:1px solid #f1f3f5;padding:8px;\">{0}</td>", Encode(StatusLabel(item.Status)));
+                builder.AppendFormat(CultureInfo.InvariantCulture, "<td style=\"border-bottom:1px solid #f1f3f5;padding:8px;\">{0}</td>", notesValue);
                 builder.Append("</tr>");
             }
 
             builder.Append("</tbody></table>");
-            builder.Append("<p>The full checklist is attached as an Excel file.</p>");
+            builder.AppendFormat(CultureInfo.InvariantCulture, "<p>{0}</p>", attachmentNote);
 
             return builder.ToString();
         }

@@ -9,6 +9,7 @@ using hOps.web.Data;
 using hOps.web.Localization;
 using hOps.web.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace hOps.web.Services.Localization
@@ -18,17 +19,20 @@ namespace hOps.web.Services.Localization
         private readonly ApplicationDbContext _context;
         private readonly StaticTranslationStore _staticStore;
         private readonly IExternalTranslationProvider _translationProvider;
+        private readonly IMemoryCache _memoryCache;
         private readonly ILogger<TranslationService> _logger;
 
         public TranslationService(
             ApplicationDbContext context,
             StaticTranslationStore staticStore,
             IExternalTranslationProvider translationProvider,
+            IMemoryCache memoryCache,
             ILogger<TranslationService> logger)
         {
             _context = context;
             _staticStore = staticStore;
             _translationProvider = translationProvider;
+            _memoryCache = memoryCache;
             _logger = logger;
         }
 
@@ -107,6 +111,12 @@ namespace hOps.web.Services.Localization
             var normalizedEntityId = string.IsNullOrWhiteSpace(entityId) ? "0" : entityId.Trim();
             var normalizedField = string.IsNullOrWhiteSpace(field) ? "General" : field.Trim();
             var hash = ComputeHash(sourceText);
+            var cacheKey = BuildCacheKey(normalizedEntityType, normalizedEntityId, normalizedField, normalizedSource, normalizedTarget, hash);
+
+            if (_memoryCache.TryGetValue(cacheKey, out string? cachedValue))
+            {
+                return cachedValue ?? string.Empty;
+            }
 
             try
             {
@@ -120,12 +130,14 @@ namespace hOps.web.Services.Localization
 
                 if (existing != null && string.Equals(existing.SourceTextHash, hash, StringComparison.OrdinalIgnoreCase))
                 {
+                    CacheTranslation(cacheKey, existing.TranslatedTextValue);
                     return existing.TranslatedTextValue;
                 }
 
                 var translated = await _translationProvider.TranslateAsync(sourceText, normalizedSource, normalizedTarget, cancellationToken);
                 if (string.IsNullOrWhiteSpace(translated))
                 {
+                    CacheTranslation(cacheKey, sourceText);
                     return sourceText;
                 }
 
@@ -156,6 +168,7 @@ namespace hOps.web.Services.Localization
                 }
 
                 await _context.SaveChangesAsync(cancellationToken);
+                CacheTranslation(cacheKey, translated);
                 return translated;
             }
             catch (Exception ex)
@@ -165,6 +178,7 @@ namespace hOps.web.Services.Localization
                 {
                     throw;
                 }
+                CacheTranslation(cacheKey, sourceText);
                 return sourceText;
             }
         }
@@ -194,6 +208,27 @@ namespace hOps.web.Services.Localization
             }
 
             return sb.ToString();
+        }
+
+        private static string BuildCacheKey(string entityType, string entityId, string field, string sourceLanguage, string targetLanguage, string sourceHash)
+        {
+            return $"dynamic::{entityType}::{entityId}::{field}::{sourceLanguage}->{targetLanguage}::{sourceHash}";
+        }
+
+        private void CacheTranslation(string cacheKey, string value)
+        {
+            if (string.IsNullOrWhiteSpace(cacheKey))
+            {
+                return;
+            }
+
+            var options = new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(6),
+                SlidingExpiration = TimeSpan.FromHours(1)
+            };
+
+            _memoryCache.Set(cacheKey, value, options);
         }
     }
 }

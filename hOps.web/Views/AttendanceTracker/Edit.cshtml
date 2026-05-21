@@ -1,13 +1,13 @@
 @model hOps.web.ViewModels.Attendance.AttendanceRecordFormViewModel
 @{
-    ViewData["Title"] = "Edit Attendance Record";
+    ViewData["Title"] = Html.Localize("Edit Attendance Record");
 }
 
 <div class="mb-4">
-    <h1 class="h3 mb-1">Edit Attendance Record</h1>
+    <h1 class="h3 mb-1">@Html.Localize("Edit Attendance Record")</h1>
     @if (ViewBag.PropertyName is string propertyName && !string.IsNullOrWhiteSpace(propertyName))
     {
-        <div class="text-muted small">Property: @propertyName</div>
+        <div class="text-muted small">@Html.Localize("Property"): @propertyName</div>
     }
 </div>
 
@@ -18,7 +18,7 @@
     <div class="mb-3">
         <label class="form-label" asp-for="MasterEmployeeId"></label>
         <select class="form-select" asp-for="MasterEmployeeId" asp-items="Model.EmployeeOptions">
-            <option value="">Select employee</option>
+            <option value="">@Html.Localize("Select employee")</option>
         </select>
         <span class="text-danger" asp-validation-for="MasterEmployeeId"></span>
     </div>
@@ -30,21 +30,22 @@
     <div class="mb-4">
         <label class="form-label" asp-for="AttendanceType"></label>
         <select class="form-select" asp-for="AttendanceType" asp-items="Model.AttendanceTypeOptions">
-            <option value="">Select type</option>
+            <option value="">@Html.Localize("Select type")</option>
         </select>
         <span class="text-danger" asp-validation-for="AttendanceType"></span>
     </div>
     <div class="mb-4">
         <label class="form-label" asp-for="Details"></label>
-        <input class="form-control" asp-for="Details" placeholder="Optional notes" />
+        <input class="form-control" asp-for="Details" placeholder="@Html.Localize("Optional notes")" />
         <span class="text-danger" asp-validation-for="Details"></span>
     </div>
     <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">Save Changes</button>
-        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">@Html.Localize("Save Changes")</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">@Html.Localize("Cancel")</a>
     </div>
 </form>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
 }
+

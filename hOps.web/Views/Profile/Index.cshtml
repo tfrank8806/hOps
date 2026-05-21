@@ -1,39 +1,39 @@
 @model hOps.web.ViewModels.MyProfileViewModel
 
 @{
-    ViewData["Title"] = "My Profile";
+    ViewData["Title"] = Html.Localize("Profile.Title", "My Profile").ToString();
 }
 
-<h2 class="mb-4">My Profile</h2>
+<h2 class="mb-4">@Html.Localize("Profile.Heading", "My Profile")</h2>
 
 @if (TempData["ProfileUpdated"] != null)
 {
-    <div class="alert alert-success">Your profile has been updated.</div>
+    <div class="alert alert-success">@Html.Localize("Profile.Alert.ProfileUpdated", "Your profile has been updated.")</div>
 }
 @if (TempData["PasswordChanged"] != null)
 {
-    <div class="alert alert-success">Your password has been changed.</div>
+    <div class="alert alert-success">@Html.Localize("Profile.Alert.PasswordChanged", "Your password has been changed.")</div>
 }
 @if (TempData["EmailPreferencesUpdated"] != null)
 {
-    <div class="alert alert-success">Your email alert preferences have been updated.</div>
+    <div class="alert alert-success">@Html.Localize("Profile.Alert.EmailPreferencesUpdated", "Your email alert preferences have been updated.")</div>
 }
 @if (TempData["DepartmentAssignmentsUpdated"] != null)
 {
-    <div class="alert alert-success">Your department assignments have been updated.</div>
+    <div class="alert alert-success">@Html.Localize("Profile.Alert.DepartmentAssignmentsUpdated", "Your department assignments have been updated.")</div>
 }
 
 <div class="row">
     <div class="col-lg-7">
         <div class="card mb-4">
-            <div class="card-header fw-bold">Account Information</div>
+            <div class="card-header fw-bold">@Html.Localize("Profile.Section.AccountInformation", "Account Information")</div>
             <div class="card-body">
                 <form asp-action="UpdateProfile" method="post" enctype="multipart/form-data">
                     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                     <div class="text-center mb-3">
                         @if (!string.IsNullOrEmpty(Model.Profile.ProfilePhotoPath))
                         {
-                            <img src="@Model.Profile.ProfilePhotoPath" alt="Profile photo" class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover;" />
+                            <img src="@Model.Profile.ProfilePhotoPath" alt='@Html.Localize("Profile.Alt.ProfilePhoto", "Profile photo")' class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover;" />
                         }
                         else
                         {
@@ -85,12 +85,12 @@
                         @if (Model.PropertyOptions?.Any() == true)
                         {
                             <select asp-for="Profile.DefaultPropertyId" asp-items="Model.PropertyOptions" class="form-select">
-                                <option value="">Select a default property</option>
+                                <option value="">@Html.Localize("Profile.Option.SelectDefaultProperty", "Select a default property")</option>
                             </select>
                         }
                         else
                         {
-                            <input class="form-control" value="No properties available" disabled />
+                            <input class="form-control" value="@Html.Localize("Profile.NoPropertiesAvailable", "No properties available")" disabled />
                         }
                         <span asp-validation-for="Profile.DefaultPropertyId" class="text-danger"></span>
                     </div>
@@ -102,15 +102,15 @@
                         <span asp-validation-for="Profile.TimeZoneId" class="text-danger"></span>
                     </div>
                     <div class="text-end">
-                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                        <button type="submit" class="btn btn-primary">@Html.Localize("Profile.Button.SaveChanges", "Save Changes")</button>
                     </div>
                 </form>
             </div>
         </div>
         <div class="card mb-4">
             <div class="card-header fw-bold d-flex justify-content-between align-items-center">
-                <span>Department Assignments</span>
-                <span class="text-muted small">Control work order alerts &amp; to-do items</span>
+                <span>@Html.Localize("Profile.Section.DepartmentAssignments", "Department Assignments")</span>
+                <span class="text-muted small">@Html.Localize("Profile.Section.DepartmentAssignmentsHelp", "Control work order alerts &amp; to-do items")</span>
             </div>
             <div class="card-body">
                 <form asp-action="UpdateDepartments" method="post">
@@ -125,12 +125,12 @@
                     @if (departmentOptions.Any())
                     {
                         <p class="text-muted small">
-                            Select every department you belong to. Work orders for these departments will appear in your to-do list and trigger alerts.
+                            @Html.Localize("Profile.Departments.HelpText", "Select every department you belong to. Work orders for these departments will appear in your to-do list and trigger alerts.")
                         </p>
                         @foreach (var group in groupedOptions)
                         {
                             <div class="mb-3">
-                                <div class="fw-semibold text-muted">@group.Key</div>
+                                <div class="fw-semibold text-muted">@Html.Localize(group.Key == "General" ? "Profile.DepartmentGroup.General" : group.Key, group.Key)</div>
                                 <div class="d-flex flex-column gap-1">
                                     @foreach (var item in group)
                                     {
@@ -157,16 +157,16 @@
                     }
                     else
                     {
-                        <p class="text-muted mb-0">No departments are available for your properties.</p>
+                        <p class="text-muted mb-0">@Html.Localize("Profile.Departments.NoneForProperties", "No departments are available for your properties.")</p>
                     }
                     <div class="text-end">
-                        <button type="submit" class="btn btn-outline-primary">Save Departments</button>
+                        <button type="submit" class="btn btn-outline-primary">@Html.Localize("Profile.Button.SaveDepartments", "Save Departments")</button>
                     </div>
                 </form>
             </div>
         </div>
         <div class="card mb-4">
-            <div class="card-header fw-bold">Email Alerts</div>
+            <div class="card-header fw-bold">@Html.Localize("Profile.Section.EmailAlerts", "Email Alerts")</div>
             <div class="card-body">
                 <form asp-action="UpdateEmailPreferences" method="post">
                     <div class="form-check mb-3">
@@ -204,21 +204,21 @@
 
                                 <div class="form-check mb-2">
                                     <input class="form-check-input" asp-for="EmailPreferences.PropertyOptions[i].IncludeInLogAlerts" id="@logCheckboxId" />
-                                    <label class="form-check-label" for="@logCheckboxId">Email me when new log entries are posted for this property</label>
+                                    <label class="form-check-label" for="@logCheckboxId">@Html.Localize("Profile.Email.LogEntries", "Email me when new log entries are posted for this property")</label>
                                 </div>
                                 <div class="form-check mb-2">
                                     <input class="form-check-input" asp-for="EmailPreferences.PropertyOptions[i].IncludeInDailySummary" id="@summaryCheckboxId" />
-                                    <label class="form-check-label" for="@summaryCheckboxId">Include this property in my daily summary email</label>
+                                    <label class="form-check-label" for="@summaryCheckboxId">@Html.Localize("Profile.Email.IncludeInDailySummary", "Include this property in my daily summary email")</label>
                                 </div>
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" asp-for="EmailPreferences.PropertyOptions[i].IncludeInWorkOrderAlerts" id="@workOrderCheckboxId" />
-                                    <label class="form-check-label" for="@workOrderCheckboxId">Send work order alerts for this property</label>
+                                    <label class="form-check-label" for="@workOrderCheckboxId">@Html.Localize("Profile.Email.WorkOrderAlerts", "Send work order alerts for this property")</label>
                                 </div>
 
                                 @if (propertyOption.Departments?.Any() == true)
                                 {
-                                    <div class="mb-2 fw-semibold">Departments for work order alerts</div>
-                                    <div class="form-text mb-2">Select departments within this property to watch for new work orders.</div>
+                                    <div class="mb-2 fw-semibold">@Html.Localize("Profile.Email.DepartmentsHeading", "Departments for work order alerts")</div>
+                                    <div class="form-text mb-2">@Html.Localize("Profile.Email.DepartmentsHelp", "Select departments within this property to watch for new work orders.")</div>
                                     <div class="d-flex flex-column gap-1">
                                         @for (var j = 0; j < propertyOption.Departments.Count; j++)
                                         {
@@ -237,22 +237,22 @@
                                 }
                                 else
                                 {
-                                    <p class="text-muted small mb-0">No departments are available for this property.</p>
+                                    <p class="text-muted small mb-0">@Html.Localize("Profile.Email.NoDepartmentsForProperty", "No departments are available for this property.")</p>
                                 }
                             </div>
                         }
                     }
                     else
                     {
-                        <p class="text-muted small mb-3">You do not have access to any properties.</p>
+                        <p class="text-muted small mb-3">@Html.Localize("Profile.Email.NoPropertyAccess", "You do not have access to any properties.")</p>
                     }
                     <div class="form-check mb-3">
                         <input class="form-check-input" asp-for="EmailPreferences.EmailDailySummary" />
                         <label class="form-check-label" asp-for="EmailPreferences.EmailDailySummary"></label>
-                        <div class="form-text">Daily summary emails include new or ongoing logs and bulletin posts.</div>
+                        <div class="form-text">@Html.Localize("Profile.Email.DailySummaryDescription", "Daily summary emails include new or ongoing logs and bulletin posts.")</div>
                     </div>
                     <div class="text-end">
-                        <button type="submit" class="btn btn-outline-primary">Save Email Preferences</button>
+                        <button type="submit" class="btn btn-outline-primary">@Html.Localize("Profile.Button.SaveEmailPreferences", "Save Email Preferences")</button>
                     </div>
                 </form>
             </div>
@@ -260,7 +260,7 @@
     </div>
     <div class="col-lg-5">
         <div class="card">
-            <div class="card-header fw-bold">Change Password</div>
+            <div class="card-header fw-bold">@Html.Localize("Profile.Section.ChangePassword", "Change Password")</div>
             <div class="card-body">
                 <form asp-action="ChangePassword" method="post">
                     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
@@ -280,7 +280,7 @@
                         <span asp-validation-for="ChangePassword.ConfirmPassword" class="text-danger"></span>
                     </div>
                     <div class="text-end">
-                        <button type="submit" class="btn btn-outline-primary">Update Password</button>
+                        <button type="submit" class="btn btn-outline-primary">@Html.Localize("Profile.Button.UpdatePassword", "Update Password")</button>
                     </div>
                 </form>
             </div>

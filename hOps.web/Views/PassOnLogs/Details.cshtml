@@ -1,10 +1,10 @@
+@using System.Globalization
 @using hOps.web.Utilities
 @model hOps.web.ViewModels.PassOnLogDetailsViewModel
 @{
-    var activeLanguage = Html.GetActiveLanguage();
-    var isDefaultLanguage = string.Equals(activeLanguage, LanguageConstants.English, StringComparison.OrdinalIgnoreCase);
-    var displayTitle = !isDefaultLanguage && !string.IsNullOrWhiteSpace(Model.TranslatedTitle) ? Model.TranslatedTitle : Model.Title;
-    var displayBody = !isDefaultLanguage && !string.IsNullOrWhiteSpace(Model.TranslatedBody) ? Model.TranslatedBody : Model.Body;
+    var entityId = Model.Id.ToString(CultureInfo.InvariantCulture);
+    var displayTitle = await Html.DisplayTranslatedTextAsync("PassOnLog", entityId, "Title", Model.Title);
+    var displayBody = await Html.DisplayTranslatedTextAsync("PassOnLog", entityId, "Body", Model.Body);
     ViewData["Title"] = displayTitle;
 }
 
@@ -90,9 +90,11 @@
                                     <div class="flex-grow-1">
                                         @{
                                             var commentLocal = TimeZoneService.ConvertToUserTime(comment.CreatedAt);
-                                            var commentBody = !isDefaultLanguage && !string.IsNullOrWhiteSpace(comment.TranslatedBody)
-                                                ? comment.TranslatedBody
-                                                : comment.Body;
+                                            var commentBody = await Html.DisplayTranslatedTextAsync(
+                                                "PassOnLogComment",
+                                                comment.Id.ToString(CultureInfo.InvariantCulture),
+                                                "Body",
+                                                comment.Body);
                                         }
                                         <div class="passon-comment__header">
                                             <div class="fw-semibold mb-0">@comment.CreatorName</div>

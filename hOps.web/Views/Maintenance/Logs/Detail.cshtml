@@ -1,49 +1,77 @@
+@using System.Globalization
+@using System.Text.Encodings.Web
 @model hOps.web.ViewModels.Maintenance.MaintenanceLogCycleDetailViewModel
 
 @{
-    ViewData["Title"] = $"{Model.TemplateName} Cycle";
+    var templateIdString = Model.TemplateId.ToString(CultureInfo.InvariantCulture);
+    var translatedTemplateName = await Html.DisplayTranslatedTextAsync("MaintenanceLogTemplate", templateIdString, "Name", Model.TemplateName);
+    if (string.IsNullOrWhiteSpace(translatedTemplateName))
+    {
+        translatedTemplateName = Model.TemplateName;
+    }
+
+    var translatedScheduleSummary = await Html.DisplayTranslatedTextAsync("MaintenanceLogTemplate", templateIdString, "ScheduleSummary", Model.ScheduleSummary);
+    if (string.IsNullOrWhiteSpace(translatedScheduleSummary))
+    {
+        translatedScheduleSummary = Model.ScheduleSummary;
+    }
+
+    ViewData["Title"] = string.Format(CultureInfo.InvariantCulture, "{0} {1}", translatedTemplateName, Html.Localize("Cycle"));
     var message = ViewBag.MaintenanceLogMessage as string;
     var error = ViewBag.MaintenanceLogError as string;
     var allCycles = ViewBag.AllCycles as IReadOnlyList<hOps.web.ViewModels.Maintenance.MaintenanceLogCycleHistoryItemViewModel> ?? Array.Empty<hOps.web.ViewModels.Maintenance.MaintenanceLogCycleHistoryItemViewModel>();
     var historyBlocks = ViewBag.HistoryBlocks is int hb ? hb : 0;
     var cycleWarningKey = ViewBag.CycleChangeTargetKey as string;
     var checklistReturnUrl = $"{Context.Request.Path}{Context.Request.QueryString}";
+    var cycleStatusLabel = Html.Localize($"MaintenanceLog.Status.{Model.Cycle.Status}");
+    if (string.IsNullOrWhiteSpace(cycleStatusLabel))
+    {
+        cycleStatusLabel = Model.Cycle.Status.ToString();
+    }
+    var deleteLatestConfirmText = JavaScriptEncoder.Default.Encode(Html.Localize("Delete the latest completion?"));
 }
 
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
-            <h2 class="mb-0">@Model.TemplateName</h2>
-            <p class="text-muted mb-0">@Model.ScheduleSummary</p>
+            <h2 class="mb-0">@translatedTemplateName</h2>
+            @if (!string.IsNullOrWhiteSpace(translatedScheduleSummary))
+            {
+                <p class="text-muted mb-0">@translatedScheduleSummary</p>
+            }
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to Logs</a>
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">@Html.Localize("Back to Logs")</a>
             @if (Model.ChecklistFilePath != null)
             {
-                <a href="@Model.ChecklistFilePath" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">Download Checklist</a>
+                <a href="@Model.ChecklistFilePath" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">@Html.Localize("Download Checklist")</a>
             }
             @if (Model.CanManage)
             {
                 <a asp-action="Checklist"
                    asp-route-id="@Model.TemplateId"
                    asp-route-returnUrl="@checklistReturnUrl"
-                   class="btn btn-primary btn-sm">Checklist</a>
+                   class="btn btn-primary btn-sm">@Html.Localize("Checklist")</a>
             }
         </div>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(message))
     {
-        <div class="alert alert-success">@message</div>
+        <div class="alert alert-success">@Html.Localize(message)</div>
     }
-    if (!string.IsNullOrWhiteSpace(error))
+    @if (!string.IsNullOrWhiteSpace(error))
     {
-        <div class="alert alert-danger">@error</div>
+        <div class="alert alert-danger">@Html.Localize(error)</div>
     }
     if (!string.IsNullOrWhiteSpace(cycleWarningKey) && Model.CanManage)
     {
         <div class="alert alert-warning">
-            The selected completion date belongs to cycle <strong>@cycleWarningKey</strong>. Check <em>Confirm cycle change</em> and submit again if that is correct.
+            @Html.Localize("The selected completion date belongs to cycle")
+            <strong>@cycleWarningKey</strong>.
+            @Html.Localize("Check")
+            <em>@Html.Localize("Confirm cycle change")</em>
+            @Html.Localize("and submit again if that is correct.")
         </div>
     }
 
@@ -51,20 +79,20 @@
         <div class="card-body">
             <div class="d-flex justify-content-between flex-wrap gap-3">
                 <div>
-                    <h5 class="mb-1">Cycle @Model.Cycle.WindowKey</h5>
+                    <h5 class="mb-1">@string.Format(CultureInfo.InvariantCulture, Html.Localize("Cycle {0}"), Model.Cycle.WindowKey)</h5>
                     <p class="text-muted mb-0">
                         @Model.Cycle.StartLocal.ToString("MMM d, yyyy") &ndash; @Model.Cycle.DueLocal.ToString("MMM d, yyyy")
                     </p>
                     @if (Model.Cycle.IsLate)
                     {
-                        <span class="badge bg-warning text-dark mt-2">Late completion</span>
+                        <span class="badge bg-warning text-dark mt-2">@Html.Localize("Late completion")</span>
                     }
                 </div>
                 <div class="d-flex gap-2 align-items-center">
-                    <span class="badge @GetStatusBadgeClass(Model.Cycle.Status)">@Model.Cycle.Status</span>
+                    <span class="badge @GetStatusBadgeClass(Model.Cycle.Status)">@cycleStatusLabel</span>
                     @if (Model.Cycle.LegacyEntries.Count > 0)
                     {
-                        <span class="badge bg-light text-dark border">Legacy history</span>
+                        <span class="badge bg-light text-dark border">@Html.Localize("Legacy history")</span>
                     }
                 </div>
             </div>
@@ -75,52 +103,52 @@
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
-                    <h5 class="h6">Record Completion</h5>
+                    <h5 class="h6">@Html.Localize("Record Completion")</h5>
                     @if (Model.CanManage)
                     {
                         <form asp-action="CreateCycleCompletion" asp-route-templateId="@Model.TemplateId" asp-route-windowKey="@Model.Cycle.WindowKey" method="post" enctype="multipart/form-data">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="history" value="@historyBlocks" />
                             <div class="mb-3">
-                                <label asp-for="CompletionForm.CompletedAtLocal" class="form-label">Completed At</label>
+                                <label asp-for="CompletionForm.CompletedAtLocal" class="form-label">@Html.Localize("Completed At")</label>
                                 <input asp-for="CompletionForm.CompletedAtLocal" class="form-control" type="datetime-local" />
                                 <span asp-validation-for="CompletionForm.CompletedAtLocal" class="text-danger small"></span>
                             </div>
                             <div class="row g-2">
                                 <div class="col-md-6 mb-3">
-                                    <label asp-for="CompletionForm.DurationMinutes" class="form-label">Duration (minutes)</label>
+                                    <label asp-for="CompletionForm.DurationMinutes" class="form-label">@Html.Localize("Duration (minutes)")</label>
                                     <input asp-for="CompletionForm.DurationMinutes" class="form-control" />
                                     <span asp-validation-for="CompletionForm.DurationMinutes" class="text-danger small"></span>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label asp-for="CompletionForm.Result" class="form-label">Result</label>
+                                    <label asp-for="CompletionForm.Result" class="form-label">@Html.Localize("Result")</label>
                                     <select asp-for="CompletionForm.Result" class="form-select">
-                                        <option value="Passed">Passed</option>
-                                        <option value="Failed">Failed</option>
+                                        <option value="Passed">@Html.Localize("Passed")</option>
+                                        <option value="Failed">@Html.Localize("Failed")</option>
                                     </select>
                                 </div>
                             </div>
                             <div class="mb-3">
-                                <label asp-for="CompletionForm.Notes" class="form-label">Notes</label>
+                                <label asp-for="CompletionForm.Notes" class="form-label">@Html.Localize("Notes")</label>
                                 <textarea asp-for="CompletionForm.Notes" rows="3" class="form-control"></textarea>
                                 <span asp-validation-for="CompletionForm.Notes" class="text-danger small"></span>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label" for="createAttachments">Attachments (max 10)</label>
+                                <label class="form-label" for="createAttachments">@Html.Localize("Attachments (max 10)")</label>
                                 <input type="file" id="createAttachments" name="CompletionAttachments" class="form-control" multiple accept=".jpg,.jpeg,.png,.pdf" />
-                                <small class="text-muted">JPG, PNG, or PDF files.</small>
+                                <small class="text-muted">@Html.Localize("JPG, PNG, or PDF files.")</small>
                                 @Html.ValidationMessage("CompletionAttachments", new { @class = "text-danger small d-block" })
                             </div>
                             <div class="form-check mb-3">
                                 <input asp-for="CompletionForm.ConfirmCycleChange" class="form-check-input" id="createConfirmCycle" />
-                                <label class="form-check-label" for="createConfirmCycle">Confirm cycle change</label>
+                                <label class="form-check-label" for="createConfirmCycle">@Html.Localize("Confirm cycle change")</label>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-sm">Save Completion</button>
+                            <button type="submit" class="btn btn-primary btn-sm">@Html.Localize("Save Completion")</button>
                         </form>
                     }
                     else
                     {
-                        <p class="text-muted mb-0">Only managers can record cycle completions.</p>
+                        <p class="text-muted mb-0">@Html.Localize("Only managers can record cycle completions.")</p>
                     }
                 </div>
             </div>
@@ -128,39 +156,55 @@
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
-                    <h5 class="h6">Latest Completion</h5>
+                    <h5 class="h6">@Html.Localize("Latest Completion")</h5>
                     @if (!Model.CanManage)
                     {
                         var latest = Model.Cycle.LatestCompletion;
                         if (latest == null)
                         {
-                            <p class="text-muted mb-0">No completions recorded yet.</p>
+                            <p class="text-muted mb-0">@Html.Localize("No completions recorded yet.")</p>
                         }
                         else
                         {
+                            var latestResultLabel = Html.Localize(latest.Result.ToString());
+                            if (string.IsNullOrWhiteSpace(latestResultLabel))
+                            {
+                                latestResultLabel = latest.Result.ToString();
+                            }
+
+                            var latestTimestamp = latest.CompletedAtLocal?.ToString("MMM d, h:mm tt") ?? Html.Localize("Recorded");
+                            var latestCompletedBy = string.IsNullOrWhiteSpace(latest.CompletedByName)
+                                ? null
+                                : string.Format(CultureInfo.InvariantCulture, Html.Localize("By {0}"), latest.CompletedByName);
+                            var latestNotes = await Html.DisplayTranslatedTextAsync(
+                                "MaintenanceLogCompletion",
+                                latest.CompletionId.ToString(CultureInfo.InvariantCulture),
+                                "Notes",
+                                latest.Notes ?? string.Empty);
+
                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <div>
-                                    <div class="fw-semibold">@latest.Result</div>
+                                    <div class="fw-semibold">@latestResultLabel</div>
                                     <div class="text-muted small">
-                                        @latest.CompletedAtLocal?.ToString("MMM d, h:mm tt") ?? "Recorded"
-                                        @if (!string.IsNullOrWhiteSpace(latest.CompletedByName))
+                                        @latestTimestamp
+                                        @if (!string.IsNullOrWhiteSpace(latestCompletedBy))
                                         {
-                                            <span> by @latest.CompletedByName</span>
+                                            <span> @latestCompletedBy</span>
                                         }
                                     </div>
                                 </div>
-                                <span class="badge bg-secondary">View only</span>
+                                <span class="badge bg-secondary">@Html.Localize("View only")</span>
                             </div>
-                            @if (!string.IsNullOrWhiteSpace(latest.Notes))
+                            @if (!string.IsNullOrWhiteSpace(latestNotes))
                             {
-                                <p class="mb-0 mt-2">@latest.Notes</p>
+                                <p class="mb-0 mt-2">@latestNotes</p>
                             }
                         }
-                        <p class="text-muted mt-3 mb-0">Contact a manager to update completions.</p>
+                        <p class="text-muted mt-3 mb-0">@Html.Localize("Contact a manager to update completions.")</p>
                     }
                     else if (Model.EditForm == null)
                     {
-                        <p class="text-muted">No completions recorded yet.</p>
+                        <p class="text-muted">@Html.Localize("No completions recorded yet.")</p>
                     }
                     else
                     {
@@ -168,31 +212,31 @@
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="history" value="@historyBlocks" />
                             <div class="mb-3">
-                                <label asp-for="EditForm.CompletedAtLocal" class="form-label">Completed At</label>
+                                <label asp-for="EditForm.CompletedAtLocal" class="form-label">@Html.Localize("Completed At")</label>
                                 <input asp-for="EditForm.CompletedAtLocal" class="form-control" type="datetime-local" />
                                 <span asp-validation-for="EditForm.CompletedAtLocal" class="text-danger small"></span>
                             </div>
                             <div class="row g-2">
                                 <div class="col-md-6 mb-3">
-                                    <label asp-for="EditForm.DurationMinutes" class="form-label">Duration (minutes)</label>
+                                    <label asp-for="EditForm.DurationMinutes" class="form-label">@Html.Localize("Duration (minutes)")</label>
                                     <input asp-for="EditForm.DurationMinutes" class="form-control" />
                                     <span asp-validation-for="EditForm.DurationMinutes" class="text-danger small"></span>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label asp-for="EditForm.Result" class="form-label">Result</label>
+                                    <label asp-for="EditForm.Result" class="form-label">@Html.Localize("Result")</label>
                                     <select asp-for="EditForm.Result" class="form-select">
-                                        <option value="Passed">Passed</option>
-                                        <option value="Failed">Failed</option>
+                                        <option value="Passed">@Html.Localize("Passed")</option>
+                                        <option value="Failed">@Html.Localize("Failed")</option>
                                     </select>
                                 </div>
                             </div>
                             <div class="mb-3">
-                                <label asp-for="EditForm.Notes" class="form-label">Notes</label>
+                                <label asp-for="EditForm.Notes" class="form-label">@Html.Localize("Notes")</label>
                                 <textarea asp-for="EditForm.Notes" rows="3" class="form-control"></textarea>
                                 <span asp-validation-for="EditForm.Notes" class="text-danger small"></span>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Existing attachments</label>
+                                <label class="form-label">@Html.Localize("Existing attachments")</label>
                                 @if (Model.Cycle.LatestCompletion?.Attachments.Any() == true)
                                 {
                                     <ul class="list-unstyled small mb-2">
@@ -202,7 +246,7 @@
                                                 <a href="@attachment.FilePath" target="_blank" rel="noopener">@attachment.OriginalFileName ?? attachment.FilePath</a>
                                                 <div class="form-check ms-2">
                                                     <input class="form-check-input" type="checkbox" name="RemoveAttachmentIds" value="@attachment.AttachmentId" id="removeAttachment-@attachment.AttachmentId" />
-                                                    <label class="form-check-label" for="removeAttachment-@attachment.AttachmentId">Remove</label>
+                                                    <label class="form-check-label" for="removeAttachment-@attachment.AttachmentId">@Html.Localize("Remove")</label>
                                                 </div>
                                             </li>
                                         }
@@ -210,24 +254,24 @@
                                 }
                                 else
                                 {
-                                    <p class="text-muted small mb-2">No attachments.</p>
+                                    <p class="text-muted small mb-2">@Html.Localize("No attachments.")</p>
                                 }
                                 <input type="file" name="EditCompletionAttachments" class="form-control" multiple accept=".jpg,.jpeg,.png,.pdf" />
-                                <small class="text-muted">Add more JPG, PNG, or PDF files.</small>
+                                <small class="text-muted">@Html.Localize("Add more JPG, PNG, or PDF files.")</small>
                                 @Html.ValidationMessage("EditCompletionAttachments", new { @class = "text-danger small d-block" })
                             </div>
                             <div class="form-check mb-3">
                                 <input asp-for="EditForm.ConfirmCycleChange" class="form-check-input" id="editConfirmCycle" />
-                                <label class="form-check-label" for="editConfirmCycle">Confirm cycle change</label>
+                                <label class="form-check-label" for="editConfirmCycle">@Html.Localize("Confirm cycle change")</label>
                             </div>
                             <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-primary btn-sm">Update Completion</button>
+                                <button type="submit" class="btn btn-primary btn-sm">@Html.Localize("Update Completion")</button>
                             </div>
                         </form>
-                        <form asp-action="DeleteCycleCompletion" asp-route-templateId="@Model.TemplateId" asp-route-windowKey="@Model.Cycle.WindowKey" asp-route-completionId="@Model.EditForm.CompletionId" method="post" class="mt-2" onsubmit="return confirm('Delete the latest completion?');">
+                        <form asp-action="DeleteCycleCompletion" asp-route-templateId="@Model.TemplateId" asp-route-windowKey="@Model.Cycle.WindowKey" asp-route-completionId="@Model.EditForm.CompletionId" method="post" class="mt-2" onsubmit="return confirm('@deleteLatestConfirmText');">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="history" value="@historyBlocks" />
-                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete Latest</button>
+                            <button type="submit" class="btn btn-outline-danger btn-sm">@Html.Localize("Delete Latest")</button>
                         </form>
                     }
                 </div>
@@ -239,40 +283,57 @@
         <div class="col-lg-6">
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
-                    <h5 class="h6">Cycle Completions</h5>
+                    <h5 class="h6">@Html.Localize("Cycle Completions")</h5>
                     @if (!Model.Cycle.Completions.Any())
                     {
-                        <p class="text-muted mb-0">No completions yet.</p>
+                        <p class="text-muted mb-0">@Html.Localize("No completions yet.")</p>
                     }
                     else
                     {
                         <ul class="list-group list-group-flush">
                             @foreach (var completion in Model.Cycle.Completions)
                             {
+                                var completionIdString = completion.CompletionId.ToString(CultureInfo.InvariantCulture);
+                                var completionResultLabel = Html.Localize(completion.Result.ToString());
+                                if (string.IsNullOrWhiteSpace(completionResultLabel))
+                                {
+                                    completionResultLabel = completion.Result.ToString();
+                                }
+
+                                var completionTimestamp = completion.CompletedAtLocal?.ToString("MMM d, h:mm tt") ?? Html.Localize("Recorded");
+                                var completionCompletedBy = string.IsNullOrWhiteSpace(completion.CompletedByName)
+                                    ? null
+                                    : string.Format(CultureInfo.InvariantCulture, Html.Localize("By {0}"), completion.CompletedByName);
+                                var completionNotes = await Html.DisplayTranslatedTextAsync(
+                                    "MaintenanceLogCompletion",
+                                    completionIdString,
+                                    "Notes",
+                                    completion.Notes ?? string.Empty);
+
                                 <li class="list-group-item">
                                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                         <div>
-                                            <div class="fw-semibold">@completion.Result</div>
+                                            <div class="fw-semibold">@completionResultLabel</div>
                                             <div class="text-muted small">
-                                                @completion.CompletedAtLocal?.ToString("MMM d, h:mm tt") ?? "Recorded"
-                                                @if (!string.IsNullOrWhiteSpace(completion.CompletedByName))
+                                                @completionTimestamp
+                                                @if (!string.IsNullOrWhiteSpace(completionCompletedBy))
                                                 {
-                                                    <span> by @completion.CompletedByName</span>
+                                                    <span> @completionCompletedBy</span>
                                                 }
                                             </div>
                                         </div>
                                         @if (completion.IsLatest)
                                         {
-                                            <span class="badge bg-primary">Latest</span>
+                                            <span class="badge bg-primary">@Html.Localize("Latest")</span>
                                         }
                                     </div>
-                                    @if (!string.IsNullOrWhiteSpace(completion.Notes))
+                                    @if (!string.IsNullOrWhiteSpace(completionNotes))
                                     {
-                                        <p class="mb-1 mt-2">@completion.Notes</p>
+                                        <p class="mb-1 mt-2">@completionNotes</p>
                                     }
                                     @if (completion.Attachments.Any())
                                     {
-                                        <div class="small text-muted mb-1">Attachments:</div>
+                                        <div class="small text-muted mb-1">@Html.Localize("Attachments:")</div>
                                         <ul class="list-unstyled small">
                                             @foreach (var attachment in completion.Attachments)
                                             {
@@ -290,10 +351,10 @@
         <div class="col-lg-6">
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
-                    <h5 class="h6">Legacy History</h5>
+                    <h5 class="h6">@Html.Localize("Legacy History")</h5>
                     @if (!Model.Cycle.LegacyEntries.Any())
                     {
-                        <p class="text-muted mb-0">No legacy records for this cycle.</p>
+                        <p class="text-muted mb-0">@Html.Localize("No legacy records for this cycle.")</p>
                     }
                     else
                     {
@@ -314,7 +375,7 @@
 
     <div class="card shadow-sm">
         <div class="card-body">
-            <h5 class="h6">Cycle History</h5>
+            <h5 class="h6">@Html.Localize("Cycle History")</h5>
             <div class="d-flex flex-wrap gap-2">
                 @foreach (var cycle in allCycles.OrderByDescending(c => c.StartLocal))
                 {
@@ -328,7 +389,7 @@
                     <input type="hidden" name="templateId" value="@Model.TemplateId" />
                     <input type="hidden" name="windowKey" value="@Model.Cycle.WindowKey" />
                     <input type="hidden" name="history" value="@(historyBlocks + 1)" />
-                    <button type="submit" class="btn btn-outline-secondary btn-sm">Load older cycles</button>
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">@Html.Localize("Load older cycles")</button>
                 </form>
             </div>
         </div>

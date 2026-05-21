@@ -1,21 +1,22 @@
 @model hOps.web.ViewModels.Maintenance.MaintenanceEquipmentIndexViewModel
+@using System.Globalization
 
 @{
-    ViewData["Title"] = "Maintenance Equipment";
+    ViewData["Title"] = Html.Localize("Maintenance Equipment");
 }
 
 <div class="container-fluid py-4">
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
         <div>
-            <h2 class="mb-0">Equipment Inventory</h2>
+            <h2 class="mb-0">@Html.Localize("Equipment Inventory")</h2>
             <p class="text-muted mb-0">@Model.PropertyName</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <a asp-action="Export" class="btn btn-outline-secondary btn-sm">
-                Export CSV
+                @Html.Localize("Export CSV")
             </a>
             <a asp-action="Create" class="btn btn-primary btn-sm">
-                Add Equipment
+                @Html.Localize("Add Equipment")
             </a>
         </div>
     </div>
@@ -37,7 +38,7 @@
     {
         <div class="card shadow-sm">
             <div class="card-body">
-                <p class="mb-0 text-muted">No equipment records found for this property.</p>
+                <p class="mb-0 text-muted">@Html.Localize("No equipment records found for this property.")</p>
             </div>
         </div>
     }
@@ -48,46 +49,85 @@
                 <table class="table table-striped align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>Name</th>
-                            <th>Category</th>
-                            <th>Location</th>
-                            <th>Brand / Model</th>
-                            <th>Serial #</th>
-                            <th>Installed</th>
-                            <th>Warranty Ends</th>
-                            <th>Updated</th>
-                            <th class="text-end">Actions</th>
+                            <th>@Html.Localize("Name")</th>
+                            <th>@Html.Localize("Category")</th>
+                            <th>@Html.Localize("Location")</th>
+                            <th>@Html.Localize("Brand / Model")</th>
+                            <th>@Html.Localize("Serial #")</th>
+                            <th>@Html.Localize("Installed")</th>
+                            <th>@Html.Localize("Warranty Ends")</th>
+                            <th>@Html.Localize("Updated")</th>
+                            <th class="text-end">@Html.Localize("Actions")</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var item in Model.Items)
                         {
+                            var itemIdString = item.Id.ToString(CultureInfo.InvariantCulture);
+                            var nameDisplay = await Html.DisplayTranslatedTextAsync("EquipmentItem", itemIdString, "Name", item.Name ?? string.Empty);
+                            if (string.IsNullOrWhiteSpace(nameDisplay))
+                            {
+                                nameDisplay = item.Name ?? string.Empty;
+                            }
+
+                            var categoryDisplay = string.IsNullOrWhiteSpace(item.Category)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("EquipmentItem", itemIdString, "Category", item.Category);
+                            if (string.IsNullOrWhiteSpace(categoryDisplay) && !string.IsNullOrWhiteSpace(item.Category))
+                            {
+                                categoryDisplay = item.Category;
+                            }
+
+                            var locationDisplay = string.IsNullOrWhiteSpace(item.Location)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("EquipmentItem", itemIdString, "Location", item.Location);
+                            if (string.IsNullOrWhiteSpace(locationDisplay) && !string.IsNullOrWhiteSpace(item.Location))
+                            {
+                                locationDisplay = item.Location;
+                            }
+
+                            var brandDisplay = string.IsNullOrWhiteSpace(item.Brand)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("EquipmentItem", itemIdString, "Brand", item.Brand);
+                            if (string.IsNullOrWhiteSpace(brandDisplay) && !string.IsNullOrWhiteSpace(item.Brand))
+                            {
+                                brandDisplay = item.Brand;
+                            }
+
+                            var modelDisplay = string.IsNullOrWhiteSpace(item.Model)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("EquipmentItem", itemIdString, "Model", item.Model);
+                            if (string.IsNullOrWhiteSpace(modelDisplay) && !string.IsNullOrWhiteSpace(item.Model))
+                            {
+                                modelDisplay = item.Model;
+                            }
+
+                            var serialDisplay = string.IsNullOrWhiteSpace(item.SerialNumber)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("EquipmentItem", itemIdString, "SerialNumber", item.SerialNumber);
+                            if (string.IsNullOrWhiteSpace(serialDisplay) && !string.IsNullOrWhiteSpace(item.SerialNumber))
+                            {
+                                serialDisplay = item.SerialNumber;
+                            }
+
+                            var brandModel = $"{brandDisplay} {modelDisplay}".Trim();
                             <tr>
                                 <td>
-                                    <a asp-action="Details" asp-route-id="@item.Id">@item.Name</a>
+                                    <a asp-action="Details" asp-route-id="@item.Id">@nameDisplay</a>
                                 </td>
-                                <td>@(string.IsNullOrWhiteSpace(item.Category) ? "—" : item.Category)</td>
-                                <td>@(string.IsNullOrWhiteSpace(item.Location) ? "—" : item.Location)</td>
-                                <td>
-                                    @if (!string.IsNullOrWhiteSpace(item.Brand) || !string.IsNullOrWhiteSpace(item.Model))
-                                    {
-                                        <span>@($"{item.Brand} {item.Model}".Trim())</span>
-                                    }
-                                    else
-                                    {
-                                        <span>—</span>
-                                    }
-                                </td>
-                                <td>@(string.IsNullOrWhiteSpace(item.SerialNumber) ? "—" : item.SerialNumber)</td>
+                                <td>@(!string.IsNullOrWhiteSpace(categoryDisplay) ? categoryDisplay : "—")</td>
+                                <td>@(!string.IsNullOrWhiteSpace(locationDisplay) ? locationDisplay : "—")</td>
+                                <td>@(!string.IsNullOrWhiteSpace(brandModel) ? brandModel : "—")</td>
+                                <td>@(!string.IsNullOrWhiteSpace(serialDisplay) ? serialDisplay : "—")</td>
                                 <td>@(item.InstalledOn.HasValue ? item.InstalledOn.Value.ToString("MMM d, yyyy") : "—")</td>
                                 <td>@(item.WarrantyEndsOn.HasValue ? item.WarrantyEndsOn.Value.ToString("MMM d, yyyy") : "—")</td>
                                 <td>@TimeZoneService.ConvertToUserTime(item.UpdatedAtUtc).ToString("g")</td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
-                                        <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-outline-secondary">View</a>
+                                        <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-outline-secondary">@Html.Localize("View")</a>
                                         @if (Model.CanManage)
                                         {
-                                            <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-outline-secondary">Edit</a>
+                                            <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-outline-secondary">@Html.Localize("Edit")</a>
                                         }
                                     </div>
                                 </td>

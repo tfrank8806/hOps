@@ -1,3 +1,4 @@
+﻿@using System.Globalization
 @model hOps.web.ViewModels.Home.HomeIndexViewModel
 
 @{
@@ -7,7 +8,7 @@
 
 <div class="card shadow-sm h-100">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <h2 class="h5 mb-0">Pass On Logs</h2>
+        <h2 class="h5 mb-0">@Html.Localize("Pass On Logs")</h2>
         <div class="d-flex gap-2 flex-wrap">
             <a class="btn btn-outline-primary btn-sm" href="@(Url.Action("Create", "PassOnLogs") ?? "/PassOnLogs/Create")">
                 + New Pass On
@@ -20,38 +21,42 @@
     <div class="card-body">
         @if (!hasProperty)
         {
-            <p class="text-muted mb-0">Select a property to review pass on log updates.</p>
+            <p class="text-muted mb-0">@Html.Localize("Select a property to review pass on log updates.")</p>
         }
         else if (!Model.PassOnLogs.Any())
         {
-            <p class="text-muted mb-0">No entries yet. Capture the latest shift updates in the pass on log.</p>
+            <p class="text-muted mb-0">@Html.Localize("No entries yet. Capture the latest shift updates in the pass on log.")</p>
         }
         else
         {
             <ul class="list-unstyled mb-0">
                 @foreach (var log in Model.PassOnLogs)
                 {
+                    var logIdString = log.Id.ToString(CultureInfo.InvariantCulture);
+                    var titleDisplay = await Html.DisplayTranslatedTextAsync("PassOnLog", logIdString, "Title", log.Title);
+                    var previewDisplay = await Html.DisplayTranslatedTextAsync("PassOnLog", logIdString, "Preview", log.Preview);
                     var createdLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
+                    var createdDisplay = createdLocal.ToString("g", CultureInfo.CurrentCulture);
                     <li class="mb-3 pb-3 border-bottom">
                         <div class="d-flex justify-content-between align-items-start gap-3">
                             <div class="flex-grow-1">
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                                    <span class="fw-semibold">@log.Title</span>
+                                    <span class="fw-semibold">@titleDisplay</span>
                                     @if (!log.IsRead)
                                     {
-                                        <span class="badge rounded-pill bg-primary text-white">Unread</span>
+                                        <span class="badge rounded-pill bg-primary text-white">@Html.Localize("Unread")</span>
                                     }
                                 </div>
-                                <div class="text-muted small">@createdLocal.ToString("g")</div>
+                                <div class="text-muted small">@createdDisplay</div>
                             </div>
                             @if (!string.IsNullOrWhiteSpace(log.DetailUrl))
                             {
-                                <a class="btn btn-link btn-sm p-0" href="@log.DetailUrl">Open</a>
+                                <a class="btn btn-link btn-sm p-0" href="@log.DetailUrl">@Html.Localize("Open")</a>
                             }
                         </div>
-                        @if (!string.IsNullOrWhiteSpace(log.Preview))
+                        @if (!string.IsNullOrWhiteSpace(previewDisplay))
                         {
-                            <p class="mb-0 small text-muted">@log.Preview</p>
+                            <p class="mb-0 small text-muted">@previewDisplay</p>
                         }
                     </li>
                 }
@@ -59,3 +64,4 @@
         }
     </div>
 </div>
+

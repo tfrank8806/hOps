@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels.Attendance;
+using hOps.web.Services.Localization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -31,19 +33,65 @@ namespace hOps.web.Controllers
         private static readonly IReadOnlyDictionary<AttendanceRecordType, AttendanceCodeMetadata> _attendanceCodeMap =
             new Dictionary<AttendanceRecordType, AttendanceCodeMetadata>
             {
-                [AttendanceRecordType.Tardy] = new("T", "Tardy", false),
-                [AttendanceRecordType.LeftEarly] = new("LE", "Left Early", false),
-                [AttendanceRecordType.CallOff] = new("C", "Call Off", false),
-                [AttendanceRecordType.NoCallNoShow] = new("NS", "No Call/No Show", false),
-                [AttendanceRecordType.Sick] = new("S", "Sick", true),
-                [AttendanceRecordType.Vacation] = new("V", "Vacation", true),
-                [AttendanceRecordType.Personal] = new("P", "Personal", true),
-                [AttendanceRecordType.Bereavement] = new("B", "Bereavement", true)
+                [AttendanceRecordType.Tardy] = new("T", false),
+                [AttendanceRecordType.LeftEarly] = new("LE", false),
+                [AttendanceRecordType.CallOff] = new("C", false),
+                [AttendanceRecordType.NoCallNoShow] = new("NS", false),
+                [AttendanceRecordType.Sick] = new("S", true),
+                [AttendanceRecordType.Vacation] = new("V", true),
+                [AttendanceRecordType.Personal] = new("P", true),
+                [AttendanceRecordType.Bereavement] = new("B", true)
             };
 
-        public AttendanceTrackerController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        private readonly ITranslationService _translationService;
+
+        public AttendanceTrackerController(
+            ApplicationDbContext context,
+            UserManager<ApplicationUser> userManager,
+            ITranslationService translationService)
             : base(context, userManager)
         {
+            _translationService = translationService;
+        }
+
+        private string GetActiveLanguage()
+            => HttpContext?.Items?["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+
+        private bool IsDefaultLanguage(string language)
+            => string.Equals(language, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+
+        private string Translate(string key, string? fallback = null)
+            => _translationService.Translate(key, GetActiveLanguage(), fallback ?? key);
+
+        private CancellationToken RequestCancellationToken
+            => HttpContext?.RequestAborted ?? CancellationToken.None;
+
+        private string GetUnknownLabel() => Translate("Unknown");
+
+        private string GetUnassignedLabel() => Translate("Unassigned");
+
+        private async Task<string> TranslateDetailsAsync(int recordId, string sourceText, string activeLanguage, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(sourceText))
+            {
+                return string.Empty;
+            }
+
+            if (IsDefaultLanguage(activeLanguage))
+            {
+                return sourceText;
+            }
+
+            var translated = await _translationService.TranslateDynamicAsync(
+                "AttendanceRecord",
+                recordId.ToString(CultureInfo.InvariantCulture),
+                "Details",
+                sourceText,
+                _translationService.DefaultLanguage,
+                activeLanguage,
+                cancellationToken);
+
+            return string.IsNullOrWhiteSpace(translated) ? sourceText : translated;
         }
 
         [HttpGet]
@@ -108,7 +156,7 @@ namespace hOps.web.Controllers
 
             if (employee == null)
             {
-                ModelState.AddModelError(nameof(model.MasterEmployeeId), "Select a valid employee for this property.");
+                ModelState.AddModelError(nameof(model.MasterEmployeeId), Translate("Select a valid employee for this property."));
                 var invalidViewModel = await BuildTrackerViewModelAsync(currentProperty, model, null, null, null, null, null, null, null, null, null);
                 return View(nameof(Index), invalidViewModel);
             }
@@ -133,7 +181,7 @@ namespace hOps.web.Controllers
             _context.AttendanceRecords.Add(record);
             await _context.SaveChangesAsync();
 
-            TempData["AttendanceStatus"] = "Attendance record saved.";
+            TempData["AttendanceStatus"] = Translate("Attendance record saved.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -194,7 +242,7 @@ namespace hOps.web.Controllers
 
             if (record == null)
             {
-                TempData["AttendanceError"] = "The attendance record could not be found.";
+                TempData["AttendanceError"] = Translate("The attendance record could not be found.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -213,7 +261,7 @@ namespace hOps.web.Controllers
 
             if (employee == null)
             {
-                ModelState.AddModelError(nameof(model.MasterEmployeeId), "Select a valid employee for this property.");
+                ModelState.AddModelError(nameof(model.MasterEmployeeId), Translate("Select a valid employee for this property."));
                 await PopulateEmployeeOptionsAsync(model, currentProperty.Id, model.MasterEmployeeId);
                 model.AttendanceTypeOptions = BuildAttendanceTypeOptions(model.AttendanceType);
                 ViewBag.PropertyName = currentProperty.Name;
@@ -235,7 +283,7 @@ namespace hOps.web.Controllers
 
             await _context.SaveChangesAsync();
 
-            TempData["AttendanceStatus"] = "Attendance record updated.";
+            TempData["AttendanceStatus"] = Translate("Attendance record updated.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -256,14 +304,14 @@ namespace hOps.web.Controllers
 
             if (record == null)
             {
-                TempData["AttendanceError"] = "The selected attendance record could not be found.";
+                TempData["AttendanceError"] = Translate("The selected attendance record could not be found.");
                 return RedirectToAction(nameof(Index));
             }
 
             _context.AttendanceRecords.Remove(record);
             await _context.SaveChangesAsync();
 
-            TempData["AttendanceStatus"] = "Attendance record deleted.";
+            TempData["AttendanceStatus"] = Translate("Attendance record deleted.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -340,6 +388,8 @@ namespace hOps.web.Controllers
             string? rangeEnd)
         {
             var range = await ResolveGridRangeAsync(propertyId, rangeMode, monthValue, rangeStart, rangeEnd);
+            var activeLanguage = GetActiveLanguage();
+            var cancellationToken = RequestCancellationToken;
             var totalDays = (int)(range.RangeEnd - range.RangeStart).TotalDays + 1;
             if (totalDays < 1)
             {
@@ -371,8 +421,9 @@ namespace hOps.web.Controllers
                     var displayName = $"{emp.FirstName} {emp.LastName}".Trim();
                     if (string.IsNullOrWhiteSpace(displayName))
                     {
-                        displayName = "Employee";
+                        displayName = Translate("Employee");
                     }
+
                     return new AttendanceGridRowViewModel
                     {
                         MasterEmployeeId = emp.Id,
@@ -416,8 +467,8 @@ namespace hOps.web.Controllers
                     r.MasterEmployeeId,
                     AttendanceDate = r.AttendanceDate,
                     r.AttendanceType,
-                    DepartmentName = r.MasterEmployee.Department != null ? r.MasterEmployee.Department.Name : "Unassigned",
-                    Position = r.MasterEmployee.Position ?? "Unassigned",
+                    DepartmentName = r.MasterEmployee.Department != null ? r.MasterEmployee.Department.Name : null,
+                    Position = r.MasterEmployee.Position,
                     r.CreatedAtUtc,
                     CreatedByFirstName = r.CreatedByUser != null ? r.CreatedByUser.FirstName : null,
                     CreatedByLastName = r.CreatedByUser != null ? r.CreatedByUser.LastName : null,
@@ -455,22 +506,31 @@ namespace hOps.web.Controllers
                 var creatorName = $"{record.CreatedByFirstName} {record.CreatedByLastName}".Trim();
                 if (string.IsNullOrWhiteSpace(creatorName))
                 {
-                    creatorName = record.CreatedByEmail ?? "Unknown";
+                    creatorName = string.IsNullOrWhiteSpace(record.CreatedByEmail)
+                        ? GetUnknownLabel()
+                        : record.CreatedByEmail!;
                 }
+
+                var attendanceTypeLabel = GetAttendanceTypeLabel(record.AttendanceType);
+                var departmentName = string.IsNullOrWhiteSpace(record.DepartmentName) ? GetUnassignedLabel() : record.DepartmentName!;
+                var positionName = string.IsNullOrWhiteSpace(record.Position) ? GetUnassignedLabel() : record.Position!;
+                var details = record.Details ?? string.Empty;
+                var translatedDetails = await TranslateDetailsAsync(record.Id, details, activeLanguage, cancellationToken);
 
                 var entry = new AttendanceGridEntryViewModel
                 {
                     RecordId = record.Id,
                     AttendanceType = record.AttendanceType,
                     Code = metadata.Code,
-                    Label = metadata.Label,
-                    AttendanceTypeDisplay = GetAttendanceTypeLabel(record.AttendanceType),
+                    Label = attendanceTypeLabel,
+                    AttendanceTypeDisplay = attendanceTypeLabel,
                     IsExcused = metadata.IsExcused,
-                    DepartmentName = record.DepartmentName ?? "Unassigned",
-                    Position = string.IsNullOrWhiteSpace(record.Position) ? "Unassigned" : record.Position,
+                    DepartmentName = departmentName,
+                    Position = positionName,
                     CreatedByDisplay = creatorName,
                     CreatedAtUtc = record.CreatedAtUtc,
-                    Details = record.Details ?? string.Empty
+                    Details = details,
+                    TranslatedDetails = translatedDetails
                 };
 
                 var cell = row.Cells[dayIndex];
@@ -489,9 +549,10 @@ namespace hOps.web.Controllers
                         continue;
                     }
 
+                    var format = Translate("{0} ({1})", "{0} ({1})");
                     var summary = cell.Entries
                         .GroupBy(entry => entry.Label)
-                        .Select(group => $"{group.Key} ({group.Count()})");
+                        .Select(group => string.Format(CultureInfo.InvariantCulture, format, group.Key, group.Count()));
                     cell.Tooltip = string.Join(", ", summary);
                 }
             }
@@ -511,7 +572,7 @@ namespace hOps.web.Controllers
             };
         }
 
-        private static List<AttendanceCodeLegendItemViewModel> BuildLegendItems()
+        private List<AttendanceCodeLegendItemViewModel> BuildLegendItems()
         {
             var items = new List<AttendanceCodeLegendItemViewModel>();
             foreach (var type in _attendanceTypeOrder)
@@ -522,7 +583,7 @@ namespace hOps.web.Controllers
                     {
                         AttendanceType = type,
                         Code = metadata.Code,
-                        Label = metadata.Label,
+                        Label = GetAttendanceTypeLabel(type),
                         IsExcused = metadata.IsExcused
                     });
                 }
@@ -756,7 +817,7 @@ namespace hOps.web.Controllers
                     e.Id,
                     e.FirstName,
                     e.LastName,
-                    DepartmentName = e.Department.Name ?? "Unassigned",
+                    DepartmentName = e.Department != null ? e.Department.Name : null,
                     e.Position
                 })
                 .Join(
@@ -769,7 +830,7 @@ namespace hOps.web.Controllers
                         e.FirstName,
                         e.LastName,
                         e.DepartmentName,
-                        Position = e.Position ?? "Unassigned",
+                        Position = e.Position,
                         Counts = a
                     })
                 .ToListAsync();
@@ -780,15 +841,15 @@ namespace hOps.web.Controllers
                     var displayName = $"{item.FirstName} {item.LastName}".Trim();
                     if (string.IsNullOrWhiteSpace(displayName))
                     {
-                        displayName = "Employee";
+                        displayName = Translate("Employee");
                     }
 
                     return new AttendanceSummaryRowViewModel
                     {
                         MasterEmployeeId = item.Id,
                         EmployeeName = displayName,
-                        DepartmentName = item.DepartmentName,
-                        Position = string.IsNullOrWhiteSpace(item.Position) ? "Unassigned" : item.Position,
+                        DepartmentName = string.IsNullOrWhiteSpace(item.DepartmentName) ? GetUnassignedLabel() : item.DepartmentName!,
+                        Position = string.IsNullOrWhiteSpace(item.Position) ? GetUnassignedLabel() : item.Position!,
                         TardyCount = item.Counts.Tardy,
                         LeftEarlyCount = item.Counts.LeftEarly,
                         CallOffCount = item.Counts.CallOff,
@@ -818,36 +879,46 @@ namespace hOps.web.Controllers
                 .ThenByDescending(r => r.CreatedAtUtc)
                 .ToListAsync();
 
-            return records.Select(r =>
+            var activeLanguage = GetActiveLanguage();
+            var cancellationToken = RequestCancellationToken;
+            var results = new List<AttendanceDetailEntryViewModel>(records.Count);
+
+            foreach (var r in records)
             {
                 var employee = r.MasterEmployee;
                 var creator = r.CreatedByUser;
                 var creatorName = creator != null
                     ? $"{creator.FirstName} {creator.LastName}".Trim()
-                    : "Unknown";
+                    : GetUnknownLabel();
                 if (string.IsNullOrWhiteSpace(creatorName))
                 {
-                    creatorName = creator?.Email ?? "Unknown";
+                    creatorName = string.IsNullOrWhiteSpace(creator?.Email) ? GetUnknownLabel() : creator!.Email!;
                 }
 
-                return new AttendanceDetailEntryViewModel
+                var details = r.Details ?? string.Empty;
+                var translatedDetails = await TranslateDetailsAsync(r.Id, details, activeLanguage, cancellationToken);
+
+                results.Add(new AttendanceDetailEntryViewModel
                 {
                     RecordId = r.Id,
                     MasterEmployeeId = r.MasterEmployeeId,
                     AttendanceDate = r.AttendanceDate,
                     AttendanceType = r.AttendanceType,
                     AttendanceTypeDisplay = GetAttendanceTypeLabel(r.AttendanceType),
-                    Details = r.Details ?? string.Empty,
+                    Details = details,
+                    TranslatedDetails = translatedDetails,
                     CreatedAtUtc = r.CreatedAtUtc,
                     UpdatedAtUtc = r.UpdatedAtUtc,
                     CreatedByDisplay = creatorName,
-                    DepartmentName = employee?.Department?.Name ?? "Unassigned",
-                    Position = employee?.Position ?? "Unassigned"
-                };
-            }).ToList();
+                    DepartmentName = string.IsNullOrWhiteSpace(employee?.Department?.Name) ? GetUnassignedLabel() : employee!.Department!.Name!,
+                    Position = string.IsNullOrWhiteSpace(employee?.Position) ? GetUnassignedLabel() : employee!.Position!
+                });
+            }
+
+            return results;
         }
 
-        private static List<SelectListItem> BuildAttendanceTypeOptions(AttendanceRecordType? selectedType)
+        private List<SelectListItem> BuildAttendanceTypeOptions(AttendanceRecordType? selectedType)
         {
             var options = new List<SelectListItem>(_attendanceTypeOrder.Length);
             foreach (var type in _attendanceTypeOrder)
@@ -863,18 +934,18 @@ namespace hOps.web.Controllers
             return options;
         }
 
-        private static string GetAttendanceTypeLabel(AttendanceRecordType type)
+        private string GetAttendanceTypeLabel(AttendanceRecordType type)
         {
             return type switch
             {
-                AttendanceRecordType.LeftEarly => "Left Early",
-                AttendanceRecordType.CallOff => "Call Off",
-                AttendanceRecordType.NoCallNoShow => "No Call/No Show",
-                AttendanceRecordType.Sick => "Sick",
-                AttendanceRecordType.Vacation => "Vacation",
-                AttendanceRecordType.Personal => "Personal",
-                AttendanceRecordType.Bereavement => "Bereavement",
-                _ => "Tardy"
+                AttendanceRecordType.LeftEarly => Translate("Left Early"),
+                AttendanceRecordType.CallOff => Translate("Call Off"),
+                AttendanceRecordType.NoCallNoShow => Translate("No Call/No Show"),
+                AttendanceRecordType.Sick => Translate("Sick"),
+                AttendanceRecordType.Vacation => Translate("Vacation"),
+                AttendanceRecordType.Personal => Translate("Personal"),
+                AttendanceRecordType.Bereavement => Translate("Bereavement"),
+                _ => Translate("Tardy")
             };
         }
 
@@ -883,7 +954,7 @@ namespace hOps.web.Controllers
             property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["AttendanceError"] = "Select a property to use the Attendance Tracker.";
+                TempData["AttendanceError"] = Translate("Select a property to use the Attendance Tracker.");
                 redirect = RedirectToAction(nameof(Index));
                 return false;
             }
@@ -902,6 +973,6 @@ namespace hOps.web.Controllers
             return string.IsNullOrEmpty(trimmed) ? null : trimmed;
         }
 
-        private sealed record AttendanceCodeMetadata(string Code, string Label, bool IsExcused);
+        private sealed record AttendanceCodeMetadata(string Code, bool IsExcused);
     }
 }

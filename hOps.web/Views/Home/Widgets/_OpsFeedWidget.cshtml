@@ -1,20 +1,28 @@
+﻿@using System.Globalization
 @model hOps.web.ViewModels.Home.HomeIndexViewModel
 
 <div class="card shadow-sm h-100" id="opsFeed">
     <div class="card-header d-flex align-items-center justify-content-between">
-        <h2 class="h5 mb-0">Ops Feed</h2>
-        <a class="btn btn-sm btn-outline-primary" asp-controller="PassOnLogs" asp-action="Create">Post Update</a>
+        <h2 class="h5 mb-0">@Html.Localize("Ops Feed")</h2>
+        <a class="btn btn-sm btn-outline-primary" asp-controller="PassOnLogs" asp-action="Create">@Html.Localize("Post Update")</a>
     </div>
     <div class="card-body">
         @if (!Model.ActivityFeed.Any())
         {
-            <p class="text-muted mb-0">No recent activity yet. Updates from bulletins, pass on logs, mentions, and work orders will appear here.</p>
+            <p class="text-muted mb-0">@Html.Localize("No recent activity yet. Updates from bulletins, pass on logs, mentions, and work orders will appear here.")</p>
         }
         else
         {
             <div class="ops-feed">
                 @foreach (var item in Model.ActivityFeed)
                 {
+                    var entityIdSeed = !string.IsNullOrWhiteSpace(item.LinkUrl)
+                        ? item.LinkUrl
+                        : $"{item.ItemType}_{item.PassOnLogId?.ToString(CultureInfo.InvariantCulture) ?? "0"}";
+                    var titleDisplay = await Html.DisplayTranslatedTextAsync("ActivityFeed", entityIdSeed, "Title", item.Title ?? string.Empty);
+                    var previewDisplay = await Html.DisplayTranslatedTextAsync("ActivityFeed", entityIdSeed, "Preview", item.Preview ?? string.Empty);
+                    var metaDisplay = await Html.DisplayTranslatedTextAsync("ActivityFeed", entityIdSeed, "Meta", item.Meta ?? string.Empty);
+                    var creatorDisplay = string.IsNullOrWhiteSpace(item.CreatorName) ? Html.Localize("Unknown") : item.CreatorName;
                     <article class="ops-feed__item">
                         <div class="ops-feed__avatar">
                             @if (item.Avatar != null)
@@ -23,39 +31,39 @@
                             }
                             else
                             {
-                                <span class="ops-feed__avatar-fallback">@item.Title?.FirstOrDefault()</span>
+                                <span class="ops-feed__avatar-fallback">@(string.IsNullOrWhiteSpace(titleDisplay) ? '?' : titleDisplay.FirstOrDefault())</span>
                             }
                         </div>
                         <div class="ops-feed__body">
                             <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-                                <div class="fw-semibold">@item.Title</div>
+                                <div class="fw-semibold">@titleDisplay</div>
                                 @if (!string.IsNullOrWhiteSpace(item.BadgeText))
                                 {
                                     var badgeClass = string.IsNullOrWhiteSpace(item.BadgeClass) ? "badge bg-secondary" : item.BadgeClass;
-                                    <span class="@badgeClass">@item.BadgeText</span>
+                                    <span class="@badgeClass">@Html.Localize(item.BadgeText)</span>
                                 }
                     </div>
                     <div class="text-muted small d-flex flex-wrap align-items-center gap-1">
-                        @if (!string.IsNullOrWhiteSpace(item.CreatorName))
+                        @if (!string.IsNullOrWhiteSpace(creatorDisplay))
                         {
-                            <span class="fw-semibold text-body">@item.CreatorName</span>
-                            <span aria-hidden="true" class="text-muted mx-1">•</span>
+                            <span class="fw-semibold text-body">@creatorDisplay</span>
+                            <span aria-hidden="true" class="text-muted mx-1">â€¢</span>
                         }
-                        <span>@TimeZoneService.ConvertToUserTime(item.OccurredAt).ToString("g")</span>
-                        @if (!string.IsNullOrWhiteSpace(item.Meta))
+                        <span>@TimeZoneService.ConvertToUserTime(item.OccurredAt).ToString("g", CultureInfo.CurrentCulture)</span>
+                        @if (!string.IsNullOrWhiteSpace(metaDisplay))
                         {
-                            <span class="text-muted mx-1" aria-hidden="true">•</span>
-                            <span>@item.Meta</span>
+                            <span class="text-muted mx-1" aria-hidden="true">â€¢</span>
+                            <span>@metaDisplay</span>
                         }
                     </div>
-                            @if (!string.IsNullOrWhiteSpace(item.Preview))
+                            @if (!string.IsNullOrWhiteSpace(previewDisplay))
                             {
-                                <p class="mb-2 text-body-secondary ops-feed__preview">@item.Preview</p>
+                                <p class="mb-2 text-body-secondary ops-feed__preview">@previewDisplay</p>
                             }
                             <div class="d-flex flex-wrap gap-2 mb-2">
                                 @if (!string.IsNullOrWhiteSpace(item.LinkUrl))
                                 {
-                                    <a class="btn btn-sm btn-outline-primary" href="@item.LinkUrl">Open</a>
+                                    <a class="btn btn-sm btn-outline-primary" href="@item.LinkUrl">@Html.Localize("Open")</a>
                                 }
                             </div>
                             @if (item.CanReply && item.PassOnLogId.HasValue)
@@ -64,9 +72,9 @@
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="NewComment.LogId" value="@item.PassOnLogId" />
                                     <input type="hidden" name="NewComment.ReturnUrl" value="@(item.ReplyReturnUrl ?? $"{Url.Action("Index", "Home") ?? "/"}#opsFeed")" />
-                                    <textarea class="form-control" name="NewComment.Body" rows="2" maxlength="2000" placeholder="@item.ReplyPlaceholder" required></textarea>
+                                    <textarea class="form-control" name="NewComment.Body" rows="2" maxlength="2000" placeholder="@Html.Localize(item.ReplyPlaceholder ?? string.Empty)" required></textarea>
                                     <div class="text-end mt-2">
-                                        <button type="submit" class="btn btn-sm btn-primary">Reply</button>
+                                        <button type="submit" class="btn btn-sm btn-primary">@Html.Localize("Reply")</button>
                                     </div>
                                 </form>
                             }
@@ -77,3 +85,7 @@
         }
     </div>
 </div>
+
+
+
+

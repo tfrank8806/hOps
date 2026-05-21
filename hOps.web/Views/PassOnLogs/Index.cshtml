@@ -1,7 +1,6 @@
+@using System.Globalization
 @model hOps.web.ViewModels.PassOnLogIndexViewModel
 @{ 
-    var activeLanguage = Html.GetActiveLanguage();
-    var isDefaultLanguage = string.Equals(activeLanguage, LanguageConstants.English, StringComparison.OrdinalIgnoreCase);
     ViewData["Title"] = Html.Localize("Pass On Logs");
     ViewData["MainContainerClass"] = "main-inner--wide";
     var hasActiveFilters =
@@ -169,8 +168,9 @@ else
     <div class="list-group">
         @foreach (var log in Model.Logs)
         {
-            var displayTitle = !isDefaultLanguage && !string.IsNullOrWhiteSpace(log.TranslatedTitle) ? log.TranslatedTitle : log.Title;
-            var displayPreview = !isDefaultLanguage && !string.IsNullOrWhiteSpace(log.TranslatedPreview) ? log.TranslatedPreview : log.Preview;
+            var logId = log.Id.ToString(CultureInfo.InvariantCulture);
+            var displayTitle = await Html.DisplayTranslatedTextAsync("PassOnLog", logId, "Title", log.Title);
+            var displayPreview = await Html.DisplayTranslatedTextAsync("PassOnLog", logId, "Preview", log.Preview);
             var byLabel = Html.Localize("By");
             var unreadLabel = Html.Localize("Unread");
             var propertiesLabel = Html.Localize("Properties:");

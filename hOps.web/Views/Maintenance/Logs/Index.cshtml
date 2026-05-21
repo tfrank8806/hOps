@@ -1,18 +1,21 @@
+@using System.Globalization
+@using System.Text.Encodings.Web
 @using Microsoft.AspNetCore.Html
 @model hOps.web.ViewModels.Maintenance.MaintenanceLogsIndexViewModel
 
 @{
-    ViewData["Title"] = "Maintenance Logs";
+    var pageTitle = Html.Localize("Maintenance Logs");
+    ViewData["Title"] = pageTitle;
     var message = ViewBag.MaintenanceLogMessage as string;
     var error = ViewBag.MaintenanceLogError as string;
     var groups = new (string Title, IReadOnlyList<hOps.web.ViewModels.Maintenance.MaintenanceLogTemplateListItemViewModel> Items)[]
     {
-        ("Daily Logs", Model.DailyTemplates),
-        ("Weekly Logs", Model.WeeklyTemplates),
-        ("Monthly Logs", Model.MonthlyTemplates),
-        ("Bi-Annual Logs", Model.BiAnnualTemplates),
-        ("Quarterly Logs", Model.QuarterlyTemplates),
-        ("Annual Logs", Model.AnnualTemplates)
+        (Html.Localize("Daily Logs"), Model.DailyTemplates),
+        (Html.Localize("Weekly Logs"), Model.WeeklyTemplates),
+        (Html.Localize("Monthly Logs"), Model.MonthlyTemplates),
+        (Html.Localize("Bi-Annual Logs"), Model.BiAnnualTemplates),
+        (Html.Localize("Quarterly Logs"), Model.QuarterlyTemplates),
+        (Html.Localize("Annual Logs"), Model.AnnualTemplates)
     };
     var hasAnyTemplates = Model.DailyTemplates.Any()
         || Model.WeeklyTemplates.Any()
@@ -41,69 +44,69 @@
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
-            <h2 class="mb-0">Maintenance Logs</h2>
+            <h2 class="mb-0">@pageTitle</h2>
             <p class="text-muted mb-0">@Model.PropertyName</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            <a asp-action="EmergencyExitLights" class="btn btn-outline-primary btn-sm">Emergency/Exit Light Log</a>
+            <a asp-action="EmergencyExitLights" class="btn btn-outline-primary btn-sm">@Html.Localize("Emergency/Exit Light Log")</a>
             @if (Model.CanManage)
             {
-                <a asp-action="Create" class="btn btn-primary btn-sm">Create New Log</a>
+                <a asp-action="Create" class="btn btn-primary btn-sm">@Html.Localize("Create New Log")</a>
             }
         </div>
     </div>
 
-    @if (!string.IsNullOrWhiteSpace(message))
-    {
-        <div class="alert alert-success">@message</div>
-    }
-    @if (!string.IsNullOrWhiteSpace(error))
-    {
-        <div class="alert alert-danger">@error</div>
-    }
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert alert-success">@Html.Localize(message)</div>
+}
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@Html.Localize(error)</div>
+}
 
     <form method="get" class="card shadow-sm mb-4">
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-3">
-                    <label class="form-label" for="scheduleFilter">Schedule</label>
+                    <label class="form-label" for="scheduleFilter">@Html.Localize("Schedule")</label>
                     <select class="form-select" id="scheduleFilter" name="schedule">
-                        <option value="">All schedules</option>
-                        <option value="Daily" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Daily ? "selected" : null)">Daily</option>
-                        <option value="Weekly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Weekly ? "selected" : null)">Weekly</option>
-                        <option value="Monthly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Monthly ? "selected" : null)">Monthly</option>
-                        <option value="BiAnnual" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.BiAnnual ? "selected" : null)">Bi-Annual</option>
-                        <option value="Quarterly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Quarterly ? "selected" : null)">Quarterly</option>
-                        <option value="Yearly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Yearly ? "selected" : null)">Annual</option>
+                        <option value="">@Html.Localize("All schedules")</option>
+                        <option value="Daily" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Daily ? "selected" : null)">@Html.Localize("Daily")</option>
+                        <option value="Weekly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Weekly ? "selected" : null)">@Html.Localize("Weekly")</option>
+                        <option value="Monthly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Monthly ? "selected" : null)">@Html.Localize("Monthly")</option>
+                        <option value="BiAnnual" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.BiAnnual ? "selected" : null)">@Html.Localize("Bi-Annual")</option>
+                        <option value="Quarterly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Quarterly ? "selected" : null)">@Html.Localize("Quarterly")</option>
+                        <option value="Yearly" selected="@(Model.Filters.ScheduleFilter == hOps.web.Models.MaintenanceLogScheduleType.Yearly ? "selected" : null)">@Html.Localize("Annual")</option>
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label" for="statusFilter">Status</label>
+                    <label class="form-label" for="statusFilter">@Html.Localize("Status")</label>
                     <select class="form-select" id="statusFilter" name="status">
-                        <option value="">All statuses</option>
-                        <option value="Passed" selected="@(Model.Filters.StatusFilter?.Equals("Passed", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Passed</option>
-                        <option value="Failed" selected="@(Model.Filters.StatusFilter?.Equals("Failed", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Failed</option>
-                        <option value="Due" selected="@(Model.Filters.StatusFilter?.Equals("Due", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Due</option>
-                        <option value="Overdue" selected="@(Model.Filters.StatusFilter?.Equals("Overdue", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Overdue</option>
-                        <option value="Upcoming" selected="@(Model.Filters.StatusFilter?.Equals("Upcoming", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Upcoming</option>
+                        <option value="">@Html.Localize("All statuses")</option>
+                        <option value="Passed" selected="@(Model.Filters.StatusFilter?.Equals("Passed", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">@Html.Localize("Passed")</option>
+                        <option value="Failed" selected="@(Model.Filters.StatusFilter?.Equals("Failed", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">@Html.Localize("Failed")</option>
+                        <option value="Due" selected="@(Model.Filters.StatusFilter?.Equals("Due", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">@Html.Localize("Due")</option>
+                        <option value="Overdue" selected="@(Model.Filters.StatusFilter?.Equals("Overdue", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">@Html.Localize("Overdue")</option>
+                        <option value="Upcoming" selected="@(Model.Filters.StatusFilter?.Equals("Upcoming", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">@Html.Localize("Upcoming")</option>
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label" for="completionFilter">Completion</label>
+                    <label class="form-label" for="completionFilter">@Html.Localize("Completion")</label>
                     <select class="form-select" id="completionFilter" name="completion">
-                        <option value="">Completed &amp; pending</option>
-                        <option value="completed" selected="@(Model.Filters.CompletionFilter?.Equals("completed", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Completed cycles</option>
-                        <option value="notcompleted" selected="@(Model.Filters.CompletionFilter?.Equals("notcompleted", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Due or overdue</option>
+                        <option value="">@Html.Localize("Completed & pending")</option>
+                        <option value="completed" selected="@(Model.Filters.CompletionFilter?.Equals("completed", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">@Html.Localize("Completed cycles")</option>
+                        <option value="notcompleted" selected="@(Model.Filters.CompletionFilter?.Equals("notcompleted", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">@Html.Localize("Due or overdue")</option>
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label" for="nameFilter">Template</label>
-                    <input type="text" id="nameFilter" name="name" value="@Model.Filters.NameQuery" class="form-control" placeholder="Search by name" />
+                    <label class="form-label" for="nameFilter">@Html.Localize("Template")</label>
+                    <input type="text" id="nameFilter" name="name" value="@Model.Filters.NameQuery" class="form-control" placeholder="@Html.Localize("Search by name")" />
                 </div>
             </div>
             <div class="d-flex gap-2 justify-content-end mt-3">
-                <button type="submit" class="btn btn-primary btn-sm">Apply Filters</button>
-                <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Clear</a>
+                <button type="submit" class="btn btn-primary btn-sm">@Html.Localize("Apply Filters")</button>
+                <a asp-action="Index" class="btn btn-outline-secondary btn-sm">@Html.Localize("Clear")</a>
             </div>
         </div>
     </form>
@@ -130,34 +133,56 @@
                 @foreach (var template in group.Items)
                 {
                     var latestCycle = template.VisibleCycles.FirstOrDefault();
+                    var templateIdString = template.TemplateId.ToString(CultureInfo.InvariantCulture);
+                    var translatedTemplateName = await Html.DisplayTranslatedTextAsync("MaintenanceLogTemplate", templateIdString, "Name", template.Name);
+                    if (string.IsNullOrWhiteSpace(translatedTemplateName))
+                    {
+                        translatedTemplateName = template.Name;
+                    }
+
+                    var translatedScheduleSummary = await Html.DisplayTranslatedTextAsync("MaintenanceLogTemplate", templateIdString, "ScheduleSummary", template.ScheduleSummary);
+                    if (string.IsNullOrWhiteSpace(translatedScheduleSummary))
+                    {
+                        translatedScheduleSummary = template.ScheduleSummary;
+                    }
+
+                    var latestStatusLabel = Html.Localize($"MaintenanceLog.Status.{template.LatestStatus}");
+                    if (string.IsNullOrWhiteSpace(latestStatusLabel))
+                    {
+                        latestStatusLabel = template.LatestStatus.ToString();
+                    }
+
                     <div class="card shadow-sm mb-3 cycle-card @(template.IsOverdue ? "border-danger" : null)">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                                 <div>
-                                    <h5 class="mb-1">@template.Name</h5>
-                                    <p class="text-muted mb-0">@template.ScheduleSummary</p>
+                                    <h5 class="mb-1">@translatedTemplateName</h5>
+                                    @if (!string.IsNullOrWhiteSpace(translatedScheduleSummary))
+                                    {
+                                        <p class="text-muted mb-0">@translatedScheduleSummary</p>
+                                    }
                                 </div>
                                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                                    <span class="badge @GetStatusBadgeClass(template.LatestStatus)">@template.LatestStatus</span>
+                                    <span class="badge @GetStatusBadgeClass(template.LatestStatus)">@latestStatusLabel</span>
                                     @if (template.IsOverdue)
                                     {
-                                        <span class="badge bg-danger">Overdue</span>
+                                        <span class="badge bg-danger">@Html.Localize("Overdue")</span>
                                     }
                                     else if (latestCycle?.IsLate == true)
                                     {
-                                        <span class="badge bg-warning text-dark">Late</span>
+                                        <span class="badge bg-warning text-dark">@Html.Localize("Late")</span>
                                     }
                                     <div class="d-flex gap-2 flex-wrap">
                                         @if (template.HasChecklistFile)
                                         {
-                                            <a href="@template.ChecklistFilePath" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener">Download Checklist</a>
+                                            <a href="@template.ChecklistFilePath" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener">@Html.Localize("Download Checklist")</a>
                                         }
                                         @if (Model.CanManage)
                                         {
                                             <a asp-action="Checklist"
                                                asp-route-id="@template.TemplateId"
                                                asp-route-returnUrl="@checklistReturnUrl"
-                                               class="btn btn-outline-primary btn-sm">Checklist</a>
+                                               class="btn btn-outline-primary btn-sm">@Html.Localize("Checklist")</a>
                                         }
                                     </div>
                                 </div>
@@ -166,7 +191,6 @@
                                 @foreach (var cycle in template.VisibleCycles)
                                 {
                                     var cellClass = $"cycle-cell status-{cycle.Status.ToString().ToLowerInvariant()}";
-                                    var routeValues = new { templateId = template.TemplateId, windowKey = cycle.WindowKey };
                                     if (cycle.Status == hOps.web.Models.MaintenanceLogCycleStatusKind.Upcoming)
                                     {
                                         <div class="@cellClass">
@@ -190,19 +214,35 @@
         @if (Model.OtherTemplates.Any())
         {
             <section class="mb-4">
-                <h4 class="h5 mb-3">Other Schedules</h4>
+                <h4 class="h5 mb-3">@Html.Localize("Other Schedules")</h4>
                 @foreach (var template in Model.OtherTemplates)
                 {
+                    var templateIdString = template.TemplateId.ToString(CultureInfo.InvariantCulture);
+                    var translatedTemplateName = await Html.DisplayTranslatedTextAsync("MaintenanceLogTemplate", templateIdString, "Name", template.Name);
+                    if (string.IsNullOrWhiteSpace(translatedTemplateName))
+                    {
+                        translatedTemplateName = template.Name;
+                    }
+
+                    var translatedScheduleSummary = await Html.DisplayTranslatedTextAsync("MaintenanceLogTemplate", templateIdString, "ScheduleSummary", template.ScheduleSummary);
+                    if (string.IsNullOrWhiteSpace(translatedScheduleSummary))
+                    {
+                        translatedScheduleSummary = template.ScheduleSummary;
+                    }
+
                     <div class="card shadow-sm mb-3">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <div>
-                                    <h5 class="mb-1">@template.Name</h5>
-                                    <p class="text-muted mb-0">@template.ScheduleSummary</p>
+                                    <h5 class="mb-1">@translatedTemplateName</h5>
+                                    @if (!string.IsNullOrWhiteSpace(translatedScheduleSummary))
+                                    {
+                                        <p class="text-muted mb-0">@translatedScheduleSummary</p>
+                                    }
                                 </div>
-                                <span class="badge bg-secondary">Legacy schedule</span>
+                                <span class="badge bg-secondary">@Html.Localize("Legacy schedule")</span>
                             </div>
-                            <p class="text-muted mt-3 mb-0 small">Cycle history will be available once this template moves to a supported schedule (daily/weekly/monthly/bi-annual/quarterly/annual).</p>
+                            <p class="text-muted mt-3 mb-0 small">@Html.Localize("Cycle history will be available once this template moves to a supported schedule (daily/weekly/monthly/bi-annual/quarterly/annual).")</p>
                         </div>
                     </div>
                 }
@@ -217,7 +257,7 @@
             <input type="hidden" name="completion" value="@Model.Filters.CompletionFilter" />
             <input type="hidden" name="name" value="@Model.Filters.NameQuery" />
             <input type="hidden" name="history" value="@(Model.AdditionalHistoryBlocks + 1)" />
-            <button type="submit" class="btn btn-outline-secondary btn-sm" @(Model.CanLoadMoreHistory ? null : "disabled")>Load older history</button>
+            <button type="submit" class="btn btn-outline-secondary btn-sm" @(Model.CanLoadMoreHistory ? null : "disabled")>@Html.Localize("Load older history")</button>
         </form>
     </div>
 </div>
@@ -233,39 +273,63 @@
         _ => "badge bg-secondary"
     };
 
-    private static IHtmlContent CycleCellContent(hOps.web.ViewModels.Maintenance.MaintenanceLogCycleHistoryItemViewModel cycle)
+    private IHtmlContent CycleCellContent(hOps.web.ViewModels.Maintenance.MaintenanceLogCycleHistoryItemViewModel cycle)
     {
         var builder = new System.Text.StringBuilder();
+        var encoder = HtmlEncoder.Default;
+        var rangeStart = cycle.StartLocal.ToString("MMM d");
+        var rangeEnd = cycle.DueLocal.ToString("MMM d");
         builder.Append("<div class='cycle-range'>")
-            .Append(cycle.StartLocal.ToString("MMM d"))
+            .Append(encoder.Encode(rangeStart))
             .Append(" &ndash; ")
-            .Append(cycle.DueLocal.ToString("MMM d"))
+            .Append(encoder.Encode(rangeEnd))
             .Append("</div>");
-        builder.Append("<div class='status-label'>").Append(cycle.Status).Append("</div>");
+        var statusLabel = Html.Localize($"MaintenanceLog.Status.{cycle.Status}");
+        if (string.IsNullOrWhiteSpace(statusLabel))
+        {
+            statusLabel = cycle.Status.ToString();
+        }
+        builder.Append("<div class='status-label'>").Append(encoder.Encode(statusLabel)).Append("</div>");
         if (cycle.LatestCompletion != null)
         {
-            var timestamp = cycle.LatestCompletion.CompletedAtLocal?.ToString("MMM d, h:mm tt") ?? "Recorded";
-            builder.Append("<div class='small text-muted'>Completed ")
-                .Append(timestamp)
-                .Append("</div>");
+            var timestamp = cycle.LatestCompletion.CompletedAtLocal?.ToString("MMM d, h:mm tt") ?? Html.Localize("Recorded");
+            var completionText = string.Format(CultureInfo.InvariantCulture, Html.Localize("Completed {0}"), timestamp);
+            builder.Append("<div class='small text-muted'>")
+                .Append(encoder.Encode(completionText));
+            if (!string.IsNullOrWhiteSpace(cycle.LatestCompletion.CompletedByName))
+            {
+                var completedBy = string.Format(CultureInfo.InvariantCulture, Html.Localize("By {0}"), cycle.LatestCompletion.CompletedByName);
+                builder.Append("<span class='ms-1'>")
+                    .Append(encoder.Encode(completedBy))
+                    .Append("</span>");
+            }
+            builder.Append("</div>");
         }
         else if (cycle.LegacyEntries.Count > 0)
         {
-            builder.Append("<div class='small text-muted'>Legacy records</div>");
+            builder.Append("<div class='small text-muted'>")
+                .Append(encoder.Encode(Html.Localize("Legacy records")))
+                .Append("</div>");
         }
         else
         {
-            builder.Append("<div class='small text-muted'>No completion</div>");
+            builder.Append("<div class='small text-muted'>")
+                .Append(encoder.Encode(Html.Localize("No completion")))
+                .Append("</div>");
         }
 
         if (cycle.IsLate)
         {
-            builder.Append("<div class='badge bg-warning text-dark mt-2'>Late</div>");
+            builder.Append("<div class='badge bg-warning text-dark mt-2'>")
+                .Append(encoder.Encode(Html.Localize("Late")))
+                .Append("</div>");
         }
 
         if (cycle.LegacyEntries.Count > 0)
         {
-            builder.Append("<div class='badge bg-light text-dark border mt-2'>Legacy</div>");
+            builder.Append("<div class='badge bg-light text-dark border mt-2'>")
+                .Append(encoder.Encode(Html.Localize("Legacy")))
+                .Append("</div>");
         }
 
         return new HtmlString(builder.ToString());

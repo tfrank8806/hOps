@@ -3,13 +3,26 @@
 @using System.Text.Json
 
 @{
-    ViewData["Title"] = "Supply Inventory";
+    ViewData["Title"] = Html.Localize("SupplyInventory.Title", "Supply Inventory").ToString();
     var serializerOptions = new JsonSerializerOptions
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
     var templateJson = JsonSerializer.Serialize(Model.TemplateItems, serializerOptions);
     var defaultBudget = Model.DefaultMonthlyBudget.ToString("0.##", CultureInfo.InvariantCulture);
+    var propertyDisplayName = string.IsNullOrWhiteSpace(Model.PropertyName)
+        ? string.Empty
+        : await Html.DisplayTranslatedTextAsync("Property", Model.PropertyId.ToString(CultureInfo.InvariantCulture), "Name", Model.PropertyName ?? string.Empty);
+    var templateItemCount = Model.TemplateItems?.Count ?? 0;
+    var itemCountSingular = Html.Localize("SupplyInventory.Template.SingleItem", "1 item").ToString();
+    var itemCountPlural = Html.Localize("SupplyInventory.Template.MultipleItems", "{0} items").ToString();
+    var templateItemCountText = templateItemCount == 1
+        ? (!string.IsNullOrEmpty(itemCountSingular) ? itemCountSingular : "1 item")
+        : string.Format(CultureInfo.InvariantCulture, !string.IsNullOrEmpty(itemCountPlural) ? itemCountPlural : "{0} items", templateItemCount);
+    var snapshotScopeTemplate = Html.Localize("SupplyInventory.Snapshot.Scope", "Snapshots are scoped to {0} and available anywhere you sign in.").ToString();
+    var snapshotScopeFallback = Html.Localize("SupplyInventory.Snapshot.ScopeFallback", "this property").ToString();
+    var snapshotScopeTarget = string.IsNullOrWhiteSpace(propertyDisplayName) ? snapshotScopeFallback : propertyDisplayName;
+    var snapshotScopeText = string.Format(CultureInfo.CurrentCulture, snapshotScopeTemplate, snapshotScopeTarget);
 }
 
 @section Styles {
@@ -34,27 +47,27 @@
 
 <div class="d-flex justify-content-between align-items-start flex-wrap mb-3">
     <div class="mb-3 mb-md-0">
-        <h1 class="h3 mb-1">Supply Inventory</h1>
-        <p class="text-muted mb-0">@Model.PropertyName</p>
+        <h1 class="h3 mb-1">@Html.Localize("SupplyInventory.Title", "Supply Inventory")</h1>
+        <p class="text-muted mb-0">@propertyDisplayName</p>
     </div>
     <div class="text-md-end">
-        <button type="button" class="btn btn-primary btn-sm me-2" data-action="add-item">Add Item</button>
-        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to Linen Inventory</a>
+        <button type="button" class="btn btn-primary btn-sm me-2" data-action="add-item">@Html.Localize("SupplyInventory.Button.AddItem", "Add Item")</button>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">@Html.Localize("SupplyInventory.Button.BackToLinen", "Back to Linen Inventory")</a>
     </div>
 </div>
 
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
-            <h2 class="h5 mb-0">Monthly Budget Overview</h2>
-            <small class="text-muted">Same layout as the worksheet summary line</small>
+            <h2 class="h5 mb-0">@Html.Localize("SupplyInventory.Section.MonthlyBudgetOverview", "Monthly Budget Overview")</h2>
+            <small class="text-muted">@Html.Localize("SupplyInventory.Section.MonthlyBudgetOverviewHelp", "Same layout as the worksheet summary line.")</small>
         </div>
-        <div class="text-muted small" data-role="save-status">Waiting for changes&hellip;</div>
+        <div class="text-muted small" data-role="save-status">@Html.Localize("SupplyInventory.Status.WaitingForChanges", "Waiting for changes...")</div>
     </div>
     <div class="card-body">
         <div class="row g-4 row-cols-1 row-cols-md-2 row-cols-xl-4">
             <div class="col">
-                <label class="form-label fw-semibold" for="monthlyBudgetInput">Monthly Budget</label>
+                <label class="form-label fw-semibold" for="monthlyBudgetInput">@Html.Localize("SupplyInventory.Label.MonthlyBudget", "Monthly Budget")</label>
                 <div class="input-group">
                     <span class="input-group-text">$</span>
                     <input type="number"
@@ -65,22 +78,22 @@
                            step="0.01"
                            value="@(Model.DefaultMonthlyBudget == 0 ? string.Empty : Model.DefaultMonthlyBudget.ToString("0.##"))" />
                 </div>
-                <div class="form-text">Auto-saves per property in the hOps database.</div>
+                <div class="form-text">@Html.Localize("SupplyInventory.Help.MonthlyBudget", "Auto-saves per property in the hOps database.")</div>
             </div>
             <div class="col">
-                <div class="text-muted text-uppercase small mb-1">Total Inventory Value</div>
+                <div class="text-muted text-uppercase small mb-1">@Html.Localize("SupplyInventory.Label.TotalInventoryValue", "Total Inventory Value")</div>
                 <div class="fw-semibold fs-3" data-role="total-inventory-value">$0.00</div>
-                <div class="text-muted small">Inventory Count multiplied by Unit Price.</div>
+                <div class="text-muted small">@Html.Localize("SupplyInventory.Help.TotalInventoryValue", "Inventory Count multiplied by Unit Price.")</div>
             </div>
             <div class="col">
-                <div class="text-muted text-uppercase small mb-1">Total Order Cost</div>
+                <div class="text-muted text-uppercase small mb-1">@Html.Localize("SupplyInventory.Label.TotalOrderCost", "Total Order Cost")</div>
                 <div class="fw-semibold fs-3" data-role="total-order-cost">$0.00</div>
-                <div class="text-muted small">Sum of the Order Cost column.</div>
+                <div class="text-muted small">@Html.Localize("SupplyInventory.Help.TotalOrderCost", "Sum of the Order Cost column.")</div>
             </div>
             <div class="col">
-                <div class="text-muted text-uppercase small mb-1">Variance to Budget</div>
+                <div class="text-muted text-uppercase small mb-1">@Html.Localize("SupplyInventory.Label.BudgetVariance", "Variance to Budget")</div>
                 <div class="fw-semibold fs-3" data-role="budget-variance">$0.00</div>
-                <div class="text-muted small">Budget minus Total Order Cost.</div>
+                <div class="text-muted small">@Html.Localize("SupplyInventory.Help.BudgetVariance", "Budget minus Total Order Cost.")</div>
             </div>
         </div>
     </div>
@@ -89,16 +102,16 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
-            <h2 class="h5 mb-0">Supply Worksheet</h2>
-            <small class="text-muted">Columns mirror Inventory Count &rarr; Order Cost</small>
+            <h2 class="h5 mb-0">@Html.Localize("SupplyInventory.Section.Worksheet", "Supply Worksheet")</h2>
+            <small class="text-muted">@Html.Localize("SupplyInventory.Section.WorksheetHelp", "Columns mirror Inventory Count to Order Cost.")</small>
         </div>
         <div class="d-flex align-items-center gap-3 flex-wrap">
-            <span class="text-muted small" data-role="item-count">@Model.TemplateItems.Count item(s)</span>
+            <span class="text-muted small" data-role="item-count">@templateItemCountText</span>
             <button type="button" class="btn btn-outline-primary btn-sm" data-action="save-history">
-                Save Snapshot
+                @Html.Localize("SupplyInventory.Button.SaveSnapshot", "Save Snapshot")
             </button>
             <button type="button" class="btn btn-outline-secondary btn-sm" data-action="reset-template">
-                Reset to Template
+                @Html.Localize("SupplyInventory.Button.ResetTemplate", "Reset to Template")
             </button>
         </div>
     </div>
@@ -106,16 +119,16 @@
         <table class="table table-sm align-middle mb-0 supply-inventory-table">
             <thead class="table-light align-middle text-center">
                 <tr>
-                    <th scope="col">Inventory<br />Count</th>
-                    <th scope="col" class="text-start">Item</th>
-                    <th scope="col" class="text-start">Description</th>
-                    <th scope="col" class="text-start">Part Number</th>
-                    <th scope="col">Unit Price</th>
-                    <th scope="col">Inventory Value</th>
-                    <th scope="col">Qty / Case</th>
-                    <th scope="col">Order Case Count</th>
-                    <th scope="col">Order Cost</th>
-                    <th scope="col" class="text-start">Actions</th>
+                    <th scope="col">@Html.Localize("SupplyInventory.Table.InventoryCount", "Inventory<br />Count")</th>
+                    <th scope="col" class="text-start">@Html.Localize("SupplyInventory.Table.Item", "Item")</th>
+                    <th scope="col" class="text-start">@Html.Localize("SupplyInventory.Table.Description", "Description")</th>
+                    <th scope="col" class="text-start">@Html.Localize("SupplyInventory.Table.PartNumber", "Part Number")</th>
+                    <th scope="col">@Html.Localize("SupplyInventory.Table.UnitPrice", "Unit Price")</th>
+                    <th scope="col">@Html.Localize("SupplyInventory.Table.InventoryValue", "Inventory Value")</th>
+                    <th scope="col">@Html.Localize("SupplyInventory.Table.QuantityPerCase", "Qty / Case")</th>
+                    <th scope="col">@Html.Localize("SupplyInventory.Table.OrderCaseCount", "Order Case Count")</th>
+                    <th scope="col">@Html.Localize("SupplyInventory.Table.OrderCost", "Order Cost")</th>
+                    <th scope="col" class="text-start">@Html.Localize("SupplyInventory.Table.Actions", "Actions")</th>
                 </tr>
             </thead>
             <tbody id="supplyInventoryRows"></tbody>
@@ -126,24 +139,24 @@
 <div class="card mt-4" data-role="history-card">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
-            <h2 class="h5 mb-0">Snapshot History</h2>
-            <small class="text-muted">Save versions to the server and reload them anytime</small>
+            <h2 class="h5 mb-0">@Html.Localize("SupplyInventory.Section.SnapshotHistory", "Snapshot History")</h2>
+            <small class="text-muted">@Html.Localize("SupplyInventory.Section.SnapshotHistoryHelp", "Save versions to the server and reload them anytime")</small>
         </div>
-        <small class="text-muted">Snapshots are scoped to @Model.PropertyName and available anywhere you sign in.</small>
+        <small class="text-muted">@snapshotScopeText</small>
     </div>
     <div class="card-body">
         <div class="alert alert-info mb-0" data-role="history-empty">
-            No history yet. Save your first supply snapshot to populate this log.
+            @Html.Localize("SupplyInventory.Snapshot.EmptyState", "No history yet. Save your first supply snapshot to populate this log.")
         </div>
         <div class="table-responsive d-none" data-role="history-table-wrapper">
             <table class="table table-sm table-bordered align-middle mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>Saved On</th>
-                        <th class="text-end">Monthly Budget</th>
-                        <th class="text-end">Inventory Value</th>
-                        <th class="text-end">Order Cost</th>
-                        <th style="width:160px;">Actions</th>
+                        <th>@Html.Localize("SupplyInventory.Snapshot.Column.SavedOn", "Saved On")</th>
+                        <th class="text-end">@Html.Localize("SupplyInventory.Snapshot.Column.MonthlyBudget", "Monthly Budget")</th>
+                        <th class="text-end">@Html.Localize("SupplyInventory.Snapshot.Column.InventoryValue", "Inventory Value")</th>
+                        <th class="text-end">@Html.Localize("SupplyInventory.Snapshot.Column.OrderCost", "Order Cost")</th>
+                        <th style="width:160px;">@Html.Localize("SupplyInventory.Snapshot.Column.Actions", "Actions")</th>
                     </tr>
                 </thead>
                 <tbody data-role="history-rows"></tbody>

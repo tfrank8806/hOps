@@ -3,11 +3,15 @@
 
     ensureGridShim();
 
+    const translate = typeof window.hopsTranslate === 'function'
+        ? window.hopsTranslate
+        : (key, fallback) => (typeof fallback === 'string' && fallback.length ? fallback : key);
+
     const storageKey = 'hops.logs.v1';
     const defaultRows = 10;
     const defaultColumns = 6;
     const storageActiveLogKey = `${storageKey}.active`;
-    const DEFAULT_USER_NAME = 'Unknown user';
+    const DEFAULT_USER_NAME = translate("Unknown user", "Unknown user");
     const MIN_ZOOM = 0.75;
     const MAX_ZOOM = 1.5;
     const ZOOM_STEP = 0.1;
@@ -42,8 +46,8 @@
     let logsLayoutElement = null;
     let logsSidebarOverlayElement = null;
     let sidebarToggleLabelEl = null;
-    let sidebarToggleOpenLabel = 'Show Logs';
-    let sidebarToggleCloseLabel = 'Hide Logs';
+    let sidebarToggleOpenLabel = translate("Show Logs", "Show Logs");
+    let sidebarToggleCloseLabel = translate("Hide Logs", "Hide Logs");
     let exportExcelButton = null;
     let undoButton = null;
     let zoomInButton = null;
@@ -423,7 +427,19 @@
         }
         const previousValue = cell.value ?? '';
         cell.value = rawValue;
-        recordAudit(log, 'Updated cell', `Updated ${formatCellLabel(rowIndex, columnIndex)} from ${formatAuditValue(previousValue)} to ${formatAuditValue(rawValue)}.`);
+        const updatedCellLabel = formatCellLabel(rowIndex, columnIndex);
+        const updatedCellDetails = translate(
+            'Updated {0} from {1} to {2}.',
+            'Updated {0} from {1} to {2}.'
+        )
+            .replace('{0}', updatedCellLabel)
+            .replace('{1}', formatAuditValue(previousValue))
+            .replace('{2}', formatAuditValue(rawValue));
+        recordAudit(
+            log,
+            translate('Updated cell', 'Updated cell'),
+            updatedCellDetails
+        );
         persistLogs();
         renderGridForLog(log);
     }
@@ -526,7 +542,11 @@
         pushUndoState();
         const newRow = Array.from({ length: log.data[0]?.length ?? defaultColumns }, () => createCell());
         log.data.push(newRow);
-        recordAudit(log, 'Row added', 'Appended a new row to the log.');
+        recordAudit(
+            log,
+            translate('Row added', 'Row added'),
+            translate('Appended a new row to the log.', 'Appended a new row to the log.')
+        );
         persistLogs();
         renderGridForLog(log);
         setSelection(Math.max(0, log.data.length - 1), 0);
@@ -543,7 +563,15 @@
         const template = log.data[0]?.length ?? defaultColumns;
         const newRow = Array.from({ length: template }, () => createCell());
         log.data.splice(insertIndex, 0, newRow);
-        recordAudit(log, 'Row inserted', `Inserted a new row above row ${insertIndex + 1}.`);
+        const insertedRowMessage = translate(
+            'Inserted a new row above row {0}.',
+            'Inserted a new row above row {0}.'
+        ).replace('{0}', insertIndex + 1);
+        recordAudit(
+            log,
+            translate('Row inserted', 'Row inserted'),
+            insertedRowMessage
+        );
         persistLogs();
         renderGridForLog(log);
         setSelection(insertIndex, 0);
@@ -561,7 +589,15 @@
         }
         pushUndoState();
         log.data.splice(range.startRow, rowCount);
-        recordAudit(log, 'Rows deleted', `Deleted ${rowCount} row(s).`);
+        const deletedRowsMessage = translate(
+            'Deleted {0} row(s).',
+            'Deleted {0} row(s).'
+        ).replace('{0}', rowCount);
+        recordAudit(
+            log,
+            translate('Rows deleted', 'Rows deleted'),
+            deletedRowsMessage
+        );
         persistLogs();
         renderGridForLog(log);
         setSelection(Math.max(0, range.startRow - 1), 0);
@@ -574,7 +610,11 @@
         }
         pushUndoState();
         log.data.forEach((row) => row.push(createCell()));
-        recordAudit(log, 'Column added', 'Appended a new column to the log.');
+        recordAudit(
+            log,
+            translate('Column added', 'Column added'),
+            translate('Appended a new column to the log.', 'Appended a new column to the log.')
+        );
         persistLogs();
         renderGridForLog(log);
     }
@@ -592,7 +632,15 @@
         }
         pushUndoState();
         log.data.forEach((row) => row.splice(range.startColumn, columnCount));
-        recordAudit(log, 'Columns deleted', `Deleted ${columnCount} column(s).`);
+        const deletedColumnsMessage = translate(
+            'Deleted {0} column(s).',
+            'Deleted {0} column(s).'
+        ).replace('{0}', columnCount);
+        recordAudit(
+            log,
+            translate('Columns deleted', 'Columns deleted'),
+            deletedColumnsMessage
+        );
         persistLogs();
         renderGridForLog(log);
     }
@@ -602,12 +650,16 @@
         if (!log) {
             return;
         }
-        if (!window.confirm('Clear all cells in this log? This cannot be undone.')) {
+        if (!window.confirm(translate("Clear all cells in this log? This cannot be undone.", "Clear all cells in this log? This cannot be undone."))) {
             return;
         }
         pushUndoState();
         log.data = createEmptyData();
-        recordAudit(log, 'Cleared log', 'All cells were cleared.');
+        recordAudit(
+            log,
+            translate('Cleared log', 'Cleared log'),
+            translate('All cells were cleared.', 'All cells were cleared.')
+        );
         persistLogs();
         renderGridForLog(log);
         setSelection(0, 0);
@@ -625,7 +677,11 @@
             auditTrail: (log.auditTrail ?? []).slice()
         };
         logs.push(clone);
-        recordAudit(clone, 'Log created', 'Duplicated from an existing log.');
+        recordAudit(
+            clone,
+            translate('Log created', 'Log created'),
+            translate('Duplicated from an existing log.', 'Duplicated from an existing log.')
+        );
         persistLogs();
         renderLogList();
         renderLogTabs();
@@ -637,7 +693,8 @@
         if (!log) {
             return;
         }
-        if (!window.confirm(`Delete "${log.name}" permanently?`)) {
+        const confirmDeleteMessage = translate('Delete "{0}" permanently?', 'Delete "{0}" permanently?').replace('{0}', log.name);
+        if (!window.confirm(confirmDeleteMessage)) {
             return;
         }
         logs = logs.filter((item) => item.id !== log.id);
@@ -668,7 +725,15 @@
             return;
         }
         log.name = trimmed;
-        recordAudit(log, 'Renamed log', `Renamed to ${trimmed}.`);
+        const renamedLogMessage = translate(
+            'Renamed to {0}.',
+            'Renamed to {0}.'
+        ).replace('{0}', trimmed);
+        recordAudit(
+            log,
+            translate('Renamed log', 'Renamed log'),
+            renamedLogMessage
+        );
         persistLogs();
         renderLogList();
         renderLogTabs();
@@ -733,7 +798,11 @@
         }
         const snapshot = history.pop();
         log.data = cloneLogData(snapshot.data);
-        recordAudit(log, 'Undo', 'Reverted the last change.');
+        recordAudit(
+            log,
+            translate('Undo', 'Undo'),
+            translate('Reverted the last change.', 'Reverted the last change.')
+        );
         persistLogs();
         renderGridForLog(log);
         updateUndoButtonState();
@@ -786,7 +855,11 @@
         }
         const log = createLog(name);
         logs.push(log);
-        recordAudit(log, 'Log created', 'Created a new custom log.');
+        recordAudit(
+            log,
+            translate('Log created', 'Log created'),
+            translate('Created a new custom log.', 'Created a new custom log.')
+        );
         persistLogs();
         renderLogList();
         renderLogTabs();
@@ -812,7 +885,15 @@
             const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
             const log = createLogFromData(generateDefaultLogName(), rows);
             logs.push(log);
-            recordAudit(log, 'Log imported', `Imported from ${file.name}.`);
+            const logImportedMessage = translate(
+                'Imported from {0}.',
+                'Imported from {0}.'
+            ).replace('{0}', file.name);
+            recordAudit(
+                log,
+                translate('Log imported', 'Log imported'),
+                logImportedMessage
+            );
             persistLogs();
             renderLogList();
             renderLogTabs();
@@ -1466,13 +1547,19 @@
     function showGridLoadingMessage() {
         placeholderEl?.classList.remove('d-none');
         gridElement?.classList.add('d-none');
-        setPlaceholderMessage('Loading log grid', 'One moment while we prepare your workspace.');
+        setPlaceholderMessage(
+            translate("Loading log grid", "Loading log grid"),
+            translate("One moment while we prepare your workspace.", "One moment while we prepare your workspace.")
+        );
     }
 
     function showGridUnavailableState() {
         placeholderEl?.classList.remove('d-none');
         gridElement?.classList.add('d-none');
-        setPlaceholderMessage('Unable to load log grid', 'Check your connection and refresh this page once you are back online.');
+        setPlaceholderMessage(
+            translate("Unable to load log grid", "Unable to load log grid"),
+            translate("Check your connection and refresh this page once you are back online.", "Check your connection and refresh this page once you are back online.")
+        );
     }
 
     function resetPlaceholderContent() {

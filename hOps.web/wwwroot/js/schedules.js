@@ -1,4 +1,8 @@
 (() => {
+    const translate = typeof window.hopsTranslate === 'function'
+        ? window.hopsTranslate
+        : (key, fallback) => (typeof fallback === 'string' && fallback.length ? fallback : key);
+
     const templateSelect = document.getElementById('shiftTemplateSelect');
     const addForm = document.getElementById('addShiftForm');
     const shiftNameInput = addForm ? addForm.querySelector('input[name="AssignmentForm.ShiftName"]') : null;
@@ -27,7 +31,8 @@
         }
 
         clipboardStatus.classList.remove('d-none');
-        clipboardStatus.textContent = `Shift copied: ${clipboard.label}. Click another cell to paste.`;
+        const template = translate('Schedules.ClipboardCopied', 'Shift copied: {0}. Click another cell to paste.');
+        clipboardStatus.textContent = template.replace('{0}', clipboard.label);
     }
 
     function getSelectedTemplateOption(select) {
@@ -380,7 +385,8 @@
                 return;
             }
             ensureCustomSortSelected();
-            setReorderStatus('Saving order...', 'text-muted');
+            const savingStatus = translate('Schedules.EmployeeOrderSaving', 'Saving order...');
+            setReorderStatus(savingStatus, 'text-muted');
             try {
                 const token = getScheduleAntiforgeryToken();
                 const response = await fetch(reorderUrl, {
@@ -400,10 +406,12 @@
                     throw new Error('Request failed');
                 }
 
-                setReorderStatus('Order saved.', 'text-success');
+                const successStatus = translate('Order saved.', 'Order saved.');
+                setReorderStatus(successStatus, 'text-success');
             } catch (error) {
                 console.error('Unable to save employee order', error);
-                setReorderStatus('Unable to save order. Please refresh and try again.', 'text-danger');
+                const errorStatus = translate('Schedules.EmployeeOrderError', 'Unable to save order. Please refresh and try again.');
+                setReorderStatus(errorStatus, 'text-danger');
             }
         }
 
@@ -443,12 +451,12 @@
         }
         const iso = (timeOffEndInput.value || '').trim();
         if (!iso) {
-            returnToWorkDateElement.textContent = 'N/A';
+            returnToWorkDateElement.textContent = translate('N/A', 'N/A');
             return;
         }
         const [year, month, day] = iso.split('-').map(part => parseInt(part, 10));
         if ([year, month, day].some(value => Number.isNaN(value))) {
-            returnToWorkDateElement.textContent = 'N/A';
+            returnToWorkDateElement.textContent = translate('N/A', 'N/A');
             return;
         }
         const date = new Date(Date.UTC(year, month - 1, day));

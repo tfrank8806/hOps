@@ -2,7 +2,7 @@
 @model hOps.web.ViewModels.MailLog.MailLogIndexViewModel
 
 @{
-    ViewData["Title"] = "Package & Mail Log";
+    ViewData["Title"] = Html.Localize("Package & Mail Log");
     ViewData["MainContainerClass"] = "main-inner--wide";
 }
 
@@ -12,14 +12,14 @@
         {
             <div class="alert alert-success alert-dismissible fade show" role="alert">
                 @successMessage
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label='@Html.Localize("Close")'></button>
             </div>
         }
         @if (TempData["MailLogError"] is string errorMessage)
         {
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 @errorMessage
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label='@Html.Localize("Close")'></button>
             </div>
         }
         <div id="mailLogAlertContainer"></div>
@@ -29,10 +29,10 @@
         <div class="card shadow-sm mail-log-card">
             <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
-                    <h2 class="h5 mb-0">Package &amp; Mail Log</h2>
+                    <h2 class="h5 mb-0">@Html.Localize("Package & Mail Log")</h2>
                     @if (Model.HasProperty)
                     {
-                        <small class="text-muted">Entries for @Model.CurrentPropertyName</small>
+                        <small class="text-muted">@string.Format(Html.Localize("Entries for {0}"), Model.CurrentPropertyName)</small>
                     }
                 </div>
                 @if (Model.HasProperty)
@@ -46,7 +46,7 @@
             <div class="card-body">
                 @if (!Model.HasProperty)
                 {
-                    <p class="text-muted mb-0">Select a property to view or record package log entries.</p>
+                    <p class="text-muted mb-0">@Html.Localize("Select a property to view or record package log entries.")</p>
                 }
                 else
                 {
@@ -102,8 +102,8 @@
                             <span asp-validation-for="Form.Notes" class="text-danger"></span>
                         </div>
                         <div class="col-12 d-flex justify-content-end gap-2">
-                            <button type="reset" class="btn btn-outline-secondary">Clear</button>
-                            <button type="submit" class="btn btn-primary">Add Entry</button>
+                            <button type="reset" class="btn btn-outline-secondary">@Html.Localize("Clear")</button>
+                            <button type="submit" class="btn btn-primary">@Html.Localize("Add Entry")</button>
                         </div>
                     </form>
 
@@ -111,8 +111,8 @@
                     {
                     <p class="text-muted mb-0">
                         @(Model.HideDelivered
-                            ? "No packages waiting to be delivered to a guest."
-                            : $"No packages logged yet for {Model.CurrentPropertyName}.")
+                            ? Html.Localize("No packages waiting to be delivered to a guest.")
+                            : string.Format(Html.Localize("No packages logged yet for {0}."), Model.CurrentPropertyName))
                     </p>
                 }
                 else
@@ -121,20 +121,20 @@
                             <table class="table table-striped align-middle mail-log-table">
                                 <thead>
                                     <tr>
-                                        <th scope="col">Logged At</th>
-                                        <th scope="col">Recipient</th>
-                                        <th scope="col">Courier</th>
-                                        <th scope="col">Tracking #</th>
-                                        <th scope="col">Room #</th>
-                                        <th scope="col">Storage</th>
-                                        <th scope="col">Arrival</th>
-                                        <th scope="col">Package Received</th>
-                                        <th scope="col">Departure</th>
-                                        <th scope="col">Notes</th>
-                                        <th scope="col">Logged By</th>
-                                        <th scope="col">Delivered?</th>
-                                        <th scope="col">Delivered At</th>
-                                        <th scope="col" class="text-end">Actions</th>
+                                        <th scope="col">@Html.Localize("Logged At")</th>
+                                        <th scope="col">@Html.Localize("Recipient")</th>
+                                        <th scope="col">@Html.Localize("Courier")</th>
+                                        <th scope="col">@Html.Localize("Tracking #")</th>
+                                        <th scope="col">@Html.Localize("Room #")</th>
+                                        <th scope="col">@Html.Localize("Storage")</th>
+                                        <th scope="col">@Html.Localize("Arrival")</th>
+                                        <th scope="col">@Html.Localize("Package Received")</th>
+                                        <th scope="col">@Html.Localize("Departure")</th>
+                                        <th scope="col">@Html.Localize("Notes")</th>
+                                        <th scope="col">@Html.Localize("Logged By")</th>
+                                        <th scope="col">@Html.Localize("Delivered?")</th>
+                                        <th scope="col">@Html.Localize("Delivered At")</th>
+                                        <th scope="col" class="text-end">@Html.Localize("Actions")</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -165,13 +165,13 @@
                                             <td>@(string.IsNullOrWhiteSpace(entry.LoggedByName) ? "-" : entry.LoggedByName)</td>
                                             <td class="delivered-cell">
                                                 <span class="badge delivered-badge @(entry.Delivered ? "text-bg-success" : "text-bg-secondary")">
-                                                    @(entry.Delivered ? "Yes" : "No")
+                                                    @(entry.Delivered ? Html.Localize("Yes") : Html.Localize("No"))
                                                 </span>
                                             </td>
                                             <td data-col="deliveredAt">@(deliveredLocal.HasValue ? deliveredLocal.Value.ToString("g") : "-")</td>
                                             <td class="text-end actions-cell">
                                                 <button type="button" class="btn btn-sm btn-outline-secondary me-1" data-bs-toggle="modal" data-bs-target="#editMailLogModal-@entry.Id">
-                                                    Edit
+                                                    @Html.Localize("Edit")
                                                 </button>
                                                 <form asp-action="ToggleDelivered" method="post" class="d-inline mail-log-toggle-form">
                                                     @Html.AntiForgeryToken()
@@ -179,21 +179,21 @@
                                                     <input type="hidden" name="delivered" value="@(entry.Delivered ? "false" : "true")" />
                                                     <input type="hidden" name="hideDelivered" value="@(Model.HideDelivered ? "true" : "false")" />
                                                     <button type="submit" class="btn btn-sm toggle-delivered-button @(entry.Delivered ? "btn-outline-warning" : "btn-outline-success")">
-                                                        @(entry.Delivered ? "Mark Pending" : "Mark Delivered")
+                                                        @(entry.Delivered ? Html.Localize("Mark Pending") : Html.Localize("Mark Delivered"))
                                                     </button>
                                                 </form>
-                                                <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Remove this entry?');">
+                                                <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm(window.hopsTranslate('MailLogConfirmRemove', 'Remove this entry?'));">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="id" value="@entry.Id" />
                                                     <input type="hidden" name="hideDelivered" value="@(Model.HideDelivered ? "true" : "false")" />
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">@Html.Localize("Remove")</button>
                                                 </form>
                                                 <div class="modal fade" id="editMailLogModal-@entry.Id" tabindex="-1" aria-labelledby="editMailLogModalLabel-@entry.Id" aria-hidden="true">
                                                     <div class="modal-dialog modal-lg modal-dialog-scrollable">
                                                         <div class="modal-content">
                                                             <div class="modal-header">
-                                                                <h5 class="modal-title" id="editMailLogModalLabel-@entry.Id">Edit Package Entry</h5>
-                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                                <h5 class="modal-title" id="editMailLogModalLabel-@entry.Id">@Html.Localize("Edit Package Entry")</h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label='@Html.Localize("Close")'></button>
                                                             </div>
                                                             <form asp-action="Edit" method="post" novalidate>
                                                                 @Html.AntiForgeryToken()
@@ -202,46 +202,46 @@
                                                                 <div class="modal-body">
                                                                     <div class="row g-3">
                                                                         <div class="col-md-6">
-                                                                            <label class="form-label" for="mail-log-edit-recipient-@entry.Id">Recipient Name</label>
+                                                                            <label class="form-label" for="mail-log-edit-recipient-@entry.Id">@Html.Localize("Recipient Name")</label>
                                                                             <input class="form-control" id="mail-log-edit-recipient-@entry.Id" name="RecipientName" value="@entry.RecipientName" maxlength="256" required />
                                                                         </div>
                                                                         <div class="col-md-3">
-                                                                            <label class="form-label" for="mail-log-edit-carrier-@entry.Id">Carrier</label>
+                                                                            <label class="form-label" for="mail-log-edit-carrier-@entry.Id">@Html.Localize("Carrier")</label>
                                                                             <input class="form-control" id="mail-log-edit-carrier-@entry.Id" name="Carrier" value="@entry.Carrier" maxlength="128" />
                                                                         </div>
                                                                         <div class="col-md-3">
-                                                                            <label class="form-label" for="mail-log-edit-tracking-@entry.Id">Tracking Number</label>
+                                                                            <label class="form-label" for="mail-log-edit-tracking-@entry.Id">@Html.Localize("Tracking Number")</label>
                                                                             <input class="form-control" id="mail-log-edit-tracking-@entry.Id" name="TrackingNumber" value="@entry.TrackingNumber" maxlength="128" />
                                                                         </div>
                                                                         <div class="col-md-3">
-                                                                            <label class="form-label" for="mail-log-edit-room-@entry.Id">Room Number</label>
+                                                                            <label class="form-label" for="mail-log-edit-room-@entry.Id">@Html.Localize("Room Number")</label>
                                                                             <input class="form-control" id="mail-log-edit-room-@entry.Id" name="RoomNumber" value="@entry.RoomNumber" maxlength="64" />
                                                                         </div>
                                                                         <div class="col-md-3">
-                                                                            <label class="form-label" for="mail-log-edit-storage-@entry.Id">Storage Location</label>
+                                                                            <label class="form-label" for="mail-log-edit-storage-@entry.Id">@Html.Localize("Storage Location")</label>
                                                                             <input class="form-control" id="mail-log-edit-storage-@entry.Id" name="StorageLocation" value="@entry.StorageLocation" maxlength="150" />
                                                                         </div>
                                                                         <div class="col-md-3">
-                                                                            <label class="form-label" for="mail-log-edit-arrival-@entry.Id">Arrival Date</label>
+                                                                            <label class="form-label" for="mail-log-edit-arrival-@entry.Id">@Html.Localize("Arrival Date")</label>
                                                                             <input type="date" class="form-control" id="mail-log-edit-arrival-@entry.Id" name="ArrivalDate" value="@(entry.ArrivalDate.HasValue ? entry.ArrivalDate.Value.ToString("yyyy-MM-dd") : string.Empty)" />
                                                                         </div>
                                                                         <div class="col-md-3">
-                                                                            <label class="form-label" for="mail-log-edit-departure-@entry.Id">Departure Date</label>
+                                                                            <label class="form-label" for="mail-log-edit-departure-@entry.Id">@Html.Localize("Departure Date")</label>
                                                                             <input type="date" class="form-control" id="mail-log-edit-departure-@entry.Id" name="DepartureDate" value="@(entry.DepartureDate.HasValue ? entry.DepartureDate.Value.ToString("yyyy-MM-dd") : string.Empty)" />
                                                                         </div>
                                                                         <div class="col-md-3">
-                                                                            <label class="form-label" for="mail-log-edit-received-@entry.Id">Package Received Date</label>
+                                                                            <label class="form-label" for="mail-log-edit-received-@entry.Id">@Html.Localize("Package Received Date")</label>
                                                                             <input type="date" class="form-control" id="mail-log-edit-received-@entry.Id" name="PackageReceivedDate" value="@(entry.PackageReceivedDate.HasValue ? entry.PackageReceivedDate.Value.ToString("yyyy-MM-dd") : string.Empty)" />
                                                                         </div>
                                                                         <div class="col-12">
-                                                                            <label class="form-label" for="mail-log-edit-notes-@entry.Id">Notes</label>
+                                                                            <label class="form-label" for="mail-log-edit-notes-@entry.Id">@Html.Localize("Notes")</label>
                                                                             <textarea class="form-control" id="mail-log-edit-notes-@entry.Id" name="Notes" rows="4" maxlength="512" data-enable-mentions="true">@entry.Notes</textarea>
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                                 <div class="modal-footer">
-                                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Html.Localize("Cancel")</button>
+                                                                    <button type="submit" class="btn btn-primary">@Html.Localize("Save changes")</button>
                                                                 </div>
                                                             </form>
                                                         </div>
@@ -264,3 +264,4 @@
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/mail-log.js" asp-append-version="true"></script>
 }
+

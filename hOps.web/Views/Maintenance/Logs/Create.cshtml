@@ -1,17 +1,17 @@
 @model hOps.web.ViewModels.Maintenance.MaintenanceLogCreateViewModel
 
 @{
-    ViewData["Title"] = "Create Maintenance Log";
+    ViewData["Title"] = Html.Localize("Create Maintenance Log");
 }
 
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
-            <h2 class="mb-0">Create Maintenance Log</h2>
+            <h2 class="mb-0">@Html.Localize("Create Maintenance Log")</h2>
             <p class="text-muted mb-0">@Model.PropertyName</p>
         </div>
         <div>
-            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back to Logs</a>
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">@Html.Localize("Back to Logs")</a>
         </div>
     </div>
 
@@ -23,24 +23,24 @@
 
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label asp-for="Name" class="form-label">Log Name</label>
+                        <label asp-for="Name" class="form-label">@Html.Localize("Log Name")</label>
                         <input asp-for="Name" class="form-control" />
                         <span asp-validation-for="Name" class="text-danger small"></span>
                     </div>
                     <div class="col-md-3">
-                        <label asp-for="ScheduleType" class="form-label">Cycle Type</label>
+                        <label asp-for="ScheduleType" class="form-label">@Html.Localize("Cycle Type")</label>
                         <select asp-for="ScheduleType" class="form-select" id="scheduleTypeSelect">
-                            <option value="Daily">Daily</option>
-                            <option value="Weekly">Weekly</option>
-                            <option value="Monthly">Monthly</option>
-                            <option value="BiAnnual">Bi-Annual</option>
-                            <option value="Quarterly">Quarterly</option>
-                            <option value="Yearly">Annual</option>
+                            <option value="Daily">@Html.Localize("Daily")</option>
+                            <option value="Weekly">@Html.Localize("Weekly")</option>
+                            <option value="Monthly">@Html.Localize("Monthly")</option>
+                            <option value="BiAnnual">@Html.Localize("Bi-Annual")</option>
+                            <option value="Quarterly">@Html.Localize("Quarterly")</option>
+                            <option value="Yearly">@Html.Localize("Annual")</option>
                         </select>
                         <span asp-validation-for="ScheduleType" class="text-danger small"></span>
                     </div>
                     <div class="col-md-3">
-                        <label asp-for="DueTimeLocal" class="form-label">Due Time (optional)</label>
+                        <label asp-for="DueTimeLocal" class="form-label">@Html.Localize("Due Time (optional)")</label>
                         <input asp-for="DueTimeLocal" class="form-control" type="time" />
                         <span asp-validation-for="DueTimeLocal" class="text-danger small"></span>
                     </div>
@@ -48,7 +48,7 @@
 
                 <div class="row g-3 mt-1">
                     <div class="col-12 d-none" id="weeklyDaysFieldset">
-                        <label class="form-label">Weekly Days</label>
+                        <label class="form-label">@Html.Localize("Weekly Days")</label>
                         <div class="d-flex flex-wrap gap-3">
                             @{
                                 var dayNames = Enum.GetNames(typeof(DayOfWeek));
@@ -56,7 +56,7 @@
                                 {
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" asp-for="WeeklyDays[i]" id="weekly-day-@i" />
-                                        <label class="form-check-label" for="weekly-day-@i">@dayNames[i]</label>
+                                        <label class="form-check-label" for="weekly-day-@i">@Html.Localize(dayNames[i])</label>
                                     </div>
                                 }
                             }
@@ -65,16 +65,16 @@
                     </div>
 
                     <div class="col-md-4 d-none" id="dayOfMonthField">
-                        <label asp-for="DayOfMonth" class="form-label">Due Day</label>
+                        <label asp-for="DayOfMonth" class="form-label">@Html.Localize("Due Day")</label>
                         <input asp-for="DayOfMonth" class="form-control" type="number" min="1" max="31" />
-                        <div class="form-text">1-31, used for monthly, bi-annual, quarterly, or annual cycles.</div>
+                        <div class="form-text">@Html.Localize("Due day helper text")</div>
                         <span asp-validation-for="DayOfMonth" class="text-danger small"></span>
                     </div>
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
-                    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
-                    <button type="submit" class="btn btn-primary">Create Log</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">@Html.Localize("Cancel")</a>
+                    <button type="submit" class="btn btn-primary">@Html.Localize("Create Log")</button>
                 </div>
             </form>
         </div>
@@ -107,3 +107,4 @@
         })();
     </script>
 }
+

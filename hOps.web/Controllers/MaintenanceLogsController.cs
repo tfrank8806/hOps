@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
+using hOps.web.Services.Localization;
 using hOps.web.Utilities;
 using hOps.web.ViewModels.Maintenance;
 using Microsoft.AspNetCore.Authorization;
@@ -48,6 +49,7 @@ namespace hOps.web.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly IUserTimeZoneService _timeZoneService; // Property-specific timezones are not stored yet, so we rely on the viewer's timezone.
         private readonly IMaintenanceLogCycleService _cycleService;
+        private readonly ITranslationService _translationService;
         private static readonly JsonSerializerOptions EntrySerializerOptions = new(JsonSerializerDefaults.Web);
 
         public MaintenanceLogsController(
@@ -55,13 +57,21 @@ namespace hOps.web.Controllers
             UserManager<ApplicationUser> userManager,
             IWebHostEnvironment environment,
             IUserTimeZoneService timeZoneService,
-            IMaintenanceLogCycleService cycleService)
+            IMaintenanceLogCycleService cycleService,
+            ITranslationService translationService)
             : base(context, userManager)
         {
             _db = context;
             _environment = environment;
             _timeZoneService = timeZoneService;
             _cycleService = cycleService;
+            _translationService = translationService;
+        }
+
+        private string Translate(string key, string? fallback = null)
+        {
+            var language = HttpContext?.Items?["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+            return _translationService.Translate(key, language, fallback ?? key);
         }
         [HttpGet("")]
         public async Task<IActionResult> Index(
@@ -74,7 +84,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property to view maintenance logs.";
+                TempData["MaintenanceLogError"] = Translate("Select a property to view maintenance logs.");
                 return RedirectToAction("Index", "Home");
             }
 
@@ -196,7 +206,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property to view maintenance logs.";
+                TempData["MaintenanceLogError"] = Translate("Select a property to view maintenance logs.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -222,7 +232,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["EmergencyLightLogError"] = "Select a property before recording light testing.";
+                TempData["EmergencyLightLogError"] = Translate("Select a property before recording light testing.");
                 return RedirectToAction(nameof(EmergencyExitLights));
             }
 
@@ -235,14 +245,14 @@ namespace hOps.web.Controllers
             var roles = await _userManager.GetRolesAsync(user);
             if (!UserCanManage(roles))
             {
-                TempData["EmergencyLightLogError"] = "You do not have permission to record testing.";
+                TempData["EmergencyLightLogError"] = Translate("You do not have permission to record testing.");
                 return RedirectToAction(nameof(EmergencyExitLights));
             }
 
             var resolvedLocation = input.Location?.Trim();
             if (string.IsNullOrWhiteSpace(resolvedLocation))
             {
-                TempData["EmergencyLightLogError"] = "Enter a location before recording testing.";
+                TempData["EmergencyLightLogError"] = Translate("Enter a location before recording testing.");
                 return RedirectToAction(nameof(EmergencyExitLights));
             }
 
@@ -253,7 +263,7 @@ namespace hOps.web.Controllers
 
             if (!input.TestDate.HasValue)
             {
-                TempData["EmergencyLightLogError"] = "Select the testing date.";
+                TempData["EmergencyLightLogError"] = Translate("Select the testing date.");
                 return RedirectToAction(nameof(EmergencyExitLights));
             }
 
@@ -275,7 +285,8 @@ namespace hOps.web.Controllers
             await _db.SaveChangesAsync();
 
             var localDisplayDate = _timeZoneService.ConvertToUserTime(entry.TestedAtUtc).ToString("MMM d, yyyy");
-            TempData["EmergencyLightLogMessage"] = $"Logged Emergency/Exit Light testing for {resolvedLocation} on {localDisplayDate}.";
+            var successTemplate = Translate("Logged Emergency/Exit Light testing for {0} on {1}.");
+            TempData["EmergencyLightLogMessage"] = string.Format(CultureInfo.InvariantCulture, successTemplate, resolvedLocation, localDisplayDate);
 
             return RedirectToAction(nameof(EmergencyExitLights));
         }
@@ -285,7 +296,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property before creating a maintenance log.";
+                TempData["MaintenanceLogError"] = Translate("Select a property before creating a maintenance log.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -320,7 +331,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property before creating a maintenance log.";
+                TempData["MaintenanceLogError"] = Translate("Select a property before creating a maintenance log.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -342,12 +353,12 @@ namespace hOps.web.Controllers
             var trimmedName = viewModel.Name?.Trim();
             if (string.IsNullOrWhiteSpace(trimmedName))
             {
-                ModelState.AddModelError(nameof(viewModel.Name), "Enter a name for the log.");
+                ModelState.AddModelError(nameof(viewModel.Name), Translate("Enter a name for the log."));
             }
 
             if (viewModel.ScheduleType == MaintenanceLogScheduleType.None)
             {
-                ModelState.AddModelError(nameof(viewModel.ScheduleType), "Select a cycle type.");
+                ModelState.AddModelError(nameof(viewModel.ScheduleType), Translate("Select a cycle type."));
             }
 
             if (viewModel.ScheduleType == MaintenanceLogScheduleType.Weekly)
@@ -355,13 +366,13 @@ namespace hOps.web.Controllers
                 var weeklySelection = GetSelectedDays(viewModel.WeeklyDays);
                 if (!weeklySelection.Any())
                 {
-                    ModelState.AddModelError("WeeklyDays", "Select at least one day for weekly logs.");
+                    ModelState.AddModelError("WeeklyDays", Translate("Select at least one day for weekly logs."));
                 }
             }
 
             if (RequiresDayOfMonth(viewModel.ScheduleType) && !viewModel.DayOfMonth.HasValue)
             {
-                ModelState.AddModelError(nameof(viewModel.DayOfMonth), "Enter the due day for this schedule.");
+                ModelState.AddModelError(nameof(viewModel.DayOfMonth), Translate("Enter the due day for this schedule."));
             }
 
             if (!ModelState.IsValid)
@@ -397,7 +408,7 @@ namespace hOps.web.Controllers
             _db.MaintenanceLogTemplates.Add(template);
             await _db.SaveChangesAsync();
 
-            TempData["MaintenanceLogMessage"] = "Maintenance log created.";
+            TempData["MaintenanceLogMessage"] = Translate("Maintenance log created.");
             return RedirectToAction(nameof(Detail), new { id = template.Id });
         }
 
@@ -407,7 +418,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property to manage checklists.";
+                TempData["MaintenanceLogError"] = Translate("Select a property to manage checklists.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -453,7 +464,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property to manage checklists.";
+                TempData["MaintenanceLogError"] = Translate("Select a property to manage checklists.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -486,13 +497,13 @@ namespace hOps.web.Controllers
 
             if (viewModel.RemoveChecklist && checklistFile is { Length: > 0 })
             {
-                ModelState.AddModelError(nameof(viewModel.RemoveChecklist), "Choose either remove or upload, not both.");
+                ModelState.AddModelError(nameof(viewModel.RemoveChecklist), Translate("Choose either remove or upload, not both."));
             }
 
             var checklistValidationError = ValidateChecklistFile(checklistFile);
             if (!string.IsNullOrEmpty(checklistValidationError))
             {
-                ModelState.AddModelError("ChecklistFile", checklistValidationError);
+                ModelState.AddModelError("ChecklistFile", Translate(checklistValidationError, checklistValidationError));
             }
 
             if (!ModelState.IsValid)
@@ -531,13 +542,13 @@ namespace hOps.web.Controllers
             {
                 template.UpdatedAtUtc = DateTime.UtcNow;
                 await _db.SaveChangesAsync();
-                TempData["MaintenanceLogMessage"] = viewModel.RemoveChecklist
+                TempData["MaintenanceLogMessage"] = Translate(viewModel.RemoveChecklist
                     ? "Checklist removed."
-                    : "Checklist updated.";
+                    : "Checklist updated.");
             }
             else
             {
-                TempData["MaintenanceLogMessage"] = "No checklist changes were made.";
+                TempData["MaintenanceLogMessage"] = Translate("No checklist changes were made.");
             }
 
             return RedirectToSafeReturn(viewModel.ReturnUrl);
@@ -558,7 +569,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property to view maintenance logs.";
+                TempData["MaintenanceLogError"] = Translate("Select a property to view maintenance logs.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -581,7 +592,7 @@ namespace hOps.web.Controllers
 
             if (!SupportsCycleRendering(template.ScheduleType))
             {
-                TempData["MaintenanceLogError"] = "Cycle-based tracking currently supports daily, weekly, monthly, bi-annual, quarterly, or annual logs.";
+                TempData["MaintenanceLogError"] = Translate("Cycle-based tracking currently supports daily, weekly, monthly, bi-annual, quarterly, or annual logs.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -591,7 +602,7 @@ namespace hOps.web.Controllers
 
             if (detailResult.ViewModel == null)
             {
-                TempData["MaintenanceLogError"] = "No cycle history is available for this template.";
+                TempData["MaintenanceLogError"] = Translate("No cycle history is available for this template.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -615,7 +626,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property to record maintenance logs.";
+                TempData["MaintenanceLogError"] = Translate("Select a property to record maintenance logs.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -642,7 +653,7 @@ namespace hOps.web.Controllers
 
             if (!SupportsCycleRendering(template.ScheduleType))
             {
-                TempData["MaintenanceLogError"] = "Cycle-based tracking currently supports daily, weekly, monthly, bi-annual, quarterly, or annual logs.";
+                TempData["MaintenanceLogError"] = Translate("Cycle-based tracking currently supports daily, weekly, monthly, bi-annual, quarterly, or annual logs.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -659,17 +670,17 @@ namespace hOps.web.Controllers
 
             if (completedLocal > localNow.AddMinutes(1))
             {
-                ModelState.AddModelError(nameof(input.CompletedAtLocal), "You cannot record completions for future cycles.");
+                ModelState.AddModelError(nameof(input.CompletedAtLocal), Translate("You cannot record completions for future cycles."));
             }
 
             if (attachmentsToAdd.Count > MaxCompletionAttachments)
             {
-                ModelState.AddModelError("CompletionAttachments", $"Upload up to {MaxCompletionAttachments} files per completion.");
+                ModelState.AddModelError("CompletionAttachments", string.Format(CultureInfo.InvariantCulture, Translate("Upload up to {0} files per completion."), MaxCompletionAttachments));
             }
 
             if (!targetWindow.WindowKey.Equals(windowKey, StringComparison.OrdinalIgnoreCase) && !input.ConfirmCycleChange)
             {
-                ModelState.AddModelError(nameof(input.CompletedAtLocal), "The selected date falls into a different cycle. Submit again to confirm.");
+                ModelState.AddModelError(nameof(input.CompletedAtLocal), Translate("The selected date falls into a different cycle. Submit again to confirm."));
                 ViewBag.CycleChangeTargetKey = pendingCycleKey;
             }
 
@@ -709,7 +720,7 @@ namespace hOps.web.Controllers
             _db.MaintenanceLogCycleCompletions.Add(completion);
             await _db.SaveChangesAsync();
 
-            TempData["MaintenanceLogMessage"] = "Cycle completion recorded.";
+            TempData["MaintenanceLogMessage"] = Translate("Cycle completion recorded.");
             return RedirectToAction(nameof(Cycle), new { templateId = template.Id, windowKey = targetWindow.WindowKey, history = historyBlocks });
         }
 
@@ -724,7 +735,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property to edit maintenance logs.";
+                TempData["MaintenanceLogError"] = Translate("Select a property to edit maintenance logs.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -759,7 +770,7 @@ namespace hOps.web.Controllers
 
             if (!await IsLatestCompletionAsync(template.Id, completion.CycleWindowKey, completion.Id))
             {
-                TempData["MaintenanceLogError"] = "Only the latest completion in a cycle can be edited.";
+                TempData["MaintenanceLogError"] = Translate("Only the latest completion in a cycle can be edited.");
                 return RedirectToAction(nameof(Cycle), new { templateId = template.Id, windowKey, history });
             }
 
@@ -781,17 +792,17 @@ namespace hOps.web.Controllers
             var resultingAttachmentCount = completion.Attachments.Count - attachmentsToRemove.Count + attachmentsToAdd.Count;
             if (resultingAttachmentCount > MaxCompletionAttachments)
             {
-                ModelState.AddModelError("EditCompletionAttachments", $"Upload up to {MaxCompletionAttachments} files per completion.");
+                ModelState.AddModelError("EditCompletionAttachments", string.Format(CultureInfo.InvariantCulture, Translate("Upload up to {0} files per completion."), MaxCompletionAttachments));
             }
 
             if (completedLocal > localNow.AddMinutes(1))
             {
-                ModelState.AddModelError(nameof(input.CompletedAtLocal), "You cannot record completions for future cycles.");
+                ModelState.AddModelError(nameof(input.CompletedAtLocal), Translate("You cannot record completions for future cycles."));
             }
 
             if (!targetWindow.WindowKey.Equals(windowKey, StringComparison.OrdinalIgnoreCase) && !input.ConfirmCycleChange)
             {
-                ModelState.AddModelError(nameof(input.CompletedAtLocal), "The selected date falls into a different cycle. Submit again to confirm.");
+                ModelState.AddModelError(nameof(input.CompletedAtLocal), Translate("The selected date falls into a different cycle. Submit again to confirm."));
                 ViewBag.CycleChangeTargetKey = targetWindow.WindowKey;
             }
 
@@ -831,7 +842,7 @@ namespace hOps.web.Controllers
 
             await _db.SaveChangesAsync();
 
-            TempData["MaintenanceLogMessage"] = "Cycle completion updated.";
+            TempData["MaintenanceLogMessage"] = Translate("Cycle completion updated.");
             return RedirectToAction(nameof(Cycle), new { templateId = template.Id, windowKey = targetWindow.WindowKey, history = historyBlocks });
         }
 
@@ -841,7 +852,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property to edit maintenance logs.";
+                TempData["MaintenanceLogError"] = Translate("Select a property to edit maintenance logs.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -875,7 +886,7 @@ namespace hOps.web.Controllers
 
             if (!await IsLatestCompletionAsync(template.Id, completion.CycleWindowKey, completion.Id))
             {
-                TempData["MaintenanceLogError"] = "Only the latest completion in a cycle can be deleted.";
+                TempData["MaintenanceLogError"] = Translate("Only the latest completion in a cycle can be deleted.");
                 return RedirectToAction(nameof(Cycle), new { templateId = template.Id, windowKey, history });
             }
 
@@ -887,7 +898,7 @@ namespace hOps.web.Controllers
             _db.MaintenanceLogCycleCompletions.Remove(completion);
             await _db.SaveChangesAsync();
 
-            TempData["MaintenanceLogMessage"] = "Cycle completion removed.";
+            TempData["MaintenanceLogMessage"] = Translate("Cycle completion removed.");
             return RedirectToAction(nameof(Cycle), new { templateId = template.Id, windowKey, history });
         }
 
@@ -908,7 +919,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property before editing maintenance logs.";
+                TempData["MaintenanceLogError"] = Translate("Select a property before editing maintenance logs.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -963,7 +974,7 @@ namespace hOps.web.Controllers
             var property = ViewBag.CurrentProperty as Property;
             if (property == null)
             {
-                TempData["MaintenanceLogError"] = "Select a property before editing maintenance logs.";
+                TempData["MaintenanceLogError"] = Translate("Select a property before editing maintenance logs.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -998,25 +1009,25 @@ namespace hOps.web.Controllers
                     viewModel.Columns = await ParseTemplateColumnsAsync(templateCsvFile);
                     if (!viewModel.Columns.Any())
                     {
-                        ModelState.AddModelError("TemplateCsvFile", "The CSV file did not include any columns.");
+                        ModelState.AddModelError("TemplateCsvFile", Translate("The CSV file did not include any columns."));
                     }
                 }
                 catch (InvalidOperationException ex)
                 {
-                    ModelState.AddModelError("TemplateCsvFile", ex.Message);
+                    ModelState.AddModelError("TemplateCsvFile", Translate(ex.Message, ex.Message));
                 }
             }
 
             var sanitizedColumns = BuildColumnDefinitions(viewModel);
             if (!sanitizedColumns.Any())
             {
-                ModelState.AddModelError(string.Empty, "Add at least one column to capture log entries.");
+                ModelState.AddModelError(string.Empty, Translate("Add at least one column to capture log entries."));
             }
 
             var checklistValidationError = ValidateChecklistFile(checklistFile);
             if (!string.IsNullOrEmpty(checklistValidationError))
             {
-                ModelState.AddModelError("ChecklistFile", checklistValidationError);
+                ModelState.AddModelError("ChecklistFile", Translate(checklistValidationError, checklistValidationError));
             }
 
             if (!ModelState.IsValid)
@@ -1053,7 +1064,7 @@ namespace hOps.web.Controllers
 
             await _db.SaveChangesAsync();
 
-            TempData["MaintenanceLogMessage"] = "Maintenance log template updated.";
+            TempData["MaintenanceLogMessage"] = Translate("Maintenance log template updated.");
             return RedirectToAction(nameof(Detail), new { id });
         }
 [HttpPost("Reorder")]
@@ -1203,7 +1214,7 @@ namespace hOps.web.Controllers
 
                 if (rows.Count >= TemplateColumnImportLimit)
                 {
-                    throw new InvalidOperationException($"Templates can include up to {TemplateColumnImportLimit} columns.");
+                    throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, Translate("Templates can include up to {0} columns."), TemplateColumnImportLimit));
                 }
 
                 var cells = SplitCsvLine(line);
@@ -1255,7 +1266,7 @@ namespace hOps.web.Controllers
 
                 if (!MaintenanceLogColumnDefinition.AllowedTypes.Contains(normalizedType))
                 {
-                    throw new InvalidOperationException($"\"{typeCell}\" is not a supported column type (row {lineNumber}).");
+                    throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, Translate("\"{0}\" is not a supported column type (row {1})."), typeCell, lineNumber));
                 }
 
                 var optionsText = string.Empty;
@@ -1971,7 +1982,7 @@ namespace hOps.web.Controllers
                 if (string.IsNullOrWhiteSpace(extension) ||
                     !AllowedPhotoExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
                 {
-                    ModelState.AddModelError($"Photos[{columnKey}]", "Upload JPG, PNG, GIF, BMP, or WebP images.");
+                    ModelState.AddModelError($"Photos[{columnKey}]", Translate("Upload JPG, PNG, GIF, BMP, or WebP images."));
                     continue;
                 }
 
@@ -2033,13 +2044,13 @@ namespace hOps.web.Controllers
             if (string.IsNullOrWhiteSpace(extension) ||
                 !AllowedChecklistExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
             {
-                return "Upload a CSV or Excel file (.csv, .xlsx) for the checklist.";
+                return Translate("Upload a CSV or Excel file (.csv, .xlsx) for the checklist.");
             }
 
             if (file.Length > ChecklistFileMaxBytes)
             {
                 var maxMb = ChecklistFileMaxBytes / (1024 * 1024);
-                return $"Checklist files must be {maxMb} MB or smaller.";
+                return string.Format(CultureInfo.InvariantCulture, Translate("Checklist files must be {0} MB or smaller."), maxMb);
             }
 
             return null;
@@ -2118,7 +2129,7 @@ namespace hOps.web.Controllers
                 if (string.IsNullOrWhiteSpace(extension) ||
                     !AllowedCompletionAttachmentExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
                 {
-                    ModelState.AddModelError(normalizedPrefix, "Upload JPG, PNG, or PDF files.");
+                    ModelState.AddModelError(normalizedPrefix, Translate("Upload JPG, PNG, or PDF files."));
                     continue;
                 }
 

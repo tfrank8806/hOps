@@ -1,41 +1,70 @@
+@using System.Collections.Generic
+@using Microsoft.AspNetCore.Mvc.Rendering
 @model hOps.web.ViewModels.Settings.ScheduleSetupViewModel
 @{
-    ViewData["Title"] = "Schedule Setup";
+    ViewData["Title"] = Html.Localize("Schedule Setup");
     var successMessage = ViewBag.ScheduleSetupMessage as string;
     var dayOptions = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToList();
+    var propertyOptions = Model.PropertyOptions ?? new List<SelectListItem>();
+    var propertyDisplayMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var option in propertyOptions)
+    {
+        var optionValue = option.Value ?? string.Empty;
+        var optionText = option.Text ?? string.Empty;
+        var displayText = await Html.DisplayTranslatedTextAsync("Property", optionValue, "Name", optionText);
+        propertyDisplayMap[optionValue] = displayText;
+    }
+
+    var dayDisplayMap = new Dictionary<DayOfWeek, string>();
+    foreach (var day in dayOptions)
+    {
+        dayDisplayMap[day] = Html.Localize(day.ToString());
+    }
+
+    var localizedSuccessMessage = string.IsNullOrWhiteSpace(successMessage)
+        ? string.Empty
+        : await Html.DisplayTranslatedTextAsync(
+            "ScheduleSetupMessage",
+            Model.SelectedPropertyId.ToString(),
+            "Message",
+            successMessage);
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <h2 class="mb-0">Schedule Setup</h2>
+    <h2 class="mb-0">@Html.Localize("Schedule Setup")</h2>
     <div class="d-flex gap-2 flex-wrap align-items-center">
         <a class="btn btn-outline-secondary" asp-controller="Schedules" asp-action="Index">
-            &larr; Back to Schedule
+            &larr; @Html.Localize("Back to Schedule")
         </a>
-        @if (Model.PropertyOptions?.Any() == true)
+        @if (propertyOptions.Any())
         {
             <form method="get" class="d-flex gap-2">
                 <select name="propertyId" class="form-select" style="min-width: 220px;">
-                    @foreach (var option in Model.PropertyOptions)
+                    @foreach (var option in propertyOptions)
                     {
-                        <option value="@option.Value" selected="@(option.Selected)">@option.Text</option>
+                        var optionValue = option.Value ?? string.Empty;
+                        var optionDisplay = propertyDisplayMap.TryGetValue(optionValue, out var display)
+                            ? display
+                            : option.Text ?? string.Empty;
+                        <option value="@option.Value" selected="@(option.Selected)">@optionDisplay</option>
                     }
                 </select>
-                <button type="submit" class="btn btn-outline-secondary">Switch</button>
+                <button type="submit" class="btn btn-outline-secondary">@Html.Localize("Switch")</button>
             </form>
         }
     </div>
 </div>
 
-@if (!string.IsNullOrWhiteSpace(successMessage))
+@if (!string.IsNullOrWhiteSpace(localizedSuccessMessage))
 {
-    <div class="alert alert-success">@successMessage</div>
+    <div class="alert alert-success">@localizedSuccessMessage</div>
 }
 
 <div class="card">
     <div class="card-body">
-        @if (Model.PropertyOptions == null || !Model.PropertyOptions.Any())
+        @if (!propertyOptions.Any())
         {
-            <p class="text-muted mb-0">You do not have access to any properties.</p>
+            <p class="text-muted mb-0">@Html.Localize("You do not have access to any properties.")</p>
         }
         else
         {
@@ -45,24 +74,27 @@
                 <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
                 <div class="mb-4">
-                    <label asp-for="StartDayOfWeek" class="form-label"></label>
+                    <label asp-for="StartDayOfWeek" class="form-label">@Html.Localize("Week starts on")</label>
                     <select asp-for="StartDayOfWeek" class="form-select" style="max-width: 320px;">
                         @foreach (var day in dayOptions)
                         {
-                            <option value="@day" selected="@(day == Model.StartDayOfWeek)">@day</option>
+                            var dayLabel = dayDisplayMap.TryGetValue(day, out var label)
+                                ? label
+                                : Html.Localize(day.ToString());
+                            <option value="@day" selected="@(day == Model.StartDayOfWeek)">@dayLabel</option>
                         }
                     </select>
                 </div>
                 <div class="d-flex justify-content-end mb-4">
                     <button class="btn btn-outline-primary btn-sm" type="button" data-action="add-shift">
-                        + Add Shift
+                        + @Html.Localize("Add Shift")
                     </button>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                    <h5 class="mb-0">Default Shifts</h5>
+                    <h5 class="mb-0">@Html.Localize("Default Shifts")</h5>
                     <button class="btn btn-outline-primary btn-sm" type="button" data-action="add-shift">
-                        + Add Shift
+                        + @Html.Localize("Add Shift")
                     </button>
                 </div>
 
@@ -71,13 +103,13 @@
                         <thead>
                             <tr>
                                 <th style="width: 40px;">#</th>
-                                <th>Template Name</th>
-                                <th>Shift Name</th>
-                                <th style="width: 150px;">Start</th>
-                                <th style="width: 150px;">End</th>
-                                <th style="width: 140px;">Color</th>
-                                <th style="width: 140px;">Shift Alert</th>
-                                <th style="width: 140px;">Actions</th>
+                                <th>@Html.Localize("Template Name")</th>
+                                <th>@Html.Localize("Shift Name")</th>
+                                <th style="width: 150px;">@Html.Localize("Start")</th>
+                                <th style="width: 150px;">@Html.Localize("End")</th>
+                                <th style="width: 140px;">@Html.Localize("Color")</th>
+                                <th style="width: 140px;">@Html.Localize("Shift Alert")</th>
+                                <th style="width: 140px;">@Html.Localize("Actions")</th>
                             </tr>
                         </thead>
                         <tbody data-next-index="@(Model.ShiftTemplates?.Count ?? 0)">
@@ -123,16 +155,16 @@
                                                        name="ShiftTemplates[@i].AlertIfMissing"
                                                        value="@(isAlertChecked ? "true" : "false")"
                                                        data-role="alert-hidden" />
-                                                <label class="form-check-label small text-muted" for="@alertInputId">Alert if missing</label>
+                                                <label class="form-check-label small text-muted" for="@alertInputId">@Html.Localize("Alert if missing")</label>
                                             </div>
                                         </td>
                                         <td class="text-nowrap">
                                             <div class="btn-group btn-group-sm mb-2" role="group">
-                                                <button type="button" class="btn btn-outline-secondary" data-action="move-up" title="Move up">&uarr;</button>
-                                                <button type="button" class="btn btn-outline-secondary" data-action="move-down" title="Move down">&darr;</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-action="move-up" title='@Html.Localize("Move up")' aria-label='@Html.Localize("Move up")'>&uarr;</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-action="move-down" title='@Html.Localize("Move down")' aria-label='@Html.Localize("Move down")'>&darr;</button>
                                             </div>
                                             <div>
-                                                <button type="button" class="btn btn-outline-danger btn-sm" data-action="delete" title="Delete shift">Delete</button>
+                                                <button type="button" class="btn btn-outline-danger btn-sm" data-action="delete" title='@Html.Localize("Delete shift")'>@Html.Localize("Delete")</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -165,16 +197,16 @@
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" id="ShiftTemplates_0__AlertIfMissing" name="ShiftTemplates[0].AlertIfMissing" value="true" data-role="alert-checkbox" />
                                             <input type="hidden" name="ShiftTemplates[0].AlertIfMissing" value="false" data-role="alert-hidden" />
-                                            <label class="form-check-label small text-muted" for="ShiftTemplates_0__AlertIfMissing">Alert if missing</label>
+                                            <label class="form-check-label small text-muted" for="ShiftTemplates_0__AlertIfMissing">@Html.Localize("Alert if missing")</label>
                                         </div>
                                     </td>
                                     <td class="text-nowrap">
                                         <div class="btn-group btn-group-sm mb-2" role="group">
-                                            <button type="button" class="btn btn-outline-secondary" data-action="move-up" title="Move up">&uarr;</button>
-                                            <button type="button" class="btn btn-outline-secondary" data-action="move-down" title="Move down">&darr;</button>
+                                            <button type="button" class="btn btn-outline-secondary" data-action="move-up" title='@Html.Localize("Move up")' aria-label='@Html.Localize("Move up")'>&uarr;</button>
+                                            <button type="button" class="btn btn-outline-secondary" data-action="move-down" title='@Html.Localize("Move down")' aria-label='@Html.Localize("Move down")'>&darr;</button>
                                         </div>
                                         <div>
-                                            <button type="button" class="btn btn-outline-danger btn-sm" data-action="delete" title="Delete shift">Delete</button>
+                                            <button type="button" class="btn btn-outline-danger btn-sm" data-action="delete" title='@Html.Localize("Delete shift")'>@Html.Localize("Delete")</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -185,17 +217,17 @@
 
                 <div class="d-flex justify-content-end mb-4">
                     <button class="btn btn-outline-primary btn-sm" type="button" data-action="add-shift">
-                        + Add Shift
+                        + @Html.Localize("Add Shift")
                     </button>
                 </div>
 
-                <button type="submit" class="btn btn-primary">Save Settings</button>
+                <button type="submit" class="btn btn-primary">@Html.Localize("Save Settings")</button>
             </form>
 
             <div class="mt-5">
                 <div class="d-flex justify-content-between flex-wrap gap-2 mb-2 align-items-center">
-                    <h5 class="mb-0">Manual Schedule Employees</h5>
-                    <small class="text-muted">Remove non-user employees from the roster</small>
+                    <h5 class="mb-0">@Html.Localize("Manual Schedule Employees")</h5>
+                    <small class="text-muted">@Html.Localize("Remove non-user employees from the roster")</small>
                 </div>
                 @if (Model.ManualEmployees?.Any() == true)
                 {
@@ -203,10 +235,10 @@
                         <table class="table table-bordered align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Name</th>
-                                    <th style="width: 240px;">Email</th>
-                                    <th style="width: 160px;">Assignments</th>
-                                    <th style="width: 120px;">Status</th>
+                                    <th>@Html.Localize("Name")</th>
+                                    <th style="width: 240px;">@Html.Localize("Email")</th>
+                                    <th style="width: 160px;">@Html.Localize("Assignments")</th>
+                                    <th style="width: 120px;">@Html.Localize("Status")</th>
                                     <th style="width: 80px;"></th>
                                 </tr>
                             </thead>
@@ -215,25 +247,34 @@
                                 {
                                     <tr>
                                         <td class="fw-semibold">@employee.DisplayName</td>
-                                        <td>@(string.IsNullOrWhiteSpace(employee.Email) ? "—" : employee.Email)</td>
                                         <td>
-                                            @if (employee.AssignmentCount > 0)
+                                            @if (string.IsNullOrWhiteSpace(employee.Email))
                                             {
-                                                <span class="badge bg-info text-dark">@employee.AssignmentCount shift(s)</span>
+                                                @Html.Localize("Not provided")
                                             }
                                             else
                                             {
-                                                <span class="text-muted">No assigned shifts</span>
+                                                @employee.Email
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (employee.AssignmentCount > 0)
+                                            {
+                                                <span class="badge bg-info text-dark">@string.Format(Html.Localize("{0} shift(s)"), employee.AssignmentCount)</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">@Html.Localize("No assigned shifts")</span>
                                             }
                                         </td>
                                         <td>
                                             @if (employee.IsActive)
                                             {
-                                                <span class="badge bg-success">Active</span>
+                                                <span class="badge bg-success">@Html.Localize("Active")</span>
                                             }
                                             else
                                             {
-                                                <span class="badge bg-secondary">Inactive</span>
+                                                <span class="badge bg-secondary">@Html.Localize("Inactive")</span>
                                             }
                                         </td>
                                         <td>
@@ -241,8 +282,8 @@
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="manualEmployeeId" value="@employee.Id" />
                                                 <input type="hidden" name="propertyId" value="@Model.SelectedPropertyId" />
-                                                <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Remove this employee from the schedule?');">
-                                                    Delete
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm(window.hopsTranslate('ScheduleSetupRemoveManualEmployee', 'Remove this employee from the schedule?'));">
+                                                    @Html.Localize("Delete")
                                                 </button>
                                             </form>
                                         </td>
@@ -254,7 +295,7 @@
                 }
                 else
                 {
-                    <p class="text-muted mb-0">You do not have any manual employees for this property.</p>
+                    <p class="text-muted mb-0">@Html.Localize("You do not have any manual employees for this property.")</p>
                 }
             </div>
         }
@@ -287,16 +328,16 @@
             <div class="form-check">
                 <input class="form-check-input" type="checkbox" value="true" id="ShiftTemplates_{{index}}__AlertIfMissing" name="ShiftTemplates[{{index}}].AlertIfMissing" data-role="alert-checkbox" />
                 <input type="hidden" name="ShiftTemplates[{{index}}].AlertIfMissing" value="false" data-role="alert-hidden" />
-                <label class="form-check-label small text-muted" for="ShiftTemplates_{{index}}__AlertIfMissing">Alert if missing</label>
+                <label class="form-check-label small text-muted" for="ShiftTemplates_{{index}}__AlertIfMissing">@Html.Localize("Alert if missing")</label>
             </div>
         </td>
         <td class="text-nowrap">
             <div class="btn-group btn-group-sm mb-2" role="group">
-                <button type="button" class="btn btn-outline-secondary" data-action="move-up" title="Move up">&uarr;</button>
-                <button type="button" class="btn btn-outline-secondary" data-action="move-down" title="Move down">&darr;</button>
+                <button type="button" class="btn btn-outline-secondary" data-action="move-up" title='@Html.Localize("Move up")' aria-label='@Html.Localize("Move up")'>&uarr;</button>
+                <button type="button" class="btn btn-outline-secondary" data-action="move-down" title='@Html.Localize("Move down")' aria-label='@Html.Localize("Move down")'>&darr;</button>
             </div>
             <div>
-                <button type="button" class="btn btn-outline-danger btn-sm" data-action="delete" title="Delete shift">Delete</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-action="delete" title='@Html.Localize("Delete shift")'>@Html.Localize("Delete")</button>
             </div>
         </td>
     </tr>
@@ -306,6 +347,11 @@
     <partial name="_ValidationScriptsPartial" />
     <script>
         (() => {
+            const translate = typeof window.hopsTranslate === "function"
+                ? window.hopsTranslate
+                : (key, fallback) => (typeof fallback === "string" && fallback.length > 0 ? fallback : key);
+            const removeShiftTemplateMessage = translate("ScheduleSetupRemoveShiftTemplate", "Remove this shift template?");
+
             const addButtons = document.querySelectorAll('[data-action="add-shift"]');
             const tableBody = document.querySelector('#shiftTemplatesTable tbody');
             const template = document.getElementById('shift-row-template');
@@ -417,7 +463,7 @@
                 event.preventDefault();
 
                 if (action === 'delete') {
-                    if (confirm('Remove this shift template?')) {
+                    if (confirm(removeShiftTemplateMessage)) {
                         markRowDeleted(row);
                     }
                     return;

@@ -70,6 +70,8 @@
     var exportUrl = $"{Url.Action("Export")}{filterQueryString}";
     var indexUrlWithFilters = $"{Url.Action("Index")}{filterQueryString}";
     var hasAssigneeOptions = Model.AssigneeOptions != null && Model.AssigneeOptions.Count > 0;
+    var hideCompletedLabel = Html.Localize("Hide completed");
+    var unassignedLabel = Html.Localize("Unassigned");
 }
 
 @functions {
@@ -711,7 +713,7 @@
                                        value="true"
                                        @(Model.Filters.HideCompleted ? "checked" : null)
                                        onchange="const hidden=this.form.querySelector('[data-hide-completed-hidden]'); if(hidden){hidden.disabled=this.checked;} this.form.submit();" />
-                                <label class="form-check-label" for="hideCompletedToggle">Hide completed</label>
+                                <label class="form-check-label" for="hideCompletedToggle">@hideCompletedLabel</label>
                             </div>
                         </form>
                     </div>
@@ -779,8 +781,10 @@
                                         statusIndex = 0;
                                     }
                                     var nextStatusLabel = statusSequence[(statusIndex + 1) % statusSequence.Length];
-                                    var statusDisplay = order.Status.Equals("New", StringComparison.OrdinalIgnoreCase) ? "Open" : order.Status;
-                                    var nextStatusFriendlyName = nextStatusLabel.Equals("New", StringComparison.OrdinalIgnoreCase) ? "Open" : nextStatusLabel;
+                                    var statusDisplayRaw = order.Status.Equals("New", StringComparison.OrdinalIgnoreCase) ? "Open" : order.Status;
+                                    var statusDisplay = Html.Localize(statusDisplayRaw);
+                                    var nextStatusFriendlyNameRaw = nextStatusLabel.Equals("New", StringComparison.OrdinalIgnoreCase) ? "Open" : nextStatusLabel;
+                                    var nextStatusFriendlyName = Html.Localize(nextStatusFriendlyNameRaw);
                                     var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
                                     var attachmentsPayload = order.Attachments.Select(att =>
                                     {
@@ -797,27 +801,38 @@
                                             isImage = IsImageAttachment(imageCandidate)
                                         };
                                     }).ToList();
-                                    var departmentDisplay = string.IsNullOrWhiteSpace(order.Department) ? "Unassigned" : order.Department;
+                                    var departmentDisplayRaw = string.IsNullOrWhiteSpace(order.Department) ? "Unassigned" : order.Department;
+                                    var departmentDisplay = Html.Localize(departmentDisplayRaw);
+                                    var assignedToDisplay = string.IsNullOrWhiteSpace(order.AssignedToName) ? unassignedLabel : order.AssignedToName;
+                                    var orderIdString = order.Id.ToString(CultureInfo.InvariantCulture);
+                                    var translatedIssue = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Issue", order.Issue);
+                                    var translatedIssueHtml = MentionMarkupFormatter.ToHtml(translatedIssue);
+                                    var translatedDetails = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Details", order.Details ?? string.Empty);
+                                    var translatedDetailsHtml = string.IsNullOrWhiteSpace(translatedDetails) ? string.Empty : MentionMarkupFormatter.ToHtml(translatedDetails);
+                                    var translatedCompletionNotes = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "CompletionNotes", order.CompletionNotes ?? string.Empty);
+                                    var translatedCompletionNotesHtml = string.IsNullOrWhiteSpace(translatedCompletionNotes) ? string.Empty : MentionMarkupFormatter.ToHtml(translatedCompletionNotes);
+                                    var translatedLocation = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Location", order.Location ?? string.Empty);
                                     var workOrderPayload = new
                                     {
                                         id = order.Id,
-                                        issue = order.Issue,
-                                        issueHtml = MentionMarkupFormatter.ToHtml(order.Issue),
-                                        details = order.Details ?? string.Empty,
-                                        detailsHtml = string.IsNullOrWhiteSpace(order.Details) ? string.Empty : MentionMarkupFormatter.ToHtml(order.Details),
-                                        completionNotes = order.CompletionNotes ?? string.Empty,
-                                        completionNotesHtml = string.IsNullOrWhiteSpace(order.CompletionNotes) ? string.Empty : MentionMarkupFormatter.ToHtml(order.CompletionNotes),
-                                        location = order.Location,
+                                        issue = translatedIssue,
+                                        issueHtml = translatedIssueHtml,
+                                        details = translatedDetails,
+                                        detailsHtml = translatedDetailsHtml,
+                                        completionNotes = translatedCompletionNotes,
+                                        completionNotesHtml = translatedCompletionNotesHtml,
+                                        location = translatedLocation,
                                         status = order.Status,
+                                        statusLabel = statusDisplay,
                                         statusColor = order.StatusColor,
                                         workOrderType = order.WorkOrderType ?? "Unspecified",
                                         department = departmentDisplay,
                                         departmentColor = order.DepartmentColor,
-                                        assignedTo = string.IsNullOrWhiteSpace(order.AssignedToName) ? "Unassigned" : order.AssignedToName,
+                                        assignedTo = assignedToDisplay,
                                         assignedToId = order.AssignedToId,
                                         dueDateText = order.DueDate.ToString("MM-dd-yy"),
                                         createdAtText = createdLocal.ToString("MM-dd-yy h:mm tt"),
-                                        creator = string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator,
+                                        creator = string.IsNullOrWhiteSpace(order.Creator) ? Html.Localize("Unknown") : order.Creator,
                                         properties = order.Properties,
                                         attachments = attachmentsPayload,
                                         priority = order.PriorityLabel,
@@ -852,7 +867,7 @@
                                             var isSelected = statusOption.Key.Equals(order.Status, StringComparison.OrdinalIgnoreCase) ||
                                                 (statusOption.Key.Equals("New", StringComparison.OrdinalIgnoreCase) && order.Status.Equals("Open", StringComparison.OrdinalIgnoreCase));
                                             <option value="@statusOption.Key" selected="@(isSelected ? "selected" : null)">
-                                                @statusOption.Label
+                                                @Html.Localize(statusOption.Label)
                                             </option>
                                         }
                                     </select>
@@ -867,16 +882,16 @@
                         </div>
                     </td>
                     <td class="col-location">
-                        <div class="fw-semibold workorder-location">@order.Location</div>
+                        <div class="fw-semibold workorder-location">@translatedLocation</div>
                     </td>
                     <td class="col-department">
                         @if (!string.IsNullOrWhiteSpace(order.Department))
                         {
-                            <span class="badge" style="background-color:@order.DepartmentColor;">@order.Department</span>
+                            <span class="badge" style="background-color:@order.DepartmentColor;">@departmentDisplay</span>
                         }
                         else
                         {
-                            <span class="text-muted">Unassigned</span>
+                            <span class="text-muted">@unassignedLabel</span>
                         }
                     </td>
                     <td class="col-assigned">
@@ -887,23 +902,23 @@
                         }
                         else
                         {
-                            <span class="text-muted">Unassigned</span>
+                            <span class="text-muted">@unassignedLabel</span>
                         }
                     </td>
                     <td class="col-type">@order.WorkOrderType</td>
                     <td class="col-issue">
-                        <div class="workorder-issue">@Html.Raw(MentionMarkupFormatter.ToHtml(order.Issue))</div>
+                        <div class="workorder-issue">@Html.Raw(translatedIssueHtml)</div>
                     </td>
                     <td class="col-details">
                         @if (!string.IsNullOrWhiteSpace(order.Details))
                         {
                             <div class="workorder-details js-workorder-details" data-details-trigger="true">
-                                @Html.Raw(MentionMarkupFormatter.ToHtml(order.Details))
+                                @Html.Raw(translatedDetailsHtml)
                             </div>
                         }
                         else
                         {
-                            <span class="text-muted">No details</span>
+                            <span class="text-muted">@Html.Localize("No details")</span>
                         }
                     </td>
                     <td class="col-due @(isPastDue ? "fw-bold text-danger" : string.Empty)">
@@ -947,7 +962,7 @@
                     @if (Model.IsEditing)
                     {
                         <div class="d-flex align-items-center gap-2 flex-wrap">
-                            <a class="btn btn-sm btn-light" href="@indexUrlWithFilters">Cancel</a>
+                            <a class="btn btn-sm btn-light" href="@indexUrlWithFilters">@Html.Localize("Cancel")</a>
                             @if (Model.CanManageWorkOrders && Model.Form != null && Model.Form.Id.HasValue)
                             {
                                 var deleteId = Model.Form!.Id!.Value;
@@ -1070,7 +1085,7 @@
                             <div class="col-sm-6">
                                 <label asp-for="Form.DepartmentId" class="form-label"></label>
                                 <select asp-for="Form.DepartmentId" class="form-select">
-                                    <option value="">-- Unassigned --</option>
+                                    <option value="">-- @unassignedLabel --</option>
                                     @foreach (var dept in Model.Departments)
                                     {
                                         <option value="@dept.Id" selected="@(Model.Form?.DepartmentId == dept.Id ? "selected" : null)">@dept.Name</option>
@@ -1249,7 +1264,7 @@
                 <textarea class="form-control" rows="4" data-complete-notes-input placeholder="Enter completion notes (optional)"></textarea>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Html.Localize("Cancel")</button>
                 <button type="button" class="btn btn-primary" data-complete-submit>Mark Complete</button>
             </div>
         </div>
@@ -1282,3 +1297,4 @@
         })();
     </script>
 }
+

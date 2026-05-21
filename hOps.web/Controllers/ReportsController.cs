@@ -5,11 +5,13 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using ClosedXML.Excel;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.ViewModels;
 using hOps.web.ViewModels.WorkOrders;
+using hOps.web.Services.Localization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -39,10 +41,15 @@ namespace hOps.web.Controllers
         private const string PackageLogReportKey = "packageLog";
 
         private readonly IReadOnlyList<ReportDefinition> _reportDefinitions;
+        private readonly ITranslationService _translationService;
 
-        public ReportsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public ReportsController(
+            ApplicationDbContext context,
+            UserManager<ApplicationUser> userManager,
+            ITranslationService translationService)
             : base(context, userManager)
         {
+            _translationService = translationService;
             _reportDefinitions = new List<ReportDefinition>
             {
                 new(PropertiesReportKey, "Property Directory", true, false,
@@ -79,6 +86,18 @@ namespace hOps.web.Controllers
                     "Shared calendar color codes for scheduling and events.")
             };
         }
+
+        private string GetActiveLanguage()
+            => HttpContext?.Items?["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+
+        private string Translate(string key, string? fallback = null)
+            => _translationService.Translate(key, GetActiveLanguage(), fallback ?? key);
+
+        private bool IsDefaultLanguage(string language)
+            => string.Equals(language, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+
+        private CancellationToken RequestCancellationToken
+            => HttpContext?.RequestAborted ?? CancellationToken.None;
 
         [HttpGet]
         public async Task<IActionResult> Index()
@@ -981,7 +1000,11 @@ namespace hOps.web.Controllers
             DateTime? startDate,
             DateTime? endDate)
         {
-            var headers = new List<string>
+            var activeLanguage = GetActiveLanguage();
+            var cancellationToken = RequestCancellationToken;
+            var isDefaultLanguage = IsDefaultLanguage(activeLanguage);
+
+            var headerKeys = new[]
             {
                 "Property",
                 "Date Found/Lost",
@@ -996,11 +1019,15 @@ namespace hOps.web.Controllers
                 "Notes"
             };
 
+            var headers = headerKeys
+                .Select(key => _translationService.Translate(key, activeLanguage, key))
+                .ToList();
+
             if (!propertyIds.Any())
             {
                 return new ReportResultViewModel
                 {
-                    Title = definition.DisplayName,
+                    Title = Translate(definition.DisplayName, definition.DisplayName),
                     Headers = headers,
                     Rows = new List<IReadOnlyList<string>>()
                 };
@@ -1036,35 +1063,196 @@ namespace hOps.web.Controllers
                 .ThenByDescending(e => e.CreatedAt)
                 .ToListAsync();
 
-            var rows = entries
-                .Select(e =>
+            var rows = new List<IReadOnlyList<string>>(entries.Count);
+
+            foreach (var entry in entries)
+            {
+                var relevantDate = entry.Type == LostFoundType.Found
+                    ? entry.DateFound ?? entry.CreatedAt
+                    : entry.DateReportedLost ?? entry.CreatedAt;
+
+                var item = entry.Type == LostFoundType.Found
+                    ? entry.ItemFound ?? string.Empty
+                    : entry.ItemLost ?? string.Empty;
+
+                var location = entry.Location ?? string.Empty;
+                var foundBy = entry.FoundBy ?? string.Empty;
+                var stored = entry.Stored ?? string.Empty;
+                var guestName = entry.GuestName ?? string.Empty;
+                var guestEmail = entry.GuestEmail ?? string.Empty;
+                var guestPhone = entry.GuestPhone ?? string.Empty;
+                var guestAddress = entry.GuestAddress ?? string.Empty;
+                var notes = entry.Notes ?? string.Empty;
+
+                if (!isDefaultLanguage)
                 {
-                    var relevantDate = e.Type == LostFoundType.Found
-                        ? e.DateFound ?? e.CreatedAt
-                        : e.DateReportedLost ?? e.CreatedAt;
+                    var entityId = entry.Id.ToString(CultureInfo.InvariantCulture);
 
-                    var item = e.Type == LostFoundType.Found ? e.ItemFound : e.ItemLost;
-
-                    return (IReadOnlyList<string>)new List<string>
+                    if (!string.IsNullOrWhiteSpace(item))
                     {
-                        NormalizeText(e.Property?.Name),
-                        FormatDate(relevantDate),
-                        NormalizeText(item),
-                        NormalizeText(e.Location),
-                        NormalizeText(e.FoundBy),
-                        NormalizeText(e.Stored),
-                        NormalizeText(e.GuestName),
-                        NormalizeText(e.GuestEmail),
-                        NormalizeText(e.GuestPhone),
-                        NormalizeText(e.GuestAddress),
-                        NormalizeText(e.Notes)
-                    };
-                })
-                .ToList();
+                        var fieldKey = entry.Type == LostFoundType.Found ? "ItemFound" : "ItemLost";
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "LostFoundEntry",
+                            entityId,
+                            fieldKey,
+                            item,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            item = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(location))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "LostFoundEntry",
+                            entityId,
+                            "Location",
+                            location,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            location = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(foundBy))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "LostFoundEntry",
+                            entityId,
+                            "FoundBy",
+                            foundBy,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            foundBy = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(stored))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "LostFoundEntry",
+                            entityId,
+                            "Stored",
+                            stored,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            stored = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(guestName))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "LostFoundEntry",
+                            entityId,
+                            "GuestName",
+                            guestName,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            guestName = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(guestEmail))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "LostFoundEntry",
+                            entityId,
+                            "GuestEmail",
+                            guestEmail,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            guestEmail = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(guestPhone))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "LostFoundEntry",
+                            entityId,
+                            "GuestPhone",
+                            guestPhone,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            guestPhone = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(guestAddress))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "LostFoundEntry",
+                            entityId,
+                            "GuestAddress",
+                            guestAddress,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            guestAddress = translated;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(notes))
+                    {
+                        var translated = await _translationService.TranslateDynamicAsync(
+                            "LostFoundEntry",
+                            entityId,
+                            "Notes",
+                            notes,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translated))
+                        {
+                            notes = translated;
+                        }
+                    }
+                }
+
+                rows.Add(new List<string>
+                {
+                    NormalizeText(entry.Property?.Name),
+                    FormatDate(relevantDate),
+                    NormalizeText(item),
+                    NormalizeText(location),
+                    NormalizeText(foundBy),
+                    NormalizeText(stored),
+                    NormalizeText(guestName),
+                    NormalizeText(guestEmail),
+                    NormalizeText(guestPhone),
+                    NormalizeText(guestAddress),
+                    NormalizeText(notes)
+                });
+            }
 
             return new ReportResultViewModel
             {
-                Title = definition.DisplayName,
+                Title = Translate(definition.DisplayName, definition.DisplayName),
                 Headers = headers,
                 Rows = rows
             };

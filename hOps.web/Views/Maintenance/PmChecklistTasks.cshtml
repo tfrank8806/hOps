@@ -1,16 +1,53 @@
 @model hOps.web.ViewModels.Maintenance.MaintenancePmChecklistTasksViewModel
+@using System.Globalization
+@using System.Text.Json
+
 @{
-    ViewData["Title"] = "Checklist Tasks";
+    var checklistIdString = Model.ChecklistId.ToString(CultureInfo.InvariantCulture);
+    var checklistName = await Html.DisplayTranslatedTextAsync(
+        "PmChecklist",
+        checklistIdString,
+        "Name",
+        Model.ChecklistName ?? string.Empty);
+    if (string.IsNullOrWhiteSpace(checklistName))
+    {
+        checklistName = Model.ChecklistName;
+    }
+
+    var areaOptions = Model.AreaOptions ?? Array.Empty<string>();
+    var translatedAreaOptions = new List<string>();
+    var areaIndex = 0;
+    foreach (var area in areaOptions)
+    {
+        var translatedArea = await Html.DisplayTranslatedTextAsync(
+            "PmChecklistAreaOption",
+            $"{checklistIdString}:{areaIndex}",
+            "Value",
+            area ?? string.Empty);
+        if (!string.IsNullOrWhiteSpace(translatedArea))
+        {
+            translatedAreaOptions.Add(translatedArea);
+        }
+        areaIndex++;
+    }
+
+    ViewData["Title"] = Html.Localize("Checklist Tasks");
+    var checklistTypeLabel = Html.Localize(Model.ChecklistType == PreventiveMaintenanceChecklistType.Area ? "Area checklist" : "Room checklist");
 }
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
-        <h2 class="mb-0">@Model.ChecklistName Tasks</h2>
-        <p class="text-muted mb-0 small">@Model.PropertyName &mdash; @(Model.ChecklistType == PreventiveMaintenanceChecklistType.Area ? "Area checklist" : "Room checklist")</p>
+        <h2 class="mb-0">@checklistName @Html.Localize("Tasks")</h2>
+        <p class="text-muted mb-0 small">@Model.PropertyName &mdash; @checklistTypeLabel</p>
     </div>
     <div class="d-flex gap-2">
-        <a asp-action="DownloadChecklistCsv" asp-route-checklistId="@Model.ChecklistId" class="btn btn-outline-primary btn-sm">Download CSV</a>
-        <a asp-action="PmChecklists" asp-route-propertyId="@Model.PropertyId" asp-route-checklistId="@Model.ChecklistId" class="btn btn-outline-secondary btn-sm">Back to Checklists</a>
+        <a asp-action="DownloadChecklistCsv"
+           asp-route-checklistId="@Model.ChecklistId"
+           class="btn btn-outline-primary btn-sm">@Html.Localize("Download CSV")</a>
+        <a asp-action="PmChecklists"
+           asp-route-propertyId="@Model.PropertyId"
+           asp-route-checklistId="@Model.ChecklistId"
+           class="btn btn-outline-secondary btn-sm">@Html.Localize("Back to Checklists")</a>
     </div>
 </div>
 
@@ -24,32 +61,36 @@
     <div class="alert alert-success">@message</div>
 }
 
-@if (Model.ChecklistType == PreventiveMaintenanceChecklistType.Area && Model.AreaOptions.Any())
+@if (Model.ChecklistType == PreventiveMaintenanceChecklistType.Area && translatedAreaOptions.Any())
 {
     <div class="alert alert-info">
-        <strong>Suggested areas:</strong> @string.Join(", ", Model.AreaOptions)
+        <strong>@Html.Localize("Suggested areas:")</strong> @string.Join(", ", translatedAreaOptions)
     </div>
 }
 
-<form asp-action="SaveChecklistTasks" asp-route-checklistId="@Model.ChecklistId" method="post" id="pmSetupForm" class="card">
+<form asp-action="SaveChecklistTasks"
+      asp-route-checklistId="@Model.ChecklistId"
+      method="post"
+      id="pmSetupForm"
+      class="card">
     @Html.AntiForgeryToken()
     <input type="hidden" name="propertyId" value="@Model.PropertyId" />
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
             <div>
-                <h5 class="mb-0">Checklist rows</h5>
-                <div class="text-muted small">Drag rows to reorder. Save to keep your changes.</div>
+                <h5 class="mb-0">@Html.Localize("Checklist rows")</h5>
+                <div class="text-muted small">@Html.Localize("Drag rows to reorder. Save to keep your changes.")</div>
             </div>
-            <button type="button" class="btn btn-secondary btn-sm" data-pm-action="add-row" data-position="top">+ Add Row</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-pm-action="add-row" data-position="top">+ @Html.Localize("Add Row")</button>
         </div>
         <div class="table-responsive">
             <table class="table align-middle table-striped" id="pmTasksTable">
                 <thead class="table-light">
                     <tr>
                         <th style="width:40px;"></th>
-                        <th>Task</th>
-                        <th>Description</th>
-                        <th class="text-end" style="width:110px;">Action</th>
+                        <th>@Html.Localize("Task")</th>
+                        <th>@Html.Localize("Description")</th>
+                        <th class="text-end" style="width:110px;">@Html.Localize("Action")</th>
                     </tr>
                 </thead>
                 <tbody id="pmTasksBody">
@@ -59,18 +100,26 @@
                         {
                             <tr draggable="true" class="pm-task-row">
                                 <td class="text-muted text-center cursor-move">
-                                    <span class="pm-drag-handle" title="Drag to reorder">&#x2630;</span>
+                                    <span class="pm-drag-handle" title="@Html.Localize("Drag to reorder")">&#x2630;</span>
                                 </td>
                                 <td>
                                     <input type="hidden" name="tasks[@i].Id" value="@Model.Tasks[i].Id" />
                                     <input type="hidden" name="tasks[@i].SortOrder" value="@Model.Tasks[i].SortOrder" />
-                                    <input type="text" class="form-control" name="tasks[@i].Title" value="@Model.Tasks[i].Title" placeholder="Task name" required />
+                                    <input type="text"
+                                           class="form-control"
+                                           name="tasks[@i].Title"
+                                           value="@Model.Tasks[i].Title"
+                                           placeholder="@Html.Localize("Task name")"
+                                           required />
                                 </td>
                                 <td>
-                                    <textarea class="form-control" name="tasks[@i].Description" rows="2" placeholder="Describe what needs to be done">@Model.Tasks[i].Description</textarea>
+                                    <textarea class="form-control"
+                                              name="tasks[@i].Description"
+                                              rows="2"
+                                              placeholder="@Html.Localize("Describe what needs to be done")">@Model.Tasks[i].Description</textarea>
                                 </td>
                                 <td class="text-end">
-                                    <button type="button" class="btn btn-outline-danger btn-sm" data-pm-action="delete-row">Remove</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" data-pm-action="delete-row">@Html.Localize("Remove")</button>
                                 </td>
                             </tr>
                         }
@@ -79,7 +128,7 @@
             </table>
         </div>
         <div class="text-end mt-3">
-            <button type="submit" class="btn btn-primary">Save Tasks</button>
+            <button type="submit" class="btn btn-primary">@Html.Localize("Save Tasks")</button>
         </div>
     </div>
 </form>
@@ -87,18 +136,18 @@
 <template id="pmTaskTemplate">
     <tr draggable="true" class="pm-task-row">
         <td class="text-muted text-center cursor-move">
-            <span class="pm-drag-handle" title="Drag to reorder">&#x2630;</span>
+            <span class="pm-drag-handle" title="@Html.Localize("Drag to reorder")">&#x2630;</span>
         </td>
         <td>
             <input type="hidden" name="tasks[#].Id" value="0" />
             <input type="hidden" name="tasks[#].SortOrder" value="0" />
-            <input type="text" class="form-control" name="tasks[#].Title" placeholder="Task name" required />
+            <input type="text" class="form-control" name="tasks[#].Title" placeholder="@Html.Localize("Task name")" required />
         </td>
         <td>
-            <textarea class="form-control" name="tasks[#].Description" rows="2" placeholder="Describe what needs to be done"></textarea>
+            <textarea class="form-control" name="tasks[#].Description" rows="2" placeholder="@Html.Localize("Describe what needs to be done")"></textarea>
         </td>
         <td class="text-end">
-            <button type="button" class="btn btn-outline-danger btn-sm" data-pm-action="delete-row">Remove</button>
+            <button type="button" class="btn btn-outline-danger btn-sm" data-pm-action="delete-row">@Html.Localize("Remove")</button>
         </td>
     </tr>
 </template>

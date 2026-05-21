@@ -1,7 +1,7 @@
 ﻿@model hOps.web.Models.Department
 @using Microsoft.AspNetCore.Mvc.Rendering
 @{
-    ViewData["Title"] = "Edit Department";
+    ViewData["Title"] = Html.Localize("Settings.Departments.EditTitle", "Edit Department").ToString();
     ViewData["FormAction"] = "EditDepartment";
     var propertyOptions = ViewBag.PropertyOptions as List<SelectListItem> ?? new List<SelectListItem>();
     bool onlyGlobal = ViewBag.OnlyGlobal as bool? ?? false;
@@ -16,14 +16,14 @@
     <input type="hidden" name="returnUrl" value="@returnUrl" />
 
     <div class="mb-3">
-        <label class="form-label" for="department-property">Applies To</label>
+        <label class="form-label" for="department-property">@Html.Localize("Settings.Departments.AppliesTo", "Applies To")</label>
         <select class="form-select" id="department-property" name="selectedPropertyId">
             @foreach (var option in propertyOptions)
             {
                 <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
             }
         </select>
-        <div class="form-text">Choose "Global" to share this department with every property.</div>
+        <div class="form-text">@Html.Localize("Settings.Departments.ScopeHelp", "Choose \"Global\" to share this department with every property.")</div>
     </div>
 
     <div class="mb-3">
@@ -36,5 +36,5 @@
         <input asp-for="Color" type="color" class="form-control" />
         <span asp-validation-for="Color" class="text-danger"></span>
     </div>
-    <button type="submit" class="btn btn-success">Save</button>
+    <button type="submit" class="btn btn-success">@Html.Localize("Save")</button>
 </form>

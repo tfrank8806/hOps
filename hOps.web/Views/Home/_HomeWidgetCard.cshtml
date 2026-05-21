@@ -1,6 +1,7 @@
-@using System
+﻿@using System
 @using System.Collections.Generic
 @using System.Linq
+@using System.Globalization
 @using hOps.web.ViewModels
 @using hOps.web.ViewModels.Home
 @model HomeWidgetViewModel
@@ -30,8 +31,8 @@
 @{
     var hasCreateAction = !string.IsNullOrWhiteSpace(Model.CreateControllerName) && !string.IsNullOrWhiteSpace(Model.CreateActionName);
     var createButtonLabel = string.IsNullOrWhiteSpace(Model.CreateButtonText)
-        ? "+ New"
-        : Model.CreateButtonText!;
+        ? Html.Localize("+ New")
+        : Html.Localize(Model.CreateButtonText!);
     var createController = Model.CreateControllerName ?? string.Empty;
     var createAction = Model.CreateActionName ?? string.Empty;
     var createFragment = Model.CreateFragment ?? string.Empty;
@@ -56,13 +57,13 @@
                     @createButtonLabel
                 </a>
             }
-            <a class="btn btn-sm btn-outline-primary" asp-controller="@Model.ControllerName" asp-action="@Model.ActionName">View All</a>
+            <a class="btn btn-sm btn-outline-primary" asp-controller="@Model.ControllerName" asp-action="@Model.ActionName">@Html.Localize("View All")</a>
         </div>
     </div>
     <div class="card-body home-widget-card__body">
         @if (!items.Any())
         {
-            <p class="text-muted mb-0">No records to show.</p>
+            <p class="text-muted mb-0">@Html.Localize("No records to show.")</p>
         }
         else if (items.First() is WorkOrderSummaryViewModel)
         {
@@ -71,50 +72,58 @@
                 @foreach (var order in workOrders)
                 {
                     var hasLink = !string.IsNullOrWhiteSpace(order.DetailUrl);
+                    var orderIdString = order.Id.ToString(CultureInfo.InvariantCulture);
+                    var issueDisplay = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Issue", order.Issue);
+                    var locationDisplay = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Location", order.Location ?? string.Empty);
+                    var departmentDisplay = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "DepartmentName", order.DepartmentName ?? string.Empty);
+                    var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
+                    var openedLabel = string.Format(CultureInfo.CurrentCulture, Html.Localize("Opened {0}"), createdLocal.ToString("g", CultureInfo.CurrentCulture));
                     <li class="widget-item">
                         <div class="d-flex justify-content-between align-items-start gap-3">
                             <div class="flex-grow-1">
                                 @if (hasLink)
                                 {
-                                    <a class="fw-semibold" href="@order.DetailUrl">@order.Issue</a>
+                                    <a class="fw-semibold" href="@order.DetailUrl">@issueDisplay</a>
                                 }
                                 else
                                 {
-                                    <span class="fw-semibold">@order.Issue</span>
+                                    <span class="fw-semibold">@issueDisplay</span>
                                 }
-                                @if (!string.IsNullOrWhiteSpace(order.Location))
+                                @if (!string.IsNullOrWhiteSpace(locationDisplay))
                                 {
-                                    <div class="text-muted small">@order.Location</div>
+                                    <div class="text-muted small">@locationDisplay</div>
                                 }
-                                @if (!string.IsNullOrWhiteSpace(order.DepartmentName))
+                                @if (!string.IsNullOrWhiteSpace(departmentDisplay))
                                 {
                                     var deptColor = string.IsNullOrWhiteSpace(order.DepartmentColor)
                                         ? "#0d6efd"
                                         : order.DepartmentColor;
                                     <div class="text-muted small d-flex align-items-center gap-2 mt-1">
                                         <span class="widget-dept-dot" style="--dept-color:@deptColor" aria-hidden="true"></span>
-                                        <span>@order.DepartmentName</span>
+                                        <span>@departmentDisplay</span>
                                     </div>
                                 }
                                 <div class="@order.SlaStatusClass mt-1">
-                                    <span class="fw-semibold">@order.SlaStatus</span>
-                                    <span class="ms-1 text-muted">@order.SlaSummary</span>
+                                    <span class="fw-semibold">@Html.Localize(order.SlaStatus ?? string.Empty)</span>
+                                    @if (!string.IsNullOrWhiteSpace(order.SlaSummary))
+                                    {
+                                        <span class="ms-1 text-muted">@Html.Localize(order.SlaSummary)</span>
+                                    }
                                 </div>
                             </div>
                             @{
                                 var statusColor = hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetColor(order.Status);
                                 var statusLabel = hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetLabel(order.Status);
+                                var localizedStatusLabel = Html.Localize(statusLabel ?? string.Empty);
+                                var localizedPriorityLabel = Html.Localize(order.PriorityLabel ?? string.Empty);
                             }
                             <div class="d-flex flex-column align-items-end gap-1 text-end flex-shrink-0">
-                                <span class="badge" style="background-color:@statusColor">@statusLabel</span>
-                                <span class="@order.PriorityClass">@order.PriorityLabel</span>
-                                <small class="text-muted">@order.DueDate.ToString("MM-dd-yy")</small>
+                                <span class="badge" style="background-color:@statusColor">@localizedStatusLabel</span>
+                                <span class="@order.PriorityClass">@localizedPriorityLabel</span>
+                                <small class="text-muted">@order.DueDate.ToString("d", CultureInfo.CurrentCulture)</small>
                             </div>
                         </div>
-                        @{
-                            var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
-                        }
-                        <div class="small mt-1" style="color:@GetDateColor(order.CreatedAt);">Opened @createdLocal.ToString("g")</div>
+                        <div class="small mt-1" style="color:@GetDateColor(order.CreatedAt);">@openedLabel</div>
                     </li>
                 }
             </ul>
@@ -126,20 +135,23 @@
                 @foreach (var entry in entries)
                 {
                     var hasLink = !string.IsNullOrWhiteSpace(entry.DetailUrl);
+                    var entryIdString = entry.Id.ToString(CultureInfo.InvariantCulture);
+                    var titleDisplay = await Html.DisplayTranslatedTextAsync("LostFoundEntry", entryIdString, "Title", entry.Title);
+                    var typeDisplay = Html.Localize(entry.Type.ToString());
+                    var statusDisplay = Html.Localize(entry.Status.ToString());
+                    var loggedLocal = TimeZoneService.ConvertToUserTime(entry.CreatedAt);
+                    var loggedLabel = string.Format(CultureInfo.CurrentCulture, Html.Localize("Logged {0}"), loggedLocal.ToString("g", CultureInfo.CurrentCulture));
                     <li class="widget-item">
                         @if (hasLink)
                         {
-                            <a class="fw-semibold" href="@entry.DetailUrl">@entry.Title</a>
+                            <a class="fw-semibold" href="@entry.DetailUrl">@titleDisplay</a>
                         }
                         else
                         {
-                            <span class="fw-semibold">@entry.Title</span>
+                            <span class="fw-semibold">@titleDisplay</span>
                         }
-                        <div class="text-muted small">@entry.Type.ToString() &middot; @entry.Status.ToString()</div>
-                        @{
-                            var loggedLocal = TimeZoneService.ConvertToUserTime(entry.CreatedAt);
-                        }
-                        <div class="small" style="color:@GetDateColor(entry.CreatedAt);">Logged @loggedLocal.ToString("g")</div>
+                        <div class="text-muted small">@typeDisplay &middot; @statusDisplay</div>
+                        <div class="small" style="color:@GetDateColor(entry.CreatedAt);">@loggedLabel</div>
                     </li>
                 }
             </ul>
@@ -156,62 +168,62 @@
                     @foreach (var package in packages)
                     {
                         var hasLink = !string.IsNullOrWhiteSpace(package.DetailUrl);
+                        var packageIdString = package.Id.ToString(CultureInfo.InvariantCulture);
+                        var recipientDisplay = await Html.DisplayTranslatedTextAsync("PackageLog", packageIdString, "RecipientName", package.RecipientName);
+                        var storageDisplay = await Html.DisplayTranslatedTextAsync("PackageLog", packageIdString, "StorageLocation", package.StorageLocation ?? string.Empty);
+                        var metaParts = new List<string>();
+                        if (!string.IsNullOrWhiteSpace(package.RoomNumber))
+                        {
+                            metaParts.Add(string.Format(CultureInfo.CurrentCulture, Html.Localize("Room {0}"), package.RoomNumber));
+                        }
+                        if (!string.IsNullOrWhiteSpace(package.Carrier))
+                        {
+                            metaParts.Add(Html.Localize(package.Carrier));
+                        }
+                        if (!string.IsNullOrWhiteSpace(package.TrackingNumber))
+                        {
+                            metaParts.Add(package.TrackingNumber);
+                        }
+                        if (!string.IsNullOrWhiteSpace(storageDisplay))
+                        {
+                            metaParts.Add(storageDisplay);
+                        }
+                        if (package.PackageReceivedDate.HasValue)
+                        {
+                            metaParts.Add(string.Format(CultureInfo.CurrentCulture, Html.Localize("Received {0}"), package.PackageReceivedDate.Value.ToString("MMM d", CultureInfo.CurrentCulture)));
+                        }
+                        var packageLoggedLocal = TimeZoneService.ConvertToUserTime(package.LoggedAt);
+                        var loggedLabel = string.Format(CultureInfo.CurrentCulture, Html.Localize("Logged {0}"), packageLoggedLocal.ToString("g", CultureInfo.CurrentCulture));
                         <li class="widget-item">
                             @if (hasLink)
                             {
-                                <a class="fw-semibold" href="@package.DetailUrl">@package.RecipientName</a>
-                        }
-                        else
-                        {
-                            <span class="fw-semibold">@package.RecipientName</span>
-                        }
-                        @{
-                            var metaParts = new List<string>();
-                            if (!string.IsNullOrWhiteSpace(package.RoomNumber))
-                            {
-                                metaParts.Add($"Room {package.RoomNumber}");
+                                <a class="fw-semibold" href="@package.DetailUrl">@recipientDisplay</a>
                             }
-                            if (!string.IsNullOrWhiteSpace(package.Carrier))
+                            else
                             {
-                                metaParts.Add(package.Carrier);
+                                <span class="fw-semibold">@recipientDisplay</span>
                             }
-                            if (!string.IsNullOrWhiteSpace(package.TrackingNumber))
+                            @if (metaParts.Any())
                             {
-                                metaParts.Add(package.TrackingNumber);
-                            }
-                            if (!string.IsNullOrWhiteSpace(package.StorageLocation))
-                            {
-                                metaParts.Add(package.StorageLocation);
-                            }
-                            if (package.PackageReceivedDate.HasValue)
-                            {
-                                metaParts.Add($"Received {package.PackageReceivedDate.Value.ToString("MMM d")}");
-                            }
-                        }
-                        @if (metaParts.Any())
-                        {
-                            <div class="text-muted small">
-                                @for (var i = 0; i < metaParts.Count; i++)
-                                {
-                                    if (i > 0)
+                                <div class="text-muted small">
+                                    @for (var i = 0; i < metaParts.Count; i++)
                                     {
-                                        <span class="mx-1" aria-hidden="true">&middot;</span>
+                                        if (i > 0)
+                                        {
+                                            <span class="mx-1" aria-hidden="true">&middot;</span>
+                                        }
+                                        @metaParts[i]
                                     }
-                                    @metaParts[i]
-                                }
-                            </div>
-                        }
-                        @{
-                            var packageLoggedLocal = TimeZoneService.ConvertToUserTime(package.LoggedAt);
-                        }
-                        <div class="small" style="color:@GetDateColor(package.LoggedAt);">Logged @packageLoggedLocal.ToString("g")</div>
-                    </li>
+                                </div>
+                            }
+                            <div class="small" style="color:@GetDateColor(package.LoggedAt);">@loggedLabel</div>
+                        </li>
                     }
                 </ul>
             }
             else
             {
-                <p class="text-muted small mb-0">No packages are waiting for pickup.</p>
+                <p class="text-muted small mb-0">@Html.Localize("No packages are waiting for pickup.")</p>
             }
         }
         else if (items.First() is CalendarEventSummaryViewModel)
@@ -239,23 +251,26 @@
                 @foreach (var calendarEvent in displayedEvents)
                 {
                     var hasLink = !string.IsNullOrWhiteSpace(calendarEvent.DetailUrl);
+                    var eventIdString = calendarEvent.Id.ToString(CultureInfo.InvariantCulture);
+                    var titleDisplay = await Html.DisplayTranslatedTextAsync("CalendarEvent", eventIdString, "Title", calendarEvent.Title);
+                    var categoryDisplay = string.IsNullOrWhiteSpace(calendarEvent.CategoryName) ? string.Empty : Html.Localize(calendarEvent.CategoryName);
                     <li class="widget-item">
                         @if (hasLink)
                         {
-                            <a class="fw-semibold" href="@calendarEvent.DetailUrl">@calendarEvent.Title</a>
+                            <a class="fw-semibold" href="@calendarEvent.DetailUrl">@titleDisplay</a>
                         }
                         else
                         {
-                            <span class="fw-semibold">@calendarEvent.Title</span>
+                            <span class="fw-semibold">@titleDisplay</span>
                         }
                         <div class="small" style="color:@GetEventBadgeColor(calendarEvent.StartDate)">@calendarEvent.DateDisplay</div>
                         @if (!string.IsNullOrWhiteSpace(calendarEvent.TimeDisplay))
                         {
                             <div class="small text-muted">@calendarEvent.TimeDisplay</div>
                         }
-                        @if (!string.IsNullOrWhiteSpace(calendarEvent.CategoryName))
+                        @if (!string.IsNullOrWhiteSpace(categoryDisplay))
                         {
-                            <span class="badge rounded-pill" style="background-color:@(calendarEvent.CategoryColor ?? "#0d6efd");">@calendarEvent.CategoryName</span>
+                            <span class="badge rounded-pill" style="background-color:@(calendarEvent.CategoryColor ?? "#0d6efd");">@categoryDisplay</span>
                         }
                     </li>
                 }
@@ -264,7 +279,7 @@
             @if (showMoreTodayButton)
             {
                 <div class="text-end mt-2">
-                    <a class="btn btn-sm btn-outline-primary" asp-controller="Calendar" asp-action="Index">More Events Today</a>
+                    <a class="btn btn-sm btn-outline-primary" asp-controller="Calendar" asp-action="Index">@Html.Localize("More Events Today")</a>
                 </div>
             }
         }
@@ -275,10 +290,15 @@
                 @foreach (var log in logs)
                 {
                     var hasLink = !string.IsNullOrWhiteSpace(log.DetailUrl);
+                    var logIdString = log.Id.ToString(CultureInfo.InvariantCulture);
+                    var titleDisplay = await Html.DisplayTranslatedTextAsync("PassOnLog", logIdString, "Title", log.Title);
+                    var previewDisplay = await Html.DisplayTranslatedTextAsync("PassOnLog", logIdString, "Preview", log.Preview);
                     var postedLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
-                    var authorName = string.IsNullOrWhiteSpace(log.CreatorName) ? "Unknown" : log.CreatorName;
+                    var authorName = string.IsNullOrWhiteSpace(log.CreatorName) ? Html.Localize("Unknown") : log.CreatorName;
                     var statusBadgeClass = log.IsRead ? "badge rounded-pill bg-success-subtle text-success" : "badge rounded-pill bg-primary text-white";
-                    var statusText = log.IsRead ? "Read" : "Unread";
+                    var statusText = log.IsRead ? Html.Localize("Read") : Html.Localize("Unread");
+                    var postedLabel = string.Format(CultureInfo.CurrentCulture, Html.Localize("Posted {0}"), postedLocal.ToString("g", CultureInfo.CurrentCulture));
+                    var authorLabel = string.Format(CultureInfo.CurrentCulture, Html.Localize("By {0}"), authorName);
                     <li class="widget-item">
                         <div class="d-flex gap-3 align-items-start">
                             <div class="flex-shrink-0">
@@ -288,20 +308,20 @@
                                 <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
                                     @if (hasLink)
                                     {
-                                        <a class="fw-semibold" href="@log.DetailUrl">@log.Title</a>
+                                        <a class="fw-semibold" href="@log.DetailUrl">@titleDisplay</a>
                                     }
                                     else
                                     {
-                                        <span class="fw-semibold">@log.Title</span>
+                                        <span class="fw-semibold">@titleDisplay</span>
                                     }
                                     <span class="@statusBadgeClass">@statusText</span>
                                 </div>
-                                <div class="text-muted small">By @authorName</div>
-                                @if (!string.IsNullOrWhiteSpace(log.Preview))
+                                <div class="text-muted small">@authorLabel</div>
+                                @if (!string.IsNullOrWhiteSpace(previewDisplay))
                                 {
-                                    <div class="small text-muted mt-1">@log.Preview</div>
+                                    <div class="small text-muted mt-1">@previewDisplay</div>
                                 }
-                                <div class="small mt-1" style="color:@GetDateColor(log.CreatedAt);">Posted @postedLocal.ToString("g")</div>
+                                <div class="small mt-1" style="color:@GetDateColor(log.CreatedAt);">@postedLabel</div>
                             </div>
                         </div>
                     </li>
@@ -310,7 +330,9 @@
         }
         else
         {
-            <p class="text-muted mb-0">Unsupported widget type.</p>
+            <p class="text-muted mb-0">@Html.Localize("Unsupported widget type.")</p>
         }
     </div>
 </div>
+
+

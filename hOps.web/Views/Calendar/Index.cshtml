@@ -1,16 +1,22 @@
 @model CalendarViewModel
 @using System.Text.Json
+@using System.Globalization
+@using System.Linq
 @{
-    ViewData["Title"] = "Calendar";
+    ViewData["Title"] = Html.Localize("Calendar").ToString();
     ViewData["MainContainerClass"] = "main-inner--wide main-inner--wide-stretched";
-    var dayHeaders = new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+    var cultureDayNames = CultureInfo.CurrentCulture.DateTimeFormat.DayNames;
+    var dayHeaders = Enumerable.Range(0, cultureDayNames.Length)
+        .Select(i => Html.Localize(cultureDayNames[i], cultureDayNames[i]).ToString())
+        .ToArray();
     var disableForm = !Model.AccessibleProperties.Any();
     var today = DateTime.Today;
+    var outsideMonthSuffix = Html.Localize("(outside current month)", "(outside current month)").ToString();
 }
 
 <div class="calendar-page">
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
-        <h1 class="h3 mb-0">Calendar</h1>
+        <h1 class="h3 mb-0">@Html.Localize("Calendar")</h1>
         <div class="d-flex align-items-center gap-2">
             <a class="btn btn-outline-secondary btn-sm"
                asp-action="Index"
@@ -29,24 +35,48 @@
                asp-action="Index"
                asp-route-year="@today.Year"
                asp-route-month="@today.Month"
-               title="Jump back to the current month">
-                Today
+               title="@Html.Localize("Jump back to the current month")">
+                @Html.Localize("Today")
             </a>
         </div>
     </div>
 
-@if (ViewBag.SuccessMessage is string successMessage)
+@if (ViewBag.SuccessMessageKey is string successMessageKey)
+{
+    var successFallback = ViewBag.SuccessMessageFallback as string ?? successMessageKey;
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <span>@Html.Localize(successMessageKey, successFallback)</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Html.Localize("Close")"></button>
+    </div>
+}
+else if (ViewBag.SuccessMessage is string successMessage)
 {
     <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <span>@successMessage</span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <span>@Html.Localize(successMessage, successMessage)</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Html.Localize("Close")"></button>
+    </div>
+}
+
+@if (ViewBag.WarningMessageKey is string warningMessageKey)
+{
+    var warningFallback = ViewBag.WarningMessageFallback as string ?? warningMessageKey;
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <span>@Html.Localize(warningMessageKey, warningFallback)</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Html.Localize("Close")"></button>
+    </div>
+}
+else if (ViewBag.WarningMessage is string warningMessage)
+{
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <span>@Html.Localize(warningMessage, warningMessage)</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Html.Localize("Close")"></button>
     </div>
 }
 
 @if (!Model.AccessibleProperties.Any())
 {
     <div class="alert alert-warning" role="alert">
-        You do not have access to any properties yet. Please contact an administrator to request access.
+        @Html.Localize("You do not have access to any properties yet. Please contact an administrator to request access.")
     </div>
 }
 
@@ -86,10 +116,10 @@
                                             cellClasses += " calendar-day--has-continuation";
                                         }
                                         var dayIso = day.Date.ToString("yyyy-MM-dd");
-                                        var ariaLabel = day.Date.ToString("dddd, MMMM d");
+                                        var ariaLabel = day.Date.ToString("D", CultureInfo.CurrentCulture);
                                         if (!day.IsCurrentMonth)
                                         {
-                                            ariaLabel += " (outside current month)";
+                                            ariaLabel = string.Concat(ariaLabel, " ", outsideMonthSuffix);
                                         }
                                         <td class="@cellClasses">
                                             <div class="calendar-day__inner"
@@ -103,49 +133,65 @@
                                                     <span class="fw-semibold">@day.Date.Day</span>
                                                     @if (isToday)
                                                     {
-                                                        <span class="badge bg-primary">Today</span>
+                                                        <span class="badge bg-primary">@Html.Localize("Today")</span>
                                                     }
                                                 </div>
                                                 <div class="calendar-day-events mt-2">
                                                     @if (day.Events.Any())
                                                     {
-                                                        foreach (var calendarEvent in day.Events)
-                                                        {
-                                                            <button type="button"
-                                                                    class="btn btn-sm text-start w-100 calendar-event"
-                                                                    style="background-color:@calendarEvent.CategoryColor; color:@calendarEvent.CategoryTextColor; border-color:@calendarEvent.CategoryColor;"
-                                                                    data-calendar-event="true"
-                                                                    data-event-id="@calendarEvent.Id"
-                                                                    data-event-title="@calendarEvent.Title"
-                                                                    data-event-category="@calendarEvent.CategoryName"
-                                                                    data-event-color="@calendarEvent.CategoryColor"
-                                                                    data-event-text-color="@calendarEvent.CategoryTextColor"
-                                                                    data-event-date="@calendarEvent.DateDisplay"
-                                                                    data-event-time="@(calendarEvent.TimeDisplay ?? string.Empty)"
-                                                                    data-event-recurrence="@calendarEvent.RecurrenceDisplay"
-                                                                    data-event-recurrence-type="@((int)calendarEvent.Recurrence)"
+                    foreach (var calendarEvent in day.Events)
+                    {
+                        var eventIdString = calendarEvent.Id.ToString(CultureInfo.InvariantCulture);
+                        var eventTitleTranslated = await Html.DisplayTranslatedTextAsync("CalendarEvent", eventIdString, "Title", calendarEvent.Title ?? string.Empty);
+                        var eventDetailsTranslated = string.IsNullOrWhiteSpace(calendarEvent.Details)
+                            ? string.Empty
+                            : await Html.DisplayTranslatedTextAsync("CalendarEvent", eventIdString, "Details", calendarEvent.Details ?? string.Empty);
+                        var eventCategoryTranslated = Html.Localize(calendarEvent.CategoryName ?? string.Empty, calendarEvent.CategoryName ?? string.Empty).ToString();
+                        var eventRecurrenceTranslated = Html.Localize(calendarEvent.RecurrenceDisplay ?? string.Empty, calendarEvent.RecurrenceDisplay ?? string.Empty).ToString();
+                        var eventPropertiesTranslated = Html.Localize(calendarEvent.PropertiesDisplay ?? string.Empty, calendarEvent.PropertiesDisplay ?? string.Empty).ToString();
+                        var eventCreatedByTranslated = Html.Localize(calendarEvent.CreatedByDisplay ?? string.Empty, calendarEvent.CreatedByDisplay ?? string.Empty).ToString();
+                        var eventTimeDisplay = calendarEvent.TimeDisplay ?? string.Empty;
+                        if (!string.IsNullOrWhiteSpace(eventTimeDisplay) && eventTimeDisplay.StartsWith("Until ", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var timePortion = eventTimeDisplay.Substring("Until ".Length);
+                            eventTimeDisplay = string.Format(CultureInfo.InvariantCulture, Html.Localize("Until {0}").ToString(), timePortion);
+                        }
+
+                        <button type="button"
+                                class="btn btn-sm text-start w-100 calendar-event"
+                                style="background-color:@calendarEvent.CategoryColor; color:@calendarEvent.CategoryTextColor; border-color:@calendarEvent.CategoryColor;"
+                                data-calendar-event="true"
+                                data-event-id="@calendarEvent.Id"
+                                data-event-title="@eventTitleTranslated"
+                                data-event-category="@eventCategoryTranslated"
+                                data-event-color="@calendarEvent.CategoryColor"
+                                data-event-text-color="@calendarEvent.CategoryTextColor"
+                                data-event-date="@calendarEvent.DateDisplay"
+                                data-event-time="@eventTimeDisplay"
+                                                                    data-event-recurrence="@eventRecurrenceTranslated"
+                                data-event-recurrence-type="@((int)calendarEvent.Recurrence)"
                                                                     data-event-occurrence='@calendarEvent.StartDate.ToString("yyyy-MM-dd")'
-                                                                    data-event-details="@(calendarEvent.Details ?? string.Empty)"
-                                                                    data-event-properties="@calendarEvent.PropertiesDisplay"
-                                                                    data-event-created-by="@calendarEvent.CreatedByDisplay"
+                                                                    data-event-details="@eventDetailsTranslated"
+                                                                    data-event-properties="@eventPropertiesTranslated"
+                                                                    data-event-created-by="@eventCreatedByTranslated"
                                                                     data-event-created-at="@TimeZoneService.ConvertToUserTime(calendarEvent.CreatedAtUtc).ToString("f")"
                                                                     data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = calendarEvent.Id })"
                                                                     data-event-attachments='@JsonSerializer.Serialize(calendarEvent.Attachments)'>
-                                                                <span class="calendar-event-title">@calendarEvent.Title</span>
-                                                                @if (!string.IsNullOrWhiteSpace(calendarEvent.TimeDisplay))
+                                                                <span class="calendar-event-title">@eventTitleTranslated</span>
+                                                                @if (!string.IsNullOrWhiteSpace(eventTimeDisplay))
                                                                 {
-                                                                    <span class="calendar-event-time d-block">@calendarEvent.TimeDisplay</span>
+                                                                    <span class="calendar-event-time d-block">@eventTimeDisplay</span>
                                                                 }
                                                                 @if (calendarEvent.IsMultiDay)
                                                                 {
-                                                                    <span class="calendar-event-range d-block">@($"Ends {calendarEvent.EndDate:MMM d}")</span>
+                                                                    <span class="calendar-event-range d-block">@string.Format(CultureInfo.InvariantCulture, Html.Localize("Ends {0}").ToString(), calendarEvent.EndDate.ToString("MMM d", CultureInfo.CurrentCulture))</span>
                                                                 }
                                                             </button>
                                                         }
                                                     }
                                                     else if (!day.ContinuingEvents.Any())
                                                     {
-                                                        <span class="text-muted small">No events</span>
+                                                        <span class="text-muted small">@Html.Localize("No events")</span>
                                                     }
 
                                                     @if (day.ContinuingEvents.Any())
@@ -153,13 +199,15 @@
                                                         <div class="calendar-day-continuations mt-2">
                                                             @foreach (var continuation in day.ContinuingEvents)
                                                             {
+                                                                var continuationIdString = continuation.Id.ToString(CultureInfo.InvariantCulture);
+                                                                var continuationTitleTranslated = await Html.DisplayTranslatedTextAsync("CalendarEvent", continuationIdString, "Title", continuation.Title ?? string.Empty);
                                                                 <div class="calendar-day-continuation"
                                                                      style="background-color:@continuation.CategoryColor; color:@continuation.CategoryTextColor;">
-                                                                    <span class="calendar-day-continuation__badge">Continues</span>
-                                                                    <span class="calendar-day-continuation__title">@continuation.Title</span>
+                                                                    <span class="calendar-day-continuation__badge">@Html.Localize("Continues")</span>
+                                                                    <span class="calendar-day-continuation__title">@continuationTitleTranslated</span>
                                                                     @if (continuation.EndDate.Date > day.Date.Date)
                                                                     {
-                                                                        <span class="calendar-day-continuation__range text-white-50">through @continuation.EndDate.ToString("MMM d")</span>
+                                                                        <span class="calendar-day-continuation__range text-white-50">@string.Format(CultureInfo.InvariantCulture, Html.Localize("through {0}").ToString(), continuation.EndDate.ToString("MMM d", CultureInfo.CurrentCulture))</span>
                                                                     }
                                                                 </div>
                                                             }
@@ -179,7 +227,7 @@
 
             <div class="card shadow-sm calendar-page__form mt-4">
                 <div class="card-header">
-                    <span>Create Event</span>
+                    <span>@Html.Localize("Create Event")</span>
                 </div>
                 <div class="card-body">
                     <form asp-action="Create" method="post" enctype="multipart/form-data" id="calendarCreateForm">
@@ -210,7 +258,7 @@
                             <div class="col-md-6">
                                 <label asp-for="Form.StartTime" class="form-label"></label>
                                 <input asp-for="Form.StartTime" class="form-control" />
-                                <span class="form-text">Optional</span>
+                                <span class="form-text">@Html.Localize("Optional")</span>
                                 <span asp-validation-for="Form.StartTime" class="text-danger"></span>
                             </div>
                         </div>
@@ -224,7 +272,7 @@
                             <div class="col-md-6">
                                 <label asp-for="Form.EndTime" class="form-label"></label>
                                 <input asp-for="Form.EndTime" class="form-control" />
-                                <span class="form-text">Optional</span>
+                                <span class="form-text">@Html.Localize("Optional")</span>
                                 <span asp-validation-for="Form.EndTime" class="text-danger"></span>
                             </div>
                         </div>
@@ -248,13 +296,13 @@
                         <div class="mb-3">
                             <label asp-for="Form.Attachments" class="form-label fw-semibold"></label>
                             <input asp-for="Form.Attachments" class="form-control" type="file" multiple accept="image/*,.pdf" />
-                            <div class="form-text">Attach up to 5 files (images or PDF, max 5&nbsp;MB each).</div>
+                            <div class="form-text">@Html.Localize("Attach up to 5 files (images or PDF, max 5 MB each).")</div>
                             <span asp-validation-for="Form.Attachments" class="text-danger"></span>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Reminders</label>
-                            <div class="form-text">Select when teammates should receive reminders.</div>
+                            <label class="form-label fw-semibold">@Html.Localize("Reminders")</label>
+                            <div class="form-text">@Html.Localize("Select when teammates should receive reminders.")</div>
                             @if (Model.ReminderOptions.Any())
                             {
                                 <div class="row g-2 mt-2">
@@ -277,12 +325,12 @@
                             }
                             else
                             {
-                                <div class="alert alert-light border mt-2 mb-0">No reminder options are available.</div>
+                                <div class="alert alert-light border mt-2 mb-0">@Html.Localize("No reminder options are available.")</div>
                             }
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Department assignment</label>
+                            <label class="form-label fw-semibold">@Html.Localize("Department assignment")</label>
                             <div class="form-check">
                                 <input class="form-check-input"
                                        type="radio"
@@ -291,7 +339,7 @@
                                        value="true"
                                        data-dept-radio="create"
                                        @(Model.Form.NotifyAllDepartments ? "checked" : string.Empty) />
-                                <label class="form-check-label" for="createDeptAll">All departments on selected properties</label>
+                                <label class="form-check-label" for="createDeptAll">@Html.Localize("All departments on selected properties")</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input"
@@ -301,7 +349,7 @@
                                        value="false"
                                        data-dept-radio="create"
                                        @(Model.Form.NotifyAllDepartments ? string.Empty : "checked") />
-                                <label class="form-check-label" for="createDeptSpecific">Specific department</label>
+                                <label class="form-check-label" for="createDeptSpecific">@Html.Localize("Specific department")</label>
                             </div>
                             <div class="mt-2">
                                 @if (Model.DepartmentOptions.Any())
@@ -311,12 +359,12 @@
                                             id="createDepartmentSelect"
                                             asp-items="Model.DepartmentOptions"
                                             disabled="@(Model.Form.NotifyAllDepartments)">
-                                        <option value="">Select a department</option>
+                                        <option value="">@Html.Localize("Select a department")</option>
                                     </select>
                                 }
                                 else
                                 {
-                                    <div class="alert alert-light border mb-0">No departments are available for your selected properties.</div>
+                            <div class="alert alert-light border mb-0">@Html.Localize("No departments are available for your selected properties.")</div>
                                 }
                             </div>
                             <span asp-validation-for="Form.TargetDepartmentId" class="text-danger"></span>
@@ -325,7 +373,7 @@
                         @if (Model.ShowPropertySelection)
                         {
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Properties</label>
+                            <label class="form-label fw-semibold">@Html.Localize("Properties")</label>
                                 <div class="row g-2">
                                     @foreach (var property in Model.AccessibleProperties)
                                     {
@@ -356,10 +404,10 @@
                                 <input type="hidden" name="Form.SelectedPropertyIds" value="@propertyId" />
                             }
                             var singleProperty = Model.AccessibleProperties.FirstOrDefault();
-                            var propertyName = singleProperty?.Name ?? "Property";
-                            var propertyCode = singleProperty?.Code ?? "N/A";
+                            var propertyName = singleProperty?.Name ?? Html.Localize("Property").ToString();
+                            var propertyCode = singleProperty?.Code ?? Html.Localize("N/A").ToString();
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Property</label>
+                                <label class="form-label fw-semibold">@Html.Localize("Property")</label>
                                 <div class="form-control-plaintext">
                                     @propertyName <span class="text-muted">(@propertyCode)</span>
                                 </div>
@@ -367,7 +415,7 @@
                         }
 
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-primary" @(disableForm ? "disabled" : string.Empty)>Save Event</button>
+                            <button type="submit" class="btn btn-primary" @(disableForm ? "disabled" : string.Empty)>@Html.Localize("Save Event")</button>
                         </div>
                     </form>
                 </div>
@@ -378,49 +426,65 @@
             <div class="calendar-upcoming-sticky">
             <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>Upcoming Events</span>
-                    <span class="badge bg-secondary">Next 10</span>
+                    <span>@Html.Localize("Upcoming Events")</span>
+                    <span class="badge bg-secondary">@string.Format(CultureInfo.InvariantCulture, Html.Localize("Next {0}").ToString(), 10)</span>
                 </div>
                 <div class="list-group list-group-flush">
                     @if (Model.UpcomingEvents.Any())
                     {
                         foreach (var upcoming in Model.UpcomingEvents)
                         {
+                            var upcomingIdString = upcoming.Id.ToString(CultureInfo.InvariantCulture);
+                            var upcomingTitleTranslated = await Html.DisplayTranslatedTextAsync("CalendarEvent", upcomingIdString, "Title", upcoming.Title ?? string.Empty);
+                            var upcomingDetailsTranslated = string.IsNullOrWhiteSpace(upcoming.Details)
+                                ? string.Empty
+                                : await Html.DisplayTranslatedTextAsync("CalendarEvent", upcomingIdString, "Details", upcoming.Details ?? string.Empty);
+                            var upcomingCategoryTranslated = Html.Localize(upcoming.CategoryName ?? string.Empty, upcoming.CategoryName ?? string.Empty).ToString();
+                            var upcomingPropertiesTranslated = Html.Localize(upcoming.PropertiesDisplay ?? string.Empty, upcoming.PropertiesDisplay ?? string.Empty).ToString();
+                            var upcomingCreatedByTranslated = Html.Localize(upcoming.CreatedByDisplay ?? string.Empty, upcoming.CreatedByDisplay ?? string.Empty).ToString();
+                            var upcomingRecurrenceTranslated = Html.Localize(upcoming.RecurrenceDisplay ?? string.Empty, upcoming.RecurrenceDisplay ?? string.Empty).ToString();
+                            var upcomingTimeDisplay = upcoming.TimeDisplay ?? string.Empty;
+                            if (!string.IsNullOrWhiteSpace(upcomingTimeDisplay) && upcomingTimeDisplay.StartsWith("Until ", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var timePortion = upcomingTimeDisplay.Substring("Until ".Length);
+                                upcomingTimeDisplay = string.Format(CultureInfo.InvariantCulture, Html.Localize("Until {0}").ToString(), timePortion);
+                            }
+
                             <button type="button"
                                     class="list-group-item list-group-item-action calendar-upcoming-event"
                                     style="border-left: 4px solid @upcoming.CategoryColor;"
                                     data-calendar-event="true"
                                     data-event-id="@upcoming.Id"
-                                    data-event-title="@upcoming.Title"
-                                    data-event-category="@upcoming.CategoryName"
+                                    data-event-title="@upcomingTitleTranslated"
+                                    data-event-category="@upcomingCategoryTranslated"
                                     data-event-color="@upcoming.CategoryColor"
                                     data-event-text-color="@upcoming.CategoryTextColor"
                                     data-event-date="@upcoming.DateDisplay"
-                                    data-event-time="@(upcoming.TimeDisplay ?? string.Empty)"
-                                    data-event-recurrence="@upcoming.RecurrenceDisplay"
+                                    data-event-time="@upcomingTimeDisplay"
+                                    data-event-recurrence="@upcomingRecurrenceTranslated"
                                     data-event-recurrence-type="@((int)upcoming.Recurrence)"
                                     data-event-occurrence='@upcoming.StartDate.ToString("yyyy-MM-dd")'
-                                    data-event-details="@(upcoming.Details ?? string.Empty)"
-                                    data-event-properties="@upcoming.PropertiesDisplay"
-                                    data-event-created-by="@upcoming.CreatedByDisplay"
+                                    data-event-details="@upcomingDetailsTranslated"
+                                    data-event-properties="@upcomingPropertiesTranslated"
+                                    data-event-created-by="@upcomingCreatedByTranslated"
                                     data-event-created-at="@TimeZoneService.ConvertToUserTime(upcoming.CreatedAtUtc).ToString("f")"
                                     data-event-edit-url="@Url.Action("Edit", "Calendar", new { id = upcoming.Id })"
                                     data-event-attachments='@JsonSerializer.Serialize(upcoming.Attachments)'>
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <span class="fw-semibold">@upcoming.Title</span>
-                                    <span class="badge" style="background-color: @upcoming.CategoryColor; color: @upcoming.CategoryTextColor">@upcoming.CategoryName</span>
+                                    <span class="fw-semibold">@upcomingTitleTranslated</span>
+                                    <span class="badge" style="background-color: @upcoming.CategoryColor; color: @upcoming.CategoryTextColor">@upcomingCategoryTranslated</span>
                                 </div>
                                 <small class="text-muted">@upcoming.DateDisplay</small>
-                                @if (!string.IsNullOrWhiteSpace(upcoming.TimeDisplay))
+                                @if (!string.IsNullOrWhiteSpace(upcomingTimeDisplay))
                                 {
-                                    <small class="text-muted">@upcoming.TimeDisplay</small>
+                                    <small class="text-muted">@upcomingTimeDisplay</small>
                                 }
                             </button>
                         }
                     }
                     else
                     {
-                        <div class="list-group-item text-muted">No upcoming events.</div>
+                        <div class="list-group-item text-muted">@Html.Localize("No upcoming events.")</div>
                     }
                 </div>
             </div>
@@ -445,7 +509,7 @@
         <div class="calendar-event-flyout__properties small fw-semibold text-secondary" data-flyout="properties"></div>
         <div class="calendar-event-flyout__details small mt-2" data-flyout="details"></div>
         <div class="calendar-event-flyout__actions mt-3 d-flex gap-2">
-            <a class="btn btn-sm btn-primary" data-flyout="edit-link" href="#">Edit</a>
+            <a class="btn btn-sm btn-primary" data-flyout="edit-link" href="#">@Html.Localize("Edit")</a>
         </div>
     </div>
 </div>
@@ -463,18 +527,19 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="eventDeleteConfirmLabel">Delete Recurring Event</h5>
+                <h5 class="modal-title" id="eventDeleteConfirmLabel">@Html.Localize("Delete Recurring Event")</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p class="mb-0">
-                    <span data-delete="title"></span> repeats on the calendar. Would you like to delete just this occurrence or the entire series?
+                    <span data-delete="title"></span> @Html.Localize("repeats on the calendar.")
+                    @Html.Localize("Would you like to delete just this occurrence or the entire series?")
                 </p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-outline-danger" data-delete-scope="occurrence">Delete This Occurrence</button>
-                <button type="button" class="btn btn-danger" data-delete-scope="series">Delete Entire Series</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Html.Localize("Cancel")</button>
+                <button type="button" class="btn btn-outline-danger" data-delete-scope="occurrence">@Html.Localize("Delete This Occurrence")</button>
+                <button type="button" class="btn btn-danger" data-delete-scope="series">@Html.Localize("Delete Entire Series")</button>
             </div>
         </div>
     </div>
@@ -484,43 +549,43 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="eventDetailsLabel" data-details="title">Event Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="eventDetailsLabel" data-details="title">@Html.Localize("Event Details")</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@Html.Localize("Close")"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
                     <span class="badge" data-details="category"></span>
                 </div>
                 <dl class="row mb-0">
-                    <dt class="col-sm-4">Dates</dt>
+                    <dt class="col-sm-4">@Html.Localize("Dates")</dt>
                     <dd class="col-sm-8" data-details="dates"></dd>
 
-                    <dt class="col-sm-4">Time</dt>
+                    <dt class="col-sm-4">@Html.Localize("Time")</dt>
                     <dd class="col-sm-8" data-details="times"></dd>
 
-                    <dt class="col-sm-4">Recurrence</dt>
+                    <dt class="col-sm-4">@Html.Localize("Recurrence")</dt>
                     <dd class="col-sm-8" data-details="recurrence"></dd>
 
-                    <dt class="col-sm-4">Properties</dt>
+                    <dt class="col-sm-4">@Html.Localize("Properties")</dt>
                     <dd class="col-sm-8" data-details="properties"></dd>
 
-                    <dt class="col-sm-4">Details</dt>
+                    <dt class="col-sm-4">@Html.Localize("Details")</dt>
                     <dd class="col-sm-8" data-details="details"></dd>
 
-                    <dt class="col-sm-4">Attachments</dt>
+                    <dt class="col-sm-4">@Html.Localize("Attachments")</dt>
                     <dd class="col-sm-8" data-details="attachments"></dd>
 
-                    <dt class="col-sm-4">Created By</dt>
+                    <dt class="col-sm-4">@Html.Localize("Created By")</dt>
                     <dd class="col-sm-8" data-details="created-by"></dd>
 
-                    <dt class="col-sm-4">Created On</dt>
+                    <dt class="col-sm-4">@Html.Localize("Created On")</dt>
                     <dd class="col-sm-8" data-details="created-at"></dd>
                 </dl>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-danger" data-details="delete-button">Delete</button>
-                <a class="btn btn-primary d-none" data-details="edit-link" href="#">Edit Event</a>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-outline-danger" data-details="delete-button">@Html.Localize("Delete")</button>
+                <a class="btn btn-primary d-none" data-details="edit-link" href="#">@Html.Localize("Edit Event")</a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Html.Localize("Close")</button>
             </div>
         </div>
     </div>
@@ -720,6 +785,27 @@
     <partial name="_ValidationScriptsPartial" />
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const translate = (key, fallback) => {
+                if (typeof window !== 'undefined' && typeof window.hopsTranslate === 'function') {
+                    return window.hopsTranslate(key, fallback);
+                }
+
+                return fallback;
+            };
+
+            const calendarStrings = {
+                eventDetailsTitle: translate('Calendar.EventDetailsTitle', 'Event Details'),
+                categoryLabel: translate('Calendar.CategoryLabel', 'Category'),
+                allDay: translate('Calendar.AllDay', 'All day'),
+                noAdditionalDetails: translate('Calendar.NoAdditionalDetails', 'No additional details'),
+                none: translate('None', 'None'),
+                attachmentFallback: translate('Attachment', 'Attachment'),
+                deleteFormUnavailable: translate('Calendar.DeleteFormUnavailable', 'Calendar: delete form is unavailable.'),
+                attachmentsParseWarning: translate('Calendar.AttachmentsParseWarning', 'Calendar: could not parse attachments payload.'),
+                bootstrapModalUnavailable: translate('Calendar.BootstrapModalUnavailable', 'Bootstrap modal library is unavailable.'),
+                unknownUser: translate('Calendar.UnknownUser', 'Unknown')
+            };
+
             const modalElement = document.getElementById('eventDetailsModal');
             const deleteModalElement = document.getElementById('eventDeleteConfirmModal');
             const flyoutElement = document.getElementById('calendarEventFlyout');
@@ -791,7 +877,7 @@
                     return window.bootstrap.Modal.getOrCreateInstance(modalElement);
                 }
 
-                console.error('Bootstrap modal library is unavailable.');
+                console.error(calendarStrings.bootstrapModalUnavailable);
                 return null;
             };
 
@@ -835,19 +921,19 @@
 
             const renderDetails = (value) => {
                 if (!value) {
-                    return '<span class="text-muted">No additional details</span>';
+                    return `<span class="text-muted">${calendarStrings.noAdditionalDetails}</span>`;
                 }
                 return escapeHtml(value).replace(/\n/g, '<br />');
             };
 
             const renderAttachments = (attachments) => {
                 if (!attachments || !attachments.length) {
-                    return '<span class="text-muted">None</span>';
+                    return `<span class="text-muted">${calendarStrings.none}</span>`;
                 }
 
                 const items = attachments
                     .map(att => {
-                        const name = escapeHtml(att.displayName || att.fileName || 'Attachment');
+                        const name = escapeHtml(att.displayName || att.fileName || calendarStrings.attachmentFallback);
                         const url = escapeHtml(att.downloadUrl || '#');
                         return `<li><a href="${url}" target="_blank" rel="noopener">${name}</a></li>`;
                     })
@@ -928,17 +1014,17 @@
                 const dataset = trigger.dataset || {};
 
                 if (flyoutTitleEl) {
-                    flyoutTitleEl.textContent = dataset.eventTitle || 'Event Details';
+                    flyoutTitleEl.textContent = dataset.eventTitle || calendarStrings.eventDetailsTitle;
                 }
 
                 if (flyoutCategoryEl) {
-                    flyoutCategoryEl.textContent = dataset.eventCategory || 'Category';
+                    flyoutCategoryEl.textContent = dataset.eventCategory || calendarStrings.categoryLabel;
                     flyoutCategoryEl.style.backgroundColor = dataset.eventColor || '#0d6efd';
                     flyoutCategoryEl.style.color = dataset.eventTextColor || '#fff';
                 }
 
                 setTextOrToggle(flyoutDateEl, dataset.eventDate || '');
-                setTextOrToggle(flyoutTimeEl, dataset.eventTime || 'All day');
+                setTextOrToggle(flyoutTimeEl, dataset.eventTime || calendarStrings.allDay);
                 setTextOrToggle(flyoutRecurrenceEl, dataset.eventRecurrence || '');
 
                 if (flyoutPropertiesEl) {
@@ -981,7 +1067,7 @@
 
             const submitDeleteRequest = (scope, dataset) => {
                 if (!deleteForm || !deleteFormIdInput || !deleteFormScopeInput || !deleteFormOccurrenceInput) {
-                    console.warn('Calendar: delete form is unavailable.');
+                    console.warn(calendarStrings.deleteFormUnavailable);
                     return;
                 }
 
@@ -998,16 +1084,16 @@
                 }
 
                 const dataset = element.dataset;
-                titleEl.textContent = dataset.eventTitle || 'Event Details';
-                categoryEl.textContent = dataset.eventCategory || 'Category';
+                titleEl.textContent = dataset.eventTitle || calendarStrings.eventDetailsTitle;
+                categoryEl.textContent = dataset.eventCategory || calendarStrings.categoryLabel;
                 categoryEl.style.backgroundColor = dataset.eventColor || '#6c757d';
                 categoryEl.style.color = dataset.eventTextColor || '#fff';
                 datesEl.textContent = dataset.eventDate || '';
-                timesEl.textContent = dataset.eventTime || 'All day';
+                timesEl.textContent = dataset.eventTime || calendarStrings.allDay;
                 recurrenceEl.textContent = dataset.eventRecurrence || '';
                 propertiesEl.textContent = dataset.eventProperties || '';
                 detailsEl.innerHTML = renderDetails(dataset.eventDetails);
-                createdByEl.textContent = dataset.eventCreatedBy || 'Unknown';
+                createdByEl.textContent = dataset.eventCreatedBy || calendarStrings.unknownUser;
                 createdAtEl.textContent = dataset.eventCreatedAt || '';
 
                 if (attachmentsEl) {
@@ -1016,7 +1102,7 @@
                         try {
                             attachmentsData = JSON.parse(dataset.eventAttachments);
                         } catch (err) {
-                            console.warn('Calendar: could not parse attachments payload.', err);
+                            console.warn(calendarStrings.attachmentsParseWarning, err);
                         }
                     }
                     attachmentsEl.innerHTML = renderAttachments(attachmentsData);
@@ -1121,6 +1207,11 @@
                 });
             }
 
+            const deleteSingleConfirmTemplate = @Html.Raw(JsonSerializer.Serialize(Html.Localize("Delete \"{0}\"? This action cannot be undone.")));
+            const deleteSeriesConfirmText = @Html.Raw(JsonSerializer.Serialize(Html.Localize("Delete the entire series? Click OK for series or Cancel to delete only this occurrence.")));
+            const defaultEventTitle = @Html.Raw(JsonSerializer.Serialize(Html.Localize("this event")));
+            const defaultModalTitle = @Html.Raw(JsonSerializer.Serialize(Html.Localize("This event")));
+
             const handleDeleteAction = () => {
                 if (!activeEventDataset) {
                     return;
@@ -1129,8 +1220,8 @@
                 const recurrenceType = parseInt(activeEventDataset.eventRecurrenceType || '0', 10) || 0;
 
                 if (recurrenceType === 0) {
-                    const title = activeEventDataset.eventTitle || 'this event';
-                    const confirmed = window.confirm(`Delete "${title}"? This action cannot be undone.`);
+                    const title = activeEventDataset.eventTitle || defaultEventTitle;
+                    const confirmed = window.confirm(deleteSingleConfirmTemplate.replace('{0}', title));
                     if (confirmed) {
                         submitDeleteRequest('EntireSeries', activeEventDataset);
                     }
@@ -1146,14 +1237,14 @@
                 }
 
                 if (deleteModalTitleTarget) {
-                    deleteModalTitleTarget.textContent = pendingDeleteDataset.eventTitle || 'This event';
+                    deleteModalTitleTarget.textContent = pendingDeleteDataset.eventTitle || defaultModalTitle;
                 }
 
                 const deleteModal = getDeleteModalInstance();
                 if (deleteModal) {
                     deleteModal.show();
                 } else {
-                    const deleteSeries = window.confirm('Delete the entire series? Click OK for series or Cancel to delete only this occurrence.');
+                    const deleteSeries = window.confirm(deleteSeriesConfirmText);
                     const scopeValue = deleteSeries ? 'EntireSeries' : 'SingleOccurrence';
                     submitDeleteRequest(scopeValue, pendingDeleteDataset);
                     pendingDeleteDataset = null;
@@ -1288,3 +1379,4 @@
         });
     </script>
 }
+

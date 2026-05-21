@@ -55,7 +55,6 @@ namespace hOps.web.ViewModels
     {
         public int Id { get; set; }
         public string Title { get; set; } = string.Empty;
-        public string TranslatedTitle { get; set; } = string.Empty;
         public string CreatorName { get; set; } = string.Empty;
         public UserAvatarViewModel CreatorAvatar { get; set; } = new();
         public DateTime CreatedAt { get; set; }
@@ -63,7 +62,6 @@ namespace hOps.web.ViewModels
         public List<string> PropertyNames { get; set; } = new();
         public int CommentCount { get; set; }
         public string Preview { get; set; } = string.Empty;
-        public string TranslatedPreview { get; set; } = string.Empty;
     }
 
     public class PassOnLogFiltersViewModel
@@ -111,9 +109,7 @@ namespace hOps.web.ViewModels
     {
         public int Id { get; set; }
         public string Title { get; set; } = string.Empty;
-        public string TranslatedTitle { get; set; } = string.Empty;
         public string Body { get; set; } = string.Empty;
-        public string TranslatedBody { get; set; } = string.Empty;
         public string CreatorName { get; set; } = string.Empty;
         public UserAvatarViewModel CreatorAvatar { get; set; } = new();
         public DateTime CreatedAt { get; set; }
@@ -133,7 +129,6 @@ namespace hOps.web.ViewModels
     {
         public int Id { get; set; }
         public string Body { get; set; } = string.Empty;
-        public string TranslatedBody { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public string CreatorName { get; set; } = string.Empty;
         public UserAvatarViewModel CreatorAvatar { get; set; } = new();

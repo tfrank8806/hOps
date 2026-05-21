@@ -2,7 +2,7 @@
 @using Microsoft.AspNetCore.Mvc.Rendering
 @model BookmarksIndexViewModel
 @{ 
-    ViewData["Title"] = "Bookmarks";
+    ViewData["Title"] = Html.Localize("Bookmarks");
     ViewData["MainContainerClass"] = "main-inner--wide";
 
     string? GetFaviconUrl(string? url)
@@ -78,7 +78,7 @@
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 mb-0">Bookmarks</h1>
+    <h1 class="h3 mb-0">@Html.Localize("Bookmarks")</h1>
 </div>
 
 @if (TempData["BookmarkSuccess"] is string successMessage)
@@ -99,7 +99,7 @@
     <div class="col-xl-4">
         <div class="card">
             <div class="card-header">
-                <h2 class="h5 mb-0">Add Bookmark</h2>
+                <h2 class="h5 mb-0">@Html.Localize("Add Bookmark")</h2>
             </div>
             <div class="card-body">
                 <form asp-action="Create" method="post" novalidate>
@@ -115,16 +115,16 @@
                         <span asp-validation-for="Form.Url" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="Form.Section" class="form-label">Add To</label>
+                        <label asp-for="Form.Section" class="form-label">@Html.Localize("Add To")</label>
                         <select asp-for="Form.Section" class="form-select" data-bookmark-section-select>
-                            <option value="@BookmarkSection.User">User Bookmarks</option>
+                            <option value="@BookmarkSection.User">@Html.Localize("User Bookmarks")</option>
                             @if (Model.HasCurrentProperty && Model.CanManagePropertyBookmarks)
                             {
-                                <option value="@BookmarkSection.Property">Property Bookmarks</option>
+                                <option value="@BookmarkSection.Property">@Html.Localize("Property Bookmarks")</option>
                             }
                             @if (Model.HasCurrentProperty)
                             {
-                                <option value="@BookmarkSection.Team">Team Bookmarks</option>
+                                <option value="@BookmarkSection.Team">@Html.Localize("Team Bookmarks")</option>
                             }
                         </select>
                         <span asp-validation-for="Form.Section" class="text-danger"></span>
@@ -133,7 +133,7 @@
                     {
                         var requiresProperty = Model.Form.Section == BookmarkSection.Property || Model.Form.Section == BookmarkSection.Team;
                         <div class="mb-3 @(requiresProperty ? string.Empty : "d-none")" data-property-picker>
-                            <label class="form-label" for="bookmark-add-property">Property</label>
+                            <label class="form-label" for="bookmark-add-property">@Html.Localize("Property")</label>
                             <select class="form-select" id="bookmark-add-property" asp-for="Form.PropertyId">
                                 @foreach (var property in Model.AccessibleProperties)
                                 {
@@ -148,7 +148,7 @@
                         <textarea asp-for="Form.Description" class="form-control" rows="3" data-enable-mentions="true"></textarea>
                         <span asp-validation-for="Form.Description" class="text-danger"></span>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Add Bookmark</button>
+                    <button type="submit" class="btn btn-primary w-100">@Html.Localize("Add Bookmark")</button>
                 </form>
                 @if (!Model.HasCurrentProperty)
                 {
@@ -165,7 +165,7 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center gap-2">
-                            <h2 class="h5 mb-0">Property Bookmarks</h2>
+                        <h2 class="h5 mb-0">@Html.Localize("Property Bookmarks")</h2>
                             @if (Model.HasCurrentProperty && Model.CurrentPropertyName is not null)
                             {
                                 <span class="badge bg-light text-dark">@Model.CurrentPropertyName</span>
@@ -179,11 +179,11 @@
                         <div class="card-body">
                         @if (!Model.HasCurrentProperty)
                         {
-                            <p class="text-muted mb-0">Select a property to view property bookmarks.</p>
+                            <p class="text-muted mb-0">@Html.Localize("Select a property to view property bookmarks.")</p>
                         }
                         else if (Model.PropertyBookmarks.Count == 0)
                         {
-                            <p class="text-muted mb-0">No property bookmarks have been added yet.</p>
+                            <p class="text-muted mb-0">@Html.Localize("No property bookmarks have been added yet.")</p>
                         }
                         else
                         {
@@ -200,7 +200,7 @@
                                                         <img src="@faviconUrl" alt="" loading="lazy" onerror="this.style.display='none'; var fallback=this.nextElementSibling; if(fallback){ fallback.classList.remove('visually-hidden'); }" />
                                                     }
                                                     <span class="bookmark-icon-fallback @(string.IsNullOrWhiteSpace(faviconUrl) ? string.Empty : "visually-hidden")" aria-hidden="true">🔗</span>
-                                                    <span class="visually-hidden">Website icon</span>
+                                                    <span class="visually-hidden">@Html.Localize("Website icon")</span>
                                                 </div>
                                                 <div>
                                                     <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
@@ -219,7 +219,7 @@
                                                                 : !string.IsNullOrWhiteSpace(last)
                                                                     ? last!
                                                                     : bookmark.CreatedBy.Email ?? "Unknown";
-                                                        <div class="text-muted small mt-1">Added by @displayName</div>
+                                                    <div class="text-muted small mt-1">@string.Format(Html.Localize("Added by {0}"), displayName)</div>
                                                     }
                                                 </div>
                                             </div>
@@ -231,19 +231,19 @@
                                                         <input type="hidden" name="id" value="@bookmark.Id" />
                                                         <div class="form-check form-switch mb-0">
                                                             <input class="form-check-input" type="checkbox" id="property-quick-toggle-@bookmark.Id" name="showInQuickMenu" value="true" @(bookmark.ShowInQuickMenu ? "checked" : null) onchange="this.form.submit()" />
-                                                            <label class="form-check-label small" for="property-quick-toggle-@bookmark.Id">Quick</label>
+                                                            <label class="form-check-label small" for="property-quick-toggle-@bookmark.Id">@Html.Localize("Quick")</label>
                                                         </div>
                                                     </form>
                                                 }
                                                 <div class="d-flex align-items-center gap-2">
-                                                    <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">Open</a>
+                                                    <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">@Html.Localize("Open")</a>
                                                     @if (Model.CanManagePropertyBookmarks)
                                                     {
-                                                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBookmarkModal-@bookmark.Id">Edit</button>
+                                                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBookmarkModal-@bookmark.Id">@Html.Localize("Edit")</button>
                                                         <form asp-action="Delete" method="post" class="d-inline">
                                                             @Html.AntiForgeryToken()
                                                             <input type="hidden" name="id" value="@bookmark.Id" />
-                                                            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete this bookmark?');">Delete</button>
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm(window.hopsTranslate('BookmarkConfirmDelete', 'Are you sure you want to delete this bookmark?'));">@Html.Localize("Delete")</button>
                                                         </form>
                                                     }
                                                 </div>
@@ -255,31 +255,31 @@
                                                 <div class="modal-dialog">
                                                     <div class="modal-content">
                                                         <div class="modal-header">
-                                                            <h5 class="modal-title" id="editBookmarkModalLabel-@bookmark.Id">Edit Bookmark</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                            <h5 class="modal-title" id="editBookmarkModalLabel-@bookmark.Id">@Html.Localize("Edit Bookmark")</h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label='@Html.Localize("Close")'></button>
                                                         </div>
                                                         <form asp-action="Edit" method="post" novalidate>
                                                             @Html.AntiForgeryToken()
                                                             <div class="modal-body">
                                                                 <input type="hidden" name="Id" value="@bookmark.Id" />
                                                                 <div class="mb-3">
-                                                                    <label class="form-label" for="bookmark-edit-name-@bookmark.Id">Name</label>
+                                                                    <label class="form-label" for="bookmark-edit-name-@bookmark.Id">@Html.Localize("Name")</label>
                                                                     <input class="form-control" id="bookmark-edit-name-@bookmark.Id" name="Name" value="@bookmark.Name" maxlength="200" required />
                                                                 </div>
                                                                 <div class="mb-3">
-                                                                    <label class="form-label" for="bookmark-edit-url-@bookmark.Id">URL</label>
+                                                                    <label class="form-label" for="bookmark-edit-url-@bookmark.Id">@Html.Localize("URL")</label>
                                                                     <input class="form-control" id="bookmark-edit-url-@bookmark.Id" name="Url" value="@bookmark.Url" maxlength="2048" required type="url" />
                                                                 </div>
                                                                 <div class="mb-3">
-                                                                    <label class="form-label" for="bookmark-edit-description-@bookmark.Id">Description</label>
+                                                                    <label class="form-label" for="bookmark-edit-description-@bookmark.Id">@Html.Localize("Description")</label>
                                                                     <textarea class="form-control" id="bookmark-edit-description-@bookmark.Id" name="Description" rows="3" maxlength="500" data-enable-mentions="true">@bookmark.Description</textarea>
                                                                 </div>
                                                                 <div class="mb-3">
-                                                                <label class="form-label" for="bookmark-edit-section-@bookmark.Id">Section</label>
+                                                                <label class="form-label" for="bookmark-edit-section-@bookmark.Id">@Html.Localize("Section")</label>
                                                                 @{
                                                                     var propertySectionOptions = new List<SelectListItem>
                                                                     {
-                                                                        new SelectListItem("User Bookmarks", ((int)BookmarkSection.User).ToString(), bookmark.Section == BookmarkSection.User)
+                                                                        new SelectListItem(Html.Localize("User Bookmarks"), ((int)BookmarkSection.User).ToString(), bookmark.Section == BookmarkSection.User)
                                                                     };
 
                                                                     if (Model.HasCurrentProperty && Model.CanManagePropertyBookmarks)
@@ -293,13 +293,13 @@
                                                                     }
                                                                 }
                                                                 <select class="form-select" id="bookmark-edit-section-@bookmark.Id" name="Section" asp-items="propertySectionOptions" data-bookmark-section-select></select>
-                                                                    <div class="form-text">Choose the property below when assigning bookmarks to property or team sections.</div>
+                                                                    <div class="form-text">@Html.Localize("Choose the property below when assigning bookmarks to property or team sections.")</div>
                                                                 </div>
                                                                 @if (Model.AccessibleProperties.Any())
                                                                 {
                                                                     var showPropertyPicker = bookmark.Section == BookmarkSection.Property || bookmark.Section == BookmarkSection.Team;
                                                                     <div class="mb-3 bookmark-property-picker @(showPropertyPicker ? string.Empty : "d-none")" data-property-picker>
-                                                                        <label class="form-label" for="bookmark-edit-property-@bookmark.Id">Property</label>
+                                                                    <label class="form-label" for="bookmark-edit-property-@bookmark.Id">@Html.Localize("Property")</label>
                                                                         <select class="form-select" id="bookmark-edit-property-@bookmark.Id" name="PropertyId">
                                                                             @foreach (var property in Model.AccessibleProperties)
                                                                             {
@@ -312,12 +312,12 @@
                                                                 </div>
                                                                 <div class="form-check form-switch mb-3">
                                                                     <input class="form-check-input" type="checkbox" id="bookmark-edit-quick-@bookmark.Id" name="ShowInQuickMenu" value="true" @(bookmark.ShowInQuickMenu ? "checked" : null) />
-                                                                    <label class="form-check-label" for="bookmark-edit-quick-@bookmark.Id">Show in Quick Bookmarks</label>
+                                                                    <label class="form-check-label" for="bookmark-edit-quick-@bookmark.Id">@Html.Localize("Show in Quick Bookmarks")</label>
                                                                 </div>
                                                             </div>
                                                             <div class="modal-footer">
-                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                                <button type="submit" class="btn btn-primary">Save changes</button>
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Html.Localize("Cancel")</button>
+                                                                <button type="submit" class="btn btn-primary">@Html.Localize("Save changes")</button>
                                                             </div>
                                                         </form>
                                                     </div>
@@ -336,7 +336,7 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center gap-2">
-                            <h2 class="h5 mb-0">Team Bookmarks</h2>
+                        <h2 class="h5 mb-0">@Html.Localize("Team Bookmarks")</h2>
                             @if (Model.HasCurrentProperty && Model.CurrentPropertyName is not null)
                             {
                                 <span class="badge bg-light text-dark">@Model.CurrentPropertyName</span>
@@ -350,11 +350,11 @@
                         <div class="card-body">
                         @if (!Model.HasCurrentProperty)
                         {
-                            <p class="text-muted mb-0">Select a property to view team bookmarks.</p>
+                            <p class="text-muted mb-0">@Html.Localize("Select a property to view team bookmarks.")</p>
                         }
                         else if (Model.TeamBookmarks.Count == 0)
                         {
-                            <p class="text-muted mb-0">No team bookmarks have been added yet.</p>
+                            <p class="text-muted mb-0">@Html.Localize("No team bookmarks have been added yet.")</p>
                         }
                         else
                         {
@@ -371,7 +371,7 @@
                                                         <img src="@faviconUrl" alt="" loading="lazy" onerror="this.style.display='none'; var fallback=this.nextElementSibling; if(fallback){ fallback.classList.remove('visually-hidden'); }" />
                                                     }
                                                     <span class="bookmark-icon-fallback @(string.IsNullOrWhiteSpace(faviconUrl) ? string.Empty : "visually-hidden")" aria-hidden="true">🔗</span>
-                                                    <span class="visually-hidden">Website icon</span>
+                                                    <span class="visually-hidden">@Html.Localize("Website icon")</span>
                                                 </div>
                                                 <div>
                                                     <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
@@ -390,7 +390,7 @@
                                                                 : !string.IsNullOrWhiteSpace(last)
                                                                     ? last!
                                                                     : bookmark.CreatedBy.Email ?? "Unknown";
-                                                        <div class="text-muted small mt-1">Added by @displayName</div>
+                                                        <div class="text-muted small mt-1">@string.Format(Html.Localize("Added by {0}"), displayName)</div>
                                                     }
                                                 </div>
                                             </div>
@@ -402,19 +402,19 @@
                                                         <input type="hidden" name="id" value="@bookmark.Id" />
                                                         <div class="form-check form-switch mb-0">
                                                             <input class="form-check-input" type="checkbox" id="team-quick-toggle-@bookmark.Id" name="showInQuickMenu" value="true" @(bookmark.ShowInQuickMenu ? "checked" : null) onchange="this.form.submit()" />
-                                                            <label class="form-check-label small" for="team-quick-toggle-@bookmark.Id">Quick</label>
+                                                            <label class="form-check-label small" for="team-quick-toggle-@bookmark.Id">@Html.Localize("Quick")</label>
                                                         </div>
                                                     </form>
                                                 }
                                                 <div class="d-flex align-items-center gap-2">
-                                                    <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">Open</a>
+                                                    <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">@Html.Localize("Open")</a>
                                                     @if (bookmark.CreatedById == Model.CurrentUserId || Model.CanManagePropertyBookmarks)
                                                     {
-                                                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBookmarkModal-@bookmark.Id">Edit</button>
+                                                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBookmarkModal-@bookmark.Id">@Html.Localize("Edit")</button>
                                                         <form asp-action="Delete" method="post" class="d-inline">
                                                             @Html.AntiForgeryToken()
                                                             <input type="hidden" name="id" value="@bookmark.Id" />
-                                                            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete this bookmark?');">Delete</button>
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm(window.hopsTranslate('BookmarkConfirmDelete', 'Are you sure you want to delete this bookmark?'));">@Html.Localize("Delete")</button>
                                                         </form>
                                                     }
                                                 </div>
@@ -426,29 +426,29 @@
                                                 <div class="modal-dialog">
                                                     <div class="modal-content">
                                                         <div class="modal-header">
-                                                            <h5 class="modal-title" id="editBookmarkModalLabel-@bookmark.Id">Edit Bookmark</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                            <h5 class="modal-title" id="editBookmarkModalLabel-@bookmark.Id">@Html.Localize("Edit Bookmark")</h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label='@Html.Localize("Close")'></button>
                                                         </div>
                                                         <form asp-action="Edit" method="post" novalidate>
                                                             @Html.AntiForgeryToken()
                                                             <div class="modal-body">
                                                                 <input type="hidden" name="Id" value="@bookmark.Id" />
                                                                 <div class="mb-3">
-                                                                    <label class="form-label" for="bookmark-edit-name-@bookmark.Id">Name</label>
+                                                                    <label class="form-label" for="bookmark-edit-name-@bookmark.Id">@Html.Localize("Name")</label>
                                                                     <input class="form-control" id="bookmark-edit-name-@bookmark.Id" name="Name" value="@bookmark.Name" maxlength="200" required />
                                                                 </div>
                                                                 <div class="mb-3">
-                                                                    <label class="form-label" for="bookmark-edit-url-@bookmark.Id">URL</label>
+                                                                    <label class="form-label" for="bookmark-edit-url-@bookmark.Id">@Html.Localize("URL")</label>
                                                                     <input class="form-control" id="bookmark-edit-url-@bookmark.Id" name="Url" value="@bookmark.Url" maxlength="2048" required type="url" />
                                                                 </div>
                                                                 <div class="mb-3">
-                                                                    <label class="form-label" for="bookmark-edit-description-@bookmark.Id">Description</label>
+                                                                    <label class="form-label" for="bookmark-edit-description-@bookmark.Id">@Html.Localize("Description")</label>
                                                                     <textarea class="form-control" id="bookmark-edit-description-@bookmark.Id" name="Description" rows="3" maxlength="500" data-enable-mentions="true">@bookmark.Description</textarea>
                                                                 </div>
                                                             </div>
                                                             <div class="modal-footer">
-                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                                <button type="submit" class="btn btn-primary">Save changes</button>
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Html.Localize("Cancel")</button>
+                                                                <button type="submit" class="btn btn-primary">@Html.Localize("Save changes")</button>
                                                             </div>
                                                         </form>
                                                     </div>
@@ -465,7 +465,7 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h2 class="h5 mb-0">Your Bookmarks</h2>
+                        <h2 class="h5 mb-0">@Html.Localize("Your Bookmarks")</h2>
                         <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#userBookmarksCollapse" aria-expanded="true" aria-controls="userBookmarksCollapse">
                             Toggle
                         </button>
@@ -474,7 +474,7 @@
                         <div class="card-body">
                         @if (Model.UserBookmarks.Count == 0)
                         {
-                            <p class="text-muted mb-0">You haven't added any personal bookmarks yet.</p>
+                            <p class="text-muted mb-0">@Html.Localize("You haven't added any personal bookmarks yet.")</p>
                         }
                         else
                         {
@@ -491,7 +491,7 @@
                                                         <img src="@faviconUrl" alt="" loading="lazy" onerror="this.style.display='none'; var fallback=this.nextElementSibling; if(fallback){ fallback.classList.remove('visually-hidden'); }" />
                                                     }
                                                     <span class="bookmark-icon-fallback @(string.IsNullOrWhiteSpace(faviconUrl) ? string.Empty : "visually-hidden")" aria-hidden="true">🔗</span>
-                                                    <span class="visually-hidden">Website icon</span>
+                                                    <span class="visually-hidden">@Html.Localize("Website icon")</span>
                                                 </div>
                                                 <div>
                                                     <a href="@bookmark.Url" target="_blank" rel="noopener noreferrer" class="fw-semibold">@bookmark.Name</a>
@@ -507,16 +507,16 @@
                                                     <input type="hidden" name="id" value="@bookmark.Id" />
                                                     <div class="form-check form-switch mb-0">
                                                         <input class="form-check-input" type="checkbox" id="user-quick-toggle-@bookmark.Id" name="showInQuickMenu" value="true" @(bookmark.ShowInQuickMenu ? "checked" : null) onchange="this.form.submit()" />
-                                                        <label class="form-check-label small" for="user-quick-toggle-@bookmark.Id">Quick</label>
+                                                        <label class="form-check-label small" for="user-quick-toggle-@bookmark.Id">@Html.Localize("Quick")</label>
                                                     </div>
                                                 </form>
                                                 <div class="d-flex align-items-center gap-2">
-                                                    <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">Open</a>
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBookmarkModal-@bookmark.Id">Edit</button>
+                                                    <a class="btn btn-outline-primary btn-sm" href="@bookmark.Url" target="_blank" rel="noopener noreferrer">@Html.Localize("Open")</a>
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBookmarkModal-@bookmark.Id">@Html.Localize("Edit")</button>
                                                     <form asp-action="Delete" method="post" class="d-inline">
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="id" value="@bookmark.Id" />
-                                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete this bookmark?');">Delete</button>
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm(window.hopsTranslate('BookmarkConfirmDelete', 'Are you sure you want to delete this bookmark?'));">@Html.Localize("Delete")</button>
                                                     </form>
                                                 </div>
                                             </div>
@@ -525,41 +525,41 @@
                                             <div class="modal-dialog">
                                                 <div class="modal-content">
                                                     <div class="modal-header">
-                                                        <h5 class="modal-title" id="editBookmarkModalLabel-@bookmark.Id">Edit Bookmark</h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        <h5 class="modal-title" id="editBookmarkModalLabel-@bookmark.Id">@Html.Localize("Edit Bookmark")</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label='@Html.Localize("Close")'></button>
                                                     </div>
                                                     <form asp-action="Edit" method="post" novalidate>
                                                         @Html.AntiForgeryToken()
                                                         <div class="modal-body">
                                                             <input type="hidden" name="Id" value="@bookmark.Id" />
                                                             <div class="mb-3">
-                                                                <label class="form-label" for="bookmark-edit-name-@bookmark.Id">Name</label>
+                                                                <label class="form-label" for="bookmark-edit-name-@bookmark.Id">@Html.Localize("Name")</label>
                                                                 <input class="form-control" id="bookmark-edit-name-@bookmark.Id" name="Name" value="@bookmark.Name" maxlength="200" required />
                                                             </div>
                                                             <div class="mb-3">
-                                                                <label class="form-label" for="bookmark-edit-url-@bookmark.Id">URL</label>
+                                                                <label class="form-label" for="bookmark-edit-url-@bookmark.Id">@Html.Localize("URL")</label>
                                                                 <input class="form-control" id="bookmark-edit-url-@bookmark.Id" name="Url" value="@bookmark.Url" maxlength="2048" required type="url" />
                                                             </div>
                                                             <div class="mb-3">
-                                                                <label class="form-label" for="bookmark-edit-description-@bookmark.Id">Description</label>
+                                                                <label class="form-label" for="bookmark-edit-description-@bookmark.Id">@Html.Localize("Description")</label>
                                                                 <textarea class="form-control" id="bookmark-edit-description-@bookmark.Id" name="Description" rows="3" maxlength="500" data-enable-mentions="true">@bookmark.Description</textarea>
                                                             </div>
                                                             <div class="mb-3">
-                                                                <label class="form-label" for="bookmark-edit-section-@bookmark.Id">Section</label>
+                                                                <label class="form-label" for="bookmark-edit-section-@bookmark.Id">@Html.Localize("Section")</label>
                                                                 @{
                                                                     var userSectionOptions = new List<SelectListItem>
                                                                     {
-                                                                        new SelectListItem("User Bookmarks", ((int)BookmarkSection.User).ToString(), bookmark.Section == BookmarkSection.User)
+                                                                        new SelectListItem(Html.Localize("User Bookmarks"), ((int)BookmarkSection.User).ToString(), bookmark.Section == BookmarkSection.User)
                                                                     };
 
                                                                     if (Model.HasCurrentProperty && Model.CanManagePropertyBookmarks)
                                                                     {
-                                                                        userSectionOptions.Add(new SelectListItem("Property Bookmarks", ((int)BookmarkSection.Property).ToString(), bookmark.Section == BookmarkSection.Property));
+                                                                        userSectionOptions.Add(new SelectListItem(Html.Localize("Property Bookmarks"), ((int)BookmarkSection.Property).ToString(), bookmark.Section == BookmarkSection.Property));
                                                                     }
 
                                                                     if (Model.HasCurrentProperty)
                                                                     {
-                                                                        userSectionOptions.Add(new SelectListItem("Team Bookmarks", ((int)BookmarkSection.Team).ToString(), bookmark.Section == BookmarkSection.Team));
+                                                                        userSectionOptions.Add(new SelectListItem(Html.Localize("Team Bookmarks"), ((int)BookmarkSection.Team).ToString(), bookmark.Section == BookmarkSection.Team));
                                                                     }
                                                                 }
                                                                 <select class="form-select" id="bookmark-edit-section-@bookmark.Id" name="Section" asp-items="userSectionOptions" data-bookmark-section-select></select>
@@ -568,7 +568,7 @@
                                                             {
                                                                 var userPickerVisible = bookmark.Section == BookmarkSection.Property || bookmark.Section == BookmarkSection.Team;
                                                                 <div class="mb-3 bookmark-property-picker @(userPickerVisible ? string.Empty : "d-none")" data-property-picker>
-                                                                    <label class="form-label" for="bookmark-edit-property-@bookmark.Id">Property</label>
+                                                                    <label class="form-label" for="bookmark-edit-property-@bookmark.Id">@Html.Localize("Property")</label>
                                                                     <select class="form-select" id="bookmark-edit-property-@bookmark.Id" name="PropertyId">
                                                                         @foreach (var property in Model.AccessibleProperties)
                                                                         {
@@ -579,12 +579,12 @@
                                                             }
                                                             <div class="form-check form-switch mb-3">
                                                                 <input class="form-check-input" type="checkbox" id="bookmark-edit-quick-@bookmark.Id" name="ShowInQuickMenu" value="true" @(bookmark.ShowInQuickMenu ? "checked" : null) />
-                                                                <label class="form-check-label" for="bookmark-edit-quick-@bookmark.Id">Show in Quick Bookmarks</label>
+                                                                    <label class="form-check-label" for="bookmark-edit-quick-@bookmark.Id">@Html.Localize("Show in Quick Bookmarks")</label>
                                                             </div>
                                                         </div>
                                                         <div class="modal-footer">
-                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="submit" class="btn btn-primary">Save changes</button>
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Html.Localize("Cancel")</button>
+                                                            <button type="submit" class="btn btn-primary">@Html.Localize("Save changes")</button>
                                                         </div>
                                                     </form>
                                                 </div>
@@ -633,4 +633,5 @@
         })();
     </script>
 }
+
 

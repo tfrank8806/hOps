@@ -8,6 +8,7 @@ namespace hOps.web.ViewModels.MasterEmployees
     public class MasterEmployeeRowViewModel
     {
         public int Id { get; set; }
+        public int? DepartmentId { get; set; }
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public string DepartmentName { get; set; } = string.Empty;

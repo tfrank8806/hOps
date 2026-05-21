@@ -299,6 +299,29 @@ else
             }
 
             const basePath = window.location.pathname.replace(/\/$/, '');
+            const staticTranslations = (typeof window !== 'undefined' && window.__STATIC_TRANSLATIONS && typeof window.__STATIC_TRANSLATIONS === 'object')
+                ? window.__STATIC_TRANSLATIONS
+                : {};
+            const resolveTranslation = (key, fallback = key) => {
+                if (!key || typeof key !== 'string') {
+                    return fallback;
+                }
+                const direct = staticTranslations[key];
+                if (typeof direct === 'string' && direct.trim()) {
+                    return direct;
+                }
+                const match = Object.keys(staticTranslations).find(
+                    existing => existing.localeCompare(key, undefined, { sensitivity: 'accent' }) === 0
+                );
+                if (match) {
+                    const translated = staticTranslations[match];
+                    if (typeof translated === 'string' && translated.trim()) {
+                        return translated;
+                    }
+                }
+                return fallback;
+            };
+            const noNotesText = resolveTranslation('No notes', 'No notes');
 
             function normalizeValues(arrayValue, fallback) {
                 if (Array.isArray(arrayValue) && arrayValue.length) {
@@ -434,7 +457,7 @@ else
                     websiteContainer.textContent = '-';
                 }
                 detailElements.address.textContent = formatValue(contact.address);
-                detailElements.notes.textContent = formatValue(contact.notes, 'No notes');
+                detailElements.notes.textContent = formatValue(contact.notes, noNotesText);
                 const editUrl = `${basePath}/Edit/${contact.id}`;
                 setActionButton(detailElements.editButton, editUrl);
                 setActionButton(detailElements.addPhoneButton, `${editUrl}#phoneFields`);

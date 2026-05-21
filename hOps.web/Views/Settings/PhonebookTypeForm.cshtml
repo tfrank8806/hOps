@@ -4,8 +4,8 @@
 @{
     var formAction = ViewData["FormAction"] as string ?? string.Empty;
     ViewData["Title"] = formAction.Contains("Edit", StringComparison.OrdinalIgnoreCase)
-        ? "Edit Phonebook Type"
-        : "Create Phonebook Type";
+        ? Html.Localize("Settings.PhonebookTypes.EditTitle", "Edit Phonebook Type").ToString()
+        : Html.Localize("Settings.PhonebookTypes.CreateTitle", "Create Phonebook Type").ToString();
     var propertyOptions = ViewBag.PropertyOptions as List<SelectListItem> ?? new List<SelectListItem>();
     bool onlyGlobal = ViewBag.OnlyGlobal as bool? ?? false;
     string returnUrl = ViewBag.ReturnUrl as string ?? Url.Action("PhonebookTypes") ?? string.Empty;
@@ -19,14 +19,14 @@
     <input type="hidden" name="returnUrl" value="@returnUrl" />
 
     <div class="mb-3">
-        <label class="form-label" for="phonebookType-property">Applies To</label>
+        <label class="form-label" for="phonebookType-property">@Html.Localize("Settings.PhonebookTypes.AppliesTo", "Applies To")</label>
         <select class="form-select" id="phonebookType-property" name="selectedPropertyId">
             @foreach (var option in propertyOptions)
             {
                 <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
             }
         </select>
-        <div class="form-text">Choose "Global" to share this type across all properties.</div>
+        <div class="form-text">@Html.Localize("Settings.PhonebookTypes.ScopeHelp", "Choose \"Global\" to share this type across all properties.")</div>
     </div>
 
     <div class="mb-3">
@@ -39,5 +39,5 @@
         <input asp-for="Color" type="color" class="form-control" />
         <span asp-validation-for="Color" class="text-danger"></span>
     </div>
-    <button type="submit" class="btn btn-success">Save</button>
+    <button type="submit" class="btn btn-success">@Html.Localize("Save")</button>
 </form>

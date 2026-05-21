@@ -1,5 +1,6 @@
 @model List<hOps.web.Models.PhonebookType>
 @using Microsoft.AspNetCore.Mvc.Rendering
+@using System.Globalization
 @functions {
     private static string NormalizeColorHex(string? color)
     {
@@ -62,7 +63,7 @@
     }
 }
 @{
-    ViewData["Title"] = "Phonebook Types";
+    ViewData["Title"] = Html.Localize("Settings.PhonebookTypes.Title", "Phonebook Types").ToString();
     var filterOptions = ViewBag.PropertyFilterOptions as List<SelectListItem> ?? new List<SelectListItem>();
     string createUrl = ViewBag.CreatePhonebookTypeUrl as string ?? Url.Action("CreatePhonebookType") ?? string.Empty;
     int? selectedPropertyId = ViewBag.SelectedPropertyId as int?;
@@ -71,9 +72,9 @@
 }
 
 <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-3">
-    <h2 class="h4 mb-0">Phonebook Types</h2>
+    <h2 class="h4 mb-0">@Html.Localize("Settings.PhonebookTypes.Heading", "Phonebook Types")</h2>
     <div class="d-flex align-items-center gap-2">
-        <label for="phonebookTypePropertyFilter" class="form-label mb-0">Scope:</label>
+        <label for="phonebookTypePropertyFilter" class="form-label mb-0">@Html.Localize("Settings.PhonebookTypes.ScopeLabel", "Scope:")</label>
         <select id="phonebookTypePropertyFilter" class="form-select form-select-sm" style="width:auto; min-width:220px;">
             @foreach (var option in filterOptions)
             {
@@ -81,28 +82,44 @@
             }
         </select>
     </div>
-    <a class="btn btn-primary" href="@createUrl">Add Type</a>
+    <a class="btn btn-primary" href="@createUrl">@Html.Localize("Settings.PhonebookTypes.AddType", "Add Type")</a>
 </div>
 
 <table class="table table-striped align-middle">
     <thead>
         <tr>
-            <th>Name</th>
-            <th>Color</th>
-            <th>Applies To</th>
-            <th class="text-end">Actions</th>
+            <th>@Html.Localize("Settings.PhonebookTypes.NameHeader", "Name")</th>
+            <th>@Html.Localize("Settings.PhonebookTypes.ColorHeader", "Color")</th>
+            <th>@Html.Localize("Settings.PhonebookTypes.AppliesToHeader", "Applies To")</th>
+            <th class="text-end">@Html.Localize("Settings.PhonebookTypes.ActionsHeader", "Actions")</th>
         </tr>
     </thead>
     <tbody>
         @foreach (var item in Model)
         {
-            var scopeLabel = item.PropertyId.HasValue
-                ? (item.Property != null ? $"{item.Property.Name} ({item.Property.Code})" : $"Property #{item.PropertyId}")
-                : "Global";
+            string scopeLabel;
+            if (item.PropertyId.HasValue)
+            {
+                var propertyIdString = item.PropertyId.Value.ToString(CultureInfo.InvariantCulture);
+                var propertyNameRaw = item.Property?.Name ?? string.Empty;
+                var translatedPropertyName = await Html.DisplayTranslatedTextAsync("Property", propertyIdString, "Name", propertyNameRaw);
+                var propertyName = string.IsNullOrWhiteSpace(translatedPropertyName) ? propertyNameRaw : translatedPropertyName;
+                var propertyCode = item.Property?.Code;
+                scopeLabel = !string.IsNullOrWhiteSpace(propertyName) && !string.IsNullOrWhiteSpace(propertyCode)
+                    ? string.Format(CultureInfo.CurrentCulture, Html.Localize("Settings.PhonebookTypes.PropertyWithCode", "{0} ({1})").ToString(), propertyName, propertyCode)
+                    : string.Format(CultureInfo.CurrentCulture, Html.Localize("Settings.PhonebookTypes.PropertyFallback", "Property #{0}").ToString(), propertyIdString);
+            }
+            else
+            {
+                scopeLabel = Html.Localize("Settings.PhonebookTypes.ScopeGlobal", "Global").ToString();
+            }
+
             var swatchColor = NormalizeColorHex(item.Color);
             var textColor = GetTextColorForBackground(swatchColor);
+            var translatedName = await Html.DisplayTranslatedTextAsync("PhonebookType", item.Id.ToString(CultureInfo.InvariantCulture), "Name", item.Name ?? string.Empty);
+
             <tr>
-                <td>@item.Name</td>
+                <td>@(string.IsNullOrWhiteSpace(translatedName) ? item.Name : translatedName)</td>
                 <td>
                     <span class="badge d-inline-flex align-items-center justify-content-center px-3"
                           style="background-color:@swatchColor; color:@textColor; border:1px solid rgba(0,0,0,0.1); min-width:4.5rem;">
@@ -111,9 +128,9 @@
                 </td>
                 <td>@scopeLabel</td>
                 <td class="text-end">
-                    <a class="btn btn-sm btn-outline-primary" asp-action="EditPhonebookType" asp-route-id="@item.Id" asp-route-propertyId="@selectedPropertyId" asp-route-onlyGlobal="@onlyGlobal" asp-route-returnUrl="@currentUrl">Edit</a>
+                    <a class="btn btn-sm btn-outline-primary" asp-action="EditPhonebookType" asp-route-id="@item.Id" asp-route-propertyId="@selectedPropertyId" asp-route-onlyGlobal="@onlyGlobal" asp-route-returnUrl="@currentUrl">@Html.Localize("Settings.PhonebookTypes.Edit", "Edit")</a>
                     <form asp-action="DeletePhonebookType" asp-route-id="@item.Id" asp-route-propertyId="@selectedPropertyId" asp-route-onlyGlobal="@onlyGlobal" asp-route-returnUrl="@currentUrl" method="post" class="d-inline">
-                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this phonebook type?');">Delete</button>
+                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm(window.hopsTranslate('Settings.PhonebookTypes.ConfirmDelete', 'Delete this phonebook type?'));">@Html.Localize("Settings.PhonebookTypes.Delete", "Delete")</button>
                     </form>
                 </td>
             </tr>

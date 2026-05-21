@@ -1,7 +1,7 @@
 @model hOps.web.ViewModels.Maintenance.MaintenanceLogTemplateEditorViewModel
 
 @{
-    var pageTitle = Model.IsEditMode ? "Edit Maintenance Log" : "Maintenance Log";
+    var pageTitle = Model.IsEditMode ? Html.Localize("Edit Maintenance Log") : Html.Localize("Maintenance Log");
     ViewData["Title"] = pageTitle;
     var formAction = Model.IsEditMode ? "Edit" : "Create";
 }
@@ -27,23 +27,23 @@
                         <span asp-validation-for="Name" class="text-danger"></span>
                     </div>
                     <div class="col-md-3">
-                        <label asp-for="ScheduleType" class="form-label">Schedule</label>
+                        <label asp-for="ScheduleType" class="form-label">@Html.Localize("Schedule")</label>
                         <select asp-for="ScheduleType" class="form-select" id="scheduleTypeSelect">
-                            <option value="None">None</option>
-                            <option value="Daily">Daily</option>
-                            <option value="Weekly">Weekly</option>
-                            <option value="Monthly">Monthly</option>
-                            <option value="Quarterly">Quarterly</option>
-                            <option value="BiAnnual">Bi-Annual</option>
-                            <option value="Yearly">Annual</option>
+                            <option value="None">@Html.Localize("None")</option>
+                            <option value="Daily">@Html.Localize("Daily")</option>
+                            <option value="Weekly">@Html.Localize("Weekly")</option>
+                            <option value="Monthly">@Html.Localize("Monthly")</option>
+                            <option value="Quarterly">@Html.Localize("Quarterly")</option>
+                            <option value="BiAnnual">@Html.Localize("Bi-Annual")</option>
+                            <option value="Yearly">@Html.Localize("Annual")</option>
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <label asp-for="DueTimeLocal" class="form-label">Due Time (optional)</label>
+                        <label asp-for="DueTimeLocal" class="form-label">@Html.Localize("Due Time (optional)")</label>
                         <input asp-for="DueTimeLocal" type="time" class="form-control" />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="ChecklistFile">Template Checklist (CSV/XLSX)</label>
+                        <label class="form-label" for="ChecklistFile">@Html.Localize("Template Checklist (CSV/XLSX)")</label>
                         <input type="file"
                                class="form-control"
                                id="ChecklistFile"
@@ -53,16 +53,16 @@
                         @if (Model.HasChecklistFile)
                         {
                             <div class="form-text mt-1">
-                                Current file:
+                                @Html.Localize("Current file:")
                                 @if (!string.IsNullOrWhiteSpace(Model.ChecklistFilePath))
                                 {
                                     <a href="@Model.ChecklistFilePath" target="_blank" rel="noopener">
-                                        @(string.IsNullOrWhiteSpace(Model.ChecklistFileName) ? "Download checklist" : Model.ChecklistFileName)
+                                        @(string.IsNullOrWhiteSpace(Model.ChecklistFileName) ? Html.Localize("Download checklist") : Model.ChecklistFileName)
                                     </a>
                                 }
                                 else
                                 {
-                                    @(string.IsNullOrWhiteSpace(Model.ChecklistFileName) ? "Checklist file" : Model.ChecklistFileName)
+                                    @(string.IsNullOrWhiteSpace(Model.ChecklistFileName) ? Html.Localize("Checklist file") : Model.ChecklistFileName)
                                 }
                                 @if (Model.ChecklistFileSizeBytes.HasValue)
                                 {
@@ -73,16 +73,16 @@
                             </div>
                             <div class="form-check mt-2">
                                 <input asp-for="RemoveChecklistFile" class="form-check-input" />
-                                <label asp-for="RemoveChecklistFile" class="form-check-label">Remove existing file</label>
+                                <label asp-for="RemoveChecklistFile" class="form-check-label">@Html.Localize("Remove existing file")</label>
                             </div>
                         }
                         else
                         {
-                            <div class="form-text">Optional upload. One CSV or Excel file per template.</div>
+                            <div class="form-text">@Html.Localize("Optional upload. One CSV or Excel file per template.")</div>
                         }
                     </div>
                     <div class="col-md-6 d-none" id="weeklyDaysFieldset">
-                        <label class="form-label">Weekly Days</label>
+                        <label class="form-label">@Html.Localize("Weekly Days")</label>
                         <div class="d-flex flex-wrap gap-3">
                             @{
                                 var dayNames = Enum.GetNames(typeof(DayOfWeek));
@@ -91,32 +91,32 @@
                                     <div class="form-check">
                                         <input type="hidden" name="WeeklyDays[@i]" value="false" />
                                         <input class="form-check-input" type="checkbox" name="WeeklyDays[@i]" value="true" @(Model.WeeklyDays.Length > i && Model.WeeklyDays[i] ? "checked" : null) id="weekday-@i" />
-                                        <label class="form-check-label" for="weekday-@i">@dayNames[i]</label>
+                                        <label class="form-check-label" for="weekday-@i">@Html.Localize(dayNames[i])</label>
                                     </div>;
                                 }
                             }
                         </div>
                     </div>
                     <div class="col-md-3 d-none" id="monthlyDayFieldset">
-                        <label asp-for="DayOfMonth" class="form-label">Day of Month</label>
+                        <label asp-for="DayOfMonth" class="form-label">@Html.Localize("Day of Month")</label>
                         <input asp-for="DayOfMonth" type="number" min="1" max="31" class="form-control" />
                         <span asp-validation-for="DayOfMonth" class="text-danger"></span>
-                        <div class="form-text">Required for Monthly, Bi-Annual, Quarterly, or Annual schedules.</div>
+                        <div class="form-text">@Html.Localize("Required for Monthly, Bi-Annual, Quarterly, or Annual schedules.")</div>
                     </div>
                     <div class="col-md-3 d-flex align-items-center">
                         <div class="form-check mt-4 pt-2">
                             <input asp-for="IsActive" class="form-check-input" />
-                            <label asp-for="IsActive" class="form-check-label">Active</label>
+                            <label asp-for="IsActive" class="form-check-label">@Html.Localize("Active")</label>
                         </div>
                     </div>
                 </div>
 
                 <div class="mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h5 class="mb-0">Columns</h5>
+                    <h5 class="mb-0">@Html.Localize("Columns")</h5>
                     <div class="d-flex gap-2 flex-wrap">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" id="addColumnBtn">Add Column</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" id="uploadColumnsBtn">Upload CSV</button>
-                        <a asp-action="DownloadTemplateCsv" class="btn btn-outline-secondary btn-sm">Download Blank CSV</a>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="addColumnBtn">@Html.Localize("Add Column")</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="uploadColumnsBtn">@Html.Localize("Upload CSV")</button>
+                        <a asp-action="DownloadTemplateCsv" class="btn btn-outline-secondary btn-sm">@Html.Localize("Download Blank CSV")</a>
                     </div>
                 </div>
 
@@ -127,7 +127,7 @@
                        accept=".csv,text/csv"
                        data-import-url="@Url.Action("PreviewTemplateCsv", "MaintenanceLogs")">
                 <div class="text-muted small mb-3">
-                    CSV columns should be ordered as: Label, Type (text, number, checkbox, select), Required, Options (comma or line break separated), Notes (yes/no), Photos (yes/no).
+                    @Html.Localize("CSV columns should be ordered as: Label, Type (text, number, checkbox, select), Required, Options (comma or line break separated), Notes (yes/no), Photos (yes/no).")
                 </div>
                 <div class="small mb-3 d-none" id="columnCsvStatus"></div>
                 @Html.ValidationMessage("TemplateCsvFile", null, new { @class = "text-danger small d-block" })
@@ -145,51 +145,51 @@
                             <div class="border rounded p-3 mb-3 column-editor" data-index="@i">
                                 <div class="row g-3">
                                     <div class="col-md-5">
-                                        <label class="form-label">Label</label>
+                                        <label class="form-label">@Html.Localize("Label")</label>
                                         <input type="text" name="Columns[@i].Label" value="@column.Label" class="form-control" />
                                         <input type="hidden" name="Columns[@i].Key" value="@column.Key" data-key-input="true" />
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="form-label">Type</label>
+                                        <label class="form-label">@Html.Localize("Type")</label>
                                         <select name="Columns[@i].Type" class="form-select column-type-select">
-                                            <option value="text" selected="@(column.Type == "text" ? "selected" : null)">Text</option>
-                                            <option value="number" selected="@(column.Type == "number" ? "selected" : null)">Number</option>
-                                            <option value="checkbox" selected="@(column.Type == "checkbox" ? "selected" : null)">Checkbox</option>
-                                            <option value="select" selected="@(column.Type == "select" ? "selected" : null)">Dropdown</option>
+                                            <option value="text" selected="@(column.Type == "text" ? "selected" : null)">@Html.Localize("Text")</option>
+                                            <option value="number" selected="@(column.Type == "number" ? "selected" : null)">@Html.Localize("Number")</option>
+                                            <option value="checkbox" selected="@(column.Type == "checkbox" ? "selected" : null)">@Html.Localize("Checkbox")</option>
+                                            <option value="select" selected="@(column.Type == "select" ? "selected" : null)">@Html.Localize("Dropdown")</option>
                                         </select>
                                     </div>
                                     <div class="col-md-2 d-flex align-items-center">
                                         <div class="form-check mt-4 pt-2">
                                             <input class="form-check-input" type="checkbox" name="Columns[@i].Required" value="true" @(column.Required ? "checked" : null) id="column-required-@i" />
-                                            <label class="form-check-label" for="column-required-@i">Required</label>
+                                            <label class="form-check-label" for="column-required-@i">@Html.Localize("Required")</label>
                                             <input type="hidden" name="Columns[@i].Required" value="false" />
                                         </div>
                                     </div>
                                     <div class="col-md-3 d-flex align-items-center">
                                         <div class="form-check mt-4 pt-2">
                                             <input class="form-check-input" type="checkbox" name="Columns[@i].IncludeNotes" value="true" @(column.IncludeNotes ? "checked" : null) id="column-notes-@i" />
-                                            <label class="form-check-label" for="column-notes-@i">Add Notes Field</label>
+                                            <label class="form-check-label" for="column-notes-@i">@Html.Localize("Add Notes Field")</label>
                                             <input type="hidden" name="Columns[@i].IncludeNotes" value="false" />
                                         </div>
                                     </div>
                                     <div class="col-md-2 d-flex align-items-center">
                                         <div class="form-check mt-4 pt-2">
                                             <input class="form-check-input" type="checkbox" name="Columns[@i].IncludePhotos" value="true" @(column.IncludePhotos ? "checked" : null) id="column-photos-@i" />
-                                            <label class="form-check-label" for="column-photos-@i">Allow Photos</label>
+                                            <label class="form-check-label" for="column-photos-@i">@Html.Localize("Allow Photos")</label>
                                             <input type="hidden" name="Columns[@i].IncludePhotos" value="false" />
                                         </div>
                                     </div>
                                     <div class="col-md-12 column-options-group @(column.Type == "select" ? string.Empty : "d-none")">
-                                        <label class="form-label">Dropdown Options (one per line)</label>
+                                        <label class="form-label">@Html.Localize("Dropdown Options (one per line)")</label>
                                         <textarea name="Columns[@i].OptionsText" class="form-control" rows="3">@column.OptionsText</textarea>
                                     </div>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
                                     <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn btn-outline-secondary move-up-btn" title="Move column up">Move Up</button>
-                                        <button type="button" class="btn btn-outline-secondary move-down-btn" title="Move column down">Move Down</button>
+                                        <button type="button" class="btn btn-outline-secondary move-up-btn" title="@Html.Localize("Move column up")">@Html.Localize("Move Up")</button>
+                                        <button type="button" class="btn btn-outline-secondary move-down-btn" title="@Html.Localize("Move column down")">@Html.Localize("Move Down")</button>
                                     </div>
-                                    <button type="button" class="btn btn-link text-danger p-0 remove-column-btn" @(columns.Count == 1 ? "disabled" : null)>Remove</button>
+                                    <button type="button" class="btn btn-link text-danger p-0 remove-column-btn" @(columns.Count == 1 ? "disabled" : null)>@Html.Localize("Remove")</button>
                                 </div>
                             </div>
                         }
@@ -200,62 +200,62 @@
                     <div class="border rounded p-3 mb-3 column-editor" data-index="__index__">
                         <div class="row g-3">
                             <div class="col-md-5">
-                                <label class="form-label">Label</label>
+                                <label class="form-label">@Html.Localize("Label")</label>
                                 <input type="text" class="form-control" data-name-template="Columns[__index__].Label" />
                                 <input type="hidden" data-name-template="Columns[__index__].Key" data-key-input="true" />
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label">Type</label>
+                                <label class="form-label">@Html.Localize("Type")</label>
                                 <select class="form-select column-type-select" data-name-template="Columns[__index__].Type">
-                                    <option value="text" selected>Text</option>
-                                    <option value="number">Number</option>
-                                    <option value="checkbox">Checkbox</option>
-                                    <option value="select">Dropdown</option>
+                                    <option value="text" selected>@Html.Localize("Text")</option>
+                                    <option value="number">@Html.Localize("Number")</option>
+                                    <option value="checkbox">@Html.Localize("Checkbox")</option>
+                                    <option value="select">@Html.Localize("Dropdown")</option>
                                 </select>
                             </div>
                             <div class="col-md-2 d-flex align-items-center">
                                 <div class="form-check mt-4 pt-2">
                                     <input class="form-check-input" type="checkbox" value="true" data-name-template="Columns[__index__].Required" />
-                                    <label class="form-check-label">Required</label>
+                                    <label class="form-check-label">@Html.Localize("Required")</label>
                                     <input type="hidden" value="false" data-name-template="Columns[__index__].Required" data-hidden-marker="true" />
                                 </div>
                             </div>
                             <div class="col-md-3 d-flex align-items-center">
                                 <div class="form-check mt-4 pt-2">
                                     <input class="form-check-input" type="checkbox" value="true" data-name-template="Columns[__index__].IncludeNotes" />
-                                    <label class="form-check-label">Add Notes Field</label>
+                                    <label class="form-check-label">@Html.Localize("Add Notes Field")</label>
                                     <input type="hidden" value="false" data-name-template="Columns[__index__].IncludeNotes" data-hidden-marker="true" />
                                 </div>
                             </div>
                             <div class="col-md-12 column-options-group d-none">
-                                <label class="form-label">Dropdown Options (one per line)</label>
+                                <label class="form-label">@Html.Localize("Dropdown Options (one per line)")</label>
                                 <textarea class="form-control" rows="3" data-name-template="Columns[__index__].OptionsText"></textarea>
                             </div>
                             <div class="col-md-12">
                                 <div class="form-check mt-2">
                                     <input class="form-check-input" type="checkbox" value="true" data-name-template="Columns[__index__].IncludePhotos" />
-                                    <label class="form-check-label">Allow Photos</label>
+                                    <label class="form-check-label">@Html.Localize("Allow Photos")</label>
                                     <input type="hidden" value="false" data-name-template="Columns[__index__].IncludePhotos" data-hidden-marker="true" />
                                 </div>
                             </div>
                         </div>
                         <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
                             <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-outline-secondary move-up-btn" title="Move column up">Move Up</button>
-                                <button type="button" class="btn btn-outline-secondary move-down-btn" title="Move column down">Move Down</button>
+                                <button type="button" class="btn btn-outline-secondary move-up-btn" title="@Html.Localize("Move column up")">@Html.Localize("Move Up")</button>
+                                <button type="button" class="btn btn-outline-secondary move-down-btn" title="@Html.Localize("Move column down")">@Html.Localize("Move Down")</button>
                             </div>
-                            <button type="button" class="btn btn-link text-danger p-0 remove-column-btn">Remove</button>
+                            <button type="button" class="btn btn-link text-danger p-0 remove-column-btn">@Html.Localize("Remove")</button>
                         </div>
                     </div>
                 </template>
 
                 <div class="d-flex justify-content-between mt-4">
-                    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                    <a asp-action="Index" class="btn btn-outline-secondary">@Html.Localize("Cancel")</a>
                     <button type="submit"
                             class="btn btn-primary"
                             data-submit-btn="true"
-                            data-loading-text="@(Model.IsEditMode ? "Saving..." : "Creating...")">
-                        @(Model.IsEditMode ? "Save Changes" : "Save Maintenance Log")
+                            data-loading-text="@(Model.IsEditMode ? Html.Localize("Saving...") : Html.Localize("Creating..."))">
+                        @(Model.IsEditMode ? Html.Localize("Save Changes") : Html.Localize("Save Maintenance Log"))
                     </button>
                 </div>
             </form>
@@ -266,6 +266,18 @@
 @section Scripts {
     <script>
         (() => {
+            const t = (key, fallback = key) => {
+                if (typeof window.hopsTranslate === 'function') {
+                    return window.hopsTranslate(key, fallback);
+                }
+                return typeof fallback === 'string' && fallback.length ? fallback : key;
+            };
+            const format = (template, ...values) => {
+                if (typeof template !== 'string') {
+                    return '';
+                }
+                return values.reduce((acc, value, index) => acc.replace(`{${index}}`, value), template);
+            };
             const scheduleTypeSelect = document.getElementById('scheduleTypeSelect');
             const weeklyFieldset = document.getElementById('weeklyDaysFieldset');
             const monthlyFieldset = document.getElementById('monthlyDayFieldset');
@@ -293,7 +305,7 @@
                         return;
                     }
                     submitBtn.disabled = true;
-                    const loadingText = submitBtn.dataset.loadingText || 'Saving...';
+                    const loadingText = submitBtn.dataset.loadingText || t('Saving...', 'Saving...');
                     submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${loadingText}`;
                     submitBtn.dataset.originalHtml = originalHtml;
                 });
@@ -496,7 +508,7 @@
 
                 const importUrl = csvInput.dataset.importUrl;
                 if (!importUrl) {
-                    showCsvStatus('Import endpoint is unavailable.', 'error');
+                    showCsvStatus(t('Import endpoint is unavailable.', 'Import endpoint is unavailable.'), 'error');
                     return;
                 }
 
@@ -509,8 +521,9 @@
                     headers['RequestVerificationToken'] = token;
                 }
 
+                const defaultError = t('Unable to import the CSV file.', 'Unable to import the CSV file.');
                 try {
-                    showCsvStatus('Importing columns...', 'muted');
+                    showCsvStatus(t('Importing columns...', 'Importing columns...'), 'muted');
                     const response = await fetch(importUrl, {
                         method: 'POST',
                         headers,
@@ -525,21 +538,27 @@
                     }
 
                     if (!response.ok) {
-                        const errorMessage = payload?.error ?? 'Unable to import the CSV file.';
+                        const errorMessage = payload?.error ? t(payload.error, payload.error) : defaultError;
                         throw new Error(errorMessage);
                     }
 
                     const imported = Array.isArray(payload?.columns) ? payload.columns : [];
                     if (imported.length === 0) {
-                        throw new Error('The CSV file did not include any columns.');
+                        throw new Error(t('The CSV file did not include any columns.', 'The CSV file did not include any columns.'));
                     }
 
                     container.innerHTML = '';
                     imported.forEach(column => createColumnFromTemplate(column));
                     refreshColumnState();
-                    showCsvStatus(`Imported ${imported.length} column${imported.length === 1 ? '' : 's'}.`);
+                    const importedMessage = imported.length === 1
+                        ? format(t('Imported {0} column.', 'Imported {0} column.'), imported.length)
+                        : format(t('Imported {0} columns.', 'Imported {0} columns.'), imported.length);
+                    showCsvStatus(importedMessage);
                 } catch (error) {
-                    showCsvStatus(error.message ?? 'Unable to import the CSV file.', 'error');
+                    const errorMessage = (typeof error?.message === 'string' && error.message.length)
+                        ? t(error.message, error.message)
+                        : defaultError;
+                    showCsvStatus(errorMessage, 'error');
                 }
             };
 
@@ -559,3 +578,4 @@
         })();
     </script>
 }
+

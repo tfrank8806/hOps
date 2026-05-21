@@ -1,12 +1,13 @@
 @model CalendarEventManageViewModel
+@using System.Globalization
 @{
-    ViewData["Title"] = "Edit Event";
+    ViewData["Title"] = Html.Localize("Calendar.Heading.EditEvent", "Edit Event").ToString();
     var disableForm = !Model.AccessibleProperties.Any();
 }
 
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
-    <h1 class="h3 mb-0">@Model.Heading</h1>
-    <a class="btn btn-outline-secondary" asp-action="Index">Back to Calendar</a>
+    <h1 class="h3 mb-0">@Html.Localize(Model.Heading ?? "Calendar.Heading.EditEvent", "Edit Event")</h1>
+    <a class="btn btn-outline-secondary" asp-action="Index">@Html.Localize("Back to Calendar")</a>
 </div>
 
 <div class="card shadow-sm">
@@ -38,7 +39,7 @@
                 <div class="col-md-6">
                     <label asp-for="Form.StartTime" class="form-label"></label>
                     <input asp-for="Form.StartTime" class="form-control" />
-                    <span class="form-text">Optional</span>
+                    <span class="form-text">@Html.Localize("Optional")</span>
                     <span asp-validation-for="Form.StartTime" class="text-danger"></span>
                 </div>
             </div>
@@ -52,7 +53,7 @@
                 <div class="col-md-6">
                     <label asp-for="Form.EndTime" class="form-label"></label>
                     <input asp-for="Form.EndTime" class="form-control" />
-                    <span class="form-text">Optional</span>
+                    <span class="form-text">@Html.Localize("Optional")</span>
                     <span asp-validation-for="Form.EndTime" class="text-danger"></span>
                 </div>
             </div>
@@ -76,7 +77,7 @@
             @if (Model.Form.ExistingAttachments.Any())
             {
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Existing Attachments</label>
+                    <label class="form-label fw-semibold">@Html.Localize("Existing Attachments")</label>
                     <div class="list-group">
                         @foreach (var attachment in Model.Form.ExistingAttachments)
                         {
@@ -87,24 +88,24 @@
                                     <input class="form-check-input" type="checkbox" id="@checkboxId" name="Form.AttachmentsToRemove" value="@attachment.FileName" @(markedForRemoval ? "checked" : string.Empty) />
                                     <span class="form-check-label">@attachment.DisplayName</span>
                                 </span>
-                                <a href="@attachment.DownloadUrl" class="small" target="_blank" rel="noopener">Download</a>
+                                <a href="@attachment.DownloadUrl" class="small" target="_blank" rel="noopener">@Html.Localize("Download")</a>
                             </label>
                         }
                     </div>
-                    <small class="text-muted d-block mt-1">Select attachments to remove when saving.</small>
+                    <small class="text-muted d-block mt-1">@Html.Localize("Select attachments to remove when saving.")</small>
                 </div>
             }
 
             <div class="mb-3">
                 <label asp-for="Form.Attachments" class="form-label fw-semibold"></label>
                 <input asp-for="Form.Attachments" class="form-control" type="file" multiple accept="image/*,.pdf" />
-                <div class="form-text">Upload up to 5 files (images or PDF, max 5 MB each).</div>
+                <div class="form-text">@Html.Localize("Upload up to 5 files (images or PDF, max 5 MB each).")</div>
                 <span asp-validation-for="Form.Attachments" class="text-danger"></span>
             </div>
 
             <div class="mb-3">
-                <label class="form-label fw-semibold">Reminders</label>
-                <div class="form-text">Select when teammates should receive reminders.</div>
+                <label class="form-label fw-semibold">@Html.Localize("Reminders")</label>
+                <div class="form-text">@Html.Localize("Select when teammates should receive reminders.")</div>
                 @if (Model.ReminderOptions.Any())
                 {
                     <div class="row g-2 mt-2">
@@ -127,12 +128,12 @@
                 }
                 else
                 {
-                    <div class="alert alert-light border mt-2 mb-0">No reminder options are available.</div>
+                    <div class="alert alert-light border mt-2 mb-0">@Html.Localize("No reminder options are available.")</div>
                 }
             </div>
 
             <div class="mb-3">
-                <label class="form-label fw-semibold">Department assignment</label>
+                <label class="form-label fw-semibold">@Html.Localize("Department assignment")</label>
                 <div class="form-check">
                     <input class="form-check-input"
                            type="radio"
@@ -141,7 +142,7 @@
                            value="true"
                            data-dept-radio="edit"
                            @(Model.Form.NotifyAllDepartments ? "checked" : string.Empty) />
-                    <label class="form-check-label" for="editDeptAll">All departments on selected properties</label>
+                    <label class="form-check-label" for="editDeptAll">@Html.Localize("All departments on selected properties")</label>
                 </div>
                 <div class="form-check">
                     <input class="form-check-input"
@@ -151,7 +152,7 @@
                            value="false"
                            data-dept-radio="edit"
                            @(Model.Form.NotifyAllDepartments ? string.Empty : "checked") />
-                    <label class="form-check-label" for="editDeptSpecific">Specific department</label>
+                    <label class="form-check-label" for="editDeptSpecific">@Html.Localize("Specific department")</label>
                 </div>
                 <div class="mt-2">
                     @if (Model.DepartmentOptions.Any())
@@ -160,14 +161,14 @@
                                 class="form-select"
                                 id="editDepartmentSelect"
                                 asp-items="Model.DepartmentOptions"
-                                disabled="@(Model.Form.NotifyAllDepartments)">
-                            <option value="">Select a department</option>
-                        </select>
-                    }
-                    else
-                    {
-                        <div class="alert alert-light border mb-0">No departments are available for your selected properties.</div>
-                    }
+                                            disabled="@(Model.Form.NotifyAllDepartments)">
+                                        <option value="">@Html.Localize("Select a department")</option>
+                                    </select>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-light border mb-0">@Html.Localize("No departments are available for your selected properties.")</div>
+                                }
                 </div>
                 <span asp-validation-for="Form.TargetDepartmentId" class="text-danger"></span>
             </div>
@@ -175,11 +176,13 @@
             @if (Model.ShowPropertySelection)
             {
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Properties</label>
+                    <label class="form-label fw-semibold">@Html.Localize("Properties")</label>
                     <div class="row g-2">
                         @foreach (var property in Model.AccessibleProperties)
                         {
                             var checkboxId = $"property_{property.Id}";
+                            var propertyIdString = property.Id.ToString(CultureInfo.InvariantCulture);
+                            var propertyDisplayName = await Html.DisplayTranslatedTextAsync("Property", propertyIdString, "Name", property.Name ?? string.Empty);
                             <div class="col-sm-6">
                                 <div class="form-check">
                                     <input class="form-check-input"
@@ -189,7 +192,7 @@
                                            name="Form.SelectedPropertyIds"
                                            @(Model.Form.SelectedPropertyIds.Contains(property.Id) ? "checked" : string.Empty) />
                                     <label class="form-check-label" for="@checkboxId">
-                                        <span class="d-block">@property.Name</span>
+                                        <span class="d-block">@propertyDisplayName</span>
                                         <small class="text-muted">@property.Code</small>
                                     </label>
                                 </div>
@@ -207,10 +210,12 @@
                 }
 
                 var singleProperty = Model.AccessibleProperties.FirstOrDefault();
-                var propertyName = singleProperty?.Name ?? "Property";
-                var propertyCode = singleProperty?.Code ?? "N/A";
+                var propertyName = singleProperty != null
+                    ? await Html.DisplayTranslatedTextAsync("Property", singleProperty.Id.ToString(CultureInfo.InvariantCulture), "Name", singleProperty.Name ?? string.Empty)
+                    : Html.Localize("Property").ToString();
+                var propertyCode = singleProperty?.Code ?? Html.Localize("N/A").ToString();
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Property</label>
+                    <label class="form-label fw-semibold">@Html.Localize("Property")</label>
                     <div class="form-control-plaintext">
                         @propertyName <span class="text-muted">(@propertyCode)</span>
                     </div>
@@ -218,8 +223,8 @@
             }
 
             <div class="d-flex justify-content-between gap-2">
-                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
-                <button type="submit" class="btn btn-primary" @(disableForm ? "disabled" : string.Empty)>Update Event</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">@Html.Localize("Cancel")</a>
+                <button type="submit" class="btn btn-primary" @(disableForm ? "disabled" : string.Empty)>@Html.Localize("Update Event")</button>
             </div>
         </form>
     </div>
@@ -245,3 +250,4 @@
         });
     </script>
 }
+

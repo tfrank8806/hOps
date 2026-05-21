@@ -6,6 +6,10 @@
             return;
         }
 
+        const translate = typeof window.hopsTranslate === 'function'
+            ? window.hopsTranslate
+            : (key, fallback) => (typeof fallback === 'string' && fallback.length ? fallback : key);
+
         const templateItems = Array.isArray(config.templateItems) ? config.templateItems : [];
         const addButton = document.querySelector('[data-action="add-item"]');
         const resetButton = document.querySelector('[data-action="reset-template"]');
@@ -35,7 +39,7 @@
         renderRows();
         updateSummary();
         renderHistory();
-        updateSaveStatus('Loading saved data...');
+        updateSaveStatus(translate('SupplyInventory.Status.Loading', 'Loading saved data...'));
         hydrateFromServer();
 
         tableBody.addEventListener('input', handleTableInput);
@@ -53,7 +57,7 @@
 
         resetButton?.addEventListener('click', event => {
             event.preventDefault();
-            if (!window.confirm('Reset the worksheet to the original supply template?')) {
+            if (!window.confirm(translate('SupplyInventory.Dialog.ResetTemplate', 'Reset the worksheet to the original supply template?'))) {
                 return;
             }
 
@@ -117,7 +121,7 @@
 
         async function hydrateFromServer() {
             if (!endpoints.load || !propertyId) {
-                updateSaveStatus('Ready');
+                updateSaveStatus(translate('SupplyInventory.Status.Ready', 'Ready'));
                 return;
             }
 
@@ -130,7 +134,7 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error('Unable to load saved data.');
+                    throw new Error(translate('SupplyInventory.Error.LoadFailed', 'Unable to load saved data.'));
                 }
 
                 const payload = await response.json();
@@ -156,11 +160,11 @@
                 renderRows();
                 updateSummary();
                 renderHistory();
-                updateSaveStatus('Ready');
+                updateSaveStatus(translate('SupplyInventory.Status.Ready', 'Ready'));
             }
             catch (error) {
                 console.error('Unable to load supply inventory state', error);
-                updateSaveStatus('Unable to load saved data', true);
+                updateSaveStatus(translate('SupplyInventory.Error.LoadFailedShort', 'Unable to load saved data'), true);
             }
         }
 
@@ -196,20 +200,21 @@
 
             saveInProgress = true;
             saveQueued = false;
-            updateSaveStatus('Saving to server...');
+            updateSaveStatus(translate('SupplyInventory.Status.Saving', 'Saving to server...'));
 
             try {
                 const response = await postJson(endpoints.save, buildSavePayload());
                 if (!response?.success) {
-                    throw new Error(response?.message || 'Unable to save changes.');
+                    throw new Error(response?.message || translate('SupplyInventory.Error.SaveFailed', 'Unable to save changes.'));
                 }
 
                 const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                updateSaveStatus(`Saved ${timestamp}`);
+                const savedMessage = translate('SupplyInventory.Status.SavedAt', 'Saved {0}').replace('{0}', timestamp);
+                updateSaveStatus(savedMessage, false, true);
             }
             catch (error) {
                 console.error('Failed to save supply inventory state', error);
-                updateSaveStatus(error?.message || 'Unable to save changes. Please refresh.', true);
+                updateSaveStatus(error?.message || translate('SupplyInventory.Error.SaveRefresh', 'Unable to save changes. Please refresh.'), true);
             }
             finally {
                 saveInProgress = false;
@@ -274,7 +279,7 @@
 
         async function postJson(url, payload) {
             if (!url) {
-                throw new Error('Endpoint missing.');
+            throw new Error(translate('SupplyInventory.Error.EndpointMissing', 'Endpoint missing.'));
             }
 
             const response = await fetch(url, {
@@ -288,7 +293,7 @@
             });
 
             if (!response.ok) {
-                throw new Error('Request failed.');
+                throw new Error(translate('SupplyInventory.Error.RequestFailed', 'Request failed.'));
             }
 
             return response.json();
@@ -349,7 +354,7 @@
                 const cell = document.createElement('td');
                 cell.colSpan = 10;
                 cell.className = 'text-center text-muted py-4';
-                cell.textContent = 'Add items to begin tracking supply inventory.';
+                cell.textContent = translate('SupplyInventory.EmptyState.Table', 'Add items to begin tracking supply inventory.');
                 emptyRow.appendChild(cell);
                 tableBody.appendChild(emptyRow);
                 updateItemCount();
@@ -365,24 +370,24 @@
 
         async function handleSaveSnapshot() {
             if (!Array.isArray(state.items) || state.items.length === 0) {
-                window.alert('Add at least one item before saving a snapshot.');
+                window.alert(translate('SupplyInventory.Dialog.SnapshotRequiresItem', 'Add at least one item before saving a snapshot.'));
                 return;
             }
 
             if (!endpoints.snapshot || !propertyId) {
-                window.alert('Snapshot endpoint not configured.');
+                window.alert(translate('SupplyInventory.Dialog.SnapshotEndpointMissing', 'Snapshot endpoint not configured.'));
                 return;
             }
 
             try {
                 const response = await postJson(endpoints.snapshot, buildSavePayload());
                 if (!response?.success || !response.snapshot) {
-                    throw new Error(response?.message || 'Unable to save snapshot.');
+                    throw new Error(response?.message || translate('SupplyInventory.Error.SnapshotSave', 'Unable to save snapshot.'));
                 }
 
                 const snapshotEntry = normalizeSnapshotEntry(response.snapshot);
                 if (!snapshotEntry) {
-                    throw new Error('Snapshot response was invalid.');
+                    throw new Error(translate('SupplyInventory.Error.SnapshotInvalid', 'Snapshot response was invalid.'));
                 }
 
                 if (!Array.isArray(state.history)) {
@@ -395,11 +400,11 @@
                 }
 
                 renderHistory();
-                updateSaveStatus('Snapshot saved');
+                updateSaveStatus(translate('SupplyInventory.Status.SnapshotSaved', 'Snapshot saved'), false, true);
             }
             catch (error) {
                 console.error('Unable to save snapshot', error);
-                window.alert(error?.message || 'Unable to save snapshot. Please try again.');
+                window.alert(error?.message || translate('SupplyInventory.Error.SnapshotSaveRetry', 'Unable to save snapshot. Please try again.'));
             }
         }
 
@@ -450,7 +455,7 @@
                 loadButton.className = 'btn btn-link btn-sm';
                 loadButton.dataset.role = 'load-history';
                 loadButton.dataset.snapshotId = entry.id;
-                loadButton.textContent = 'Load';
+                loadButton.textContent = translate('SupplyInventory.Button.LoadSnapshot', 'Load');
                 actionCell.appendChild(loadButton);
 
                 const deleteButton = document.createElement('button');
@@ -458,7 +463,7 @@
                 deleteButton.className = 'btn btn-link btn-sm text-danger';
                 deleteButton.dataset.role = 'delete-history';
                 deleteButton.dataset.snapshotId = entry.id;
-                deleteButton.textContent = 'Delete';
+                deleteButton.textContent = translate('SupplyInventory.Button.DeleteSnapshot', 'Delete');
                 actionCell.appendChild(deleteButton);
 
                 row.appendChild(actionCell);
@@ -516,7 +521,7 @@
             renderRows();
             updateSummary();
             scheduleSave(true);
-            updateSaveStatus('Loaded snapshot');
+            updateSaveStatus(translate('SupplyInventory.Status.SnapshotLoaded', 'Loaded snapshot'), false, true);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -529,7 +534,7 @@
                 return;
             }
 
-            if (!window.confirm('Delete this snapshot from history?')) {
+            if (!window.confirm(translate('SupplyInventory.Dialog.DeleteSnapshotConfirm', 'Delete this snapshot from history?'))) {
                 return;
             }
 
@@ -540,7 +545,7 @@
                 });
 
                 if (!response?.success) {
-                    throw new Error(response?.message || 'Unable to delete snapshot.');
+                    throw new Error(response?.message || translate('SupplyInventory.Error.SnapshotDelete', 'Unable to delete snapshot.'));
                 }
 
                 const targetId = snapshotId?.toString() ?? '';
@@ -549,7 +554,7 @@
             }
             catch (error) {
                 console.error('Unable to delete snapshot', error);
-                window.alert(error?.message || 'Unable to delete snapshot. Please try again.');
+                window.alert(error?.message || translate('SupplyInventory.Error.SnapshotDeleteRetry', 'Unable to delete snapshot. Please try again.'));
             }
         }
 
@@ -639,7 +644,7 @@
             button.type = 'button';
             button.className = 'btn btn-link btn-sm text-danger';
             button.dataset.role = 'remove-item';
-            button.textContent = 'Remove';
+            button.textContent = translate('SupplyInventory.Button.RemoveRow', 'Remove');
             cell.appendChild(button);
             return cell;
         }
@@ -662,7 +667,10 @@
             }
 
             const count = state.items.length;
-            itemCountEl.textContent = count === 1 ? '1 item' : `${count} items`;
+            const itemCountText = count === 1
+                ? translate('SupplyInventory.Template.SingleItem', '1 item')
+                : translate('SupplyInventory.Template.MultipleItems', '{0} items').replace('{0}', count);
+            itemCountEl.textContent = itemCountText;
         }
 
         function updateSummary() {
@@ -710,7 +718,7 @@
         function formatDateTime(value) {
             const date = new Date(value);
             if (Number.isNaN(date.getTime())) {
-                return 'Unknown';
+                return translate('SupplyInventory.Label.Unknown', 'Unknown');
             }
 
             return date.toLocaleString(undefined, {
@@ -748,14 +756,14 @@
             return amount.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
         }
 
-        function updateSaveStatus(message, isError) {
+        function updateSaveStatus(message, isError, isSuccess) {
             if (!saveStatusEl) {
                 return;
             }
 
             saveStatusEl.textContent = message;
             saveStatusEl.classList.toggle('text-danger', Boolean(isError));
-            saveStatusEl.classList.toggle('text-success', !isError && message.toLowerCase().startsWith('saved'));
+            saveStatusEl.classList.toggle('text-success', Boolean(isSuccess));
         }
 
         function generateId() {

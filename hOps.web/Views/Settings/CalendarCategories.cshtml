@@ -1,5 +1,6 @@
 @model List<hOps.web.Models.CalendarCategory>
 @using Microsoft.AspNetCore.Mvc.Rendering
+@using System.Globalization
 @functions {
     private static string NormalizeColorHex(string? color)
     {
@@ -62,7 +63,7 @@
     }
 }
 @{
-    ViewData["Title"] = "Calendar Categories";
+    ViewData["Title"] = Html.Localize("Settings.CalendarCategories.Title", "Calendar Categories").ToString();
     var filterOptions = ViewBag.PropertyFilterOptions as List<SelectListItem> ?? new List<SelectListItem>();
     string createUrl = ViewBag.CreateCalendarCategoryUrl as string ?? Url.Action("CreateCalendarCategory") ?? string.Empty;
     int? selectedPropertyId = ViewBag.SelectedPropertyId as int?;
@@ -71,9 +72,9 @@
 }
 
 <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-3">
-    <h2 class="h4 mb-0">Calendar Categories</h2>
+    <h2 class="h4 mb-0">@Html.Localize("Settings.CalendarCategories.Heading", "Calendar Categories")</h2>
     <div class="d-flex align-items-center gap-2">
-        <label for="calendarCategoryPropertyFilter" class="form-label mb-0">Scope:</label>
+        <label for="calendarCategoryPropertyFilter" class="form-label mb-0">@Html.Localize("Settings.CalendarCategories.ScopeLabel", "Scope:")</label>
         <select id="calendarCategoryPropertyFilter" class="form-select form-select-sm" style="width:auto; min-width:220px;">
             @foreach (var option in filterOptions)
             {
@@ -81,26 +82,40 @@
             }
         </select>
     </div>
-    <a class="btn btn-primary" href="@createUrl">Add Category</a>
+    <a class="btn btn-primary" href="@createUrl">@Html.Localize("Settings.CalendarCategories.AddCategory", "Add Category")</a>
 </div>
 
 <table class="table table-striped align-middle">
     <thead>
         <tr>
-            <th>Name</th>
-            <th>Color</th>
-            <th>Applies To</th>
-            <th class="text-end">Actions</th>
+            <th>@Html.Localize("Settings.CalendarCategories.NameHeader", "Name")</th>
+            <th>@Html.Localize("Settings.CalendarCategories.ColorHeader", "Color")</th>
+            <th>@Html.Localize("Settings.CalendarCategories.AppliesToHeader", "Applies To")</th>
+            <th class="text-end">@Html.Localize("Settings.CalendarCategories.ActionsHeader", "Actions")</th>
         </tr>
     </thead>
     <tbody>
         @foreach (var item in Model)
         {
-            var scopeLabel = item.PropertyId.HasValue
-                ? (item.Property != null ? $"{item.Property.Name} ({item.Property.Code})" : $"Property #{item.PropertyId}")
-                : "Global";
             var swatchColor = NormalizeColorHex(item.Color);
             var textColor = GetTextColorForBackground(swatchColor);
+            string scopeLabel;
+            if (item.PropertyId.HasValue)
+            {
+                var propertyIdString = item.PropertyId.Value.ToString(CultureInfo.InvariantCulture);
+                var propertyNameRaw = item.Property?.Name ?? string.Empty;
+                var translatedPropertyName = await Html.DisplayTranslatedTextAsync("Property", propertyIdString, "Name", propertyNameRaw);
+                var propertyName = string.IsNullOrWhiteSpace(translatedPropertyName) ? propertyNameRaw : translatedPropertyName;
+                var propertyCode = item.Property?.Code;
+                scopeLabel = !string.IsNullOrWhiteSpace(propertyName) && !string.IsNullOrWhiteSpace(propertyCode)
+                    ? string.Format(CultureInfo.CurrentCulture, Html.Localize("Settings.CalendarCategories.PropertyWithCode", "{0} ({1})").ToString(), propertyName, propertyCode)
+                    : string.Format(CultureInfo.CurrentCulture, Html.Localize("Settings.CalendarCategories.PropertyFallback", "Property #{0}").ToString(), propertyIdString);
+            }
+            else
+            {
+                scopeLabel = Html.Localize("Settings.CalendarCategories.ScopeGlobal", "Global").ToString();
+            }
+
             <tr>
                 <td>@item.Name</td>
                 <td>
@@ -111,9 +126,9 @@
                 </td>
                 <td>@scopeLabel</td>
                 <td class="text-end">
-                    <a class="btn btn-sm btn-outline-primary" asp-action="EditCalendarCategory" asp-route-id="@item.Id" asp-route-propertyId="@selectedPropertyId" asp-route-onlyGlobal="@onlyGlobal" asp-route-returnUrl="@currentUrl">Edit</a>
+                    <a class="btn btn-sm btn-outline-primary" asp-action="EditCalendarCategory" asp-route-id="@item.Id" asp-route-propertyId="@selectedPropertyId" asp-route-onlyGlobal="@onlyGlobal" asp-route-returnUrl="@currentUrl">@Html.Localize("Settings.CalendarCategories.Edit", "Edit")</a>
                     <form asp-action="DeleteCalendarCategory" asp-route-id="@item.Id" asp-route-propertyId="@selectedPropertyId" asp-route-onlyGlobal="@onlyGlobal" asp-route-returnUrl="@currentUrl" method="post" class="d-inline">
-                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this calendar category?');">Delete</button>
+                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm(window.hopsTranslate('Settings.CalendarCategories.ConfirmDelete', 'Delete this calendar category?'));">@Html.Localize("Settings.CalendarCategories.Delete", "Delete")</button>
                     </form>
                 </td>
             </tr>

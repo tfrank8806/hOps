@@ -1,3 +1,4 @@
+﻿@using System.Globalization
 @model hOps.web.ViewModels.Home.HomeIndexViewModel
 
 @{
@@ -25,7 +26,7 @@
 
 <div class="card shadow-sm h-100 home-widget-card home-widget-card--fill">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2 home-widget-card__header">
-        <h2 class="h6 mb-0">Work Orders</h2>
+        <h2 class="h6 mb-0">@Html.Localize("Work Orders")</h2>
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <a class="btn btn-sm btn-primary"
                asp-controller="WorkOrders"
@@ -33,13 +34,13 @@
                asp-fragment="workOrdersForm">
                 + New Work Order
             </a>
-            <a class="btn btn-sm btn-outline-primary" asp-controller="WorkOrders" asp-action="Index">View All</a>
+            <a class="btn btn-sm btn-outline-primary" asp-controller="WorkOrders" asp-action="Index">@Html.Localize("View All")</a>
         </div>
     </div>
     <div class="card-body home-widget-card__body">
         @if (!workOrders.Any())
         {
-            <p class="text-muted mb-0">No work orders are currently assigned to this property.</p>
+            <p class="text-muted mb-0">@Html.Localize("No work orders are currently assigned to this property.")</p>
         }
         else
         {
@@ -91,8 +92,8 @@
             {
                 <div class="mb-3">
                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-                        <span class="fw-semibold">Open work orders by department</span>
-                        <span class="text-muted small">Includes New, In Progress, and Escalated</span>
+                        <span class="fw-semibold">@Html.Localize("Open work orders by department")</span>
+                        <span class="text-muted small">@Html.Localize("Includes New, In Progress, and Escalated")</span>
                     </div>
                     <div class="home-workorder-summary-grid">
                         @foreach (var summary in departmentSummaries)
@@ -103,7 +104,7 @@
                             <div class="home-workorder-summary-item" style="--dept-color:@deptColor">
                                 <div class="department-info">
                                     <span class="department-dot" aria-hidden="true"></span>
-                                    <span>@summary.DepartmentName</span>
+                                    <span>@Html.Localize(summary.DepartmentName ?? string.Empty)</span>
                                 </div>
                                 <div class="department-count">@summary.OpenCount</div>
                             </div>
@@ -116,53 +117,62 @@
                 @foreach (var order in workOrders)
                 {
                     var hasLink = !string.IsNullOrWhiteSpace(order.DetailUrl);
+                    var orderIdString = order.Id.ToString(CultureInfo.InvariantCulture);
+                    var issueDisplay = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Issue", order.Issue);
+                    var locationDisplay = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Location", order.Location ?? string.Empty);
+                    var departmentDisplay = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "DepartmentName", order.DepartmentName ?? string.Empty);
+                    var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
+                    var openedLabel = string.Format(CultureInfo.CurrentCulture, Html.Localize("Opened {0}"), createdLocal.ToString("g", CultureInfo.CurrentCulture));
                     <li class="widget-item">
                         <div class="d-flex justify-content-between align-items-start gap-3">
                             <div class="flex-grow-1">
                                 @if (hasLink)
                                 {
-                                    <a class="fw-semibold" href="@order.DetailUrl">@order.Issue</a>
+                                    <a class="fw-semibold" href="@order.DetailUrl">@issueDisplay</a>
                                 }
                                 else
                                 {
-                                    <span class="fw-semibold">@order.Issue</span>
+                                    <span class="fw-semibold">@issueDisplay</span>
                                 }
-                                @if (!string.IsNullOrWhiteSpace(order.Location))
+                                @if (!string.IsNullOrWhiteSpace(locationDisplay))
                                 {
-                                    <div class="text-muted small">@order.Location</div>
+                                    <div class="text-muted small">@locationDisplay</div>
                                 }
-                                @if (!string.IsNullOrWhiteSpace(order.DepartmentName))
+                                @if (!string.IsNullOrWhiteSpace(departmentDisplay))
                                 {
                                     var deptColor = string.IsNullOrWhiteSpace(order.DepartmentColor)
                                         ? "#0d6efd"
                                         : order.DepartmentColor;
                                     <div class="text-muted small d-flex align-items-center gap-2 mt-1">
                                         <span class="widget-dept-dot" style="--dept-color:@deptColor" aria-hidden="true"></span>
-                                        <span>@order.DepartmentName</span>
+                                        <span>@departmentDisplay</span>
                                     </div>
                                 }
                                 <div class="@order.SlaStatusClass mt-1">
-                                    <span class="fw-semibold">@order.SlaStatus</span>
-                                    <span class="ms-1 text-muted">@order.SlaSummary</span>
+                                    <span class="fw-semibold">@Html.Localize(order.SlaStatus ?? string.Empty)</span>
+                                    @if (!string.IsNullOrWhiteSpace(order.SlaSummary))
+                                    {
+                                        <span class="ms-1 text-muted">@Html.Localize(order.SlaSummary)</span>
+                                    }
                                 </div>
                             </div>
                             @{
                                 var statusColor = hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetColor(order.Status);
                                 var statusLabel = hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetLabel(order.Status);
+                                var localizedStatusLabel = Html.Localize(statusLabel ?? string.Empty);
+                                var localizedPriorityLabel = Html.Localize(order.PriorityLabel ?? string.Empty);
                             }
                             <div class="d-flex flex-column align-items-end gap-1 text-end flex-shrink-0">
-                                <span class="badge" style="background-color:@statusColor">@statusLabel</span>
-                                <span class="@order.PriorityClass">@order.PriorityLabel</span>
-                                <small class="text-muted">@order.DueDate.ToString("MM-dd-yy")</small>
+                                <span class="badge" style="background-color:@statusColor">@localizedStatusLabel</span>
+                                <span class="@order.PriorityClass">@localizedPriorityLabel</span>
+                                <small class="text-muted">@order.DueDate.ToString("d", CultureInfo.CurrentCulture)</small>
                             </div>
                         </div>
-                        @{
-                            var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
-                        }
-                        <div class="small mt-1" style="color:@GetDateColor(order.CreatedAt);">Opened @createdLocal.ToString("g")</div>
+                        <div class="small mt-1" style="color:@GetDateColor(order.CreatedAt);">@openedLabel</div>
                     </li>
                 }
             </ul>
         }
     </div>
 </div>
+

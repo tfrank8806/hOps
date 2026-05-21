@@ -2,7 +2,10 @@
 @using Microsoft.AspNetCore.Mvc.Rendering
 @{
     var formAction = ViewData["FormAction"] as string ?? "CreateCalendarCategory";
-    ViewData["Title"] = formAction.Contains("Edit", System.StringComparison.OrdinalIgnoreCase) ? "Edit Calendar Category" : "Create Calendar Category";
+    var isEdit = formAction.Contains("Edit", System.StringComparison.OrdinalIgnoreCase);
+    ViewData["Title"] = (isEdit
+        ? Html.Localize("Settings.CalendarCategoryForm.EditTitle", "Edit Calendar Category")
+        : Html.Localize("Settings.CalendarCategoryForm.CreateTitle", "Create Calendar Category")).ToString();
     var propertyOptions = ViewBag.PropertyOptions as List<SelectListItem> ?? new List<SelectListItem>();
     bool onlyGlobal = ViewBag.OnlyGlobal as bool? ?? false;
     string returnUrl = ViewBag.ReturnUrl as string ?? Url.Action("CalendarCategories") ?? string.Empty;
@@ -16,14 +19,14 @@
     <input type="hidden" name="returnUrl" value="@returnUrl" />
 
     <div class="mb-3">
-        <label class="form-label" for="calendarCategory-property">Applies To</label>
+        <label class="form-label" for="calendarCategory-property">@Html.Localize("Settings.CalendarCategoryForm.AppliesTo", "Applies To")</label>
         <select class="form-select" id="calendarCategory-property" name="selectedPropertyId">
             @foreach (var option in propertyOptions)
             {
                 <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
             }
         </select>
-        <div class="form-text">Choose "Global" to share this category across all properties.</div>
+        <div class="form-text">@Html.Localize("Settings.CalendarCategoryForm.ScopeHelp", "Choose \"Global\" to share this category across all properties.")</div>
     </div>
 
     <div class="mb-3">
@@ -36,5 +39,5 @@
         <input asp-for="Color" type="color" class="form-control" />
         <span asp-validation-for="Color" class="text-danger"></span>
     </div>
-    <button type="submit" class="btn btn-success">Save</button>
+    <button type="submit" class="btn btn-success">@Html.Localize("Save")</button>
 </form>

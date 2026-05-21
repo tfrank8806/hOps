@@ -1,8 +1,9 @@
+@using System.Globalization
 @using hOps.web.Utilities
 @model hOps.web.ViewModels.Messages.DirectMessagePageViewModel
 
 @{
-    ViewData["Title"] = "Messages";
+    ViewData["Title"] = Html.Localize("DirectMessages.Title", "Messages").ToString();
     ViewData["MainContainerClass"] = "main-inner--wide";
     ViewData["ContentSurfaceClass"] = "content-surface--flush";
     var showNewConversation = Model.ShowNewConversation;
@@ -14,9 +15,9 @@
     <div class="col-lg-4 col-xl-3 col-xxl-3 d-flex">
         <div class="card shadow-sm flex-fill">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h2 class="h5 mb-0">Conversations</h2>
+                <h2 class="h5 mb-0">@Html.Localize("DirectMessages.Conversations.Heading", "Conversations")</h2>
                 <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#newConversationForm" aria-expanded="@(showNewConversation ? "true" : "false")" aria-controls="newConversationForm" @(Model.AvailableRecipients.Any() ? string.Empty : "disabled")>
-                    New Message
+                    @Html.Localize("DirectMessages.Conversations.NewMessage", "New Message")
                 </button>
             </div>
             <div class="card-body p-0 d-flex flex-column">
@@ -26,9 +27,9 @@
                         <form asp-action="Start" method="post" class="p-3" data-dm-existing-url="@Url.Action("Index", "DirectMessages")">
                             @Html.AntiForgeryToken()
                             <div class="mb-3">
-                                <label for="newConversationRecipient" class="form-label">Recipient</label>
+                                <label for="newConversationRecipient" class="form-label">@Html.Localize("DirectMessages.Conversations.RecipientLabel", "Recipient")</label>
                                 <select class="form-select" id="newConversationRecipient" name="RecipientUserId" required>
-                                    <option value="" selected disabled>Select a teammate</option>
+                                    <option value="" selected disabled>@Html.Localize("DirectMessages.Conversations.SelectTeammate", "Select a teammate")</option>
                                     @foreach (var option in Model.AvailableRecipients)
                                     {
                                         var isSelected = !string.IsNullOrEmpty(Model.NewConversation.RecipientUserId)
@@ -38,19 +39,19 @@
                                 </select>
                             </div>
                             <div class="mb-3">
-                                <label for="newConversationBody" class="form-label">Message</label>
-                                <textarea class="form-control" id="newConversationBody" name="Body" rows="3" maxlength="2000" required data-enable-mentions="true"></textarea>
+                                <label for="newConversationBody" class="form-label">@Html.Localize("DirectMessages.Conversations.MessageLabel", "Message")</label>
+                                <textarea class="form-control" id="newConversationBody" name="Body" rows="3" maxlength="2000" required data-enable-mentions="true" placeholder='@Html.Localize("DirectMessages.Conversations.MessagePlaceholder", "Type a message...")'></textarea>
                             </div>
                             <div class="d-flex justify-content-end gap-2 align-items-center">
-                                <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#newConversationForm">Cancel</button>
-                                <button class="btn btn-primary btn-sm" type="submit">Send</button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#newConversationForm">@Html.Localize("Cancel")</button>
+                                <button class="btn btn-primary btn-sm" type="submit">@Html.Localize("DirectMessages.Conversations.Send", "Send")</button>
                             </div>
                         </form>
                     }
                     else
                     {
                         <div class="p-3 text-muted small">
-                            Messaging is limited to teammates assigned to the same properties as you. Once you share a property with someone, they will appear here.
+                            @Html.Localize("DirectMessages.Conversations.NoRecipients", "Messaging is limited to teammates assigned to the same properties as you. Once you share a property with someone, they will appear here.")
                         </div>
                     }
                 </div>
@@ -71,49 +72,49 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h2 class="h5 mb-0">@Model.ActiveConversation.ParticipantName</h2>
-                            <small class="text-muted">Direct messages</small>
+                            <small class="text-muted">@Html.Localize("DirectMessages.Conversations.DetailLabel", "Direct messages")</small>
                         </div>
                         @if (!string.IsNullOrWhiteSpace(Model.ActiveConversation.ParticipantEmail))
                         {
-                            <a class="btn btn-outline-secondary btn-sm" href="mailto:@Model.ActiveConversation.ParticipantEmail">Email</a>
+                            <a class="btn btn-outline-secondary btn-sm" href="mailto:@Model.ActiveConversation.ParticipantEmail">@Html.Localize("DirectMessages.Conversations.EmailButton", "Email")</a>
                         }
                         else
                         {
-                            <button class="btn btn-outline-secondary btn-sm" type="button" disabled title="Email address unavailable">Email</button>
+                            <button class="btn btn-outline-secondary btn-sm" type="button" disabled title='@Html.Localize("DirectMessages.Conversations.EmailUnavailable", "Email address unavailable")'>@Html.Localize("DirectMessages.Conversations.EmailButton", "Email")</button>
                         }
                     </div>
                 }
                 else
                 {
-                    <h2 class="h5 mb-0">Select a conversation</h2>
+                    <h2 class="h5 mb-0">@Html.Localize("DirectMessages.Conversations.SelectHeading", "Select a conversation")</h2>
                 }
             </div>
             <div class="card-body d-flex flex-column gap-3">
                 @if (TempData["DirectMessageMessage"] is string successMessage)
                 {
                     <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        @successMessage
-                        <button class="btn-close" type="button" data-bs-dismiss="alert" aria-label="Close"></button>
+                        @Html.Localize(successMessage, successMessage)
+                        <button class="btn-close" type="button" data-bs-dismiss="alert" aria-label='@Html.Localize("Close")'></button>
                     </div>
                 }
                 @if (TempData["DirectMessageError"] is string errorMessage)
                 {
                     <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        @errorMessage
-                        <button class="btn-close" type="button" data-bs-dismiss="alert" aria-label="Close"></button>
+                        @Html.Localize(errorMessage, errorMessage)
+                        <button class="btn-close" type="button" data-bs-dismiss="alert" aria-label='@Html.Localize("Close")'></button>
                     </div>
                 }
 
                 @if (Model.ActiveConversation == null)
                 {
                     <div class="direct-message-placeholder text-center text-muted py-5">
-                        <p class="fw-semibold mb-1">No conversation selected</p>
-                        <p class="mb-0">Choose a conversation from the left or start a new one.</p>
+                        <p class="fw-semibold mb-1">@Html.Localize("DirectMessages.Conversations.NoneSelected", "No conversation selected")</p>
+                        <p class="mb-0">@Html.Localize("DirectMessages.Conversations.SelectPrompt", "Choose a conversation from the left or start a new one.")</p>
                     </div>
                 }
                 else
                 {
-                    var participantName = Model.ActiveConversation.ParticipantName ?? "Conversation";
+                    var participantName = Model.ActiveConversation.ParticipantName ?? Html.Localize("DirectMessages.Conversations.DefaultParticipant", "Conversation").ToString();
                     var participantEmail = Model.ActiveConversation.ParticipantEmail;
                     var initial = participantName.Trim().Length > 0
                         ? participantName.Trim()[0].ToString().ToUpperInvariant()
@@ -122,21 +123,21 @@
                         <div class="direct-messages-widget__summary-avatar">@initial</div>
                         <div class="direct-messages-widget__summary-body">
                             <span class="direct-messages-widget__summary-name">@participantName</span>
-                            <span class="direct-messages-widget__summary-meta">Direct messages</span>
+                            <span class="direct-messages-widget__summary-meta">@Html.Localize("DirectMessages.Conversations.DetailLabel", "Direct messages")</span>
                         </div>
                         <div class="d-flex flex-column gap-2 align-items-stretch">
                             @if (!string.IsNullOrWhiteSpace(participantEmail))
                             {
-                                <a class="btn btn-outline-primary btn-sm" href="mailto:@participantEmail">Email</a>
+                                <a class="btn btn-outline-primary btn-sm" href="mailto:@participantEmail">@Html.Localize("DirectMessages.Conversations.EmailButton", "Email")</a>
                             }
                             else
                             {
-                                <button class="btn btn-outline-primary btn-sm" type="button" disabled title="Email address unavailable">Email</button>
+                                <button class="btn btn-outline-primary btn-sm" type="button" disabled title='@Html.Localize("DirectMessages.Conversations.EmailUnavailable", "Email address unavailable")'>@Html.Localize("DirectMessages.Conversations.EmailButton", "Email")</button>
                             }
-                            <form asp-action="Delete" method="post" onsubmit="return confirm('Delete this conversation? This cannot be undone.');">
+                            <form asp-action="Delete" method="post" onsubmit="return confirm(window.hopsTranslate('DirectMessages.Conversations.ConfirmDelete', 'Delete this conversation? This cannot be undone.'));">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="conversationId" value="@Model.ActiveConversation.ConversationId" />
-                                <button class="btn btn-outline-danger btn-sm w-100" type="submit">Delete</button>
+                                <button class="btn btn-outline-danger btn-sm w-100" type="submit">@Html.Localize("DirectMessages.Conversations.Delete", "Delete")</button>
                             </form>
                         </div>
                     </div>
@@ -154,8 +155,8 @@
                         @Html.AntiForgeryToken()
                         <input type="hidden" asp-for="Form.ConversationId" value="@Model.ActiveConversation.ConversationId" />
                         <div class="direct-message-composer__controls">
-                            <textarea class="form-control flex-grow-1" asp-for="Form.Body" rows="2" maxlength="2000" placeholder="Type a message..." required data-enable-mentions="true"></textarea>
-                            <button class="btn btn-primary flex-shrink-0" type="submit">Send</button>
+                            <textarea class="form-control flex-grow-1" asp-for="Form.Body" rows="2" maxlength="2000" placeholder='@Html.Localize("DirectMessages.Conversations.MessagePlaceholder", "Type a message...")' required data-enable-mentions="true"></textarea>
+                            <button class="btn btn-primary flex-shrink-0" type="submit">@Html.Localize("DirectMessages.Conversations.Send", "Send")</button>
                         </div>
                         <span asp-validation-for="Form.Body" class="text-danger small"></span>
                     </form>
@@ -337,5 +338,6 @@
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/directMessages.js"></script>
 }
+
 
 

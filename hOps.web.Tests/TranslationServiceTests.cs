@@ -8,6 +8,7 @@ using hOps.web.Models;
 using hOps.web.Services.Localization;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -22,6 +23,7 @@ namespace hOps.web.Tests
         private readonly ApplicationDbContext _context;
         private readonly StaticTranslationStore _staticStore;
         private readonly StubTranslationProvider _provider;
+        private readonly IMemoryCache _memoryCache;
         private readonly TranslationService _translationService;
 
         public TranslationServiceTests()
@@ -51,10 +53,12 @@ namespace hOps.web.Tests
             var hostEnvironment = new TestHostEnvironment(_contentRoot);
             _staticStore = new StaticTranslationStore(hostEnvironment, NullLogger<StaticTranslationStore>.Instance);
             _provider = new StubTranslationProvider();
+            _memoryCache = new MemoryCache(new MemoryCacheOptions());
             _translationService = new TranslationService(
                 _context,
                 _staticStore,
                 _provider,
+                _memoryCache,
                 NullLogger<TranslationService>.Instance);
         }
 
@@ -104,6 +108,7 @@ namespace hOps.web.Tests
         {
             _context.Dispose();
             _connection.Dispose();
+            _memoryCache.Dispose();
             if (Directory.Exists(_contentRoot))
             {
                 Directory.Delete(_contentRoot, recursive: true);

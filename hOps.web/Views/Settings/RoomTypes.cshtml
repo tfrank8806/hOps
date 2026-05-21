@@ -1,32 +1,44 @@
-﻿@model List<hOps.web.Models.RoomType>
+
+@model List<hOps.web.Models.RoomType>
+@using System.Globalization
 @{
-    ViewData["Title"] = "Room Types";
+    ViewData["Title"] = Html.Localize("Settings.RoomTypes.Title", "Room Types").ToString();
 }
 
-<h2>@ViewData["Title"]</h2>
-<p><a class="btn btn-primary" asp-action="CreateRoomType">Add Room Type</a></p>
+<h2>@Html.Localize("Settings.RoomTypes.Heading", "Room Types")</h2>
+<p><a class="btn btn-primary" asp-action="CreateRoomType">@Html.Localize("Settings.RoomTypes.Add", "Add Room Type")</a></p>
 
-<table class="table">
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Description</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var rt in Model)
-        {
+@if (!Model.Any())
+{
+    <div class="alert alert-info">@Html.Localize("Settings.RoomTypes.EmptyState", "No room types have been added yet.")</div>
+}
+else
+{
+    <table class="table">
+        <thead>
             <tr>
-                <td>@rt.Name</td>
-                <td>@rt.Description</td>
-                <td>
-                    <a asp-action="EditRoomType" asp-route-id="@rt.Id" class="btn btn-sm btn-warning">Edit</a>
-                    <form asp-action="DeleteRoomType" asp-route-id="@rt.Id" method="post" style="display:inline">
-                        <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this room type?')">Delete</button>
-                    </form>
-                </td>
+                <th>@Html.Localize("Settings.RoomTypes.NameHeader", "Name")</th>
+                <th>@Html.Localize("Settings.RoomTypes.DescriptionHeader", "Description")</th>
+                <th class="text-end">@Html.Localize("Settings.RoomTypes.ActionsHeader", "Actions")</th>
             </tr>
-        }
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+            @foreach (var rt in Model)
+            {
+                var typeIdString = rt.Id.ToString(CultureInfo.InvariantCulture);
+                var nameTranslated = await Html.DisplayTranslatedTextAsync("RoomType", typeIdString, "Name", rt.Name ?? string.Empty);
+                var descriptionTranslated = await Html.DisplayTranslatedTextAsync("RoomType", typeIdString, "Description", rt.Description ?? string.Empty);
+                <tr>
+                    <td>@(string.IsNullOrWhiteSpace(nameTranslated) ? rt.Name : nameTranslated)</td>
+                    <td>@(string.IsNullOrWhiteSpace(descriptionTranslated) ? rt.Description : descriptionTranslated)</td>
+                    <td class="text-end">
+                        <a asp-action="EditRoomType" asp-route-id="@rt.Id" class="btn btn-sm btn-warning">@Html.Localize("Settings.RoomTypes.Edit", "Edit")</a>
+                        <form asp-action="DeleteRoomType" asp-route-id="@rt.Id" method="post" class="d-inline">
+                            <button class="btn btn-sm btn-danger" onclick="return confirm(window.hopsTranslate('Settings.RoomTypes.ConfirmDelete', 'Delete this room type?'));">@Html.Localize("Settings.RoomTypes.Delete", "Delete")</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

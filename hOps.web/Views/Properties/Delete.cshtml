@@ -1,21 +1,22 @@
-﻿@model hOps.web.Models.Property
+@model hOps.web.Models.Property
 @{
-    ViewData["Title"] = "Delete Property";
+    ViewData["Title"] = Html.Localize("Delete Property");
 }
 
-<h2>@ViewData["Title"]</h2>
+<h2>@Html.Localize("Delete Property")</h2>
 
 <div>
-    <h4>Are you sure you want to delete this property?</h4>
+    <h4>@Html.Localize("Are you sure you want to delete this property?")</h4>
     <div>
-        <strong>Code:</strong> @Model.Code <br />
-        <strong>Name:</strong> @Model.Name <br />
-        <strong>Address:</strong> @Model.Address
+        <strong>@Html.Localize("Code"):</strong> @Model.Code <br />
+        <strong>@Html.Localize("Name"):</strong> @Model.Name <br />
+        <strong>@Html.Localize("Address"):</strong> @Model.Address
     </div>
 </div>
 
 <form asp-action="DeleteConfirmed" method="post">
     <input type="hidden" asp-for="Id" />
-    <button type="submit" class="btn btn-danger">Delete</button>
-    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+    <button type="submit" class="btn btn-danger">@Html.Localize("Delete")</button>
+    <a asp-action="Index" class="btn btn-secondary">@Html.Localize("Cancel")</a>
 </form>
+

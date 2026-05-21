@@ -1,4 +1,6 @@
 @using System
+@using System.Globalization
+@using System.Threading.Tasks
 @using System.Linq
 @using hOps.web.Models
 @using hOps.web.Utilities
@@ -13,11 +15,11 @@
     };
     Func<LostFoundStatus, string> statusLabel = status => status switch
     {
-        LostFoundStatus.ReturnedToGuest => "Returned to Guest",
-        LostFoundStatus.DisposedOf => "Disposed of",
-        _ => "Logged"
+        LostFoundStatus.ReturnedToGuest => Html.Localize("Returned to Guest").ToString(),
+        LostFoundStatus.DisposedOf => Html.Localize("Disposed of").ToString(),
+        _ => Html.Localize("Logged").ToString()
     };
-    Func<LostFoundEntry, string> matchLabel = entry =>
+    Func<LostFoundEntry, Task<string>> buildMatchDisplayAsync = async entry =>
     {
         if (entry == null)
         {
@@ -26,22 +28,37 @@
 
         if (entry.MatchedEntry != null)
         {
-            return entry.MatchedEntry.Type == LostFoundType.Found
-                ? (!string.IsNullOrWhiteSpace(entry.MatchedEntry.ItemFound)
-                    ? entry.MatchedEntry.ItemFound
-                    : $"Found Entry #{entry.MatchedEntry.Id}")
-                : (!string.IsNullOrWhiteSpace(entry.MatchedEntry.ItemLost)
-                    ? entry.MatchedEntry.ItemLost
-                    : $"Lost Entry #{entry.MatchedEntry.Id}");
+            var matched = entry.MatchedEntry;
+            var matchedIdString = matched.Id.ToString(CultureInfo.InvariantCulture);
+            var matchedField = matched.Type == LostFoundType.Found ? "ItemFound" : "ItemLost";
+            var matchedSource = matched.Type == LostFoundType.Found ? matched.ItemFound : matched.ItemLost;
+            var translated = string.IsNullOrWhiteSpace(matchedSource)
+                ? string.Empty
+                : await Html.DisplayTranslatedTextAsync("LostFoundEntry", matchedIdString, matchedField, matchedSource ?? string.Empty);
+            if (string.IsNullOrWhiteSpace(translated) && !string.IsNullOrWhiteSpace(matchedSource))
+            {
+                translated = matchedSource!;
+            }
+
+            if (!string.IsNullOrWhiteSpace(translated))
+            {
+                return translated;
+            }
+
+            var labelKey = matched.Type == LostFoundType.Found ? "Found Entry #{0}" : "Lost Entry #{0}";
+            return string.Format(CultureInfo.InvariantCulture, Html.Localize(labelKey).ToString(), matched.Id);
         }
 
-        return entry.MatchedEntryId.HasValue
-            ? $"Entry #{entry.MatchedEntryId}"
-            : string.Empty;
+        if (entry.MatchedEntryId.HasValue)
+        {
+            return string.Format(CultureInfo.InvariantCulture, Html.Localize("Entry #{0}").ToString(), entry.MatchedEntryId.Value);
+        }
+
+        return string.Empty;
     };
 }
 @{
-    ViewData["Title"] = "Lost & Found Log";
+    ViewData["Title"] = Html.Localize("Lost & Found Log");
     ViewData["MainContainerClass"] = "main-inner--wide lost-found-container";
     var hasActiveFilters =
         !string.Equals(Model.Filters.SortOrder, "newest", StringComparison.OrdinalIgnoreCase) ||
@@ -60,25 +77,25 @@
 }
 
 <div class="lost-found-page d-flex flex-column flex-grow-1">
-    <h1 class="mb-4">Lost &amp; Found Log</h1>
+    <h1 class="mb-4">@Html.Localize("Lost & Found Log")</h1>
 
     @if (TempData["Success"] is string successMessage)
     {
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             @successMessage
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Html.Localize("Close")"></button>
         </div>
     }
     @if (TempData["Error"] is string errorMessage)
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             @errorMessage
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Html.Localize("Close")"></button>
         </div>
     }
 
     <div class="card mb-4 lost-found-entry-card" id="lostFoundEntryForm">
-        <div class="card-header bg-light fw-semibold">Log Lost &amp; Found Entry</div>
+        <div class="card-header bg-light fw-semibold">@Html.Localize("Log Lost & Found Entry")</div>
         <div class="card-body py-3">
             <form asp-action="Create" method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
@@ -86,10 +103,10 @@
 
                 <div class="row g-2 g-lg-3">
                     <div class="col-sm-6 col-lg-3">
-                        <label asp-for="Submission.Type" class="form-label">Type</label>
+                        <label asp-for="Submission.Type" class="form-label">@Html.Localize("Type")</label>
                         <select asp-for="Submission.Type" class="form-select" id="entryType">
-                            <option value="@LostFoundType.Found">Found</option>
-                            <option value="@LostFoundType.Lost">Lost</option>
+                            <option value="@LostFoundType.Found">@Html.Localize("Found")</option>
+                            <option value="@LostFoundType.Lost">@Html.Localize("Lost")</option>
                         </select>
                     </div>
 
@@ -100,7 +117,7 @@
                     else
                     {
                         <div class="col-12">
-                            <label class="form-label" for="propertySelection">Property</label>
+                            <label class="form-label" for="propertySelection">@Html.Localize("Property")</label>
                             <select
                                 class="form-select"
                                 id="propertySelection"
@@ -125,73 +142,73 @@
                     }
 
                     <div class="col-sm-6 col-lg-3 type-field type-found">
-                        <label asp-for="Submission.DateFound" class="form-label">Date Found</label>
+                        <label asp-for="Submission.DateFound" class="form-label">@Html.Localize("Date Found")</label>
                         <input asp-for="Submission.DateFound" class="form-control" type="date" />
                         <span asp-validation-for="Submission.DateFound" class="text-danger"></span>
                     </div>
                     <div class="col-sm-6 col-lg-3 type-field type-lost">
-                        <label asp-for="Submission.DateReportedLost" class="form-label">Date Reported Lost</label>
+                        <label asp-for="Submission.DateReportedLost" class="form-label">@Html.Localize("Date Reported Lost")</label>
                         <input asp-for="Submission.DateReportedLost" class="form-control" type="date" />
                         <span asp-validation-for="Submission.DateReportedLost" class="text-danger"></span>
                     </div>
 
                     <div class="col-sm-6 col-lg-3 type-field type-found">
-                        <label asp-for="Submission.FoundBy" class="form-label">Found By</label>
+                        <label asp-for="Submission.FoundBy" class="form-label">@Html.Localize("Found By")</label>
                         <input asp-for="Submission.FoundBy" class="form-control" list="foundByOptions" />
                     </div>
 
                     <div class="col-sm-6 col-lg-3 type-field type-lost">
-                        <label asp-for="Submission.GuestName" class="form-label">Guest Name</label>
+                        <label asp-for="Submission.GuestName" class="form-label">@Html.Localize("Guest Name")</label>
                         <input asp-for="Submission.GuestName" class="form-control" />
                     </div>
                     <div class="col-sm-6 col-lg-3 type-field type-lost">
-                        <label asp-for="Submission.GuestEmail" class="form-label">Guest Email</label>
+                        <label asp-for="Submission.GuestEmail" class="form-label">@Html.Localize("Guest Email")</label>
                         <input asp-for="Submission.GuestEmail" class="form-control" type="email" />
                         <span asp-validation-for="Submission.GuestEmail" class="text-danger"></span>
                     </div>
                     <div class="col-sm-6 col-lg-3 type-field type-lost">
-                        <label asp-for="Submission.GuestPhone" class="form-label">Guest Phone</label>
+                        <label asp-for="Submission.GuestPhone" class="form-label">@Html.Localize("Guest Phone")</label>
                         <input asp-for="Submission.GuestPhone" class="form-control" />
                     </div>
                     <div class="col-sm-6 col-lg-4 type-field type-lost">
-                        <label asp-for="Submission.GuestAddress" class="form-label">Guest Address</label>
+                        <label asp-for="Submission.GuestAddress" class="form-label">@Html.Localize("Guest Address")</label>
                         <input asp-for="Submission.GuestAddress" class="form-control" />
                     </div>
 
                     <div class="col-sm-6 col-lg-4">
-                        <label asp-for="Submission.Location" class="form-label">Location</label>
+                        <label asp-for="Submission.Location" class="form-label">@Html.Localize("Location")</label>
                         <input asp-for="Submission.Location" class="form-control" list="locationOptions" />
                     </div>
 
                     <div class="col-sm-6 col-lg-4 type-field type-found">
-                        <label asp-for="Submission.ItemFound" class="form-label">Item Found</label>
+                        <label asp-for="Submission.ItemFound" class="form-label">@Html.Localize("Item Found")</label>
                         <input asp-for="Submission.ItemFound" class="form-control" />
                         <span asp-validation-for="Submission.ItemFound" class="text-danger"></span>
                     </div>
                     <div class="col-sm-6 col-lg-4 type-field type-lost">
-                        <label asp-for="Submission.ItemLost" class="form-label">Item Lost</label>
+                        <label asp-for="Submission.ItemLost" class="form-label">@Html.Localize("Item Lost")</label>
                         <input asp-for="Submission.ItemLost" class="form-control" />
                         <span asp-validation-for="Submission.ItemLost" class="text-danger"></span>
                     </div>
 
                     <div class="col-sm-6 col-lg-3 type-field type-found">
-                        <label asp-for="Submission.Stored" class="form-label">Stored</label>
-                        <input asp-for="Submission.Stored" class="form-control" placeholder="Storage location" />
+                        <label asp-for="Submission.Stored" class="form-label">@Html.Localize("Stored")</label>
+                        <input asp-for="Submission.Stored" class="form-control" placeholder="@Html.Localize("Storage location")" />
                     </div>
 
                     <div class="col-lg-6">
-                        <label asp-for="Submission.Notes" class="form-label">Notes</label>
+                        <label asp-for="Submission.Notes" class="form-label">@Html.Localize("Notes")</label>
                         <textarea asp-for="Submission.Notes" class="form-control" rows="2" data-enable-mentions="true"></textarea>
                     </div>
 
                     <div class="col-sm-6 col-lg-3">
-                        <label asp-for="Submission.Photo" class="form-label">Photo</label>
+                        <label asp-for="Submission.Photo" class="form-label">@Html.Localize("Photo")</label>
                         <input asp-for="Submission.Photo" class="form-control" type="file" accept="image/*" />
                     </div>
                 </div>
 
                 <div class="mt-3">
-                    <button type="submit" class="btn btn-success">Save Entry</button>
+                    <button type="submit" class="btn btn-success">@Html.Localize("Save Entry")</button>
                 </div>
             </form>
         </div>
@@ -220,9 +237,9 @@
 
     <div class="card mb-4">
         <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
-            <span>Filter Entries</span>
+            <span>@Html.Localize("Filter Entries")</span>
             <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapse" aria-expanded="false" aria-controls="filtersCollapse">
-                @(hasActiveFilters ? "Show Filters (Active)" : "Show Filters")
+                @(hasActiveFilters ? Html.Localize("Show Filters (Active)") : Html.Localize("Show Filters"))
             </button>
         </div>
         <div id="filtersCollapse" class="collapse">
@@ -230,42 +247,42 @@
                 <form method="get" class="row g-3 align-items-end">
                     <input type="hidden" name="HideClosedItems" value="@(Model.Filters.HideClosedItems ? "true" : "false")" />
                     <div class="col-md-2">
-                        <label class="form-label" for="sortOrder">Sort</label>
+                        <label class="form-label" for="sortOrder">@Html.Localize("Sort")</label>
                         <select id="sortOrder" name="SortOrder" class="form-select">
-                            <option value="newest" selected="@(Model.Filters.SortOrder?.Equals("newest", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Newest</option>
-                            <option value="oldest" selected="@(Model.Filters.SortOrder?.Equals("oldest", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">Oldest</option>
+                            <option value="newest" selected="@(Model.Filters.SortOrder?.Equals("newest", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">@Html.Localize("Newest")</option>
+                            <option value="oldest" selected="@(Model.Filters.SortOrder?.Equals("oldest", StringComparison.OrdinalIgnoreCase) == true ? "selected" : null)">@Html.Localize("Oldest")</option>
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label" for="dateFrom">Date From</label>
+                        <label class="form-label" for="dateFrom">@Html.Localize("Date From")</label>
                         <input type="date" id="dateFrom" name="DateFrom" class="form-control" value="@(Model.Filters.DateFrom?.ToString("yyyy-MM-dd"))" />
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label" for="dateTo">Date To</label>
+                        <label class="form-label" for="dateTo">@Html.Localize("Date To")</label>
                         <input type="date" id="dateTo" name="DateTo" class="form-control" value="@(Model.Filters.DateTo?.ToString("yyyy-MM-dd"))" />
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label" for="roomNumber">Room / Location</label>
+                        <label class="form-label" for="roomNumber">@Html.Localize("Room / Location")</label>
                         <input type="text" id="roomNumber" name="RoomNumber" list="locationOptions" class="form-control" value="@Model.Filters.RoomNumber" />
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label" for="guestName">Guest Name</label>
+                        <label class="form-label" for="guestName">@Html.Localize("Guest Name")</label>
                         <input type="text" id="guestName" name="GuestName" class="form-control" value="@Model.Filters.GuestName" />
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label" for="foundBy">Found By</label>
+                        <label class="form-label" for="foundBy">@Html.Localize("Found By")</label>
                         <input type="text" id="foundBy" name="FoundBy" list="foundByOptions" class="form-control" value="@Model.Filters.FoundBy" />
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label" for="creator">Creator</label>
+                        <label class="form-label" for="creator">@Html.Localize("Creator")</label>
                         <input type="text" id="creator" name="Creator" list="creatorOptions" class="form-control" value="@Model.Filters.Creator" />
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label" for="keyword">Keyword</label>
-                        <input type="text" id="keyword" name="Keyword" class="form-control" value="@Model.Filters.Keyword" placeholder="Search notes, items, storage..." />
+                        <label class="form-label" for="keyword">@Html.Localize("Keyword")</label>
+                        <input type="text" id="keyword" name="Keyword" class="form-control" value="@Model.Filters.Keyword" placeholder="@Html.Localize("Search notes, items, storage...")" />
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label" for="statusFilter">Action</label>
+                        <label class="form-label" for="statusFilter">@Html.Localize("Action")</label>
                         <select id="statusFilter" name="Statuses" class="form-select" multiple size="@actionOptions.Count">
                             @foreach (var status in actionOptions)
                             {
@@ -274,16 +291,16 @@
                                 <option value="@status" selected="@(selected ? "selected" : null)">@label</option>
                             }
                         </select>
-                        <div class="form-text">Use Ctrl/Cmd-click to select multiple actions.</div>
+                        <div class="form-text">@Html.Localize("Use Ctrl/Cmd-click to select multiple actions.")</div>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label" for="filterPropertyIds">Property</label>
+                        <label class="form-label" for="filterPropertyIds">@Html.Localize("Property")</label>
                         <select id="filterPropertyIds"
                                 name="PropertyIds"
                                 class="form-select js-checkbox-multiselect"
                                 multiple
-                                data-placeholder="All properties"
-                                data-all-label="All properties">
+                                data-placeholder="@Html.Localize("All properties")"
+                                data-all-label="@Html.Localize("All properties")">
                             @foreach (var property in Model.AccessibleProperties)
                             {
                                 var selected = Model.Filters.PropertyIds.Contains(property.Id);
@@ -295,8 +312,8 @@
                         </select>
                     </div>
                     <div class="col-md-12 d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">Apply Filters</button>
-                        <a class="btn btn-outline-secondary" asp-action="Index">Clear</a>
+                        <button type="submit" class="btn btn-primary">@Html.Localize("Apply Filters")</button>
+                        <a class="btn btn-outline-secondary" asp-action="Index">@Html.Localize("Clear")</a>
                     </div>
                 </form>
             </div>
@@ -304,7 +321,7 @@
     </div>
 
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <h2 class="h5 mb-0">Entry Log</h2>
+        <h2 class="h5 mb-0">@Html.Localize("Entry Log")</h2>
         <form method="get" class="d-flex align-items-center gap-2 hide-closed-form">
             <input type="hidden" name="SortOrder" value="@Model.Filters.SortOrder" />
             <input type="hidden" name="DateFrom" value="@(Model.Filters.DateFrom?.ToString("yyyy-MM-dd") ?? string.Empty)" />
@@ -325,7 +342,7 @@
             <input type="hidden" name="HideClosedItems" value="false" />
             <div class="form-check form-switch mb-0">
                 <input class="form-check-input" type="checkbox" id="hideClosedToggle" name="HideClosedItems" value="true" @(Model.Filters.HideClosedItems ? "checked" : null) onchange="this.form.submit()" />
-                <label class="form-check-label" for="hideClosedToggle">Hide Returned/Disposed Items</label>
+                <label class="form-check-label" for="hideClosedToggle">@Html.Localize("Hide Returned/Disposed Items")</label>
             </div>
         </form>
     </div>
@@ -334,49 +351,84 @@
         <div class="col-lg-6">
             <div class="card h-100">
                 <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
-                    <span>Found Items (@Model.FoundEntries.Count)</span>
+                    <span>@Html.Localize("Found Items") (@Model.FoundEntries.Count)</span>
                 </div>
                 <div class="card-body">
                     @if (!Model.FoundEntries.Any())
                     {
-                        <p class="text-muted mb-0">No found items logged for the selected filters.</p>
+                        <p class="text-muted mb-0">@Html.Localize("No found items logged for the selected filters.")</p>
                     }
                     else
                     {
                         <div class="list-group list-group-flush">
                             @foreach (var entry in Model.FoundEntries)
                             {
+                                var entryIdString = entry.Id.ToString(CultureInfo.InvariantCulture);
+                                var translatedItem = string.IsNullOrWhiteSpace(entry.ItemFound)
+                                    ? string.Empty
+                                    : await Html.DisplayTranslatedTextAsync("LostFoundEntry", entryIdString, "ItemFound", entry.ItemFound ?? string.Empty);
+                                if (string.IsNullOrWhiteSpace(translatedItem) && !string.IsNullOrWhiteSpace(entry.ItemFound))
+                                {
+                                    translatedItem = entry.ItemFound!;
+                                }
+
+                                var translatedLocation = string.IsNullOrWhiteSpace(entry.Location)
+                                    ? string.Empty
+                                    : await Html.DisplayTranslatedTextAsync("LostFoundEntry", entryIdString, "Location", entry.Location ?? string.Empty);
+                                if (string.IsNullOrWhiteSpace(translatedLocation) && !string.IsNullOrWhiteSpace(entry.Location))
+                                {
+                                    translatedLocation = entry.Location!;
+                                }
+
                                 <div class="list-group-item">
                                     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                                         <div>
                                             <button class="btn btn-link p-0 text-start" type="button" data-bs-toggle="modal" data-bs-target="#entryModal-@entry.Id">
-                                                <span class="fw-semibold">@(!string.IsNullOrWhiteSpace(entry.ItemFound) ? entry.ItemFound : "Found Item")</span>
+                                                <span class="fw-semibold">
+                                                    @if (!string.IsNullOrWhiteSpace(translatedItem))
+                                                    {
+                                                        @translatedItem
+                                                    }
+                                                    else
+                                                    {
+                                                        @Html.Localize("Found Item")
+                                                    }
+                                                </span>
                                             </button>
                                             <div class="small text-muted">
                                                 @{
                                                     var createdLocal = TimeZoneService.ConvertToUserTime(entry.CreatedAt);
+                                                    var dateDisplay = entry.DateFound?.ToString("MMM d, yyyy") ?? createdLocal.ToString("MMM d, yyyy");
                                                 }
-                                                @(entry.DateFound?.ToString("MMM d, yyyy") ?? createdLocal.ToString("MMM d, yyyy"))
-                                                @if (!string.IsNullOrWhiteSpace(entry.Location))
+                                                @dateDisplay
+                                                @if (!string.IsNullOrWhiteSpace(translatedLocation))
                                                 {
-                                                    <span>&nbsp;&middot; @entry.Location</span>
+                                                    <span>&nbsp;&middot; @translatedLocation</span>
                                                 }
                                             </div>
                                         </div>
                                         <div class="text-end">
                                             <div>
-                                                <span class="badge @statusBadge(entry.Status)">@entry.Status</span>
+                                                <span class="badge @statusBadge(entry.Status)">@statusLabel(entry.Status)</span>
                                             </div>
                                             @if (entry.MatchedEntryId.HasValue)
                                             {
-                                                <div class="small text-info mt-1">Matched to @matchLabel(entry)</div>
+                                                var matchedDisplay = await buildMatchDisplayAsync(entry);
+                                                if (!string.IsNullOrWhiteSpace(matchedDisplay))
+                                                {
+                                                    <div class="small text-info mt-1">
+                                                        @Html.Localize("Matched to") @matchedDisplay
+                                                    </div>
+                                                }
                                             }
                                             <div class="d-flex gap-1 flex-wrap justify-content-end mt-2">
-                                                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editEntryModal-@entry.Id">Edit</button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editEntryModal-@entry.Id">
+                                                    @Html.Localize("Edit")
+                                                </button>
                                                 @if (entry.Status == LostFoundStatus.Logged)
                                                 {
                                                     <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#matchEntryModal-@entry.Id">
-                                                        @(entry.MatchedEntryId.HasValue ? "Update Match" : "Match")
+                                                        @(entry.MatchedEntryId.HasValue ? Html.Localize("Update Match") : Html.Localize("Match"))
                                                     </button>
                                                 }
                                             </div>
@@ -392,49 +444,84 @@
         <div class="col-lg-6">
             <div class="card h-100">
                 <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
-                    <span>Lost Items (@Model.LostEntries.Count)</span>
+                    <span>@Html.Localize("Lost Items") (@Model.LostEntries.Count)</span>
                 </div>
                 <div class="card-body">
                     @if (!Model.LostEntries.Any())
                     {
-                        <p class="text-muted mb-0">No lost items logged for the selected filters.</p>
+                        <p class="text-muted mb-0">@Html.Localize("No lost items logged for the selected filters.")</p>
                     }
                     else
                     {
                         <div class="list-group list-group-flush">
                             @foreach (var entry in Model.LostEntries)
                             {
+                                var entryIdString = entry.Id.ToString(CultureInfo.InvariantCulture);
+                                var translatedItem = string.IsNullOrWhiteSpace(entry.ItemLost)
+                                    ? string.Empty
+                                    : await Html.DisplayTranslatedTextAsync("LostFoundEntry", entryIdString, "ItemLost", entry.ItemLost ?? string.Empty);
+                                if (string.IsNullOrWhiteSpace(translatedItem) && !string.IsNullOrWhiteSpace(entry.ItemLost))
+                                {
+                                    translatedItem = entry.ItemLost!;
+                                }
+
+                                var translatedGuestName = string.IsNullOrWhiteSpace(entry.GuestName)
+                                    ? string.Empty
+                                    : await Html.DisplayTranslatedTextAsync("LostFoundEntry", entryIdString, "GuestName", entry.GuestName ?? string.Empty);
+                                if (string.IsNullOrWhiteSpace(translatedGuestName) && !string.IsNullOrWhiteSpace(entry.GuestName))
+                                {
+                                    translatedGuestName = entry.GuestName!;
+                                }
+
                                 <div class="list-group-item">
                                     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                                         <div>
                                             <button class="btn btn-link p-0 text-start" type="button" data-bs-toggle="modal" data-bs-target="#entryModal-@entry.Id">
-                                                <span class="fw-semibold">@(!string.IsNullOrWhiteSpace(entry.ItemLost) ? entry.ItemLost : "Lost Item")</span>
+                                                <span class="fw-semibold">
+                                                    @if (!string.IsNullOrWhiteSpace(translatedItem))
+                                                    {
+                                                        @translatedItem
+                                                    }
+                                                    else
+                                                    {
+                                                        @Html.Localize("Lost Item")
+                                                    }
+                                                </span>
                                             </button>
                                             <div class="small text-muted">
                                                 @{
                                                     var createdLocal = TimeZoneService.ConvertToUserTime(entry.CreatedAt);
+                                                    var dateDisplay = entry.DateReportedLost?.ToString("MMM d, yyyy") ?? createdLocal.ToString("MMM d, yyyy");
                                                 }
-                                                @(entry.DateReportedLost?.ToString("MMM d, yyyy") ?? createdLocal.ToString("MMM d, yyyy"))
-                                                @if (!string.IsNullOrWhiteSpace(entry.GuestName))
+                                                @dateDisplay
+                                                @if (!string.IsNullOrWhiteSpace(translatedGuestName))
                                                 {
-                                                    <span>&nbsp;&middot; @entry.GuestName</span>
+                                                    <span>&nbsp;&middot; @translatedGuestName</span>
                                                 }
                                             </div>
                                         </div>
                                         <div class="text-end">
                                             <div>
-                                                <span class="badge @statusBadge(entry.Status)">@entry.Status</span>
+                                                <span class="badge @statusBadge(entry.Status)">@statusLabel(entry.Status)</span>
                                             </div>
                                             @if (entry.MatchedEntryId.HasValue)
                                             {
-                                                <div class="small text-info mt-1">Matched to @matchLabel(entry)</div>
+                                                var matchedDisplay = await buildMatchDisplayAsync(entry);
+                                                if (!string.IsNullOrWhiteSpace(matchedDisplay))
+                                                {
+                                                    <div class="small text-info mt-1">
+                                                        @Html.Localize("Matched to") @matchedDisplay
+                                                    </div>
+                                                }
                                             }
                                             <div class="d-flex gap-1 flex-wrap justify-content-end mt-2">
-                                                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editEntryModal-@entry.Id">Edit</button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editEntryModal-@entry.Id">
+                                                    @Html.Localize("Edit")
+                                                </button>
                                                 @if (entry.Status == LostFoundStatus.Logged)
                                                 {
                                                     <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#matchEntryModal-@entry.Id">
-                                                        @(entry.MatchedEntryId.HasValue ? "Update Match" : "Match")
+                                                        @(entry.MatchedEntryId.HasValue ? Html.Localize("Update Match") : Html.Localize("Match"))
                                                     </button>
                                                 }
                                             </div>
@@ -451,157 +538,221 @@
 
     @foreach (var entry in Model.FoundEntries.Concat(Model.LostEntries))
     {
+        var entryIdString = entry.Id.ToString(CultureInfo.InvariantCulture);
+        var entryTypeLabel = entry.Type == LostFoundType.Found ? Html.Localize("Found").ToString() : Html.Localize("Lost").ToString();
+        var detailsTitle = string.Format(CultureInfo.InvariantCulture, Html.Localize("{0} Item Details").ToString(), entryTypeLabel);
+        async Task<string> TranslateFieldAsync(string field, string? source)
+        {
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                return string.Empty;
+            }
+
+            var translated = await Html.DisplayTranslatedTextAsync("LostFoundEntry", entryIdString, field, source ?? string.Empty);
+            return string.IsNullOrWhiteSpace(translated) ? source ?? string.Empty : translated;
+        }
+
+        var locationDisplay = await TranslateFieldAsync("Location", entry.Location);
+        var foundByDisplay = await TranslateFieldAsync("FoundBy", entry.FoundBy);
+        var storedDisplay = await TranslateFieldAsync("Stored", entry.Stored);
+        var notesDisplay = await TranslateFieldAsync("Notes", entry.Notes);
+        var itemFoundDisplay = await TranslateFieldAsync("ItemFound", entry.ItemFound);
+        var itemLostDisplay = await TranslateFieldAsync("ItemLost", entry.ItemLost);
+        var guestNameDisplay = await TranslateFieldAsync("GuestName", entry.GuestName);
+        var guestPhoneDisplay = await TranslateFieldAsync("GuestPhone", entry.GuestPhone);
+        var guestEmailDisplay = await TranslateFieldAsync("GuestEmail", entry.GuestEmail);
+        var guestAddressDisplay = await TranslateFieldAsync("GuestAddress", entry.GuestAddress);
+        var notesHtml = string.IsNullOrWhiteSpace(notesDisplay) ? string.Empty : MentionMarkupFormatter.ToHtml(notesDisplay);
+        var editTitle = string.Format(CultureInfo.InvariantCulture, Html.Localize("Edit {0} Entry").ToString(), entryTypeLabel);
+        var matchTitle = string.Format(CultureInfo.InvariantCulture, Html.Localize("Match {0} Entry").ToString(), entryTypeLabel);
+
         <div class="modal fade lost-found-modal" id="entryModal-@entry.Id" tabindex="-1" aria-labelledby="entryModalLabel-@entry.Id" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="entryModalLabel-@entry.Id">@((entry.Type == LostFoundType.Found ? "Found" : "Lost")) Item Details</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="entryModalLabel-@entry.Id">@detailsTitle</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@Html.Localize("Close")"></button>
                     </div>
                     <div class="modal-body">
                         <dl class="row">
-                            <dt class="col-sm-4">Property</dt>
+                            <dt class="col-sm-4">@Html.Localize("Property")</dt>
                             <dd class="col-sm-8">@entry.Property?.Name (@entry.Property?.Code)</dd>
 
-                            <dt class="col-sm-4">Status</dt>
-                            <dd class="col-sm-8">@entry.Status</dd>
+                            <dt class="col-sm-4">@Html.Localize("Status")</dt>
+                            <dd class="col-sm-8">@statusLabel(entry.Status)</dd>
 
-                            <dt class="col-sm-4">Logged On</dt>
+                            <dt class="col-sm-4">@Html.Localize("Logged On")</dt>
                             @{
                                 var createdLocal = TimeZoneService.ConvertToUserTime(entry.CreatedAt);
                             }
                             <dd class="col-sm-8">@createdLocal.ToString("f")</dd>
 
-                            <dt class="col-sm-4">Logged By</dt>
+                            <dt class="col-sm-4">@Html.Localize("Logged By")</dt>
                             <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(entry.CreatedByDisplayName) ? entry.CreatedByDisplayName : entry.CreatedByUser?.Email)</dd>
 
-                            @if (!string.IsNullOrWhiteSpace(entry.Location))
+                            @if (!string.IsNullOrWhiteSpace(locationDisplay))
                             {
-                                <dt class="col-sm-4">Location</dt>
-                                <dd class="col-sm-8">@entry.Location</dd>
+                                <dt class="col-sm-4">@Html.Localize("Location")</dt>
+                                <dd class="col-sm-8">@locationDisplay</dd>
                             }
 
                             @if (entry.Type == LostFoundType.Found)
                             {
-                                <dt class="col-sm-4">Date Found</dt>
+                                <dt class="col-sm-4">@Html.Localize("Date Found")</dt>
                                 <dd class="col-sm-8">@entry.DateFound?.ToString("D")</dd>
 
-                                @if (!string.IsNullOrWhiteSpace(entry.FoundBy))
+                                @if (!string.IsNullOrWhiteSpace(foundByDisplay))
                                 {
-                                    <dt class="col-sm-4">Found By</dt>
-                                    <dd class="col-sm-8">@entry.FoundBy</dd>
+                                    <dt class="col-sm-4">@Html.Localize("Found By")</dt>
+                                    <dd class="col-sm-8">@foundByDisplay</dd>
                                 }
 
-                                @if (!string.IsNullOrWhiteSpace(entry.ItemFound))
+                                @if (!string.IsNullOrWhiteSpace(itemFoundDisplay))
                                 {
-                                    <dt class="col-sm-4">Item Found</dt>
-                                    <dd class="col-sm-8">@entry.ItemFound</dd>
+                                    <dt class="col-sm-4">@Html.Localize("Item Found")</dt>
+                                    <dd class="col-sm-8">@itemFoundDisplay</dd>
                                 }
 
-                                @if (!string.IsNullOrWhiteSpace(entry.Stored))
+                                @if (!string.IsNullOrWhiteSpace(storedDisplay))
                                 {
-                                    <dt class="col-sm-4">Stored</dt>
-                                    <dd class="col-sm-8">@entry.Stored</dd>
+                                    <dt class="col-sm-4">@Html.Localize("Stored")</dt>
+                                    <dd class="col-sm-8">@storedDisplay</dd>
                                 }
                             }
                             else
                             {
-                                <dt class="col-sm-4">Date Reported Lost</dt>
+                                <dt class="col-sm-4">@Html.Localize("Date Reported Lost")</dt>
                                 <dd class="col-sm-8">@entry.DateReportedLost?.ToString("D")</dd>
 
-                                @if (!string.IsNullOrWhiteSpace(entry.GuestName))
+                                @if (!string.IsNullOrWhiteSpace(guestNameDisplay))
                                 {
-                                    <dt class="col-sm-4">Guest Name</dt>
-                                    <dd class="col-sm-8">@entry.GuestName</dd>
+                                    <dt class="col-sm-4">@Html.Localize("Guest Name")</dt>
+                                    <dd class="col-sm-8">@guestNameDisplay</dd>
                                 }
-                                @if (!string.IsNullOrWhiteSpace(entry.GuestPhone))
+                                @if (!string.IsNullOrWhiteSpace(guestPhoneDisplay))
                                 {
-                                    <dt class="col-sm-4">Guest Phone</dt>
-                                    <dd class="col-sm-8">@entry.GuestPhone</dd>
+                                    <dt class="col-sm-4">@Html.Localize("Guest Phone")</dt>
+                                    <dd class="col-sm-8">@guestPhoneDisplay</dd>
                                 }
-                                @if (!string.IsNullOrWhiteSpace(entry.GuestEmail))
+                                @if (!string.IsNullOrWhiteSpace(guestEmailDisplay))
                                 {
-                                    <dt class="col-sm-4">Guest Email</dt>
+                                    <dt class="col-sm-4">@Html.Localize("Guest Email")</dt>
                                     <dd class="col-sm-8">
                                         <a href="mailto:@entry.GuestEmail">@entry.GuestEmail</a>
                                     </dd>
                                 }
-                                @if (!string.IsNullOrWhiteSpace(entry.GuestAddress))
+                                @if (!string.IsNullOrWhiteSpace(guestAddressDisplay))
                                 {
-                                    <dt class="col-sm-4">Guest Address</dt>
-                                    <dd class="col-sm-8">@entry.GuestAddress</dd>
+                                    <dt class="col-sm-4">@Html.Localize("Guest Address")</dt>
+                                    <dd class="col-sm-8">@guestAddressDisplay</dd>
                                 }
 
-                                @if (!string.IsNullOrWhiteSpace(entry.ItemLost))
+                                @if (!string.IsNullOrWhiteSpace(itemLostDisplay))
                                 {
-                                    <dt class="col-sm-4">Item Lost</dt>
-                                    <dd class="col-sm-8">@entry.ItemLost</dd>
+                                    <dt class="col-sm-4">@Html.Localize("Item Lost")</dt>
+                                    <dd class="col-sm-8">@itemLostDisplay</dd>
                                 }
                             }
 
-                            @if (!string.IsNullOrWhiteSpace(entry.Notes))
+                            @if (!string.IsNullOrWhiteSpace(notesHtml))
                             {
-                                <dt class="col-sm-4">Notes</dt>
-                                <dd class="col-sm-8">@Html.Raw(MentionMarkupFormatter.ToHtml(entry.Notes))</dd>
+                                <dt class="col-sm-4">@Html.Localize("Notes")</dt>
+                                <dd class="col-sm-8">@Html.Raw(notesHtml)</dd>
                             }
                         </dl>
 
                         @if (entry.MatchedEntry != null)
                         {
                             var matched = entry.MatchedEntry;
-                            var matchedTitle = matched.Type == LostFoundType.Found
-                                ? (string.IsNullOrWhiteSpace(matched.ItemFound) ? $"Found Entry #{matched.Id}" : matched.ItemFound)
-                                : (string.IsNullOrWhiteSpace(matched.ItemLost) ? $"Lost Entry #{matched.Id}" : matched.ItemLost);
+                            var matchedIdString = matched.Id.ToString(CultureInfo.InvariantCulture);
+                            async Task<string> TranslateMatchedFieldAsync(string field, string? source)
+                            {
+                                if (string.IsNullOrWhiteSpace(source))
+                                {
+                                    return string.Empty;
+                                }
+
+                                var translated = await Html.DisplayTranslatedTextAsync("LostFoundEntry", matchedIdString, field, source ?? string.Empty);
+                                return string.IsNullOrWhiteSpace(translated) ? source ?? string.Empty : translated;
+                            }
+
+                            var matchedItemSource = matched.Type == LostFoundType.Found ? matched.ItemFound : matched.ItemLost;
+                            var matchedItemDisplay = await TranslateMatchedFieldAsync(matched.Type == LostFoundType.Found ? "ItemFound" : "ItemLost", matchedItemSource);
+                            if (string.IsNullOrWhiteSpace(matchedItemDisplay))
+                            {
+                                var fallbackFormat = matched.Type == LostFoundType.Found
+                                    ? Html.Localize("Found Entry #{0}").ToString()
+                                    : Html.Localize("Lost Entry #{0}").ToString();
+                                matchedItemDisplay = string.Format(CultureInfo.InvariantCulture, fallbackFormat, matched.Id);
+                            }
+
+                            var matchedLocationDisplay = await TranslateMatchedFieldAsync("Location", matched.Location);
+                            var matchedFoundByDisplay = await TranslateMatchedFieldAsync("FoundBy", matched.FoundBy);
+                            var matchedStoredDisplay = await TranslateMatchedFieldAsync("Stored", matched.Stored);
+                            var matchedGuestNameDisplay = await TranslateMatchedFieldAsync("GuestName", matched.GuestName);
+                            var matchedGuestPhoneDisplay = await TranslateMatchedFieldAsync("GuestPhone", matched.GuestPhone);
+                            var matchedGuestEmailDisplay = await TranslateMatchedFieldAsync("GuestEmail", matched.GuestEmail);
+                            var matchedGuestAddressDisplay = await TranslateMatchedFieldAsync("GuestAddress", matched.GuestAddress);
+                            var matchedTypeLabel = matched.Type == LostFoundType.Found ? Html.Localize("Found").ToString() : Html.Localize("Lost").ToString();
+
                             <div class="matched-entry-details border rounded-3 bg-light p-3 mb-3">
                                 <div class="d-flex justify-content-between flex-wrap align-items-center gap-2 mb-2">
                                     <div>
-                                        <div class="fw-semibold">@matchedTitle</div>
-                                        <small class="text-muted">@matched.Location</small>
+                                        <div class="fw-semibold">@matchedItemDisplay</div>
+                                        @if (!string.IsNullOrWhiteSpace(matchedLocationDisplay))
+                                        {
+                                            <small class="text-muted">@matchedLocationDisplay</small>
+                                        }
                                     </div>
                                     <span class="badge @statusBadge(matched.Status)">@statusLabel(matched.Status)</span>
                                 </div>
                                 <dl class="row mb-0 small">
-                                    <dt class="col-sm-5">Type</dt>
-                                    <dd class="col-sm-7">@matched.Type</dd>
+                                    <dt class="col-sm-5">@Html.Localize("Type")</dt>
+                                    <dd class="col-sm-7">@matchedTypeLabel</dd>
                                     @if (matched.Type == LostFoundType.Found)
                                     {
                                         if (matched.DateFound.HasValue)
                                         {
-                                            <dt class="col-sm-5">Date Found</dt>
+                                            <dt class="col-sm-5">@Html.Localize("Date Found")</dt>
                                             <dd class="col-sm-7">@matched.DateFound?.ToString("d")</dd>
                                         }
-                                        if (!string.IsNullOrWhiteSpace(matched.FoundBy))
+                                        if (!string.IsNullOrWhiteSpace(matchedFoundByDisplay))
                                         {
-                                            <dt class="col-sm-5">Found By</dt>
-                                            <dd class="col-sm-7">@matched.FoundBy</dd>
+                                            <dt class="col-sm-5">@Html.Localize("Found By")</dt>
+                                            <dd class="col-sm-7">@matchedFoundByDisplay</dd>
                                         }
-                                        if (!string.IsNullOrWhiteSpace(matched.Stored))
+                                        if (!string.IsNullOrWhiteSpace(matchedStoredDisplay))
                                         {
-                                            <dt class="col-sm-5">Stored</dt>
-                                            <dd class="col-sm-7">@matched.Stored</dd>
+                                            <dt class="col-sm-5">@Html.Localize("Stored")</dt>
+                                            <dd class="col-sm-7">@matchedStoredDisplay</dd>
                                         }
                                     }
                                     else
                                     {
                                         if (matched.DateReportedLost.HasValue)
                                         {
-                                            <dt class="col-sm-5">Date Reported Lost</dt>
+                                            <dt class="col-sm-5">@Html.Localize("Date Reported Lost")</dt>
                                             <dd class="col-sm-7">@matched.DateReportedLost?.ToString("d")</dd>
                                         }
-                                        if (!string.IsNullOrWhiteSpace(matched.GuestName))
+                                        if (!string.IsNullOrWhiteSpace(matchedGuestNameDisplay))
                                         {
-                                            <dt class="col-sm-5">Guest Name</dt>
-                                            <dd class="col-sm-7">@matched.GuestName</dd>
+                                            <dt class="col-sm-5">@Html.Localize("Guest Name")</dt>
+                                            <dd class="col-sm-7">@matchedGuestNameDisplay</dd>
                                         }
-                                        if (!string.IsNullOrWhiteSpace(matched.GuestPhone))
+                                        if (!string.IsNullOrWhiteSpace(matchedGuestPhoneDisplay))
                                         {
-                                            <dt class="col-sm-5">Guest Phone</dt>
-                                            <dd class="col-sm-7">@matched.GuestPhone</dd>
+                                            <dt class="col-sm-5">@Html.Localize("Guest Phone")</dt>
+                                            <dd class="col-sm-7">@matchedGuestPhoneDisplay</dd>
                                         }
-                                        if (!string.IsNullOrWhiteSpace(matched.GuestEmail))
+                                        if (!string.IsNullOrWhiteSpace(matchedGuestEmailDisplay))
                                         {
-                                            <dt class="col-sm-5">Guest Email</dt>
-                                            <dd class="col-sm-7">@matched.GuestEmail</dd>
+                                            <dt class="col-sm-5">@Html.Localize("Guest Email")</dt>
+                                            <dd class="col-sm-7">@matchedGuestEmailDisplay</dd>
+                                        }
+                                        if (!string.IsNullOrWhiteSpace(matchedGuestAddressDisplay))
+                                        {
+                                            <dt class="col-sm-5">@Html.Localize("Guest Address")</dt>
+                                            <dd class="col-sm-7">@matchedGuestAddressDisplay</dd>
                                         }
                                     }
                                 </dl>
@@ -609,15 +760,20 @@
                         }
                         else if (entry.MatchedEntryId.HasValue)
                         {
-                            <div class="alert alert-info mb-3">
-                                Matched to @matchLabel(entry). Open the matched entry to view more details.
-                            </div>
+                            var matchedDisplay = await buildMatchDisplayAsync(entry);
+                            if (!string.IsNullOrWhiteSpace(matchedDisplay))
+                            {
+                                var infoTemplate = Html.Localize("Matched to {0}. Open the matched entry to view more details.").ToString();
+                                <div class="alert alert-info mb-3">
+                                    @string.Format(CultureInfo.InvariantCulture, infoTemplate, matchedDisplay)
+                                </div>
+                            }
                         }
 
                         @if (!string.IsNullOrWhiteSpace(entry.PhotoPath))
                         {
                             <div class="mt-3">
-                                <img src="@entry.PhotoPath" alt="Item photo" class="img-fluid rounded" />
+                                <img src="@entry.PhotoPath" alt="@Html.Localize("Item photo")" class="img-fluid rounded" />
                             </div>
                         }
                     </div>
@@ -627,24 +783,24 @@
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="id" value="@entry.Id" />
                                 <input type="hidden" name="status" value="@LostFoundStatus.ReturnedToGuest" />
-                                <button type="submit" class="btn btn-outline-success btn-sm">Returned to Guest</button>
+                                <button type="submit" class="btn btn-outline-success btn-sm">@Html.Localize("Returned to Guest")</button>
                             </form>
                             <form asp-action="UpdateStatus" method="post" class="d-inline ms-2">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="id" value="@entry.Id" />
                                 <input type="hidden" name="status" value="@LostFoundStatus.DisposedOf" />
-                                <button type="submit" class="btn btn-outline-danger btn-sm">Disposed of</button>
+                                <button type="submit" class="btn btn-outline-danger btn-sm">@Html.Localize("Disposed of")</button>
                             </form>
                             @if (isAdmin)
                             {
-                                <form asp-action="Delete" method="post" class="d-inline ms-2" onsubmit="return confirm('Delete this lost &amp; found entry?');">
+                                <form asp-action="Delete" method="post" class="d-inline ms-2" onsubmit="return confirm(window.hopsTranslate('LostAndFoundConfirmDelete', 'Delete this lost &amp; found entry?'));">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@entry.Id" />
-                                    <button type="submit" class="btn btn-danger btn-sm">Delete Entry</button>
+                                    <button type="submit" class="btn btn-danger btn-sm">@Html.Localize("Delete Entry")</button>
                                 </form>
                             }
                         </div>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Html.Localize("Close")</button>
                     </div>
                 </div>
             </div>
@@ -656,70 +812,70 @@
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="Id" value="@entry.Id" />
                         <div class="modal-header">
-                            <h5 class="modal-title" id="editEntryModalLabel-@entry.Id">Edit @(entry.Type == LostFoundType.Found ? "Found" : "Lost") Entry</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            <h5 class="modal-title" id="editEntryModalLabel-@entry.Id">@editTitle</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@Html.Localize("Close")"></button>
                         </div>
                         <div class="modal-body">
                             <div class="row g-3">
                                 @if (entry.Type == LostFoundType.Found)
                                 {
                                     <div class="col-md-6">
-                                        <label class="form-label" for="edit-datefound-@entry.Id">Date Found</label>
+                                        <label class="form-label" for="edit-datefound-@entry.Id">@Html.Localize("Date Found")</label>
                                         <input type="date" class="form-control" id="edit-datefound-@entry.Id" name="DateFound" value="@entry.DateFound?.ToString("yyyy-MM-dd")" />
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label" for="edit-foundby-@entry.Id">Found By</label>
+                                        <label class="form-label" for="edit-foundby-@entry.Id">@Html.Localize("Found By")</label>
                                         <input type="text" class="form-control" id="edit-foundby-@entry.Id" name="FoundBy" value="@entry.FoundBy" />
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label" for="edit-itemfound-@entry.Id">Item Found</label>
+                                        <label class="form-label" for="edit-itemfound-@entry.Id">@Html.Localize("Item Found")</label>
                                         <input type="text" class="form-control" id="edit-itemfound-@entry.Id" name="ItemFound" value="@entry.ItemFound" />
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label" for="edit-stored-@entry.Id">Stored</label>
+                                        <label class="form-label" for="edit-stored-@entry.Id">@Html.Localize("Stored")</label>
                                         <input type="text" class="form-control" id="edit-stored-@entry.Id" name="Stored" value="@entry.Stored" />
                                     </div>
                                 }
                                 else
                                 {
                                     <div class="col-md-6">
-                                        <label class="form-label" for="edit-datelost-@entry.Id">Date Reported Lost</label>
+                                        <label class="form-label" for="edit-datelost-@entry.Id">@Html.Localize("Date Reported Lost")</label>
                                         <input type="date" class="form-control" id="edit-datelost-@entry.Id" name="DateReportedLost" value="@entry.DateReportedLost?.ToString("yyyy-MM-dd")" />
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label" for="edit-guestname-@entry.Id">Guest Name</label>
+                                        <label class="form-label" for="edit-guestname-@entry.Id">@Html.Localize("Guest Name")</label>
                                         <input type="text" class="form-control" id="edit-guestname-@entry.Id" name="GuestName" value="@entry.GuestName" />
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label" for="edit-guestemail-@entry.Id">Guest Email</label>
+                                        <label class="form-label" for="edit-guestemail-@entry.Id">@Html.Localize("Guest Email")</label>
                                         <input type="email" class="form-control" id="edit-guestemail-@entry.Id" name="GuestEmail" value="@entry.GuestEmail" />
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label" for="edit-guestphone-@entry.Id">Guest Phone</label>
+                                        <label class="form-label" for="edit-guestphone-@entry.Id">@Html.Localize("Guest Phone")</label>
                                         <input type="text" class="form-control" id="edit-guestphone-@entry.Id" name="GuestPhone" value="@entry.GuestPhone" />
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label" for="edit-guestaddress-@entry.Id">Guest Address</label>
+                                        <label class="form-label" for="edit-guestaddress-@entry.Id">@Html.Localize("Guest Address")</label>
                                         <input type="text" class="form-control" id="edit-guestaddress-@entry.Id" name="GuestAddress" value="@entry.GuestAddress" />
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label" for="edit-itemlost-@entry.Id">Item Lost</label>
+                                        <label class="form-label" for="edit-itemlost-@entry.Id">@Html.Localize("Item Lost")</label>
                                         <input type="text" class="form-control" id="edit-itemlost-@entry.Id" name="ItemLost" value="@entry.ItemLost" />
                                     </div>
                                 }
                                 <div class="col-md-6">
-                                    <label class="form-label" for="edit-location-@entry.Id">Location</label>
+                                    <label class="form-label" for="edit-location-@entry.Id">@Html.Localize("Location")</label>
                                     <input type="text" class="form-control" id="edit-location-@entry.Id" name="Location" value="@entry.Location" />
                                 </div>
                             </div>
                             <div class="mt-3">
-                                <label class="form-label" for="edit-notes-@entry.Id">Notes</label>
+                                <label class="form-label" for="edit-notes-@entry.Id">@Html.Localize("Notes")</label>
                                 <textarea class="form-control" id="edit-notes-@entry.Id" name="Notes" rows="3" data-enable-mentions="true">@entry.Notes</textarea>
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="submit" class="btn btn-primary">Save Changes</button>
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">@Html.Localize("Save Changes")</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Html.Localize("Cancel")</button>
                         </div>
                     </form>
                 </div>
@@ -729,13 +885,13 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="matchEntryModalLabel-@entry.Id">Match @(entry.Type == LostFoundType.Found ? "Found" : "Lost") Entry</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="matchEntryModalLabel-@entry.Id">@matchTitle</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@Html.Localize("Close")"></button>
                     </div>
                     <div class="modal-body">
                         @if (entry.Status != LostFoundStatus.Logged)
                         {
-                            <div class="alert alert-warning mb-0">Only logged entries can be matched.</div>
+                            <div class="alert alert-warning mb-0">@Html.Localize("Only logged entries can be matched.")</div>
                         }
                         else
                         {
@@ -747,36 +903,62 @@
 
                             if (entry.MatchedEntryId.HasValue)
                             {
-                                <div class="alert alert-info">
-                                    Currently matched to <strong>@matchLabel(entry)</strong>.
-                                </div>
+                                var matchedDisplay = await buildMatchDisplayAsync(entry);
+                                if (!string.IsNullOrWhiteSpace(matchedDisplay))
+                                {
+                                    var currentTemplate = Html.Localize("Currently matched to {0}.").ToString();
+                                    <div class="alert alert-info">
+                                        @Html.Raw(string.Format(CultureInfo.InvariantCulture, currentTemplate, $"<strong>{matchedDisplay}</strong>"))
+                                    </div>
+                                }
                             }
+
+                            var counterpartType = isFoundEntry ? Html.Localize("Lost").ToString() : Html.Localize("Found").ToString();
 
                             if (!potentialMatches.Any())
                             {
-                                <div class="alert alert-info mb-0">No @(isFoundEntry ? "lost" : "found") items are available to match for this property.</div>
+                                var noMatchTemplate = Html.Localize("No {0} items are available to match for this property.").ToString();
+                                <div class="alert alert-info mb-0">
+                                    @string.Format(CultureInfo.InvariantCulture, noMatchTemplate, counterpartType)
+                                </div>
                             }
                             else
                             {
+                                var selectLabel = isFoundEntry ? Html.Localize("Lost Item").ToString() : Html.Localize("Found Item").ToString();
+                                var selectPlaceholder = Html.Localize("Select an item").ToString();
+                                var loggedTemplate = Html.Localize("Logged {0}").ToString();
                                 <form asp-action="MatchEntries" method="post">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="entryId" value="@entry.Id" />
                                     <div class="mb-3">
-                                        <label class="form-label" for="match-select-@entry.Id">@(isFoundEntry ? "Lost Item" : "Found Item")</label>
+                                        <label class="form-label" for="match-select-@entry.Id">@selectLabel</label>
                                         <select class="form-select" id="match-select-@entry.Id" name="matchId" required>
-                                            <option value="">Select an item</option>
+                                            <option value="">@selectPlaceholder</option>
                                             @foreach (var option in potentialMatches)
                                             {
-                                                var description = option.Type == LostFoundType.Found
-                                                    ? (!string.IsNullOrWhiteSpace(option.ItemFound) ? option.ItemFound : $"Found Entry #{option.Id}")
-                                                    : (!string.IsNullOrWhiteSpace(option.ItemLost) ? option.ItemLost : $"Lost Entry #{option.Id}");
+                                                var optionIdString = option.Id.ToString(CultureInfo.InvariantCulture);
+                                                var optionField = option.Type == LostFoundType.Found ? "ItemFound" : "ItemLost";
+                                                var optionSource = option.Type == LostFoundType.Found ? option.ItemFound : option.ItemLost;
+                                                var optionDisplay = string.IsNullOrWhiteSpace(optionSource)
+                                                    ? string.Empty
+                                                    : await Html.DisplayTranslatedTextAsync("LostFoundEntry", optionIdString, optionField, optionSource ?? string.Empty);
+                                                if (string.IsNullOrWhiteSpace(optionDisplay))
+                                                {
+                                                    var fallbackFormat = option.Type == LostFoundType.Found
+                                                        ? Html.Localize("Found Entry #{0}").ToString()
+                                                        : Html.Localize("Lost Entry #{0}").ToString();
+                                                    optionDisplay = string.Format(CultureInfo.InvariantCulture, fallbackFormat, option.Id);
+                                                }
                                                 var loggedAt = TimeZoneService.ConvertToUserTime(option.CreatedAt).ToString("g");
-                                                <option value="@option.Id">@description (Logged @loggedAt)</option>
+                                                <option value="@option.Id">@optionDisplay (@string.Format(CultureInfo.InvariantCulture, loggedTemplate, loggedAt))</option>
                                             }
                                         </select>
                                     </div>
-                                    <p class="text-muted small mb-3">Matching links this entry with the selected @((isFoundEntry ? "lost" : "found")) record.</p>
-                                    <button type="submit" class="btn btn-primary">Save Match</button>
+                                    @{
+                                        var matchDescriptionTemplate = Html.Localize("Matching links this entry with the selected {0} record.").ToString();
+                                    }
+                                    <p class="text-muted small mb-3">@string.Format(CultureInfo.InvariantCulture, matchDescriptionTemplate, counterpartType)</p>
+                                    <button type="submit" class="btn btn-primary">@Html.Localize("Save Match")</button>
                                 </form>
                             }
 
@@ -785,13 +967,13 @@
                                 <form asp-action="UnmatchEntry" method="post" class="mt-3">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@entry.Id" />
-                                    <button type="submit" class="btn btn-outline-danger">Remove Match</button>
+                                    <button type="submit" class="btn btn-outline-danger">@Html.Localize("Remove Match")</button>
                                 </form>
                             }
                         }
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Html.Localize("Close")</button>
                     </div>
                 </div>
             </div>
@@ -829,9 +1011,11 @@
             const filtersCollapseEl = document.getElementById('filtersCollapse');
             if (filterToggleButton && filtersCollapseEl) {
                 const updateFilterButtonLabel = () => {
+                    const hideFiltersLabel = window.hopsTranslate('LostAndFoundHideFilters', 'Hide Filters');
+                    const showFiltersLabel = window.hopsTranslate('LostAndFoundShowFilters', 'Show Filters');
                     filterToggleButton.textContent = filtersCollapseEl.classList.contains('show')
-                        ? 'Hide Filters'
-                        : 'Show Filters';
+                        ? hideFiltersLabel
+                        : showFiltersLabel;
                 };
 
                 filtersCollapseEl.addEventListener('shown.bs.collapse', updateFilterButtonLabel);
@@ -847,3 +1031,4 @@
         })();
     </script>
 }
+

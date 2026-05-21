@@ -1,4 +1,4 @@
-@using System.Globalization
+﻿@using System.Globalization
 @using System.Linq
 @using System.Text.Json
 @using System.Text.Json.Serialization
@@ -7,7 +7,7 @@
 @model hOps.web.ViewModels.Home.HomeIndexViewModel
 
 @{
-    ViewData["Title"] = "Home";
+    ViewData["Title"] = Html.Localize("Home");
     var property = Model.CurrentProperty;
     var hasProperty = property != null;
     ViewData["MainContainerClass"] = "main-inner--wide home-main-container";
@@ -39,6 +39,20 @@
         defaultHeight = Model.WidgetHeightDefault
     };
     var heightOptionsJson = JsonSerializer.Serialize(heightOptionsPayload);
+    Func<HomeWidgetSize, string> formatSizeLabel = size => size switch
+    {
+        HomeWidgetSize.Full => Html.Localize("Full width"),
+        HomeWidgetSize.Half => Html.Localize("Half width"),
+        HomeWidgetSize.Third => Html.Localize("One third"),
+        HomeWidgetSize.Quarter => Html.Localize("One quarter"),
+        _ => Html.Localize("Custom width")
+    };
+    Func<int, string> formatCustomSizeLabel = span => string.Format(CultureInfo.CurrentCulture, Html.Localize("Custom ({0}/12)"), span);
+    Func<string, string> formatLockedSizeLabel = label => string.Format(CultureInfo.CurrentCulture, Html.Localize("{0} (locked)"), label);
+    Func<int, int, bool, string> formatHeightLabel = (appliedHeight, defaultHeight, isCustom) =>
+        isCustom
+            ? string.Format(CultureInfo.CurrentCulture, Html.Localize("Height: {0}px"), appliedHeight)
+            : string.Format(CultureInfo.CurrentCulture, Html.Localize("Height: Default ({0}px)"), defaultHeight);
 }
 
 <form id="homeLayoutAntiforgery" method="post" class="d-none">
@@ -63,17 +77,17 @@
 
     <div class="home-layout-controls d-flex flex-wrap gap-3 mb-3 align-items-center">
         <div class="d-flex gap-2 align-items-center flex-wrap">
-            <button type="button" class="btn btn-outline-secondary" data-layout-action="start">Customize Layout</button>
+            <button type="button" class="btn btn-outline-secondary" data-layout-action="start">@Html.Localize("Customize Layout")</button>
             <div class="btn-group d-none" data-layout-editor>
-                <button type="button" class="btn btn-primary" data-layout-action="save">Save Layout</button>
-                <button type="button" class="btn btn-outline-secondary" data-layout-action="cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" data-layout-action="save">@Html.Localize("Save Layout")</button>
+                <button type="button" class="btn btn-outline-secondary" data-layout-action="cancel">@Html.Localize("Cancel")</button>
             </div>
             <button type="button" class="btn btn-link p-0 text-decoration-none" data-layout-help>
-                <span class="me-1" aria-hidden="true">💡</span>Layout tips
+                <span class="me-1" aria-hidden="true">&#9432;</span>@Html.Localize("Layout tips")
             </button>
         </div>
         <div class="text-muted" data-layout-hint>
-            Drag cards anywhere on the grid while customizing—positions snap to the nearest intersection. Resize handles adjust width or height.
+            @Html.Localize("Drag cards anywhere on the grid while customizing. Positions snap to the nearest intersection. Resize handles adjust width or height.")
         </div>
     </div>
 
@@ -81,21 +95,21 @@
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h1 class="modal-title fs-5" id="layoutHelpModalLabel">Customize your dashboard</h1>
+                    <h1 class="modal-title fs-5" id="layoutHelpModalLabel">@Html.Localize("Customize your dashboard")</h1>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <ol class="mb-3">
-                        <li>Click <strong>Customize Layout</strong> to unlock drag &amp; resize controls.</li>
-                        <li>Use the <em>six-dot</em> handle to drag widgets anywhere on the grid—they’ll snap to the nearest intersection.</li>
-                        <li>Grab the corner resize handles for precise sizing within the grid.</li>
-                        <li>Widgets snap to a 12-column grid—Full = 12, Half = 6, etc.</li>
-                        <li>Press <strong>Save Layout</strong> to keep changes or <strong>Cancel</strong> to revert.</li>
+                        <li>@Html.Localize("Click <strong>Customize Layout</strong> to unlock drag and resize controls.")</li>
+                        <li>@Html.Localize("Use the <em>six-dot</em> handle to drag widgets anywhere on the grid. They will snap to the nearest intersection.")</li>
+                        <li>@Html.Localize("Grab the corner resize handles for precise sizing within the grid.")</li>
+                        <li>@Html.Localize("Widgets snap to a 12-column grid (Full = 12, Half = 6, etc.).")</li>
+                        <li>@Html.Localize("Press <strong>Save Layout</strong> to keep changes or <strong>Cancel</strong> to revert.")</li>
                     </ol>
-                    <p class="mb-0 text-muted">Tip: your layout is remembered per persona. Switching personas gives each team its own arrangement.</p>
+                    <p class="mb-0 text-muted">@Html.Localize("Tip: your layout is remembered per persona. Switching personas gives each team its own arrangement.")</p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Got it</button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">@Html.Localize("Got it")</button>
                 </div>
             </div>
         </div>
@@ -106,8 +120,8 @@
         <div class="card mb-3 d-none" data-widget-marketplace>
             <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div>
-                    <h2 class="h6 mb-0">Widget Marketplace</h2>
-                    <div class="text-muted small">Enable or disable dashboard modules for everyone.</div>
+                    <h2 class="h6 mb-0">@Html.Localize("Widget Marketplace")</h2>
+                    <div class="text-muted small">@Html.Localize("Enable or disable dashboard modules for everyone.")</div>
                 </div>
             </div>
             <div class="card-body">
@@ -118,16 +132,16 @@
                         <div class="col-12 col-md-6 col-xl-4">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="WidgetIds" value="@module.WidgetId" id="marketplace_@module.WidgetId" @(module.IsEnabled ? "checked" : string.Empty) />
-                                <label class="form-check-label fw-semibold" for="marketplace_@module.WidgetId">@module.DisplayName</label>
+                                <label class="form-check-label fw-semibold" for="marketplace_@module.WidgetId">@Html.Localize(module.DisplayName ?? string.Empty)</label>
                                 @if (!string.IsNullOrWhiteSpace(module.Description))
                                 {
-                                    <div class="text-muted small">@module.Description</div>
+                                    <div class="text-muted small">@Html.Localize(module.Description ?? string.Empty)</div>
                                 }
                             </div>
                         </div>
                     }
                     <div class="col-12 text-end">
-                        <button type="submit" class="btn btn-sm btn-primary">Save Modules</button>
+                        <button type="submit" class="btn btn-sm btn-primary">@Html.Localize("Save Modules")</button>
                     </div>
                 </form>
             </div>
@@ -166,7 +180,7 @@
             var storedSpan = widget.CustomSpan.HasValue ? Math.Clamp(widget.CustomSpan.Value, 1, 12) : (int?)null;
             var appliedSpan = forceFullWidth ? 12 : storedSpan ?? defaultSpan;
             var showCustomLabel = !forceFullWidth && storedSpan.HasValue && appliedSpan != defaultSpan;
-            var sizeLabel = showCustomLabel ? $"Custom ({appliedSpan}/12)" : GetSizeLabel(effectiveSize);
+            var sizeLabel = showCustomLabel ? formatCustomSizeLabel(appliedSpan) : formatSizeLabel(effectiveSize);
             var defaultHeight = definitionLookup.TryGetValue(widgetId, out var definition) && definition?.DefaultHeight > 0
                 ? definition.DefaultHeight
                 : Model.WidgetHeightDefault;
@@ -177,9 +191,9 @@
                 ? SnapWidgetHeightToGrid(storedHeightRaw.Value, widgetRowUnit, widgetRowGap, Model.WidgetHeightMin, Model.WidgetHeightMax)
                 : (int?)null;
             var appliedHeight = snappedStoredHeight ?? snappedDefaultHeight;
-            var sizeLabelText = forceFullWidth ? $"{sizeLabel} (locked)" : sizeLabel;
+            var sizeLabelText = forceFullWidth ? formatLockedSizeLabel(sizeLabel) : sizeLabel;
             var isCustomHeight = snappedStoredHeight.HasValue && Math.Abs(appliedHeight - snappedDefaultHeight) > Model.WidgetHeightResetThreshold;
-            var heightLabelText = GetHeightLabel(appliedHeight, snappedDefaultHeight, isCustomHeight);
+            var heightLabelText = formatHeightLabel(appliedHeight, snappedDefaultHeight, isCustomHeight);
             var rowSpan = Math.Max(1, (int)Math.Ceiling((double)(appliedHeight + widgetRowGap) / (widgetRowUnit + widgetRowGap)));
             var columnStart = widget.ColumnStart.HasValue ? Math.Clamp(widget.ColumnStart.Value, 1, 12) : (int?)null;
             var rowStart = widget.RowStart.HasValue ? Math.Max(1, widget.RowStart.Value) : (int?)null;
@@ -205,7 +219,7 @@
                  style="@widgetStyle"
                  draggable="false">
                 <div class="home-widget__editor d-flex align-items-center gap-2">
-                    <span class="home-widget__drag-handle" role="button" tabindex="0" aria-label="Drag widget" title="Drag widget">⋮⋮</span>
+                    <span class="home-widget__drag-handle" role="button" tabindex="0" aria-label='@Html.Localize("Drag widget")' title='@Html.Localize("Drag widget")'>â‹®â‹®</span>
                     <span class="home-widget__size-label" data-size-label>@sizeLabelText</span>
                     <span class="home-widget__height-label" data-height-label>@heightLabelText</span>
                 </div>
@@ -223,24 +237,24 @@
                             break;
                         case HomeWidgetIds.PackageLog:
                             @await Html.PartialAsync("_HomeWidgetCard", new HomeWidgetViewModel(
-                                "Package Log",
+                                Html.Localize("Package Log"),
                                 Model.PackageLogs.Cast<object>().ToList(),
                                 "MailLog",
                                 "Index",
                                 createControllerName: "MailLog",
                                 createActionName: "Index",
-                                createButtonText: "+ New Package",
+                                createButtonText: Html.Localize("+ New Package"),
                                 createFragment: "mailLogCreateForm"))
                             break;
                         case HomeWidgetIds.UpcomingEvents:
                             @await Html.PartialAsync("_HomeWidgetCard", new HomeWidgetViewModel(
-                                "Upcoming Events",
+                                Html.Localize("Upcoming Events"),
                                 Model.UpcomingEvents.Cast<object>().ToList(),
                                 "Calendar",
                                 "Index",
                                 createControllerName: "Calendar",
                                 createActionName: "Index",
-                                createButtonText: "+ New Event",
+                                createButtonText: Html.Localize("+ New Event"),
                                 createFragment: "calendarCreateForm"))
                             break;
                         case HomeWidgetIds.CalendarMonth:
@@ -257,43 +271,32 @@
                             break;
                         case HomeWidgetIds.LostFound:
                             @await Html.PartialAsync("_HomeWidgetCard", new HomeWidgetViewModel(
-                                "Lost & Found",
+                                Html.Localize("Lost & Found"),
                                 Model.LostFoundEntries.Cast<object>().ToList(),
                                 "LostAndFound",
                                 "Index",
                                 createControllerName: "LostAndFound",
                                 createActionName: "Index",
-                                createButtonText: "+ New L&F Entry",
+                                createButtonText: Html.Localize("+ New L&F Entry"),
                                 createFragment: "lostFoundEntryForm"))
                             break;
                         case HomeWidgetIds.HotelLayout:
                             @await Html.PartialAsync("~/Views/Home/Widgets/_HotelLayoutWidget.cshtml", Model)
                             break;
                         default:
-                            <div class="card shadow-sm"><div class="card-body"><p class="text-muted mb-0">This widget is not supported.</p></div></div>
+                            <div class="card shadow-sm"><div class="card-body"><p class="text-muted mb-0">@Html.Localize("This widget is not supported.")</p></div></div>
                             break;
                     }
                 </div>
                 <div class="home-widget__resize-edge home-widget__resize-edge--right" data-resize-handle data-resize-axis="horizontal" aria-hidden="true"></div>
                 <div class="home-widget__resize-edge home-widget__resize-edge--bottom" data-resize-handle data-resize-axis="vertical" aria-hidden="true"></div>
-                <button type="button" class="home-widget__resizer" data-resize-handle data-resize-axis="both" aria-label="Resize widget"></button>
+                <button type="button" class="home-widget__resizer" data-resize-handle data-resize-axis="both" aria-label='@Html.Localize("Resize widget")'></button>
             </div>
         }
     </div>
 </div>
 
 @functions {
-    private static string GetSizeLabel(HomeWidgetSize size) => size switch
-    {
-        HomeWidgetSize.Full => "Full width",
-        HomeWidgetSize.Half => "Half width",
-        HomeWidgetSize.Third => "One third",
-        HomeWidgetSize.Quarter => "One quarter",
-        _ => "Custom width"
-    };
-    private static string GetHeightLabel(int appliedHeight, int defaultHeight, bool isCustom) =>
-        isCustom ? $"Height: {appliedHeight}px" : $"Height: Default ({defaultHeight}px)";
-
     private static int SnapWidgetHeightToGrid(int height, int rowUnit, int rowGap, int minHeight, int maxHeight)
     {
         var clamped = Math.Clamp(height, minHeight, maxHeight);
@@ -315,6 +318,9 @@
         if (!grid) {
             return;
         }
+        const translate = typeof window.hopsTranslate === 'function'
+            ? window.hopsTranslate
+            : (key, fallback) => (typeof fallback === 'string' && fallback.length) ? fallback : key;
 
         document.querySelectorAll('#homeWidgetGrid .modal').forEach(modal => {
             if (modal?.parentElement && modal.parentElement !== document.body) {
@@ -346,7 +352,7 @@
         if (marketplace) {
             const marketplaceForm = marketplace.querySelector('form');
             marketplaceForm?.addEventListener('submit', () => {
-                announceStatus('Updating widget marketplace modules...');
+                announceStatus(translate("Updating widget marketplace modules...", "Updating widget marketplace modules..."));
             });
         }
         const sizeOptions = (() => {
@@ -357,10 +363,10 @@
             }
         })();
         const sizeLabelMap = {
-            full: 'Full width',
-            half: 'Half width',
-            third: 'One third',
-            quarter: 'One quarter'
+            full: translate("Full width", "Full width"),
+            half: translate("Half width", "Half width"),
+            third: translate("One third", "One third"),
+            quarter: translate("One quarter", "One quarter")
         };
         const selectedPersona = grid.dataset.persona || 'default';
         const sizeEntries = Object.entries(sizeOptions).map(([key, span]) => ({
@@ -1162,13 +1168,13 @@
             if (!hasSeenLayoutTips()) {
                 showLayoutTips();
             }
-            announceStatus('Dashboard layout editing enabled.');
+            announceStatus(translate("Dashboard layout editing enabled.", "Dashboard layout editing enabled."));
         });
 
         cancelButton?.addEventListener('click', () => {
             applyLayout(originalLayout);
             setEditingState(false);
-            announceStatus('Layout changes canceled.');
+            announceStatus(translate("Layout changes canceled.", "Layout changes canceled."));
         });
 
         saveButton?.addEventListener('click', async () => {
@@ -1194,18 +1200,18 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error('Unable to save layout.');
+                    throw new Error(translate("Unable to save layout.", "Unable to save layout."));
                 }
 
                 originalLayout = payload.widgets;
                 grid.dataset.initialLayout = JSON.stringify(originalLayout);
                 persistStoredLayout(originalLayout);
                 setEditingState(false);
-                announceStatus('Dashboard layout saved successfully.');
+                announceStatus(translate("Dashboard layout saved successfully.", "Dashboard layout saved successfully."));
             }
             catch {
-                alert('Unable to save your layout changes. Please try again.');
-                announceStatus('Unable to save layout changes.');
+                alert(translate("Unable to save your layout changes. Please try again.", "Unable to save your layout changes. Please try again."));
+                announceStatus(translate("Unable to save layout changes.", "Unable to save layout changes."));
             }
         });
         helpButton?.addEventListener('click', (event) => {
@@ -1224,4 +1230,23 @@
 @section Scripts {
     @await Html.PartialAsync("~/Views/Home/Widgets/_HotelLayoutWidgetScripts.cshtml")
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -1,23 +1,24 @@
+@using System.Globalization
 @model hOps.web.ViewModels.Admin.AccessRequestsPageViewModel
 
 @{
-    ViewData["Title"] = "Access Requests";
+    ViewData["Title"] = Html.Localize("Access Requests");
 }
 
-<h2>Pending Access Requests</h2>
+<h2>@Html.Localize("Pending Access Requests")</h2>
 
-@if (TempData["Success"] != null)
+@if (TempData["Success"] is string successMessage)
 {
-    <div class="alert alert-success">@TempData["Success"]</div>
+    <div class="alert alert-success">@Html.Localize(successMessage, successMessage)</div>
 }
-@if (TempData["Error"] != null)
+@if (TempData["Error"] is string errorMessage)
 {
-    <div class="alert alert-danger">@TempData["Error"]</div>
+    <div class="alert alert-danger">@Html.Localize(errorMessage, errorMessage)</div>
 }
 
 @if (!Model.Requests.Any())
 {
-    <p>No pending access requests.</p>
+    <p>@Html.Localize("No pending access requests.")</p>
 }
 else
 {
@@ -27,12 +28,12 @@ else
         <div class="card mb-3">
             <div class="card-body row g-3 align-items-end">
                 <div class="col-md-8">
-                    <label class="form-label" for="bulkComments">Comments (optional)</label>
+                    <label class="form-label" for="bulkComments">@Html.Localize("Comments (optional)")</label>
                     <textarea class="form-control"
                               id="bulkComments"
                               name="comments"
                               rows="3"
-                              placeholder="Included in the approval/denial email for each selected request"></textarea>
+                              placeholder="@Html.Localize("Included in the approval/denial email for each selected request")"></textarea>
                 </div>
                 <div class="col-md-4 d-flex flex-wrap gap-2 justify-content-md-end">
                     <button type="submit"
@@ -40,14 +41,14 @@ else
                             name="actionType"
                             value="approve"
                             disabled>
-                        Approve Selected
+                        @Html.Localize("Approve Selected")
                     </button>
                     <button type="submit"
                             class="btn btn-danger flex-grow-1"
                             name="actionType"
                             value="reject"
                             disabled>
-                        Reject Selected
+                        @Html.Localize("Reject Selected")
                     </button>
                 </div>
             </div>
@@ -55,20 +56,25 @@ else
 
         <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
             <div class="text-muted small">
-                Showing page @Model.PageNumber of @Model.TotalPages (@Model.TotalCount total requests)
+                @string.Format(
+                    CultureInfo.InvariantCulture,
+                    Html.Localize("Showing page {0} of {1} ({2} total requests)").ToString(),
+                    Model.PageNumber,
+                    Model.TotalPages,
+                    Model.TotalCount)
             </div>
             @if (Model.TotalPages > 1)
             {
-                <div class="btn-group btn-group-sm" role="group" aria-label="Pagination controls">
+                <div class="btn-group btn-group-sm" role="group" aria-label="@Html.Localize("Pagination controls")">
                     <a class="btn btn-outline-secondary @(Model.HasPreviousPage ? string.Empty : "disabled")"
                        asp-action="AccessRequests"
                        asp-route-page="@(Model.PreviousPage)">
-                        Previous
+                        @Html.Localize("Previous")
                     </a>
                     <a class="btn btn-outline-secondary @(Model.HasNextPage ? string.Empty : "disabled")"
                        asp-action="AccessRequests"
                        asp-route-page="@(Model.NextPage)">
-                        Next
+                        @Html.Localize("Next")
                     </a>
                 </div>
             }
@@ -83,11 +89,11 @@ else
                                    class="form-check-input"
                                    id="selectAllRequests" />
                         </th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Property Code</th>
-                        <th>Requested At</th>
+                        <th>@Html.Localize("Name")</th>
+                        <th>@Html.Localize("Email")</th>
+                        <th>@Html.Localize("Phone")</th>
+                        <th>@Html.Localize("Property Code")</th>
+                        <th>@Html.Localize("Requested At")</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -104,7 +110,7 @@ else
                             <td>@req.Email</td>
                             <td>@req.MobilePhone</td>
                             <td>@req.PropertyCode</td>
-                            <td>@req.RequestedAt.ToString("g")</td>
+                            <td>@req.RequestedAt.ToString("g", CultureInfo.CurrentCulture)</td>
                         </tr>
                     }
                 </tbody>

@@ -327,6 +327,7 @@ builder.Services.Configure<CaptchaOptions>(builder.Configuration.GetSection("Cap
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddHttpClient<ICaptchaValidator, GoogleRecaptchaValidator>();
 builder.Services.AddSingleton(supabaseStorageOptions);
+builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<StaticTranslationStore>();
 builder.Services.AddSingleton<IExternalTranslationProvider, NoOpTranslationProvider>();
 builder.Services.AddScoped<ITranslationService, TranslationService>();

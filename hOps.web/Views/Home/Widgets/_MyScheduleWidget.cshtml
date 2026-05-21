@@ -1,4 +1,5 @@
-@using hOps.web.ViewModels.Home
+@using System.Globalization
+﻿@using hOps.web.ViewModels.Home
 @model HomeIndexViewModel
 
 @{
@@ -8,10 +9,10 @@
     {
         if (!timeSpan.HasValue)
         {
-            return "Time TBD";
+            return Html.Localize("Time TBD");
         }
 
-        return DateTime.Today.Add(timeSpan.Value).ToString("h:mm tt");
+        return DateTime.Today.Add(timeSpan.Value).ToString("t", CultureInfo.CurrentCulture);
     }
 
     string BuildScheduleUrl(MyScheduleShiftViewModel shift)
@@ -24,15 +25,19 @@
 <div class="card shadow-sm h-100 home-widget-card">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
-            <h2 class="h6 mb-0">My Schedule</h2>
-            <div class="text-muted small">Upcoming shifts for @Model.CurrentProperty?.Name</div>
+            <h2 class="h6 mb-0">@Html.Localize("My Schedule")</h2>
+            @{
+                var propertyName = Model.CurrentProperty?.Name ?? Html.Localize("this property");
+                var subtitle = string.Format(CultureInfo.CurrentCulture, Html.Localize("Upcoming shifts for {0}"), propertyName);
+            }
+            <div class="text-muted small">@subtitle</div>
         </div>
-        <a class="btn btn-sm btn-outline-primary" asp-controller="Schedules" asp-action="Index">Open Schedules</a>
+        <a class="btn btn-sm btn-outline-primary" asp-controller="Schedules" asp-action="Index">@Html.Localize("Open Schedules")</a>
     </div>
     <div class="card-body home-widget-card__body">
         @if (!shifts.Any())
         {
-            <p class="text-muted mb-0">No upcoming shifts have been published for you at this property.</p>
+            <p class="text-muted mb-0">@Html.Localize("No upcoming shifts have been published for you at this property.")</p>
         }
         else
         {
@@ -45,7 +50,7 @@
                             <div class="flex-grow-1">
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
                                     <a class="fw-semibold" href="@scheduleUrl">@shift.ShiftName</a>
-                                    <span class="badge bg-primary-subtle text-primary">@shift.ShiftDate.ToString("ddd, MMM d")</span>
+                                    <span class="badge bg-primary-subtle text-primary">@shift.ShiftDate.ToString("ddd, MMM d", CultureInfo.CurrentCulture)</span>
                                 </div>
                                 <div class="small text-muted">
                                     @FormatTimeSpan(shift.ShiftStartTime)
@@ -56,7 +61,7 @@
                                 </div>
                                 @if (!string.IsNullOrWhiteSpace(shift.ScheduleTitle))
                                 {
-                                    <div class="small text-muted">From @shift.ScheduleTitle</div>
+                                    <div class="small text-muted">@string.Format(CultureInfo.CurrentCulture, Html.Localize("From {0}"), shift.ScheduleTitle)</div>
                                 }
                                 @if (!string.IsNullOrWhiteSpace(shift.Notes))
                                 {
@@ -64,7 +69,7 @@
                                 }
                             </div>
                             <div class="text-end text-muted small flex-shrink-0">
-                                Week of @shift.WeekStartDate.ToString("MMM d")
+                                @string.Format(CultureInfo.CurrentCulture, Html.Localize("Week of {0}"), shift.WeekStartDate.ToString("MMM d", CultureInfo.CurrentCulture))
                             </div>
                         </div>
                     </li>
@@ -73,3 +78,4 @@
         }
     </div>
 </div>
+

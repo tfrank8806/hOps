@@ -1,18 +1,18 @@
 ﻿@model IEnumerable<hOps.web.Models.Property>
 @{
-    ViewData["Title"] = "Properties";
+    ViewData["Title"] = Html.Localize("Properties");
 }
 
-<h2>Properties</h2>
+<h2>@Html.Localize("Properties")</h2>
 <p>
-    <a class="btn btn-primary" asp-action="Create">Add New Property</a>
+    <a class="btn btn-primary" asp-action="Create">@Html.Localize("Add New Property")</a>
 </p>
 <table class="table table-striped">
     <thead>
         <tr>
-            <th>Code</th>
-            <th>Name</th>
-            <th>Address</th>
+            <th>@Html.Localize("Code")</th>
+            <th>@Html.Localize("Name")</th>
+            <th>@Html.Localize("Address")</th>
             <th></th>
         </tr>
     </thead>
@@ -24,8 +24,8 @@
                 <td>@prop.Name</td>
                 <td>@prop.Address</td>
                 <td>
-                    <a asp-action="Edit" asp-route-id="@prop.Id" class="btn btn-sm btn-warning">Edit</a>
-                    <a asp-action="Delete" asp-route-id="@prop.Id" class="btn btn-sm btn-danger">Delete</a>
+                    <a asp-action="Edit" asp-route-id="@prop.Id" class="btn btn-sm btn-warning">@Html.Localize("Edit")</a>
+                    <a asp-action="Delete" asp-route-id="@prop.Id" class="btn btn-sm btn-danger">@Html.Localize("Delete")</a>
                 </td>
             </tr>
         }

@@ -1,4 +1,4 @@
-<script>
+﻿<script>
         (() => {
             const overlayView = document.getElementById('layoutOverlayView');
             const perFloorView = document.getElementById('layoutFloorView');
@@ -7,6 +7,10 @@
             if (!overlayView && !perFloorView) {
                 return;
             }
+
+            const translate = typeof window.hopsTranslate === 'function'
+                ? window.hopsTranslate
+                : (key, fallback) => (typeof fallback === 'string' && fallback.length ? fallback : key);
 
             const floorSections = document.querySelectorAll('.layout-floor-section');
 
@@ -258,7 +262,8 @@
                     return;
                 }
                 if (!items.length) {
-                    roomMenuList.innerHTML = '<p class="text-muted small mb-0">No open work orders for this room.</p>';
+                    const emptyMessage = translate("No open work orders for this room.", "No open work orders for this room.");
+                    roomMenuList.innerHTML = `<p class="text-muted small mb-0">${emptyMessage}</p>`;
                     return;
                 }
 
@@ -288,11 +293,17 @@
 
                     const statusSpan = document.createElement('span');
                     statusSpan.className = 'fw-semibold me-2';
-                    statusSpan.textContent = order.status ?? 'Work Order';
+                    const statusLabel = typeof order.status === 'string' && order.status.trim().length
+                        ? translate(order.status, order.status)
+                        : translate("Work Order", "Work Order");
+                    statusSpan.textContent = statusLabel;
 
                     const issueSpan = document.createElement('span');
                     issueSpan.className = 'layout-room-menu__workorder-issue';
-                    issueSpan.textContent = order.issue ?? 'Details unavailable';
+                    const issueText = typeof order.issue === 'string' && order.issue.trim().length
+                        ? order.issue
+                        : translate("Details unavailable", "Details unavailable");
+                    issueSpan.textContent = issueText;
 
                     const meta = document.createElement('small');
                     meta.className = 'text-muted d-block';
@@ -303,7 +314,7 @@
                     if (order.createdAt) {
                         metaParts.push(order.createdAt);
                     }
-                    meta.textContent = metaParts.join(' â€¢ ');
+                    meta.textContent = metaParts.join(' \u00b7 ');
 
                     textWrap.appendChild(statusSpan);
                     textWrap.appendChild(issueSpan);
@@ -381,7 +392,8 @@
                 if (!identifiers.length) {
                     return;
                 }
-                roomMenuList.innerHTML = '<div class="text-muted small py-2">Loading open work orders...</div>';
+                const loadingMessage = translate("Loading open work orders...", "Loading open work orders...");
+                roomMenuList.innerHTML = `<div class="text-muted small py-2">${loadingMessage}</div>`;
                 try {
                     const requests = identifiers.map(identifier => {
                         const params = new URLSearchParams({
@@ -420,7 +432,8 @@
 
                     renderWorkOrders(uniqueOrders);
                 } catch (error) {
-                    roomMenuList.innerHTML = '<p class="text-danger small mb-0">Unable to load work orders.</p>';
+                    const errorMessage = translate("Unable to load work orders.", "Unable to load work orders.");
+                    roomMenuList.innerHTML = `<p class="text-danger small mb-0">${errorMessage}</p>`;
                 }
             };
 
@@ -429,7 +442,7 @@
                     return;
                 }
 
-                const roomLabel = tile.dataset.roomLabel?.trim() || tile.dataset.roomNumber?.trim() || 'Room';
+                const roomLabel = tile.dataset.roomLabel?.trim() || tile.dataset.roomNumber?.trim() || translate("Room", "Room");
                 const aggregatedRooms = getRoomNumbersForTile(tile);
                 const primaryRoom = aggregatedRooms[0] || tile.dataset.roomNumber?.trim() || '';
                 const isAllFloorsSelection = tile.classList.contains('room-tile-overlay') &&
@@ -437,8 +450,8 @@
                     aggregatedRooms.length > 1;
                 const floorValue = tile.dataset.roomFloor?.trim();
                 const floorLabel = isAllFloorsSelection
-                    ? 'All Floors'
-                    : (floorValue ? `Floor ${floorValue}` : '');
+                    ? translate("All Floors", "All Floors")
+                    : (floorValue ? translate("Floor {0}", "Floor {0}").replace('{0}', floorValue) : '');
 
                 currentRoom = {
                     roomNumber: primaryRoom,
@@ -550,10 +563,12 @@
                     roomLabelInput.value = selectedRoom.roomLabel ?? selectedRoom.roomNumber;
                 }
                 if (roomDisplay) {
-                    const label = selectedRoom.roomLabel ?? selectedRoom.roomNumber ?? 'Selected Room';
+                    const label = selectedRoom.roomLabel ?? selectedRoom.roomNumber ?? translate("Selected Room", "Selected Room");
                     const multiFloor = Array.isArray(selectedRoom.roomNumbers) && selectedRoom.roomNumbers.length > 1;
-                    const floor = multiFloor ? 'All Floors' : (selectedRoom.floor ? `Floor ${selectedRoom.floor}` : '');
-                    roomDisplay.textContent = floor ? `${label} Â· ${floor}` : label;
+                    const floor = multiFloor
+                        ? translate("All Floors", "All Floors")
+                        : (selectedRoom.floor ? translate("Floor {0}", "Floor {0}").replace('{0}', selectedRoom.floor) : '');
+                    roomDisplay.textContent = floor ? `${label} \u00b7 ${floor}` : label;
                 }
                 if (dueDateInput) {
                     dueDateInput.value = dueDateInput.dataset.defaultValue || '';
@@ -605,13 +620,13 @@
                 };
 
                 if (!payload.roomNumber) {
-                    showFormStatus('danger', 'Select a room before submitting.');
+                    showFormStatus('danger', translate("Select a room before submitting.", "Select a room before submitting."));
                     submitButton?.removeAttribute('disabled');
                     return;
                 }
 
                 if (!payload.issue) {
-                    showFormStatus('danger', 'Issue description is required.');
+                    showFormStatus('danger', translate("Issue description is required.", "Issue description is required."));
                     submitButton?.removeAttribute('disabled');
                     return;
                 }
@@ -629,13 +644,16 @@
                     const result = await response.json().catch(() => ({}));
 
                     if (!response.ok) {
-                        const message = result?.message ?? 'Unable to create work order. Please try again.';
+                        const fallbackError = translate("Unable to create work order. Please try again.", "Unable to create work order. Please try again.");
+                        const message = typeof result?.message === 'string' && result.message.trim().length
+                            ? translate(result.message, result.message)
+                            : fallbackError;
                         showFormStatus('danger', message);
                         submitButton?.removeAttribute('disabled');
                         return;
                     }
 
-                    showFormStatus('success', 'Work order created successfully.');
+                    showFormStatus('success', translate("Work order created successfully.", "Work order created successfully."));
                     if (issueInput) {
                         issueInput.value = '';
                     }
@@ -655,10 +673,22 @@
                         modalInstance?.hide();
                     }, 900);
                 } catch (error) {
-                    showFormStatus('danger', 'Something went wrong while creating the work order.');
+                    showFormStatus('danger', translate("Something went wrong while creating the work order.", "Something went wrong while creating the work order."));
                 } finally {
                     submitButton?.removeAttribute('disabled');
                 }
             });
         })();
     </script>
+
+
+
+
+
+
+
+
+
+
+
+

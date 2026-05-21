@@ -1,6 +1,24 @@
 (() => {
     const dayInput = document.querySelector('[data-day-source]');
     const dayTarget = document.querySelector('[data-day-target]');
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const translate = (key, fallback) => {
+        if (typeof window !== "undefined" && typeof window.hopsTranslate === "function") {
+            return window.hopsTranslate(key, fallback);
+        }
+
+        return fallback;
+    };
+
+    const parseDateValue = (value) => {
+        const parts = value.split("-").map(Number);
+        if (parts.length !== 3 || parts.some(Number.isNaN)) {
+            return null;
+        }
+
+        const [year, month, day] = parts;
+        return new Date(year, month - 1, day);
+    };
 
     const updateDayOfWeek = () => {
         if (!dayInput || !dayTarget) {
@@ -13,13 +31,14 @@
             return;
         }
 
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) {
+        const date = parseDateValue(value);
+        if (!date || Number.isNaN(date.getTime())) {
             dayTarget.value = '';
             return;
         }
 
-        dayTarget.value = date.toLocaleDateString(undefined, { weekday: 'long' });
+        const dayKey = dayNames[date.getDay()];
+        dayTarget.value = dayKey ? translate(dayKey, dayKey) : '';
     };
 
     dayInput?.addEventListener('change', updateDayOfWeek);

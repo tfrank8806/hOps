@@ -10,7 +10,7 @@
         <partial name="_LogForm" model="Model" />
     </div>
     <div class="card-footer d-flex justify-content-end gap-2">
-        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+        <a asp-action="Index" class="btn btn-outline-secondary">@Html.Localize("Cancel")</a>
         <button type="submit" class="btn btn-primary" data-submit-btn="true" data-loading-text="Saving...">Save Log</button>
     </div>
 </form>
@@ -38,3 +38,4 @@
         })();
     </script>
 }
+

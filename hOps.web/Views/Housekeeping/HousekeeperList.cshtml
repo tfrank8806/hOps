@@ -1,8 +1,9 @@
+@using System.Text.Json
 @using hOps.web.ViewModels.Housekeeping
 @model MprHousekeeperListViewModel
 
 @{
-    ViewData["Title"] = "Housekeeper List";
+    ViewData["Title"] = Html.Localize("Housekeeper List");
     var fallbackDate = DateTime.UtcNow;
     var filterPeriod = Model.FilterPeriod ?? MprTrackerLogFilterViewModel.PeriodMonth;
     var filterMonth = Model.FilterMonth ?? fallbackDate.Month;
@@ -13,8 +14,8 @@
 
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
     <div>
-        <h1 class="h3 mb-1">Housekeeper List</h1>
-        <p class="text-muted mb-0">Manage the names that populate the Minutes Per Room tracker.</p>
+        <h1 class="h3 mb-1">@Html.Localize("Housekeeper List")</h1>
+        <p class="text-muted mb-0">@Html.Localize("Manage the names that populate the Minutes Per Room tracker.")</p>
     </div>
     <a class="btn btn-outline-secondary"
        asp-action="MprTracker"
@@ -23,7 +24,7 @@
        asp-route-year="@filterYear"
        asp-route-start="@filterStart"
        asp-route-end="@filterEnd">
-        Back to MPR Tracker
+        @Html.Localize("Back to MPR Tracker")
     </a>
 </div>
 
@@ -31,7 +32,7 @@
 {
     <div class="alert alert-success alert-dismissible fade show" role="alert">
         @Model.StatusMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label='@Html.Localize("Close")'></button>
     </div>
 }
 
@@ -39,19 +40,19 @@
 {
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
         @Model.ErrorMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label='@Html.Localize("Close")'></button>
     </div>
 }
 
 <div class="card shadow-sm">
     <div class="card-header">
-        <h2 class="h5 mb-0">Housekeeper names</h2>
-        <small class="text-muted">These names appear in the tracker dropdown for the selected property.</small>
+        <h2 class="h5 mb-0">@Html.Localize("Housekeeper names")</h2>
+        <small class="text-muted">@Html.Localize("These names appear in the tracker dropdown for the selected property.")</small>
     </div>
     <div class="card-body">
         @if (!Model.HasPropertySelected)
         {
-            <p class="text-muted mb-0">Select a property to add or update the housekeeper list.</p>
+            <p class="text-muted mb-0">@Html.Localize("Select a property to add or update the housekeeper list.")</p>
         }
         else
         {
@@ -59,8 +60,8 @@
             {
                 <form asp-action="AddHousekeeper" method="post" class="row g-2 align-items-end mb-3">
                     <div class="col-md-6">
-                        <label class="form-label">Add housekeeper</label>
-                        <input type="text" name="name" class="form-control" placeholder="Full name" required />
+                        <label class="form-label">@Html.Localize("Add housekeeper")</label>
+                        <input type="text" name="name" class="form-control" placeholder='@Html.Localize("Full name")' required />
                     </div>
                     <div class="col-auto">
                         <input type="hidden" name="period" value="@filterPeriod" />
@@ -69,19 +70,19 @@
                         <input type="hidden" name="start" value="@filterStart" />
                         <input type="hidden" name="end" value="@filterEnd" />
                         <input type="hidden" name="returnToList" value="true" />
-                        <button type="submit" class="btn btn-outline-primary">Add</button>
+                        <button type="submit" class="btn btn-outline-primary">@Html.Localize("Add")</button>
                     </div>
                 </form>
             }
             else
             {
-                <p class="text-muted small mb-3">You need manager or admin access to update this list.</p>
+                <p class="text-muted small mb-3">@Html.Localize("You need manager or admin access to update this list.")</p>
             }
 
             <ul class="list-group list-group-flush">
                 @if (!Model.Housekeepers.Any())
                 {
-                    <li class="list-group-item text-muted small">No housekeepers have been added yet.</li>
+                    <li class="list-group-item text-muted small">@Html.Localize("No housekeepers have been added yet.")</li>
                 }
                 else
                 {
@@ -99,8 +100,8 @@
                                     <input type="hidden" name="start" value="@filterStart" />
                                     <input type="hidden" name="end" value="@filterEnd" />
                                     <input type="hidden" name="returnToList" value="true" />
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove @hk.Name from the list?');">
-                                        Delete
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm(window.hopsTranslate('RemoveHousekeeperConfirm', 'Remove {0} from the list?').replace('{0}', @Html.Raw(JsonSerializer.Serialize(hk.Name))));">
+                                        @Html.Localize("Delete")
                                     </button>
                                 </form>
                             }

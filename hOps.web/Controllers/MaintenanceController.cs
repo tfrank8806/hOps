@@ -2,9 +2,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
@@ -16,6 +18,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using hOps.web.Services.Localization;
 
 namespace hOps.web.Controllers
 {
@@ -25,12 +28,29 @@ namespace hOps.web.Controllers
     public class MaintenanceController : BaseController
     {
         private readonly ApplicationDbContext _db;
+        private readonly ITranslationService _translationService;
         private const int ChecklistTemplateRowLimit = 500;
-        public MaintenanceController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public MaintenanceController(
+            ApplicationDbContext context,
+            UserManager<ApplicationUser> userManager,
+            ITranslationService translationService)
             : base(context, userManager)
         {
             _db = context;
+            _translationService = translationService;
         }
+
+        private string GetActiveLanguage()
+            => HttpContext?.Items?["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+
+        private string Translate(string key, string? fallback = null)
+            => _translationService.Translate(key, GetActiveLanguage(), fallback ?? key);
+
+        private bool IsDefaultLanguage(string language)
+            => string.Equals(language, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+
+        private CancellationToken RequestCancellationToken
+            => HttpContext?.RequestAborted ?? CancellationToken.None;
 
         [HttpGet("PMs/Checklists")]
         public async Task<IActionResult> PmChecklists(int? propertyId = null, int? checklistId = null)
@@ -107,7 +127,7 @@ namespace hOps.web.Controllers
                     .FirstOrDefaultAsync(c => c.Id == request.Id.Value && c.PropertyId == selectedProperty.Id);
                 if (checklist == null)
                 {
-                    TempData["PmChecklistError"] = "Checklist not found.";
+                    TempData["PmChecklistError"] = Translate("Checklist not found.");
                     return RedirectToAction(nameof(PmChecklists), new { propertyId = selectedProperty.Id });
                 }
 
@@ -115,7 +135,7 @@ namespace hOps.web.Controllers
                     .AnyAsync(s => s.ChecklistId == checklist.Id);
                 if (hasSessions && checklist.ChecklistType != request.ChecklistType)
                 {
-                    TempData["PmChecklistError"] = "Checklist type cannot be changed after PM sessions have been recorded.";
+                    TempData["PmChecklistError"] = Translate("Checklist type cannot be changed after PM sessions have been recorded.");
                     return RedirectToAction(nameof(PmChecklists), new { propertyId = selectedProperty.Id, checklistId = checklist.Id });
                 }
 
@@ -145,12 +165,12 @@ namespace hOps.web.Controllers
                 _db.PreventiveMaintenanceChecklists.Add(checklist);
                 await _db.SaveChangesAsync();
 
-                TempData["PmChecklistMessage"] = "Checklist created.";
+                TempData["PmChecklistMessage"] = Translate("Checklist created.");
                 return RedirectToAction(nameof(PmChecklists), new { propertyId = selectedProperty.Id, checklistId = checklist.Id });
             }
 
             await _db.SaveChangesAsync();
-            TempData["PmChecklistMessage"] = "Checklist updated.";
+            TempData["PmChecklistMessage"] = Translate("Checklist updated.");
             return RedirectToAction(nameof(PmChecklists), new { propertyId = selectedProperty.Id, checklistId = request.Id });
         }
 
@@ -203,7 +223,7 @@ namespace hOps.web.Controllers
 
             await _db.SaveChangesAsync();
 
-            TempData["PmChecklistMessage"] = "PM frequency updated.";
+            TempData["PmChecklistMessage"] = Translate("PM frequency updated.");
             return RedirectToAction(nameof(PmChecklists), new { propertyId });
         }
 
@@ -224,7 +244,7 @@ namespace hOps.web.Controllers
 
             if (request == null || request.PropertyId <= 0 || request.ChecklistIds == null || request.ChecklistIds.Count == 0)
             {
-                return BadRequest(new { error = "Provide a property and checklist order." });
+                return BadRequest(new { error = Translate("Provide a property and checklist order.") });
             }
 
             var properties = await GetManageablePropertiesAsync(currentUser, roles);
@@ -242,14 +262,14 @@ namespace hOps.web.Controllers
 
             if (!checklists.Any())
             {
-                return BadRequest(new { error = "No checklists exist for this property." });
+                return BadRequest(new { error = Translate("No checklists exist for this property.") });
             }
 
             var propertyChecklistIds = checklists.Select(c => c.Id).ToHashSet();
             var invalidIds = request.ChecklistIds.Where(id => !propertyChecklistIds.Contains(id)).ToList();
             if (invalidIds.Any())
             {
-                return BadRequest(new { error = "One or more checklists are invalid for this property." });
+                return BadRequest(new { error = Translate("One or more checklists are invalid for this property.") });
             }
 
             var orderLookup = request.ChecklistIds
@@ -303,7 +323,7 @@ namespace hOps.web.Controllers
                 .FirstOrDefaultAsync(c => c.Id == id && c.PropertyId == propertyId);
             if (checklist == null)
             {
-                TempData["PmChecklistError"] = "Checklist not found.";
+                TempData["PmChecklistError"] = Translate("Checklist not found.");
                 return RedirectToAction(nameof(PmChecklists), new { propertyId });
             }
 
@@ -312,7 +332,7 @@ namespace hOps.web.Controllers
             checklist.UpdatedById = currentUser.Id;
             await _db.SaveChangesAsync();
 
-            TempData["PmChecklistMessage"] = isActive ? "Checklist activated." : "Checklist deactivated.";
+            TempData["PmChecklistMessage"] = isActive ? Translate("Checklist activated.") : Translate("Checklist deactivated.");
             return RedirectToAction(nameof(PmChecklists), new { propertyId, checklistId = id });
         }
 
@@ -341,7 +361,7 @@ namespace hOps.web.Controllers
                 .FirstOrDefaultAsync(c => c.Id == id && c.PropertyId == propertyId);
             if (checklist == null)
             {
-                TempData["PmChecklistError"] = "Checklist not found.";
+                TempData["PmChecklistError"] = Translate("Checklist not found.");
                 return RedirectToAction(nameof(PmChecklists), new { propertyId });
             }
 
@@ -349,7 +369,7 @@ namespace hOps.web.Controllers
                 .AnyAsync(s => s.ChecklistId == id);
             if (hasSessions)
             {
-                TempData["PmChecklistError"] = "Completed PM sessions reference this checklist. Deactivate it instead of deleting.";
+                TempData["PmChecklistError"] = Translate("Completed PM sessions reference this checklist. Deactivate it instead of deleting.");
                 return RedirectToAction(nameof(PmChecklists), new { propertyId, checklistId = id });
             }
 
@@ -364,7 +384,7 @@ namespace hOps.web.Controllers
             _db.PreventiveMaintenanceChecklists.Remove(checklist);
             await _db.SaveChangesAsync();
 
-            TempData["PmChecklistMessage"] = "Checklist deleted.";
+            TempData["PmChecklistMessage"] = Translate("Checklist deleted.");
             return RedirectToAction(nameof(PmChecklists), new { propertyId });
         }
 
@@ -405,10 +425,53 @@ namespace hOps.web.Controllers
                 .ToListAsync();
 
             var builder = new StringBuilder();
-            builder.AppendLine("Task,Description");
+            var activeLanguage = GetActiveLanguage();
+            var isDefaultLanguage = IsDefaultLanguage(activeLanguage);
+            var cancellationToken = RequestCancellationToken;
+            var headerTask = _translationService.Translate("Task", activeLanguage, "Task");
+            var headerDescription = _translationService.Translate("Description", activeLanguage, "Description");
+            builder.AppendLine($"{EscapeCsvCell(headerTask)},{EscapeCsvCell(headerDescription)}");
             foreach (var task in tasks)
             {
-                builder.AppendLine($"{EscapeCsvCell(task.Name)},{EscapeCsvCell(task.Description)}");
+                var title = task.Name ?? string.Empty;
+                var description = task.Description ?? string.Empty;
+                if (!isDefaultLanguage)
+                {
+                    var entityId = task.Id.ToString(CultureInfo.InvariantCulture);
+                    if (!string.IsNullOrWhiteSpace(title))
+                    {
+                        var translatedTitle = await _translationService.TranslateDynamicAsync(
+                            "PmChecklistTask",
+                            entityId,
+                            "Title",
+                            title,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedTitle))
+                        {
+                            title = translatedTitle;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(description))
+                    {
+                        var translatedDescription = await _translationService.TranslateDynamicAsync(
+                            "PmChecklistTask",
+                            entityId,
+                            "Description",
+                            description,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedDescription))
+                        {
+                            description = translatedDescription;
+                        }
+                    }
+                }
+
+                builder.AppendLine($"{EscapeCsvCell(title)},{EscapeCsvCell(description)}");
             }
 
             var payload = Encoding.UTF8.GetBytes(builder.ToString());
@@ -420,9 +483,18 @@ namespace hOps.web.Controllers
         public IActionResult DownloadChecklistTemplateCsv()
         {
             var builder = new StringBuilder();
-            builder.AppendLine("Task,Description");
-            builder.AppendLine("\"Inspect HVAC filters\",\"Replace or clean as needed; record readings\"");
-            builder.AppendLine("\"Check fire extinguisher pressure\",\"Verify seal is intact and tag is signed\"");
+            var activeLanguage = GetActiveLanguage();
+            var headerTask = _translationService.Translate("Task", activeLanguage, "Task");
+            var headerDescription = _translationService.Translate("Description", activeLanguage, "Description");
+            builder.AppendLine($"{EscapeCsvCell(headerTask)},{EscapeCsvCell(headerDescription)}");
+
+            var sampleTask1 = _translationService.Translate("Inspect HVAC filters", activeLanguage, "Inspect HVAC filters");
+            var sampleDescription1 = _translationService.Translate("Replace or clean as needed; record readings", activeLanguage, "Replace or clean as needed; record readings");
+            var sampleTask2 = _translationService.Translate("Check fire extinguisher pressure", activeLanguage, "Check fire extinguisher pressure");
+            var sampleDescription2 = _translationService.Translate("Verify seal is intact and tag is signed", activeLanguage, "Verify seal is intact and tag is signed");
+
+            builder.AppendLine($"{EscapeCsvCell(sampleTask1)},{EscapeCsvCell(sampleDescription1)}");
+            builder.AppendLine($"{EscapeCsvCell(sampleTask2)},{EscapeCsvCell(sampleDescription2)}");
             var payload = Encoding.UTF8.GetBytes(builder.ToString());
             return File(payload, "text/csv", "pm-checklist-template.csv");
         }
@@ -451,7 +523,7 @@ namespace hOps.web.Controllers
 
             if (form.CsvFile == null || form.CsvFile.Length == 0)
             {
-                ModelState.AddModelError(nameof(form.CsvFile), "Select a CSV file to upload.");
+                ModelState.AddModelError(nameof(form.CsvFile), Translate("Select a CSV file to upload."));
             }
 
             List<(string Title, string? Description)> rows = new();
@@ -462,12 +534,12 @@ namespace hOps.web.Controllers
                     rows = await ParseChecklistTemplateCsvAsync(form.CsvFile);
                     if (rows.Count == 0)
                     {
-                        ModelState.AddModelError(nameof(form.CsvFile), "The file did not contain any checklist rows.");
+                        ModelState.AddModelError(nameof(form.CsvFile), Translate("The file did not contain any checklist rows."));
                     }
                 }
                 catch (InvalidOperationException ex)
                 {
-                    ModelState.AddModelError(nameof(form.CsvFile), ex.Message);
+                    ModelState.AddModelError(nameof(form.CsvFile), Translate(ex.Message, ex.Message));
                 }
             }
 
@@ -526,8 +598,30 @@ namespace hOps.web.Controllers
                 await _db.SaveChangesAsync();
             }
 
-            var suffix = rows.Count == 1 ? "task" : "tasks";
-            TempData["PmChecklistMessage"] = $"Checklist '{checklist.Name}' created with {rows.Count} {suffix}.";
+            var activeLanguage = GetActiveLanguage();
+            var isDefaultLanguage = IsDefaultLanguage(activeLanguage);
+            var checklistIdString = checklist.Id.ToString(CultureInfo.InvariantCulture);
+            var nameDisplay = checklist.Name ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(nameDisplay) && !isDefaultLanguage)
+            {
+                var translatedName = await _translationService.TranslateDynamicAsync(
+                    "PmChecklist",
+                    checklistIdString,
+                    "Name",
+                    nameDisplay,
+                    _translationService.DefaultLanguage,
+                    activeLanguage,
+                    RequestCancellationToken);
+                if (!string.IsNullOrWhiteSpace(translatedName))
+                {
+                    nameDisplay = translatedName;
+                }
+            }
+
+            var messageTemplate = rows.Count == 1
+                ? Translate("Checklist '{0}' created with {1} task.")
+                : Translate("Checklist '{0}' created with {1} tasks.");
+            TempData["PmChecklistMessage"] = string.Format(CultureInfo.InvariantCulture, messageTemplate, nameDisplay, rows.Count);
             return RedirectToAction(nameof(PmChecklists), new { propertyId = property.Id, checklistId = checklist.Id });
         }
 
@@ -613,7 +707,7 @@ namespace hOps.web.Controllers
                 .FirstOrDefaultAsync(c => c.Id == checklistId && c.PropertyId == propertyId);
             if (checklist == null)
             {
-                TempData["PmChecklistError"] = "Checklist not found.";
+                TempData["PmChecklistError"] = Translate("Checklist not found.");
                 return RedirectToAction(nameof(PmChecklists), new { propertyId });
             }
 
@@ -673,7 +767,7 @@ namespace hOps.web.Controllers
             }
 
             await _db.SaveChangesAsync();
-            TempData["PmChecklistMessage"] = "Checklist tasks saved.";
+            TempData["PmChecklistMessage"] = Translate("Checklist tasks saved.");
             return RedirectToAction(nameof(ChecklistTasks), new { checklistId, propertyId });
         }
 

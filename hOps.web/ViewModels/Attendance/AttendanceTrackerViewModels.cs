@@ -58,6 +58,7 @@ namespace hOps.web.ViewModels.Attendance
         public AttendanceRecordType AttendanceType { get; set; }
         public string AttendanceTypeDisplay { get; set; } = string.Empty;
         public string Details { get; set; } = string.Empty;
+        public string TranslatedDetails { get; set; } = string.Empty;
         public DateTime CreatedAtUtc { get; set; }
         public DateTime? UpdatedAtUtc { get; set; }
         public string CreatedByDisplay { get; set; } = string.Empty;
@@ -141,6 +142,7 @@ namespace hOps.web.ViewModels.Attendance
         public string CreatedByDisplay { get; set; } = string.Empty;
         public DateTime CreatedAtUtc { get; set; }
         public string Details { get; set; } = string.Empty;
+        public string TranslatedDetails { get; set; } = string.Empty;
     }
 
     public class AttendanceGridDayTotalViewModel

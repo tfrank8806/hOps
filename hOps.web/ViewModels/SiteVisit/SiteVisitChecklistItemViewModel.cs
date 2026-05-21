@@ -6,6 +6,8 @@ namespace hOps.web.ViewModels.SiteVisit
 {
     public class SiteVisitChecklistItemViewModel
     {
+        public int? ReportItemId { get; set; }
+
         [StringLength(200)]
         [Display(Name = "Section")]
         public string? SectionName { get; set; }

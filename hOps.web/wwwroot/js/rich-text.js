@@ -5,17 +5,21 @@
         return;
     }
 
+    const translate = typeof window.hopsTranslate === 'function'
+        ? window.hopsTranslate
+        : (key, fallback) => (typeof fallback === 'string' && fallback.length ? fallback : key);
+
     const colorOptions = [
-        { value: 'default', label: 'Default', previewColor: '' },
-        { value: 'red', label: 'Red', previewColor: '#b42318' },
-        { value: 'orange', label: 'Orange', previewColor: '#c2410c' },
-        { value: 'yellow', label: 'Yellow', previewColor: '#b58105' },
-        { value: 'green', label: 'Green', previewColor: '#15803d' },
-        { value: 'teal', label: 'Teal', previewColor: '#0f766e' },
-        { value: 'blue', label: 'Blue', previewColor: '#2563eb' },
-        { value: 'purple', label: 'Purple', previewColor: '#7c3aed' },
-        { value: 'pink', label: 'Pink', previewColor: '#db2777' },
-        { value: 'gray', label: 'Gray', previewColor: '#334155' }
+        { value: 'default', label: translate('Default', 'Default'), previewColor: '' },
+        { value: 'red', label: translate('Red', 'Red'), previewColor: '#b42318' },
+        { value: 'orange', label: translate('Orange', 'Orange'), previewColor: '#c2410c' },
+        { value: 'yellow', label: translate('Yellow', 'Yellow'), previewColor: '#b58105' },
+        { value: 'green', label: translate('Green', 'Green'), previewColor: '#15803d' },
+        { value: 'teal', label: translate('Teal', 'Teal'), previewColor: '#0f766e' },
+        { value: 'blue', label: translate('Blue', 'Blue'), previewColor: '#2563eb' },
+        { value: 'purple', label: translate('Purple', 'Purple'), previewColor: '#7c3aed' },
+        { value: 'pink', label: translate('Pink', 'Pink'), previewColor: '#db2777' },
+        { value: 'gray', label: translate('Gray', 'Gray'), previewColor: '#334155' }
     ];
 
     const colorHexMap = {
@@ -479,8 +483,9 @@
             searchInput = document.createElement('input');
             searchInput.type = 'search';
             searchInput.className = 'rich-text-emoji-menu__search-input';
-            searchInput.placeholder = 'Search emoji';
-            searchInput.setAttribute('aria-label', 'Search emoji');
+            const searchPlaceholder = translate('Search emoji', 'Search emoji');
+            searchInput.placeholder = searchPlaceholder;
+            searchInput.setAttribute('aria-label', searchPlaceholder);
             searchInput.addEventListener('input', () => {
                 currentQuery = searchInput.value || '';
                 renderEmojiSections();
@@ -507,11 +512,12 @@
             if (query) {
                 const matches = searchEmojiLibrary(library, query);
                 if (!matches.length) {
-                    sectionsContainer.appendChild(createEmojiEmptyState('No emojis match your search.'));
+                    sectionsContainer.appendChild(createEmojiEmptyState(translate('No emojis match your search.', 'No emojis match your search.')));
                     return;
                 }
 
-                const section = createEmojiSection(`Search results (${matches.length})`, matches);
+                const searchResultsLabel = translate('Search results ({0})', 'Search results ({0})').replace('{0}', matches.length);
+                const section = createEmojiSection(searchResultsLabel, matches);
                 if (section) {
                     sectionsContainer.appendChild(section);
                 }
@@ -521,7 +527,7 @@
             const sections = [];
             const recentEntries = getRecentEmojiEntries(library);
             if (recentEntries.length) {
-                const recentSection = createEmojiSection('Recently used', recentEntries);
+                const recentSection = createEmojiSection(translate('Recently used', 'Recently used'), recentEntries);
                 if (recentSection) {
                     sections.push(recentSection);
                 }
@@ -535,7 +541,7 @@
             });
 
             if (!sections.length) {
-                sectionsContainer.appendChild(createEmojiEmptyState('No emojis available.'));
+                sectionsContainer.appendChild(createEmojiEmptyState(translate('No emojis available.', 'No emojis available.')));
                 return;
             }
 
@@ -565,7 +571,8 @@
                 item.className = 'rich-text-emoji-menu__emoji';
                 item.textContent = entry.char;
                 const ariaLabel = entry.displayLabel || entry.shortcode || entry.char;
-                item.setAttribute('aria-label', `Insert ${ariaLabel}`);
+                const insertAriaLabel = translate('Insert {0}', 'Insert {0}').replace('{0}', ariaLabel);
+                item.setAttribute('aria-label', insertAriaLabel);
                 const preserveSelectionBeforeInsert = (event) => {
                     if (event.type === 'pointerdown') {
                         if (event.pointerType === 'mouse' && typeof event.button === 'number' && event.button !== 0) {
@@ -615,7 +622,7 @@
                 return Promise.resolve();
             }
 
-            showEmojiStatus('Loading emojis…');
+            showEmojiStatus(translate('Loading emojis…', 'Loading emojis…'));
             return getEmojiLibrary().then(result => {
                 library = result;
                 buildMenuStructure();

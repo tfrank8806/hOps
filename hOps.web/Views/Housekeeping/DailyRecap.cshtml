@@ -1,39 +1,52 @@
+@using System.Globalization
 @model hOps.web.ViewModels.Housekeeping.DailyRecapViewModel
 @{
-    ViewData["Title"] = "Daily Recap";
+    ViewData["Title"] = Html.Localize("Daily Recap");
     var property = ViewBag.CurrentProperty as hOps.web.Models.Property;
     var createdLogId = TempData["DailyRecapCreatedLogId"] as int?;
     var createdLogTitle = TempData["DailyRecapCreatedTitle"] as string;
-    var dayOfWeekText = Model.ReportDate?.ToString("dddd");
+    var dayOfWeekText = Model.ReportDate.HasValue
+        ? Model.ReportDate.Value.ToString("dddd", CultureInfo.InvariantCulture)
+        : string.Empty;
     var successLink = createdLogId.HasValue
         ? Url.Action("Details", "PassOnLogs", new { id = createdLogId.Value })
         : null;
+    var propertyNameDisplay = property != null
+        ? await Html.DisplayTranslatedTextAsync("Property", property.Id.ToString(), "Name", property.Name ?? string.Empty)
+        : string.Empty;
+    var propertyCodeDisplay = property?.Code ?? string.Empty;
+    var createdLogTitleDisplay = createdLogId.HasValue
+        ? await Html.DisplayTranslatedTextAsync("PassOnLog", createdLogId.Value.ToString(), "Title", createdLogTitle ?? string.Empty)
+        : createdLogTitle ?? string.Empty;
+    var dayOfWeekDisplay = string.IsNullOrWhiteSpace(dayOfWeekText) ? string.Empty : Html.Localize(dayOfWeekText, dayOfWeekText);
+    string LocalizeDisplayNameFor<TProp>(System.Linq.Expressions.Expression<Func<hOps.web.ViewModels.Housekeeping.DailyRecapViewModel, TProp>> expression)
+        => Html.Localize(Html.DisplayNameFor(expression).ToString());
 }
 
 <div class="daily-recap-page">
     <div class="daily-recap-header card shadow-sm mb-4">
         <div class="card-body d-flex flex-column flex-lg-row justify-content-between gap-4">
             <div>
-                <p class="text-uppercase text-muted fw-semibold small mb-1">Housekeeping log</p>
-                <h1 class="h3 mb-2">Daily Recap</h1>
+                <p class="text-uppercase text-muted fw-semibold small mb-1">@Html.Localize("Housekeeping log")</p>
+                <h1 class="h3 mb-2">@Html.Localize("Daily Recap")</h1>
                 <p class="mb-0 text-muted">
-                    Capture the housekeeping performance for the day. When you submit this form we'll automatically post the recap in <a asp-controller="PassOnLogs" asp-action="Index">Pass On Logs</a>.
+                    @Html.Localize("Capture the housekeeping performance for the day. When you submit this form we'll automatically post the recap in") <a asp-controller="PassOnLogs" asp-action="Index">@Html.Localize("Pass On Logs")</a>.
                 </p>
             </div>
             <div class="text-lg-end">
                 @if (property != null)
                 {
-                    <div class="text-muted small text-uppercase mb-1">Posting to</div>
-                    <div class="h5 mb-0">@property.Name</div>
-                    @if (!string.IsNullOrWhiteSpace(property.Code))
+                    <div class="text-muted small text-uppercase mb-1">@Html.Localize("Posting to")</div>
+                    <div class="h5 mb-0">@propertyNameDisplay</div>
+                    @if (!string.IsNullOrWhiteSpace(propertyCodeDisplay))
                     {
-                        <div class="text-muted">@property.Code</div>
+                        <div class="text-muted">@propertyCodeDisplay</div>
                     }
                 }
                 else
                 {
                     <div class="alert alert-warning mb-0">
-                        Select a property from the header to unlock the daily recap form.
+                        @Html.Localize("Select a property from the header to unlock the daily recap form.")
                     </div>
                 }
             </div>
@@ -44,12 +57,19 @@
     {
         <div class="alert alert-success d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-4" role="status">
             <div>
-                <strong>Success!</strong>
-                <span>@(string.IsNullOrWhiteSpace(createdLogTitle) ? "Daily recap posted to Pass On Logs." : $"{createdLogTitle} was posted to Pass On Logs.")</span>
+                <strong>@Html.Localize("Success!")</strong>
+                <span>
+                    @{
+                        var successMessage = string.IsNullOrWhiteSpace(createdLogTitleDisplay)
+                            ? Html.Localize("Daily recap posted to Pass On Logs.")
+                            : string.Format(Html.Localize("{0} was posted to Pass On Logs."), createdLogTitleDisplay);
+                    }
+                    @successMessage
+                </span>
             </div>
             @if (!string.IsNullOrWhiteSpace(successLink))
             {
-                <a class="btn btn-outline-success btn-sm" href="@successLink">View log</a>
+                <a class="btn btn-outline-success btn-sm" href="@successLink">@Html.Localize("View log")</a>
             }
         </div>
     }
@@ -57,7 +77,7 @@
     @if (property == null)
     {
         <div class="alert alert-info">
-            Choose a property from the selector above to start tracking your daily housekeeping recap.
+            @Html.Localize("Choose a property from the selector above to start tracking your daily housekeeping recap.")
         </div>
     }
     else
@@ -68,20 +88,20 @@
 
             <div class="card daily-recap-card mb-4">
                 <div class="card-body">
-                    <h2 class="h5 mb-3">Daily overview</h2>
+                    <h2 class="h5 mb-3">@Html.Localize("Daily overview")</h2>
                     <div class="row g-4">
                         <div class="col-md-4">
-                            <label asp-for="ReportDate" class="form-label"></label>
+                            @Html.LabelFor(m => m.ReportDate, LocalizeDisplayNameFor(m => m.ReportDate), new { @class = "form-label" })
                             <input asp-for="ReportDate" type="date" class="form-control" data-day-source />
                             <span asp-validation-for="ReportDate" class="text-danger small"></span>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Day of Week</label>
-                            <input type="text" class="form-control" value="@dayOfWeekText" readonly data-day-target />
+                            <label class="form-label">@Html.Localize("Day of Week")</label>
+                            <input type="text" class="form-control" value="@dayOfWeekDisplay" readonly data-day-target />
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="ManagerName" class="form-label"></label>
-                            <input asp-for="ManagerName" class="form-control" placeholder="Name of manager or supervisor" />
+                            @Html.LabelFor(m => m.ManagerName, LocalizeDisplayNameFor(m => m.ManagerName), new { @class = "form-label" })
+                            <input asp-for="ManagerName" class="form-control" placeholder="@Html.Localize("Name of manager or supervisor")" />
                             <span asp-validation-for="ManagerName" class="text-danger small"></span>
                         </div>
                     </div>
@@ -90,46 +110,46 @@
 
             <div class="card daily-recap-card mb-4">
                 <div class="card-body">
-                    <h2 class="h5 mb-3">Daily metrics</h2>
+                    <h2 class="h5 mb-3">@Html.Localize("Daily metrics")</h2>
                     <div class="row g-4">
                         <div class="col-md-6">
-                            <div class="daily-recap-section-label">Start of Day</div>
+                            <div class="daily-recap-section-label">@Html.Localize("Start of Day")</div>
                             <div class="row g-3">
                                 <div class="col-sm-6">
-                                    <label asp-for="OccupancyPercent" class="form-label small"></label>
-                                    <input asp-for="OccupancyPercent" class="form-control form-control-sm" placeholder="e.g. 88%" />
+                                    @Html.LabelFor(m => m.OccupancyPercent, LocalizeDisplayNameFor(m => m.OccupancyPercent), new { @class = "form-label small" })
+                                    <input asp-for="OccupancyPercent" class="form-control form-control-sm" placeholder="@Html.Localize("e.g. 88%")" />
                                 </div>
                                 <div class="col-sm-6">
-                                    <label asp-for="CheckOuts" class="form-label small"></label>
-                                    <input asp-for="CheckOuts" class="form-control form-control-sm" placeholder="Number of check-outs" />
+                                    @Html.LabelFor(m => m.CheckOuts, LocalizeDisplayNameFor(m => m.CheckOuts), new { @class = "form-label small" })
+                                    <input asp-for="CheckOuts" class="form-control form-control-sm" placeholder="@Html.Localize("Number of check-outs")" />
                                 </div>
                                 <div class="col-sm-6">
-                                    <label asp-for="Stayovers" class="form-label small"></label>
+                                    @Html.LabelFor(m => m.Stayovers, LocalizeDisplayNameFor(m => m.Stayovers), new { @class = "form-label small" })
                                     <input asp-for="Stayovers" class="form-control form-control-sm" />
                                 </div>
                                 <div class="col-sm-6">
-                                    <label asp-for="RoomsOutOfOrderStart" class="form-label small"></label>
+                                    @Html.LabelFor(m => m.RoomsOutOfOrderStart, LocalizeDisplayNameFor(m => m.RoomsOutOfOrderStart), new { @class = "form-label small" })
                                     <input asp-for="RoomsOutOfOrderStart" class="form-control form-control-sm" />
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="daily-recap-section-label">End of Day</div>
+                            <div class="daily-recap-section-label">@Html.Localize("End of Day")</div>
                             <div class="row g-3">
                                 <div class="col-sm-6">
-                                    <label asp-for="VacantClean" class="form-label small"></label>
+                                    @Html.LabelFor(m => m.VacantClean, LocalizeDisplayNameFor(m => m.VacantClean), new { @class = "form-label small" })
                                     <input asp-for="VacantClean" class="form-control form-control-sm" />
                                 </div>
                                 <div class="col-sm-6">
-                                    <label asp-for="VacantDirty" class="form-label small"></label>
+                                    @Html.LabelFor(m => m.VacantDirty, LocalizeDisplayNameFor(m => m.VacantDirty), new { @class = "form-label small" })
                                     <input asp-for="VacantDirty" class="form-control form-control-sm" />
                                 </div>
                                 <div class="col-sm-6">
-                                    <label asp-for="DeepCleansCompleted" class="form-label small"></label>
+                                    @Html.LabelFor(m => m.DeepCleansCompleted, LocalizeDisplayNameFor(m => m.DeepCleansCompleted), new { @class = "form-label small" })
                                     <input asp-for="DeepCleansCompleted" class="form-control form-control-sm" />
                                 </div>
                                 <div class="col-sm-6">
-                                    <label asp-for="RoomsOutOfOrderEnd" class="form-label small"></label>
+                                    @Html.LabelFor(m => m.RoomsOutOfOrderEnd, LocalizeDisplayNameFor(m => m.RoomsOutOfOrderEnd), new { @class = "form-label small" })
                                     <input asp-for="RoomsOutOfOrderEnd" class="form-control form-control-sm" />
                                 </div>
                             </div>
@@ -141,22 +161,22 @@
             <div class="card daily-recap-card mb-4">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                        <h2 class="h5 mb-0">1. Staffing Overview</h2>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="Staffing">Add row</button>
+                        <h2 class="h5 mb-0">@Html.Localize("1. Staffing Overview")</h2>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="Staffing">@Html.Localize("Add row")</button>
                     </div>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label asp-for="PublicAreasAttendant" class="form-label fw-semibold"></label>
+                            @Html.LabelFor(m => m.PublicAreasAttendant, LocalizeDisplayNameFor(m => m.PublicAreasAttendant), new { @class = "form-label fw-semibold" })
                             <input asp-for="PublicAreasAttendant"
                                    class="form-control"
-                                   placeholder="Name of the associate covering public areas" />
+                                   placeholder="@Html.Localize("Name of the associate covering public areas")" />
                             <span asp-validation-for="PublicAreasAttendant" class="text-danger small"></span>
                         </div>
                         <div class="col-md-6">
-                            <label asp-for="LaundryAttendant" class="form-label fw-semibold"></label>
+                            @Html.LabelFor(m => m.LaundryAttendant, LocalizeDisplayNameFor(m => m.LaundryAttendant), new { @class = "form-label fw-semibold" })
                             <input asp-for="LaundryAttendant"
                                    class="form-control"
-                                   placeholder="Name of the associate covering laundry" />
+                                   placeholder="@Html.Localize("Name of the associate covering laundry")" />
                             <span asp-validation-for="LaundryAttendant" class="text-danger small"></span>
                         </div>
                     </div>
@@ -164,12 +184,12 @@
                         <table class="table table-sm table-bordered align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Area</th>
-                                    <th>Scheduled</th>
-                                    <th>Call-Offs</th>
-                                    <th>Tardies</th>
-                                    <th>Notes</th>
-                                    <th class="text-center">Remove</th>
+                                    <th>@Html.Localize("Area")</th>
+                                    <th>@Html.Localize("Scheduled")</th>
+                                    <th>@Html.Localize("Call-Offs")</th>
+                                    <th>@Html.Localize("Tardies")</th>
+                                    <th>@Html.Localize("Notes")</th>
+                                    <th class="text-center">@Html.Localize("Remove")</th>
                                 </tr>
                             </thead>
                             <tbody data-collection="Staffing" data-next-index="@Model.Staffing.Count">
@@ -193,7 +213,7 @@
                                             <input asp-for="Staffing[i].Notes" class="form-control form-control-sm" />
                                         </td>
                                         <td class="text-center align-middle">
-                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="Remove row">&times;</button>
+                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="@Html.Localize("Remove row")">&times;</button>
                                         </td>
                                     </tr>
                                 }
@@ -205,19 +225,19 @@
             <div class="card daily-recap-card mb-4">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                        <h2 class="h5 mb-0">2. Out of Order / Out of Service Rooms</h2>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="OutOfOrderRooms">Add row</button>
+                        <h2 class="h5 mb-0">@Html.Localize("2. Out of Order / Out of Service Rooms")</h2>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="OutOfOrderRooms">@Html.Localize("Add row")</button>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-sm table-bordered align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Room Number</th>
-                                    <th>OOO / OOS</th>
-                                    <th>Issue</th>
-                                    <th>Clean or Dirty</th>
-                                    <th>If dirty, why left dirty?</th>
-                                    <th class="text-center">Remove</th>
+                                    <th>@Html.Localize("Room Number")</th>
+                                    <th>@Html.Localize("OOO / OOS")</th>
+                                    <th>@Html.Localize("Issue")</th>
+                                    <th>@Html.Localize("Clean or Dirty")</th>
+                                    <th>@Html.Localize("If dirty, why left dirty?")</th>
+                                    <th class="text-center">@Html.Localize("Remove")</th>
                                 </tr>
                             </thead>
                             <tbody data-collection="OutOfOrderRooms" data-next-index="@Model.OutOfOrderRooms.Count">
@@ -241,7 +261,7 @@
                                             <input asp-for="OutOfOrderRooms[i].ReasonLeftDirty" class="form-control form-control-sm" />
                                         </td>
                                         <td class="text-center align-middle">
-                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="@Html.Localize("Remove row")">&times;</button>
                                         </td>
                                     </tr>
                                 }
@@ -254,19 +274,19 @@
             <div class="card daily-recap-card mb-4">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                        <h2 class="h5 mb-0">3. Rooms Not Cleaned / Rolled Over / DND</h2>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="RoomsNotCleaned">Add row</button>
+                        <h2 class="h5 mb-0">@Html.Localize("3. Rooms Not Cleaned / Rolled Over / DND")</h2>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="RoomsNotCleaned">@Html.Localize("Add row")</button>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-sm table-bordered align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Room Number</th>
-                                    <th>Room Status</th>
-                                    <th>Reason Not Cleaned</th>
-                                    <th>Assigned To</th>
-                                    <th>Action Plan / Next Step</th>
-                                    <th class="text-center">Remove</th>
+                                    <th>@Html.Localize("Room Number")</th>
+                                    <th>@Html.Localize("Room Status")</th>
+                                    <th>@Html.Localize("Reason Not Cleaned")</th>
+                                    <th>@Html.Localize("Assigned To")</th>
+                                    <th>@Html.Localize("Action Plan / Next Step")</th>
+                                    <th class="text-center">@Html.Localize("Remove")</th>
                                 </tr>
                             </thead>
                             <tbody data-collection="RoomsNotCleaned" data-next-index="@Model.RoomsNotCleaned.Count">
@@ -290,7 +310,7 @@
                                             <input asp-for="RoomsNotCleaned[i].ActionPlan" class="form-control form-control-sm" />
                                         </td>
                                         <td class="text-center align-middle">
-                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="@Html.Localize("Remove row")">&times;</button>
                                         </td>
                                     </tr>
                                 }
@@ -303,19 +323,19 @@
             <div class="card daily-recap-card mb-4">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                        <h2 class="h5 mb-0">4. Maintenance Issues Found by Housekeeping</h2>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="MaintenanceIssues">Add row</button>
+                        <h2 class="h5 mb-0">@Html.Localize("4. Maintenance Issues Found by Housekeeping")</h2>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="MaintenanceIssues">@Html.Localize("Add row")</button>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-sm table-bordered align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Room / Area</th>
-                                    <th>Issue Found</th>
-                                    <th>Work Order Submitted?</th>
-                                    <th>Room Status</th>
-                                    <th>Notes</th>
-                                    <th class="text-center">Remove</th>
+                                    <th>@Html.Localize("Room / Area")</th>
+                                    <th>@Html.Localize("Issue Found")</th>
+                                    <th>@Html.Localize("Work Order Submitted?")</th>
+                                    <th>@Html.Localize("Room Status")</th>
+                                    <th>@Html.Localize("Notes")</th>
+                                    <th class="text-center">@Html.Localize("Remove")</th>
                                 </tr>
                             </thead>
                             <tbody data-collection="MaintenanceIssues" data-next-index="@Model.MaintenanceIssues.Count">
@@ -339,7 +359,7 @@
                                             <input asp-for="MaintenanceIssues[i].Notes" class="form-control form-control-sm" />
                                         </td>
                                         <td class="text-center align-middle">
-                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="@Html.Localize("Remove row")">&times;</button>
                                         </td>
                                     </tr>
                                 }
@@ -352,19 +372,19 @@
             <div class="card daily-recap-card mb-4">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                        <h2 class="h5 mb-0">5. Cleanliness / Inspection Failures</h2>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="InspectionFailures">Add row</button>
+                        <h2 class="h5 mb-0">@Html.Localize("5. Cleanliness / Inspection Failures")</h2>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="InspectionFailures">@Html.Localize("Add row")</button>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-sm table-bordered align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Room / Area</th>
-                                    <th>Issue</th>
-                                    <th>Associate Responsible</th>
-                                    <th>Coaching Given?</th>
-                                    <th>Notes</th>
-                                    <th class="text-center">Remove</th>
+                                    <th>@Html.Localize("Room / Area")</th>
+                                    <th>@Html.Localize("Issue")</th>
+                                    <th>@Html.Localize("Associate Responsible")</th>
+                                    <th>@Html.Localize("Coaching Given?")</th>
+                                    <th>@Html.Localize("Notes")</th>
+                                    <th class="text-center">@Html.Localize("Remove")</th>
                                 </tr>
                             </thead>
                             <tbody data-collection="InspectionFailures" data-next-index="@Model.InspectionFailures.Count">
@@ -388,7 +408,7 @@
                                             <input asp-for="InspectionFailures[i].Notes" class="form-control form-control-sm" />
                                         </td>
                                         <td class="text-center align-middle">
-                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="@Html.Localize("Remove row")">&times;</button>
                                         </td>
                                     </tr>
                                 }
@@ -402,21 +422,21 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                         <div>
-                            <h2 class="h5 mb-1">6. Public Areas / Laundry / Supplies</h2>
-                            <p class="text-muted small mb-0">Attach the signed Houseman/Public Area Attendant checklist in Pass On Logs if needed.</p>
+                            <h2 class="h5 mb-1">@Html.Localize("6. Public Areas / Laundry / Supplies")</h2>
+                            <p class="text-muted small mb-0">@Html.Localize("Attach the signed Houseman/Public Area Attendant checklist in Pass On Logs if needed.")</p>
                         </div>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="PublicAreas">Add row</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-collection-add="PublicAreas">@Html.Localize("Add row")</button>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-sm table-bordered align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Area / Item</th>
-                                    <th>Completed?</th>
-                                    <th>Issue / Shortage</th>
-                                    <th>Items Need Order</th>
-                                    <th>Notes</th>
-                                    <th class="text-center">Remove</th>
+                                    <th>@Html.Localize("Area / Item")</th>
+                                    <th>@Html.Localize("Completed?")</th>
+                                    <th>@Html.Localize("Issue / Shortage")</th>
+                                    <th>@Html.Localize("Items Need Order")</th>
+                                    <th>@Html.Localize("Notes")</th>
+                                    <th class="text-center">@Html.Localize("Remove")</th>
                                 </tr>
                             </thead>
                             <tbody data-collection="PublicAreas" data-next-index="@Model.PublicAreas.Count">
@@ -440,7 +460,7 @@
                                             <input asp-for="PublicAreas[i].Notes" class="form-control form-control-sm" />
                                         </td>
                                         <td class="text-center align-middle">
-                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+                                            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="@Html.Localize("Remove row")">&times;</button>
                                         </td>
                                     </tr>
                                 }
@@ -451,23 +471,23 @@
             </div>
             <div class="card daily-recap-card mb-4">
                 <div class="card-body">
-                    <h2 class="h5 mb-3">8. Associate Performance Notes & End-of-Day Summary</h2>
+                    <h2 class="h5 mb-3">@Html.Localize("8. Associate Performance Notes & End-of-Day Summary")</h2>
                     <div class="row g-4">
                         <div class="col-md-6">
-                            <label asp-for="PerformanceHighlights" class="form-label small"></label>
-                            <textarea asp-for="PerformanceHighlights" rows="3" class="form-control" placeholder="Recognize standout team members, wins, or shout-outs."></textarea>
+                            @Html.LabelFor(m => m.PerformanceHighlights, LocalizeDisplayNameFor(m => m.PerformanceHighlights), new { @class = "form-label small" })
+                            <textarea asp-for="PerformanceHighlights" rows="3" class="form-control" placeholder="@Html.Localize("Recognize standout team members, wins, or shout-outs.")"></textarea>
                         </div>
                         <div class="col-md-6">
-                            <label asp-for="PerformanceCoaching" class="form-label small"></label>
-                            <textarea asp-for="PerformanceCoaching" rows="3" class="form-control" placeholder="Document coaching or accountability items."></textarea>
+                            @Html.LabelFor(m => m.PerformanceCoaching, LocalizeDisplayNameFor(m => m.PerformanceCoaching), new { @class = "form-label small" })
+                            <textarea asp-for="PerformanceCoaching" rows="3" class="form-control" placeholder="@Html.Localize("Document coaching or accountability items.")"></textarea>
                         </div>
                         <div class="col-md-6">
-                            <label asp-for="OperationalChallenges" class="form-label small"></label>
-                            <textarea asp-for="OperationalChallenges" rows="3" class="form-control" placeholder="What slowed the team down or needs help?"></textarea>
+                            @Html.LabelFor(m => m.OperationalChallenges, LocalizeDisplayNameFor(m => m.OperationalChallenges), new { @class = "form-label small" })
+                            <textarea asp-for="OperationalChallenges" rows="3" class="form-control" placeholder="@Html.Localize("What slowed the team down or needs help?")"></textarea>
                         </div>
                         <div class="col-md-6">
-                            <label asp-for="TomorrowPlan" class="form-label small"></label>
-                            <textarea asp-for="TomorrowPlan" rows="3" class="form-control" placeholder="Outline follow-up tasks or tomorrow's focus."></textarea>
+                            @Html.LabelFor(m => m.TomorrowPlan, LocalizeDisplayNameFor(m => m.TomorrowPlan), new { @class = "form-label small" })
+                            <textarea asp-for="TomorrowPlan" rows="3" class="form-control" placeholder="@Html.Localize("Outline follow-up tasks or tomorrow's focus.")"></textarea>
                         </div>
                     </div>
                 </div>
@@ -475,14 +495,14 @@
 
             <div class="card daily-recap-card mb-4">
                 <div class="card-body">
-                    <h2 class="h5 mb-3">@Html.DisplayNameFor(m => m.AdditionalNotes)</h2>
-                    <textarea asp-for="AdditionalNotes" rows="4" class="form-control" placeholder="Any other updates worth sharing with the next shift?"></textarea>
+                    <h2 class="h5 mb-3">@Html.Localize(Html.DisplayNameFor(m => m.AdditionalNotes).ToString())</h2>
+                    <textarea asp-for="AdditionalNotes" rows="4" class="form-control" placeholder="@Html.Localize("Any other updates worth sharing with the next shift?")"></textarea>
                 </div>
             </div>
 
             <div class="d-flex justify-content-end gap-2">
-                <a asp-controller="PassOnLogs" asp-action="Index" class="btn btn-outline-secondary">View Pass On Logs</a>
-                <button type="submit" class="btn btn-primary">Post Daily Recap</button>
+                <a asp-controller="PassOnLogs" asp-action="Index" class="btn btn-outline-secondary">@Html.Localize("View Pass On Logs")</a>
+                <button type="submit" class="btn btn-primary">@Html.Localize("Post Daily Recap")</button>
             </div>
         </form>
     }
@@ -506,7 +526,7 @@
             <input class="form-control form-control-sm" name="Staffing[__index__].Notes" />
         </td>
         <td class="text-center align-middle">
-            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="@Html.Localize("Remove row")">&times;</button>
         </td>
     </tr>
 </template>
@@ -530,7 +550,7 @@
             <input class="form-control form-control-sm" name="OutOfOrderRooms[__index__].ReasonLeftDirty" />
         </td>
         <td class="text-center align-middle">
-            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="@Html.Localize("Remove row")">&times;</button>
         </td>
     </tr>
 </template>
@@ -554,7 +574,7 @@
             <input class="form-control form-control-sm" name="RoomsNotCleaned[__index__].ActionPlan" />
         </td>
         <td class="text-center align-middle">
-            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="@Html.Localize("Remove row")">&times;</button>
         </td>
     </tr>
 </template>
@@ -578,7 +598,7 @@
             <input class="form-control form-control-sm" name="MaintenanceIssues[__index__].Notes" />
         </td>
         <td class="text-center align-middle">
-            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="@Html.Localize("Remove row")">&times;</button>
         </td>
     </tr>
 </template>
@@ -602,7 +622,7 @@
             <input class="form-control form-control-sm" name="InspectionFailures[__index__].Notes" />
         </td>
         <td class="text-center align-middle">
-            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="@Html.Localize("Remove row")">&times;</button>
         </td>
     </tr>
 </template>
@@ -626,7 +646,7 @@
             <input class="form-control form-control-sm" name="PublicAreas[__index__].Notes" />
         </td>
         <td class="text-center align-middle">
-            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove>&times;</button>
+            <button type="button" class="btn btn-link text-danger p-0" data-collection-remove title="@Html.Localize("Remove row")">&times;</button>
         </td>
     </tr>
 </template>

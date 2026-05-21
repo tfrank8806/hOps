@@ -1,12 +1,12 @@
 @model hOps.web.ViewModels.MasterEmployees.MasterEmployeeFormViewModel
 @{
-    ViewData["Title"] = "Add Employee";
+    ViewData["Title"] = Html.Localize("Add Employee");
     ViewData["MainContainerClass"] = "main-inner--wide";
 }
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
-    <h1 class="h3 mb-0">Add Employee</h1>
-    <a class="btn btn-outline-secondary" asp-action="Index">Back to list</a>
+    <h1 class="h3 mb-0">@Html.Localize("Add Employee")</h1>
+    <a class="btn btn-outline-secondary" asp-action="Index">@Html.Localize("Back to list")</a>
 </div>
 
 <div class="card shadow-sm">
@@ -27,7 +27,7 @@
                 <div class="col-md-6">
                     <label asp-for="DepartmentId" class="form-label"></label>
                     <select asp-for="DepartmentId" class="form-select" asp-items="Model.DepartmentOptions">
-                        <option value="">Select a department</option>
+                        <option value="">@Html.Localize("Select a department")</option>
                     </select>
                     <span asp-validation-for="DepartmentId" class="text-danger small"></span>
                 </div>
@@ -38,8 +38,8 @@
                 </div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-4">
-                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
-                <button type="submit" class="btn btn-primary">Save Employee</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">@Html.Localize("Cancel")</a>
+                <button type="submit" class="btn btn-primary">@Html.Localize("Save Employee")</button>
             </div>
         </form>
     </div>
@@ -48,3 +48,4 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
 }
+

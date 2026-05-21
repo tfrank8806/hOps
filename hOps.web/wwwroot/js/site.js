@@ -1,3 +1,8 @@
+(() => {
+const translate = typeof window.hopsTranslate === 'function'
+    ? window.hopsTranslate
+    : (key, fallback) => (typeof fallback === 'string' && fallback.length ? fallback : key);
+
 document.addEventListener('DOMContentLoaded', () => {
     const multiselects = document.querySelectorAll('select.js-checkbox-multiselect');
     if (!multiselects.length) {
@@ -12,8 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
         select.dataset.checkboxMultiselect = 'true';
         select.multiple = true;
 
-        const placeholder = select.dataset.placeholder || 'Select options';
-        const allLabel = select.dataset.allLabel || 'All';
+        const placeholder = select.dataset.placeholder || translate('Select options', 'Select options');
+        const allLabel = select.dataset.allLabel || translate('All', 'All');
 
         const wrapper = document.createElement('div');
         wrapper.className = 'dropdown filter-multiselect w-100';
@@ -125,7 +130,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 labelSpan.textContent = selectedLabels[0];
                 button.title = selectedLabels[0];
             } else {
-                labelSpan.textContent = `${selectedLabels.length} selected`;
+                const selectedCountTemplate = translate('Shared.Site.MultiselectSelectedCount', '{0} selected');
+                const countText = selectedCountTemplate.replace('{0}', selectedLabels.length.toString());
+                labelSpan.textContent = countText;
                 button.title = selectedLabels.join(', ');
             }
         };
@@ -202,8 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const collapsed = body.classList.toggle('sidebar-collapsed');
         sidebarToggleButton.setAttribute('aria-expanded', (!collapsed).toString());
         userToggledSidebar = true;
-    });
-
+});
+})();
     window.addEventListener('resize', () => {
         if (window.innerWidth >= RESPONSIVE_BREAKPOINT && body.classList.contains('sidebar-collapsed') && !userToggledSidebar) {
             body.classList.remove('sidebar-collapsed');

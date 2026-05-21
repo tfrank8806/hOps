@@ -1,3 +1,4 @@
+@using System.Globalization
 @using hOps.web.Utilities
 @model hOps.web.ViewModels.Home.HomeIndexViewModel
 
@@ -13,25 +14,25 @@
 <div class="card shadow-sm h-100">
     <div class="card-header d-flex flex-column flex-md-row gap-2 align-items-start align-items-md-center justify-content-between">
         <div>
-            <h2 class="h5 mb-0">Bulletin Board</h2>
+            <h2 class="h5 mb-0">@Html.Localize("Bulletin Board")</h2>
             @if (hasProperty)
             {
-                <span class="text-muted small">Visible to everyone at @property!.Name</span>
+                <span class="text-muted small">@string.Format(Html.Localize("Visible to everyone at {0}"), property?.Name ?? string.Empty)</span>
             }
         </div>
         <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#newBulletinModal" @(hasProperty ? string.Empty : "disabled")>
             <span class="me-1" aria-hidden="true">+</span>
-            <span>New Bulletin</span>
+            <span>@Html.Localize("New Bulletin")</span>
         </button>
     </div>
     <div class="card-body">
         @if (!hasProperty)
         {
-            <p class="text-muted mb-0">Select a property to collaborate with your team.</p>
+            <p class="text-muted mb-0">@Html.Localize("Select a property to collaborate with your team.")</p>
         }
         else if (!Model.BulletinPosts.Any())
         {
-            <p class="text-muted mb-0">No bulletin posts yet. Start the conversation above.</p>
+            <p class="text-muted mb-0">@Html.Localize("No bulletin posts yet. Start the conversation above.")</p>
         }
         else
         {
@@ -40,21 +41,28 @@
                 {
                     var modalId = $"editBulletinModal_{post.Id}";
                     var modalLabelId = $"{modalId}Label";
+                    var editLabel = Html.Localize("Edit");
+                    var deleteLabel = Html.Localize("Delete");
+                    var removeConfirm = Html.Localize("Remove this bulletin entry?");
+                    var translatedContent = await Html.DisplayTranslatedTextAsync("BulletinPost", post.Id.ToString(CultureInfo.InvariantCulture), "Content", post.Content ?? string.Empty);
+                    var renderedContent = RichTextRenderer.ToHtml(translatedContent);
                     <article class="bulletin-item mb-4 p-3 border rounded-3">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <h3 class="h6 mb-1">@(!string.IsNullOrWhiteSpace(post.CreatedByName) ? post.CreatedByName : "Team Member")</h3>
+                                <h3 class="h6 mb-1">@(!string.IsNullOrWhiteSpace(post.CreatedByName) ? post.CreatedByName : Html.Localize("Team Member"))</h3>
                                 @{
                                     var createdLocal = TimeZoneService.ConvertToUserTime(post.CreatedAt);
                                     var updatedLocal = post.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(post.UpdatedAt.Value) : (DateTime?)null;
                                 }
-                                <p class="mb-2 text-muted small">Posted @createdLocal.ToString("g")
+                                <p class="mb-2 text-muted small">
+                                @string.Format(Html.Localize("Posted {0}"), createdLocal.ToString("g"))
                                 @if (post.UpdatedAt.HasValue)
                                 {
-                                    <span class="ms-2">• Updated @updatedLocal?.ToString("g")
+                                    <span class="ms-2">
+                                        @string.Format(Html.Localize("Updated {0}"), updatedLocal?.ToString("g") ?? string.Empty)
                                         @if (!string.IsNullOrWhiteSpace(post.UpdatedByName))
                                         {
-                                            <text>by @post.UpdatedByName</text>
+                                            <text> @string.Format(Html.Localize("by {0}"), post.UpdatedByName)</text>
                                         }
                                     </span>
                                 }
@@ -63,17 +71,17 @@
                             @if (post.CanEdit)
                             {
                                 <div class="btn-group">
-                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#@modalId">Edit</button>
-                                    <form asp-action="DeleteBulletin" method="post" onsubmit="return confirm('Remove this bulletin entry?');">
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#@modalId">@editLabel</button>
+                                    <form asp-action="DeleteBulletin" method="post" onsubmit="return confirm('@removeConfirm');">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="id" value="@post.Id" />
                                         <input type="hidden" name="propertyId" value="@property!.Id" />
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">@deleteLabel</button>
                                     </form>
                                 </div>
                             }
                         </div>
-                        <div class="bulletin-content rich-text-output">@Html.Raw(RichTextRenderer.ToHtml(post.Content))</div>
+                        <div class="bulletin-content rich-text-output">@Html.Raw(renderedContent)</div>
 
                         @if (post.Attachments.Any())
                         {
@@ -96,8 +104,8 @@
                                 <div class="modal-dialog modal-lg modal-dialog-scrollable">
                                     <div class="modal-content">
                                         <div class="modal-header">
-                                            <h5 class="modal-title" id="@modalLabelId">Edit Bulletin</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            <h5 class="modal-title" id="@modalLabelId">@Html.Localize("Edit Bulletin")</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label='@Html.Localize("Close")'></button>
                                         </div>
                                         <div class="modal-body">
                                             <form asp-action="UpdateBulletin" method="post" enctype="multipart/form-data">
@@ -105,7 +113,7 @@
                                                 <input type="hidden" name="Id" value="@post.Id" />
                                                 <input type="hidden" name="PropertyId" value="@property!.Id" />
                                                 <div class="mb-3">
-                                                    <label class="form-label" for="bulletinContent_@post.Id">Edit message</label>
+                                                    <label class="form-label" for="bulletinContent_@post.Id">@Html.Localize("Edit message")</label>
                                                     <textarea class="form-control"
                                                               id="bulletinContent_@post.Id"
                                                               name="Content"
@@ -115,12 +123,12 @@
                                                               data-rich-text="true"
                                                               data-clipboard-upload-target="#bulletinFiles_@post.Id"
                                                               data-initial-html="@postInitialHtml">@Html.Raw(EscapeTextareaValue(post.Content))</textarea>
-                                                    <div class="form-text">Use the toolbar to emphasize changes before saving.</div>
+                                                    <div class="form-text">@Html.Localize("Use the toolbar to emphasize changes before saving.")</div>
                                                 </div>
                                                 @if (post.Attachments.Any())
                                                 {
                                                     <div class="mb-3">
-                                                        <label class="form-label">Current Attachments</label>
+                                                        <label class="form-label">@Html.Localize("Current Attachments")</label>
                                                         <ul class="list-unstyled mb-2">
                                                             @foreach (var attachment in post.Attachments)
                                                             {
@@ -129,22 +137,22 @@
                                                                     <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
                                                                     <div class="form-check mb-0">
                                                                         <input class="form-check-input" type="checkbox" name="AttachmentsToDelete" value="@attachment.Id" id="@checkboxId" />
-                                                                        <label class="form-check-label" for="@checkboxId">Remove</label>
+                                                                        <label class="form-check-label" for="@checkboxId">@Html.Localize("Remove")</label>
                                                                     </div>
                                                                 </li>
                                                             }
                                                         </ul>
-                                                        <div class="form-text">Select remove to delete existing files before saving.</div>
+                                                        <div class="form-text">@Html.Localize("Select remove to delete existing files before saving.")</div>
                                                     </div>
                                                 }
                                                 <div class="mb-3">
-                                                    <label class="form-label" for="bulletinFiles_@post.Id">Add Attachments</label>
+                                                    <label class="form-label" for="bulletinFiles_@post.Id">@Html.Localize("Add Attachments")</label>
                                                     <input class="form-control" type="file" id="bulletinFiles_@post.Id" name="Files" multiple />
-                                                    <div class="form-text">Attach additional files to share updated details.</div>
+                                                    <div class="form-text">@Html.Localize("Attach additional files to share updated details.")</div>
                                                 </div>
                                                 <div class="d-flex justify-content-end gap-2">
-                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Html.Localize("Cancel")</button>
+                                                    <button type="submit" class="btn btn-primary">@Html.Localize("Save Changes")</button>
                                                 </div>
                                             </form>
                                         </div>
@@ -165,26 +173,26 @@
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="newBulletinModalLabel">New Bulletin</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title" id="newBulletinModalLabel">@Html.Localize("New Bulletin")</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label='@Html.Localize("Close")'></button>
                 </div>
                 <div class="modal-body">
                     <form asp-action="CreateBulletin" method="post" enctype="multipart/form-data">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="PropertyId" value="@property!.Id" />
                         <div class="mb-3">
-                            <label for="newBulletinContent" class="form-label">Share an update</label>
-                            <textarea class="form-control" id="newBulletinContent" name="Content" rows="3" maxlength="2000" placeholder="Add a note for the team" required data-enable-mentions="true" data-rich-text="true" data-clipboard-upload-target="#newBulletinFiles"></textarea>
+                            <label for="newBulletinContent" class="form-label">@Html.Localize("Share an update")</label>
+                            <textarea class="form-control" id="newBulletinContent" name="Content" rows="3" maxlength="2000" placeholder='@Html.Localize("Add a note for the team")' required data-enable-mentions="true" data-rich-text="true" data-clipboard-upload-target="#newBulletinFiles"></textarea>
                             <div class="form-text">Formatting supports bold, italic, underline, lists, and quotes to highlight key details. Use Shift + Enter to create a new line.</div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label" for="newBulletinFiles">Attachments (optional)</label>
+                            <label class="form-label" for="newBulletinFiles">@Html.Localize("Attachments (optional)")</label>
                             <input class="form-control" type="file" id="newBulletinFiles" name="Files" multiple />
-                            <div class="form-text">Add photos or documents to give more context.</div>
+                            <div class="form-text">@Html.Localize("Add photos or documents to give more context.")</div>
                         </div>
                         <div class="d-flex justify-content-end gap-2">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Post to Bulletin</button>
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Html.Localize("Cancel")</button>
+                            <button type="submit" class="btn btn-primary">@Html.Localize("Post to Bulletin")</button>
                         </div>
                     </form>
                 </div>
@@ -208,3 +216,15 @@
         </script>
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+

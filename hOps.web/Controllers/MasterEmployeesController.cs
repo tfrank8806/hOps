@@ -45,6 +45,7 @@ namespace hOps.web.Controllers
                 .Select(e => new MasterEmployeeRowViewModel
                 {
                     Id = e.Id,
+                    DepartmentId = e.DepartmentId,
                     FirstName = e.FirstName,
                     LastName = e.LastName,
                     DepartmentName = e.Department.Name ?? "Unassigned",

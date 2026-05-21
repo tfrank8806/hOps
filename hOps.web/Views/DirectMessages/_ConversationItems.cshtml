@@ -1,10 +1,11 @@
+@using System.Globalization
 @using hOps.web.Utilities
 @model hOps.web.ViewModels.Messages.DirectMessagePageViewModel
 
 @if (!Model.Conversations.Any())
 {
     <div class="direct-messages-conversation-list__empty text-muted small px-3 py-4">
-        No conversations yet.
+        @Html.Localize("DirectMessages.Conversations.EmptyState", "No conversations yet.")
     </div>
 }
 else
@@ -12,8 +13,9 @@ else
     foreach (var conversation in Model.Conversations)
     {
         var url = Url.Action("Index", new { conversationId = conversation.ConversationId });
+        var fallbackName = Html.Localize("DirectMessages.Conversations.FallbackName", "Teammate").ToString();
         var displayName = string.IsNullOrWhiteSpace(conversation.ParticipantName)
-            ? (!string.IsNullOrWhiteSpace(conversation.ParticipantEmail) ? conversation.ParticipantEmail : "Teammate")
+            ? (!string.IsNullOrWhiteSpace(conversation.ParticipantEmail) ? conversation.ParticipantEmail : fallbackName)
             : conversation.ParticipantName;
         var participantInitial = string.IsNullOrWhiteSpace(displayName)
             ? "?"
@@ -29,11 +31,11 @@ else
                     <span class="direct-messages-conversation-item__name">@displayName</span>
                     @if (lastTimestamp.HasValue)
                     {
-                        <time datetime="@lastTimestamp.Value.ToString("o")" class="direct-messages-conversation-item__time">@lastTimestamp.Value.ToString("g")</time>
+                        <time datetime="@lastTimestamp.Value.ToString("o")" class="direct-messages-conversation-item__time">@lastTimestamp.Value.ToString("g", CultureInfo.CurrentCulture)</time>
                     }
                 </div>
                 <div class="direct-messages-conversation-item__preview @(conversation.HasUnread ? "direct-messages-conversation-item__preview--unread" : string.Empty)">
-                    @(string.IsNullOrWhiteSpace(conversation.LastMessagePreview) ? "(No recent messages)" : conversation.LastMessagePreview)
+                    @(string.IsNullOrWhiteSpace(conversation.LastMessagePreview) ? Html.Localize("DirectMessages.Conversations.NoRecentMessages", "(No recent messages)").ToString() : conversation.LastMessagePreview)
                 </div>
             </div>
             @if (conversation.HasUnread)

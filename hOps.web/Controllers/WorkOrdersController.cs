@@ -5,12 +5,15 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using ClosedXML.Excel;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
 using hOps.web.ViewModels.WorkOrders;
 using hOps.web.Utilities;
+using hOps.web.Services.Localization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -42,6 +45,7 @@ namespace hOps.web.Controllers
         private readonly MentionService _mentionService;
         private readonly IEmailSender _emailSender;
         private readonly IUserTimeZoneService _timeZoneService;
+        private readonly ITranslationService _translationService;
 
         public WorkOrdersController(
             ApplicationDbContext context,
@@ -51,7 +55,8 @@ namespace hOps.web.Controllers
             ILogger<WorkOrdersController> logger,
             MentionService mentionService,
             IEmailSender emailSender,
-            IUserTimeZoneService timeZoneService) : base(context, userManager)
+            IUserTimeZoneService timeZoneService,
+            ITranslationService translationService) : base(context, userManager)
         {
             _environment = environment;
             _configuration = configuration;
@@ -59,6 +64,7 @@ namespace hOps.web.Controllers
             _mentionService = mentionService;
             _emailSender = emailSender;
             _timeZoneService = timeZoneService;
+            _translationService = translationService;
         }
 
         [HttpGet]
@@ -132,9 +138,18 @@ namespace hOps.web.Controllers
                 "Attachments"
             };
 
+            var activeLanguage = HttpContext?.Items?["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+            var isDefaultLanguage = string.Equals(activeLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+            var cancellationToken = HttpContext?.RequestAborted ?? CancellationToken.None;
+
             for (var i = 0; i < headers.Length; i++)
             {
-                worksheet.Cell(1, i + 1).Value = headers[i];
+                var header = headers[i];
+                if (!isDefaultLanguage)
+                {
+                    header = _translationService.Translate(header, activeLanguage, header);
+                }
+                worksheet.Cell(1, i + 1).Value = header;
             }
 
             var headerRange = worksheet.Range(1, 1, 1, headers.Length);
@@ -146,17 +161,77 @@ namespace hOps.web.Controllers
                 var rowNumber = index + 2;
                 var order = viewModel.WorkOrders[index];
 
-                worksheet.Cell(rowNumber, 1).Value = order.Status;
-                worksheet.Cell(rowNumber, 2).Value = order.Location;
-                worksheet.Cell(rowNumber, 3).Value = order.Department ?? "Unassigned";
-                worksheet.Cell(rowNumber, 4).Value = string.IsNullOrWhiteSpace(order.AssignedToName) ? "Unassigned" : order.AssignedToName;
+                var statusLabel = WorkOrderStatusOptions.GetLabel(order.Status ?? string.Empty);
+                if (!isDefaultLanguage)
+                {
+                    statusLabel = _translationService.Translate(statusLabel, activeLanguage, statusLabel);
+                }
+
+                var locationValue = order.Location ?? string.Empty;
+                var issueValue = order.Issue ?? string.Empty;
+                var detailsValue = order.Details ?? string.Empty;
+                if (!isDefaultLanguage)
+                {
+                    var entityId = order.Id.ToString(CultureInfo.InvariantCulture);
+                    if (!string.IsNullOrWhiteSpace(locationValue))
+                    {
+                        locationValue = await _translationService.TranslateDynamicAsync(
+                            "WorkOrder",
+                            entityId,
+                            "Location",
+                            locationValue,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(issueValue))
+                    {
+                        issueValue = await _translationService.TranslateDynamicAsync(
+                            "WorkOrder",
+                            entityId,
+                            "Issue",
+                            issueValue,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(detailsValue))
+                    {
+                        detailsValue = await _translationService.TranslateDynamicAsync(
+                            "WorkOrder",
+                            entityId,
+                            "Details",
+                            detailsValue,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+                }
+
+                worksheet.Cell(rowNumber, 1).Value = statusLabel;
+                worksheet.Cell(rowNumber, 2).Value = locationValue;
+
+                var departmentValue = order.Department ?? (isDefaultLanguage
+                    ? "Unassigned"
+                    : _translationService.Translate("Unassigned", activeLanguage, "Unassigned"));
+                var assignedValue = string.IsNullOrWhiteSpace(order.AssignedToName)
+                    ? (isDefaultLanguage ? "Unassigned" : _translationService.Translate("Unassigned", activeLanguage, "Unassigned"))
+                    : order.AssignedToName;
+
+                worksheet.Cell(rowNumber, 3).Value = departmentValue;
+                worksheet.Cell(rowNumber, 4).Value = assignedValue;
                 worksheet.Cell(rowNumber, 5).Value = order.WorkOrderType ?? string.Empty;
-                worksheet.Cell(rowNumber, 6).Value = order.Issue;
-                worksheet.Cell(rowNumber, 7).Value = string.IsNullOrWhiteSpace(order.Details) ? string.Empty : order.Details;
+                worksheet.Cell(rowNumber, 6).Value = issueValue;
+                worksheet.Cell(rowNumber, 7).Value = detailsValue;
                 worksheet.Cell(rowNumber, 8).Value = order.DueDate;
                 var createdLocal = _timeZoneService.ConvertToUserTime(order.CreatedAt);
                 worksheet.Cell(rowNumber, 9).Value = createdLocal;
-                worksheet.Cell(rowNumber, 10).Value = string.IsNullOrWhiteSpace(order.Creator) ? "Unknown" : order.Creator;
+                var creatorValue = string.IsNullOrWhiteSpace(order.Creator)
+                    ? (isDefaultLanguage ? "Unknown" : _translationService.Translate("Unknown", activeLanguage, "Unknown"))
+                    : order.Creator;
+                worksheet.Cell(rowNumber, 10).Value = creatorValue;
                 worksheet.Cell(rowNumber, 11).Value = string.Join(Environment.NewLine, order.Properties);
                 worksheet.Cell(rowNumber, 12).Value = string.Join(Environment.NewLine, order.Attachments.Select(a => a.FileName));
 

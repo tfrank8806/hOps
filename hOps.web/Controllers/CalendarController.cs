@@ -2,6 +2,7 @@ using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Utilities;
 using hOps.web.ViewModels;
+using hOps.web.Services.Localization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -23,13 +24,21 @@ namespace hOps.web.Controllers
     {
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<CalendarController> _logger;
+        private readonly ITranslationService _translationService;
 
-        public CalendarController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IWebHostEnvironment environment, ILogger<CalendarController> logger)
+        public CalendarController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IWebHostEnvironment environment, ILogger<CalendarController> logger, ITranslationService translationService)
             : base(context, userManager)
         {
             _environment = environment;
             _logger = logger;
+            _translationService = translationService;
         }
+
+        private string GetActiveLanguage()
+            => HttpContext?.Items?["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+
+        private string Translate(string key, string? fallback = null)
+            => _translationService.Translate(key, GetActiveLanguage(), fallback ?? key);
 
         private const long MaxAttachmentSizeBytes = 5 * 1024 * 1024; // 5 MB
         private const int MaxAttachmentCount = 5;
@@ -58,9 +67,24 @@ namespace hOps.web.Controllers
             var targetMonth = ResolveTargetMonth(month, year, DateTime.Today);
             var viewModel = await BuildViewModelAsync(user, targetMonth);
 
-            if (TempData["SuccessMessage"] is string message)
+            if (TempData["SuccessMessageKey"] is string successKey)
+            {
+                ViewBag.SuccessMessageKey = successKey;
+                ViewBag.SuccessMessageFallback = TempData["SuccessMessageFallback"] as string;
+            }
+            else if (TempData["SuccessMessage"] is string message)
             {
                 ViewBag.SuccessMessage = message;
+            }
+
+            if (TempData["WarningMessageKey"] is string warningKey)
+            {
+                ViewBag.WarningMessageKey = warningKey;
+                ViewBag.WarningMessageFallback = TempData["WarningMessageFallback"] as string;
+            }
+            else if (TempData["WarningMessage"] is string warningMessage)
+            {
+                ViewBag.WarningMessage = warningMessage;
             }
 
             return View(viewModel);
@@ -90,7 +114,7 @@ namespace hOps.web.Controllers
 
             if (!propertyIds.Any())
             {
-                ModelState.AddModelError(string.Empty, "You do not have access to any properties to associate with this event.");
+                ModelState.AddModelError(string.Empty, Translate("Calendar.Errors.NoAccessibleProperties", "You do not have access to any properties to associate with this event."));
             }
 
             form.SelectedPropertyIds = (form.SelectedPropertyIds ?? new List<int>())
@@ -105,11 +129,11 @@ namespace hOps.web.Controllers
 
             if (!form.SelectedPropertyIds.Any())
             {
-                ModelState.AddModelError(propertySelectionKey, "Select at least one property.");
+                ModelState.AddModelError(propertySelectionKey, Translate("Calendar.Errors.SelectAtLeastOneProperty", "Select at least one property."));
             }
             else if (form.SelectedPropertyIds.Any(id => !propertyIds.Contains(id)))
             {
-                ModelState.AddModelError(propertySelectionKey, "You can only select properties you have access to.");
+                ModelState.AddModelError(propertySelectionKey, Translate("Calendar.Errors.PropertyAccess", "You can only select properties you have access to."));
             }
 
             form.StartDate = form.StartDate == default ? DateTime.Today : form.StartDate.Date;
@@ -117,19 +141,19 @@ namespace hOps.web.Controllers
 
             if (form.EndDate < form.StartDate)
             {
-                ModelState.AddModelError("Form.EndDate", "End date cannot be before start date.");
+                ModelState.AddModelError("Form.EndDate", Translate("Calendar.Errors.EndBeforeStartDate", "End date cannot be before start date."));
             }
 
             if (form.StartDate == form.EndDate && form.StartTime.HasValue && form.EndTime.HasValue && form.EndTime < form.StartTime)
             {
-                ModelState.AddModelError("Form.EndTime", "End time cannot be before start time when the event occurs on a single day.");
+                ModelState.AddModelError("Form.EndTime", Translate("Calendar.Errors.EndBeforeStartTime", "End time cannot be before start time when the event occurs on a single day."));
             }
 
             var categoryExists = await FilterCalendarCategoriesByProperties(propertyIds)
                 .AnyAsync(c => c.Id == form.CategoryId);
             if (!categoryExists)
             {
-                ModelState.AddModelError("Form.CategoryId", "Select a valid category.");
+                ModelState.AddModelError("Form.CategoryId", Translate("Calendar.Errors.ValidCategoryRequired", "Select a valid category."));
             }
 
             ValidateAttachments(form.Attachments, 0, "Form.Attachments");
@@ -146,11 +170,11 @@ namespace hOps.web.Controllers
             {
                 if (!form.TargetDepartmentId.HasValue)
                 {
-                    ModelState.AddModelError("Form.TargetDepartmentId", "Select a department for this event.");
+                    ModelState.AddModelError("Form.TargetDepartmentId", Translate("Calendar.Errors.DepartmentRequired", "Select a department for this event."));
                 }
                 else if (!validDepartmentIds.Contains(form.TargetDepartmentId.Value))
                 {
-                    ModelState.AddModelError("Form.TargetDepartmentId", "Choose a department associated with the selected properties.");
+                    ModelState.AddModelError("Form.TargetDepartmentId", Translate("Calendar.Errors.DepartmentInvalidForProperties", "Choose a department associated with the selected properties."));
                 }
             }
 
@@ -198,12 +222,14 @@ namespace hOps.web.Controllers
             }
             catch
             {
-                TempData["WarningMessage"] = "Event saved, but one or more attachments could not be uploaded.";
+                TempData["WarningMessageKey"] = "Calendar.Warning.AttachmentsCreate";
+                TempData["WarningMessageFallback"] = "Event saved, but one or more attachments could not be uploaded.";
             }
 
             await SyncEventRemindersAsync(calendarEvent, reminderSelections);
 
-            TempData["SuccessMessage"] = "Event created successfully.";
+            TempData["SuccessMessageKey"] = "Calendar.Success.EventCreated";
+            TempData["SuccessMessageFallback"] = "Event created successfully.";
 
             return RedirectToAction(nameof(Index), new { month = calendarEvent.StartDate.Month, year = calendarEvent.StartDate.Year });
         }
@@ -277,7 +303,7 @@ namespace hOps.web.Controllers
 
             var viewModel = new CalendarEventManageViewModel
             {
-                Heading = "Edit Event",
+                Heading = "Calendar.Heading.EditEvent",
                 Form = form,
                 CategoryOptions = categoryOptions,
                 AccessibleProperties = accessibleProperties,
@@ -360,11 +386,11 @@ namespace hOps.web.Controllers
 
             if (!form.SelectedPropertyIds.Any())
             {
-                ModelState.AddModelError(propertySelectionKey, "Select at least one property.");
+                ModelState.AddModelError(propertySelectionKey, Translate("Calendar.Errors.SelectAtLeastOneProperty", "Select at least one property."));
             }
             else if (form.SelectedPropertyIds.Any(selectedId => !accessiblePropertyIds.Contains(selectedId)))
             {
-                ModelState.AddModelError(propertySelectionKey, "You can only select properties you have access to.");
+                ModelState.AddModelError(propertySelectionKey, Translate("Calendar.Errors.PropertyAccess", "You can only select properties you have access to."));
             }
 
             form.StartDate = form.StartDate == default ? calendarEvent.StartDate.Date : form.StartDate.Date;
@@ -372,19 +398,19 @@ namespace hOps.web.Controllers
 
             if (form.EndDate < form.StartDate)
             {
-                ModelState.AddModelError("Form.EndDate", "End date cannot be before start date.");
+                ModelState.AddModelError("Form.EndDate", Translate("Calendar.Errors.EndBeforeStartDate", "End date cannot be before start date."));
             }
 
             if (form.StartDate == form.EndDate && form.StartTime.HasValue && form.EndTime.HasValue && form.EndTime < form.StartTime)
             {
-                ModelState.AddModelError("Form.EndTime", "End time cannot be before start time when the event occurs on a single day.");
+                ModelState.AddModelError("Form.EndTime", Translate("Calendar.Errors.EndBeforeStartTime", "End time cannot be before start time when the event occurs on a single day."));
             }
 
             var categoryExists = await FilterCalendarCategoriesByProperties(accessiblePropertyIds)
                 .AnyAsync(c => c.Id == form.CategoryId);
             if (!categoryExists)
             {
-                ModelState.AddModelError("Form.CategoryId", "Select a valid category.");
+                ModelState.AddModelError("Form.CategoryId", Translate("Calendar.Errors.ValidCategoryRequired", "Select a valid category."));
             }
 
             ValidateAttachments(form.Attachments, remainingAttachmentCount, "Form.Attachments");
@@ -401,11 +427,11 @@ namespace hOps.web.Controllers
             {
                 if (!form.TargetDepartmentId.HasValue)
                 {
-                    ModelState.AddModelError("Form.TargetDepartmentId", "Select a department for this event.");
+                    ModelState.AddModelError("Form.TargetDepartmentId", Translate("Calendar.Errors.DepartmentRequired", "Select a department for this event."));
                 }
                 else if (!validDepartmentIds.Contains(form.TargetDepartmentId.Value))
                 {
-                    ModelState.AddModelError("Form.TargetDepartmentId", "Choose a department associated with the selected properties.");
+                    ModelState.AddModelError("Form.TargetDepartmentId", Translate("Calendar.Errors.DepartmentInvalidForProperties", "Choose a department associated with the selected properties."));
                 }
             }
 
@@ -419,7 +445,7 @@ namespace hOps.web.Controllers
 
                 var viewModel = new CalendarEventManageViewModel
                 {
-                    Heading = "Edit Event",
+                    Heading = "Calendar.Heading.EditEvent",
                     Form = form,
                     CategoryOptions = categoryOptions,
                     AccessibleProperties = accessibleProperties,
@@ -492,12 +518,14 @@ namespace hOps.web.Controllers
             }
             catch
             {
-                TempData["WarningMessage"] = "Event updated, but one or more attachments could not be uploaded.";
+                TempData["WarningMessageKey"] = "Calendar.Warning.AttachmentsUpdate";
+                TempData["WarningMessageFallback"] = "Event updated, but one or more attachments could not be uploaded.";
             }
 
             await SyncEventRemindersAsync(calendarEvent, reminderSelections);
 
-            TempData["SuccessMessage"] = "Event updated successfully.";
+            TempData["SuccessMessageKey"] = "Calendar.Success.EventUpdated";
+            TempData["SuccessMessageFallback"] = "Event updated successfully.";
 
             return RedirectToAction(nameof(Index), new { month = calendarEvent.StartDate.Month, year = calendarEvent.StartDate.Year });
         }
@@ -571,7 +599,8 @@ namespace hOps.web.Controllers
                     await _context.SaveChangesAsync();
                 }
 
-                TempData["SuccessMessage"] = "Event occurrence deleted.";
+                TempData["SuccessMessageKey"] = "Calendar.Success.EventOccurrenceDeleted";
+                TempData["SuccessMessageFallback"] = "Event occurrence deleted.";
                 return RedirectToAction(nameof(Index), new { month = redirectTarget.Month, year = redirectTarget.Year });
             }
 
@@ -579,7 +608,8 @@ namespace hOps.web.Controllers
             await _context.SaveChangesAsync();
             DeleteAllAttachments(calendarEvent.Id);
 
-            TempData["SuccessMessage"] = "Event deleted successfully.";
+            TempData["SuccessMessageKey"] = "Calendar.Success.EventDeleted";
+            TempData["SuccessMessageFallback"] = "Event deleted successfully.";
             return RedirectToAction(nameof(Index), new { month = redirectTarget.Month, year = redirectTarget.Year });
         }
 
@@ -786,17 +816,38 @@ namespace hOps.web.Controllers
                 .ThenBy(d => d.Name)
                 .ToListAsync();
 
+            var defaultDepartmentLabel = Translate("Calendar.DepartmentFallback", "Department");
+            var departmentWithPropertyTemplate = Translate("Calendar.DepartmentWithProperty", "{0} ({1})");
+
             return departments
                 .Select(d => new SelectListItem
                 {
                     Value = d.Id.ToString(),
-                    Text = d.Property == null ? d.Name ?? "Department" : $"{d.Name} ({d.Property.Name})",
+                    Text = BuildDepartmentLabel(d, defaultDepartmentLabel, departmentWithPropertyTemplate),
                     Selected = selectedDepartmentId.HasValue && d.Id == selectedDepartmentId.Value
                 })
                 .ToList();
         }
 
-        private static List<SelectListItem> BuildReminderOptions(IEnumerable<int> selectedValues)
+        private string BuildDepartmentLabel(Department department, string defaultDepartmentLabel, string withPropertyTemplate)
+        {
+            var departmentName = string.IsNullOrWhiteSpace(department.Name)
+                ? defaultDepartmentLabel
+                : department.Name!;
+
+            if (department.Property == null || string.IsNullOrWhiteSpace(department.Property.Name))
+            {
+                return departmentName;
+            }
+
+            return string.Format(
+                CultureInfo.CurrentCulture,
+                withPropertyTemplate,
+                departmentName,
+                department.Property.Name);
+        }
+
+        private List<SelectListItem> BuildReminderOptions(IEnumerable<int> selectedValues)
         {
             var selected = new HashSet<int>(selectedValues ?? Array.Empty<int>());
             return Enum.GetValues(typeof(CalendarEventReminderOffset))
@@ -880,21 +931,37 @@ namespace hOps.web.Controllers
 
             if (existingCount + validFiles.Count > MaxAttachmentCount)
             {
-                ModelState.AddModelError(modelStateKey, $"Please upload no more than {MaxAttachmentCount} files in total.");
+                ModelState.AddModelError(
+                    modelStateKey,
+                    string.Format(
+                        CultureInfo.CurrentCulture,
+                        Translate("Calendar.Errors.AttachmentLimit", "Please upload no more than {0} files in total."),
+                        MaxAttachmentCount));
             }
 
             foreach (var file in validFiles)
             {
                 if (file.Length > MaxAttachmentSizeBytes)
                 {
-                    ModelState.AddModelError(modelStateKey, $"'{file.FileName}' exceeds the {MaxAttachmentSizeBytes / (1024 * 1024)} MB limit.");
+                    ModelState.AddModelError(
+                        modelStateKey,
+                        string.Format(
+                            CultureInfo.CurrentCulture,
+                            Translate("Calendar.Errors.AttachmentTooLarge", "'{0}' exceeds the {1} MB limit."),
+                            file.FileName,
+                            MaxAttachmentSizeBytes / (1024 * 1024)));
                 }
 
                 var contentType = file.ContentType ?? string.Empty;
                 var extension = Path.GetExtension(file.FileName) ?? string.Empty;
                 if (!IsAllowedAttachment(contentType, extension))
                 {
-                    ModelState.AddModelError(modelStateKey, $"'{file.FileName}' is not an allowed file type. Upload images or PDF files.");
+                    ModelState.AddModelError(
+                        modelStateKey,
+                        string.Format(
+                            CultureInfo.CurrentCulture,
+                            Translate("Calendar.Errors.AttachmentType", "'{0}' is not an allowed file type. Upload images or PDF files."),
+                            file.FileName));
                 }
             }
         }
@@ -1185,15 +1252,15 @@ namespace hOps.web.Controllers
             return offsets.ToList();
         }
 
-        private static string GetReminderOptionLabel(CalendarEventReminderOffset offset)
+        private string GetReminderOptionLabel(CalendarEventReminderOffset offset)
         {
             return offset switch
             {
-                CalendarEventReminderOffset.DayOfEvent => "Day of event",
-                CalendarEventReminderOffset.OneDayBefore => "1 day before",
-                CalendarEventReminderOffset.TwoDaysBefore => "2 days before",
-                CalendarEventReminderOffset.OneWeekBefore => "1 week before",
-                _ => "Reminder"
+                CalendarEventReminderOffset.DayOfEvent => Translate("Calendar.Reminders.DayOfEvent", "Day of event"),
+                CalendarEventReminderOffset.OneDayBefore => Translate("Calendar.Reminders.OneDayBefore", "1 day before"),
+                CalendarEventReminderOffset.TwoDaysBefore => Translate("Calendar.Reminders.TwoDaysBefore", "2 days before"),
+                CalendarEventReminderOffset.OneWeekBefore => Translate("Calendar.Reminders.OneWeekBefore", "1 week before"),
+                _ => Translate("Calendar.Reminders.Default", "Reminder")
             };
         }
 
