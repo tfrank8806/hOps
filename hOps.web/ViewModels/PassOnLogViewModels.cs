@@ -60,6 +60,7 @@ namespace hOps.web.ViewModels
         public DateTime CreatedAt { get; set; }
         public bool IsUnread { get; set; }
         public List<string> PropertyNames { get; set; } = new();
+        public List<PassOnLogPropertyDisplayViewModel> Properties { get; set; } = new();
         public int CommentCount { get; set; }
         public string Preview { get; set; } = string.Empty;
     }
@@ -115,6 +116,7 @@ namespace hOps.web.ViewModels
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public List<string> PropertyNames { get; set; } = new();
+        public List<PassOnLogPropertyDisplayViewModel> Properties { get; set; } = new();
         public List<PassOnLogCommentViewModel> Comments { get; set; } = new();
         public List<PassOnLogViewerViewModel> Viewers { get; set; } = new();
         public bool CanEdit { get; set; }
@@ -158,5 +160,12 @@ namespace hOps.web.ViewModels
         public int Id { get; set; }
         public string FileName { get; set; } = string.Empty;
         public string DownloadUrl { get; set; } = string.Empty;
+    }
+
+    public class PassOnLogPropertyDisplayViewModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
     }
 }

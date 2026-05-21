@@ -169,6 +169,22 @@ namespace hOps.web.Controllers
             {
                 var creatorName = PassOnLogEmailHelper.FormatUserName(log.CreatedBy?.FirstName, log.CreatedBy?.LastName, log.CreatedBy?.Email ?? string.Empty);
 
+                var properties = log.Properties
+                    .Where(lp => lp.Property != null)
+                    .GroupBy(lp => lp.PropertyId)
+                    .Select(group =>
+                    {
+                        var property = group.First().Property;
+                        return new PassOnLogPropertyDisplayViewModel
+                        {
+                            Id = group.Key,
+                            Name = property?.Name ?? string.Empty,
+                            Code = property?.Code ?? string.Empty
+                        };
+                    })
+                    .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
                 return new PassOnLogListItemViewModel
                 {
                     Id = log.Id,
@@ -177,7 +193,8 @@ namespace hOps.web.Controllers
                     CreatorAvatar = UserAvatarHelper.BuildFromUser(log.CreatedBy, creatorName, "lg"),
                     CreatedAt = log.CreatedAt,
                     IsUnread = IsLogUnread(log, currentUser.Id),
-                    PropertyNames = log.Properties.Select(lp => lp.Property.Name).Distinct().OrderBy(name => name).ToList(),
+                    PropertyNames = properties.Select(p => p.Name).Where(name => !string.IsNullOrWhiteSpace(name)).Distinct().OrderBy(name => name).ToList(),
+                    Properties = properties,
                     CommentCount = log.Comments.Count,
                     Preview = BuildPreview(log.Body)
                 };
@@ -971,6 +988,21 @@ namespace hOps.web.Controllers
                 CreatedAt = log.CreatedAt,
                 UpdatedAt = log.UpdatedAt,
                 PropertyNames = log.Properties.Select(lp => lp.Property.Name).Distinct().OrderBy(name => name).ToList(),
+                Properties = log.Properties
+                    .Where(lp => lp.Property != null)
+                    .GroupBy(lp => lp.PropertyId)
+                    .Select(group =>
+                    {
+                        var property = group.First().Property;
+                        return new PassOnLogPropertyDisplayViewModel
+                        {
+                            Id = group.Key,
+                            Name = property?.Name ?? string.Empty,
+                            Code = property?.Code ?? string.Empty
+                        };
+                    })
+                    .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
                 CanEdit = log.CreatedById == currentUserId,
                 Comments = log.Comments
                     .OrderBy(c => c.CreatedAt)

@@ -1,4 +1,5 @@
 @using System.Globalization
+@using System.Text.Encodings.Web
 @using hOps.web.Utilities
 @model hOps.web.ViewModels.PassOnLogDetailsViewModel
 @{
@@ -6,6 +7,45 @@
     var displayTitle = await Html.DisplayTranslatedTextAsync("PassOnLog", entityId, "Title", Model.Title);
     var displayBody = await Html.DisplayTranslatedTextAsync("PassOnLog", entityId, "Body", Model.Body);
     ViewData["Title"] = displayTitle;
+
+    var createdLocal = TimeZoneService.ConvertToUserTime(Model.CreatedAt);
+    var updatedLocal = Model.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(Model.UpdatedAt.Value) : (DateTime?)null;
+    var propertyDisplayNames = new List<string>();
+    if (Model.Properties != null)
+    {
+        foreach (var property in Model.Properties)
+        {
+            var propertyIdString = property.Id.ToString(CultureInfo.InvariantCulture);
+            var translatedPropertyName = await Html.DisplayTranslatedTextAsync("Property", propertyIdString, "Name", property.Name);
+            var propertyNameDisplay = string.IsNullOrWhiteSpace(translatedPropertyName) ? property.Name : translatedPropertyName;
+        var propertyEntry = string.IsNullOrWhiteSpace(property.Code)
+            ? propertyNameDisplay
+            : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", propertyNameDisplay, property.Code);
+        if (!string.IsNullOrWhiteSpace(propertyEntry))
+        {
+            propertyDisplayNames.Add(propertyEntry);
+        }
+        }
+    }
+    var propertiesDisplay = string.Join(", ", propertyDisplayNames);
+
+    var postedByTemplate = Html.Localize("PassOnLogs.Details.PostedByOn", "Posted by {0} on {1}").ToString();
+    var postedByText = string.Format(CultureInfo.CurrentCulture, postedByTemplate, Model.CreatorName, createdLocal.ToString("f"));
+    var updatedTemplate = Html.Localize("PassOnLogs.Details.UpdatedOn", "Updated {0}").ToString();
+    var updatedText = updatedLocal.HasValue
+        ? string.Format(CultureInfo.CurrentCulture, updatedTemplate, updatedLocal.Value.ToString("g"))
+        : null;
+    var propertiesLabel = Html.Localize("Properties:");
+    var attachmentsLabel = Html.Localize("PassOnLogs.Attachments", "Attachments");
+    var commentsLabel = Html.Localize("PassOnLogs.Comments", "Comments");
+    var viewedByLabel = Html.Localize("PassOnLogs.ViewedBy", "Viewed By");
+    var noViewersLabel = Html.Localize("PassOnLogs.NoViewers", "No one has viewed this log yet.");
+    var addImagesHelp = Html.Localize("PassOnLogs.Comment.AddImagesHelp", "Attach screenshots or photos. You can also paste them directly into the comment box.");
+    var postCommentLabel = Html.Localize("PassOnLogs.Comment.PostButton", "Post Comment");
+    var editLabel = Html.Localize("Edit");
+    var deleteLabel = Html.Localize("Delete");
+    var deleteConfirmMessage = Html.Localize("PassOnLogs.Details.DeleteConfirm", "Are you sure you want to delete this pass on log? This action cannot be undone.").ToString();
+    var deleteConfirmMessageEscaped = JavaScriptEncoder.Default.Encode(deleteConfirmMessage);
 }
 
 <div class="card mb-4 passon-details-card">
@@ -16,33 +56,32 @@
             </div>
             <div>
                 <h2 class="mb-2">@displayTitle</h2>
-                @{
-                    var createdLocal = TimeZoneService.ConvertToUserTime(Model.CreatedAt);
-                    var updatedLocal = Model.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(Model.UpdatedAt.Value) : (DateTime?)null;
-                }
-                <div class="text-muted">Posted by @Model.CreatorName on @createdLocal.ToString("f")</div>
-                @if (updatedLocal.HasValue)
+                <div class="text-muted">@postedByText</div>
+                @if (!string.IsNullOrWhiteSpace(updatedText))
                 {
-                    <div class="text-muted">Updated @updatedLocal.Value.ToString("g")</div>
+                    <div class="text-muted">@updatedText</div>
                 }
-                <div class="text-muted">Properties: @string.Join(", ", Model.PropertyNames)</div>
+                @if (!string.IsNullOrWhiteSpace(propertiesDisplay))
+                {
+                    <div class="text-muted">@propertiesLabel @propertiesDisplay</div>
+                }
             </div>
         </div>
         <div class="d-flex gap-2 flex-wrap passon-details-actions">
             <partial name="_PassOnLogNavigation" model="Model" />
             @if (Model.CanEdit)
             {
-                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">@editLabel</a>
             }
             @if (Model.CanDelete)
             {
                 <form asp-action="Delete"
                       method="post"
                       class="d-inline"
-                      onsubmit="return confirm('Are you sure you want to delete this pass on log? This action cannot be undone.');">
+                      onsubmit="return confirm('@deleteConfirmMessageEscaped');">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="id" value="@Model.Id" />
-                    <button type="submit" class="btn btn-danger">Delete</button>
+                    <button type="submit" class="btn btn-danger">@deleteLabel</button>
                 </form>
             }
         </div>
@@ -58,7 +97,7 @@
 @if (Model.Attachments.Any())
 {
     <div class="card mb-4">
-        <div class="card-header">Attachments (@Model.Attachments.Count)</div>
+        <div class="card-header">@attachmentsLabel (@Model.Attachments.Count)</div>
         <div class="card-body">
             <ul class="list-unstyled mb-0">
                 @foreach (var attachment in Model.Attachments)
@@ -75,7 +114,7 @@
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="card mb-4">
-            <div class="card-header">Comments (@Model.Comments.Count)</div>
+            <div class="card-header">@commentsLabel (@Model.Comments.Count)</div>
             <div class="card-body">
                 @if (Model.Comments.Any())
                 {
@@ -135,10 +174,10 @@
                                    class="form-control"
                                    accept="image/*"
                                    multiple />
-                            <div class="form-text">Attach screenshots or photos. You can also paste them directly into the comment box.</div>
+                            <div class="form-text">@addImagesHelp</div>
                             <span asp-validation-for="NewComment.Files" class="text-danger"></span>
                         </div>
-                        <button type="submit" class="btn btn-primary">Post Comment</button>
+                        <button type="submit" class="btn btn-primary">@postCommentLabel</button>
                     </div>
                 </form>
             </div>
@@ -146,7 +185,7 @@
     </div>
     <div class="col-lg-4">
         <div class="card">
-            <div class="card-header">Viewed By</div>
+            <div class="card-header">@viewedByLabel</div>
             <div class="card-body">
                 @if (Model.Viewers.Any())
                 {
@@ -165,7 +204,7 @@
                 }
                 else
                 {
-                    <p class="text-muted mb-0">No one has viewed this log yet.</p>
+                    <p class="text-muted mb-0">@noViewersLabel</p>
                 }
             </div>
         </div>

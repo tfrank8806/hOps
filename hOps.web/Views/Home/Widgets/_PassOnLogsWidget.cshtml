@@ -11,10 +11,10 @@
         <h2 class="h5 mb-0">@Html.Localize("Pass On Logs")</h2>
         <div class="d-flex gap-2 flex-wrap">
             <a class="btn btn-outline-primary btn-sm" href="@(Url.Action("Create", "PassOnLogs") ?? "/PassOnLogs/Create")">
-                + New Pass On
+                <span aria-hidden="true" class="me-1">+</span>@Html.Localize("PassOnLogs.Widget.NewEntry", "New Pass On")
             </a>
             <a class="btn btn-outline-secondary btn-sm" href="@(Url.Action("Index", "PassOnLogs") ?? "/PassOnLogs")">
-                View All
+                @Html.Localize("PassOnLogs.Widget.ViewAll", "View All")
             </a>
         </div>
     </div>

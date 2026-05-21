@@ -1619,5 +1619,16 @@
   "Schedules.ClipboardCopied": "Turno copiado: {0}. Haz clic en otra celda para pegar.",
   "Schedules.EmployeeOrderSaving": "Guardando el orden...",
   "Schedules.EmployeeOrderError": "No se pudo guardar el orden. Actualiza la p\u00e1gina e int\u00e9ntalo de nuevo.",
+  "PassOnLogs.Details.PostedByOn": "Publicado por {0} el {1}",
+  "PassOnLogs.Details.UpdatedOn": "Actualizado {0}",
+  "PassOnLogs.Attachments": "Adjuntos",
+  "PassOnLogs.Comments": "Comentarios",
+  "PassOnLogs.ViewedBy": "Visto por",
+  "PassOnLogs.NoViewers": "Nadie ha visto este registro todav\u00eda.",
+  "PassOnLogs.Comment.AddImagesHelp": "Adjunta capturas de pantalla o fotos. Tambi\u00e9n puedes pegarlas directamente en el cuadro de comentario.",
+  "PassOnLogs.Comment.PostButton": "Publicar comentario",
+  "PassOnLogs.Details.DeleteConfirm": "\u00bfEliminar este registro de turno? Esta acci\u00f3n no se puede deshacer.",
+  "PassOnLogs.Widget.NewEntry": "Nuevo registro",
+  "PassOnLogs.Widget.ViewAll": "Ver todo",
   "Shared.Notifications.DefaultTitle": "Notificaci\u00f3n"
 }

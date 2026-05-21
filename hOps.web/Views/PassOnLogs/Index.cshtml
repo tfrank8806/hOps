@@ -176,6 +176,24 @@ else
             var propertiesLabel = Html.Localize("Properties:");
             var commentLabel = log.CommentCount == 1 ? Html.Localize("comment") : Html.Localize("comments");
             var createdLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
+            var propertyDisplayNames = new List<string>();
+            if (log.Properties != null)
+            {
+                foreach (var property in log.Properties)
+                {
+                    var propertyIdString = property.Id.ToString(CultureInfo.InvariantCulture);
+                    var translatedPropertyName = await Html.DisplayTranslatedTextAsync("Property", propertyIdString, "Name", property.Name);
+                    var propertyNameDisplay = string.IsNullOrWhiteSpace(translatedPropertyName) ? property.Name : translatedPropertyName;
+                    var propertyEntry = string.IsNullOrWhiteSpace(property.Code)
+                        ? propertyNameDisplay
+                        : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", propertyNameDisplay, property.Code);
+                    if (!string.IsNullOrWhiteSpace(propertyEntry))
+                    {
+                        propertyDisplayNames.Add(propertyEntry);
+                    }
+                }
+            }
+            var propertiesDisplay = string.Join(", ", propertyDisplayNames);
             <a asp-action="Details" asp-route-id="@log.Id" class="list-group-item list-group-item-action log-list-item @(log.IsUnread ? "log-unread" : string.Empty)">
                 <div class="d-flex gap-3 align-items-start">
                     <div class="flex-shrink-0">
@@ -185,7 +203,11 @@ else
                         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                             <div>
                                 <h5 class="mb-1">@displayTitle</h5>
-                                <div class="text-muted small">@byLabel @log.CreatorName • @createdLocal.ToString("g")</div>
+                                <div class="text-muted small">
+                                    @byLabel @log.CreatorName
+                                    <span class="text-secondary" aria-hidden="true">&bull;</span>
+                                    @createdLocal.ToString("g")
+                                </div>
                             </div>
                             @if (log.IsUnread)
                             {
@@ -194,8 +216,11 @@ else
                         </div>
                         <p class="mb-2 text-muted">@displayPreview</p>
                         <div class="d-flex flex-wrap gap-2 small text-muted">
-                            <span><strong>@propertiesLabel</strong> @string.Join(", ", log.PropertyNames)</span>
-                            <span class="text-secondary">•</span>
+                            @if (!string.IsNullOrWhiteSpace(propertiesDisplay))
+                            {
+                                <span><strong>@propertiesLabel</strong> @propertiesDisplay</span>
+                                <span class="text-secondary" aria-hidden="true">&bull;</span>
+                            }
                             <span>@log.CommentCount @commentLabel</span>
                         </div>
                     </div>
@@ -204,3 +229,5 @@ else
         }
     </div>
 }
+
+
