@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
 using Moq;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace hOps.web.Tests;
@@ -75,7 +76,8 @@ public class SettingsControllerScheduleSetupTests
             }, "Test"))
         };
 
-        var controller = new SettingsController(db, userManagerMock.Object)
+        var logger = Mock.Of<ILogger<SettingsController>>();
+        var controller = new SettingsController(db, userManagerMock.Object, logger)
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext },
             TempData = new TempDataDictionary(httpContext, Mock.Of<ITempDataProvider>())

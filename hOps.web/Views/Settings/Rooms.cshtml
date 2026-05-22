@@ -26,6 +26,8 @@
     <div class="alert alert-success">@Html.Localize(successMessage, successMessage)</div>
 }
 
+<div id="roomsAlert"></div>
+
 @if (allProps.Count > 1)
 {
     <div class="mb-3">
@@ -70,6 +72,7 @@
 </div>
 
 <form asp-action="SaveRooms" method="post" id="roomsForm">
+    @Html.AntiForgeryToken()
     <input type="hidden" name="propertyId" value="@propertyId" />
 
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -111,7 +114,7 @@
         <tbody>
             @for (int i = 0; i < Model.Count; i++)
             {
-                <tr>
+                <tr data-room-id="@Model[i].Id" data-room-number="@Model[i].RoomNumber">
                     <td class="w-25">
                         <input type="hidden" name="rooms[@i].Id" value="@Model[i].Id" />
                         <input type="hidden" name="rooms[@i].PropertyId" value="@propertyId" />
@@ -151,7 +154,7 @@
                 </tr>
             }
 
-            <tr id="newRowTemplate" style="display:none;">
+            <tr id="newRowTemplate" style="display:none;" data-room-id="0" data-room-number="">
                 <td>
                     <input type="hidden" name="rooms[#].Id" value="0" />
                     <input type="hidden" name="rooms[#].PropertyId" value="@propertyId" />
@@ -192,10 +195,12 @@
 </form>
 @section Scripts {
 <script>
+    const roomsForm = document.getElementById("roomsForm");
     const addRowButtons = document.querySelectorAll(".js-add-row");
     const roomsTable = document.getElementById("roomsTable");
     const roomsTableBody = roomsTable ? roomsTable.querySelector("tbody") : null;
     const newRowTemplate = document.getElementById("newRowTemplate");
+    const roomsAlert = document.getElementById("roomsAlert");
     const sortButtons = document.querySelectorAll(".table-sort");
     const sortSelectors = {
         RoomNumber: 'input[name$=".RoomNumber"]',
@@ -204,8 +209,178 @@
         Floor: 'input[name$=".Floor"]',
         Description: 'input[name$=".Description"]'
     };
+    const deleteRoomUrl = '@Url.Action("DeleteRoom", "Settings")';
+    const propertyId = @propertyId;
     let currentSortKey = null;
     let currentSortDirection = "asc";
+
+    function showRoomsAlert(status, message) {
+        if (!roomsAlert) {
+            return;
+        }
+
+        if (!message) {
+            roomsAlert.innerHTML = "";
+            return;
+        }
+
+        const statusClassMap = {
+            success: "alert-success",
+            error: "alert-danger",
+            danger: "alert-danger",
+            warning: "alert-warning",
+            info: "alert-info"
+        };
+
+        const alertClass = statusClassMap[status] ?? "alert-success";
+        roomsAlert.innerHTML = `<div class="alert ${alertClass}" role="alert">${message}</div>`;
+    }
+
+    function reindexRoomRows() {
+        if (!roomsTableBody) {
+            return;
+        }
+
+        const rows = Array.from(roomsTableBody.querySelectorAll("tr"))
+            .filter(row => row.id !== "newRowTemplate");
+
+        rows.forEach((row, index) => {
+            row.dataset.rowIndex = index.toString();
+
+            const inputs = row.querySelectorAll("input, textarea, select");
+            inputs.forEach(input => {
+                const currentName = input.getAttribute("name");
+                if (currentName && currentName.includes("rooms[")) {
+                    input.setAttribute("name", currentName.replace(/rooms\[\d+\]/g, `rooms[${index}]`));
+                }
+
+                const currentId = input.getAttribute("id");
+                if (currentId && currentId.includes("room-")) {
+                    const updatedId = currentId
+                        .replace(/room-\d+-pm/g, `room-${index}-pm`)
+                        .replace(/room-\d+-dc/g, `room-${index}-dc`);
+                    if (updatedId !== currentId) {
+                        input.setAttribute("id", updatedId);
+                    }
+                }
+            });
+
+            row.querySelectorAll("label[for]").forEach(label => {
+                const currentFor = label.getAttribute("for");
+                if (!currentFor) {
+                    return;
+                }
+
+                const updatedFor = currentFor
+                    .replace(/room-\d+-pm/g, `room-${index}-pm`)
+                    .replace(/room-\d+-dc/g, `room-${index}-dc`);
+                if (updatedFor !== currentFor) {
+                    label.setAttribute("for", updatedFor);
+                }
+            });
+
+            const roomIdInput = row.querySelector('input[name$=".Id"]');
+            const roomNumberInput = row.querySelector('input[name$=".RoomNumber"]');
+            const idValue = roomIdInput ? parseInt(roomIdInput.value || "0", 10) : 0;
+            row.dataset.roomId = Number.isNaN(idValue) ? "0" : idValue.toString();
+            row.dataset.roomNumber = roomNumberInput ? (roomNumberInput.value || "") : "";
+        });
+    }
+
+    function getAntiForgeryToken() {
+        const tokenInput = roomsForm?.querySelector('input[name="__RequestVerificationToken"]');
+        return tokenInput ? tokenInput.value : null;
+    }
+
+    async function handleDeleteRow(row) {
+        if (!row) {
+            return;
+        }
+
+        const roomIdValue = parseInt(row.dataset.roomId || "0", 10);
+        const roomNumberInput = row.querySelector('input[name$=".RoomNumber"]');
+        const roomNumber = (roomNumberInput?.value || row.dataset.roomNumber || "").trim();
+        const descriptor = roomNumber ? `room ${roomNumber}` : "this room";
+
+        const confirmationMessage = roomIdValue > 0
+            ? `Are you sure you want to delete ${descriptor}?`
+            : `Remove ${descriptor}?`;
+
+        if (!window.confirm(confirmationMessage)) {
+            showRoomsAlert("", "");
+            return;
+        }
+
+        let notificationStatus = "success";
+        let notificationMessage = `Deleted ${descriptor}.`;
+
+        if (roomIdValue > 0) {
+            const token = getAntiForgeryToken();
+            if (!token) {
+                showRoomsAlert("danger", "Cannot delete the room because the security token is missing. Reload the page and try again.");
+                return;
+            }
+
+            let response;
+            try {
+                response = await fetch(deleteRoomUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "RequestVerificationToken": token
+                    },
+                    body: JSON.stringify({ roomId: roomIdValue, propertyId })
+                });
+            } catch {
+                showRoomsAlert("danger", `Network error while deleting ${descriptor}.`);
+                return;
+            }
+
+            if (!response.ok) {
+                let errorMessage = `Failed to delete ${descriptor}.`;
+                const contentType = response.headers.get("content-type") || "";
+                try {
+                    if (contentType.includes("application/json")) {
+                        const payload = await response.json();
+                        if (payload?.error) {
+                            errorMessage = payload.error;
+                        } else if (payload?.message) {
+                            errorMessage = payload.message;
+                        }
+                    } else {
+                        const text = await response.text();
+                        if (text) {
+                            errorMessage = text;
+                        }
+                    }
+                } catch {
+                    // ignore parsing issues
+                }
+
+                showRoomsAlert("danger", errorMessage);
+                return;
+            }
+
+            const contentType = response.headers.get("content-type") || "";
+            if (contentType.includes("application/json")) {
+                try {
+                    const payload = await response.json();
+                    if (payload?.message) {
+                        notificationMessage = payload.message;
+                    }
+                } catch {
+                    // ignore parsing issues
+                }
+            }
+        } else {
+            notificationStatus = "info";
+            notificationMessage = `Removed ${descriptor}.`;
+        }
+
+        row.remove();
+        reindexRoomRows();
+        showRoomsAlert(notificationStatus, notificationMessage);
+    }
 
     function addRoomRow(position) {
         if (!roomsTableBody || !newRowTemplate) {
@@ -215,14 +390,19 @@
         var clone = newRowTemplate.cloneNode(true);
         clone.style.display = "";
         clone.removeAttribute("id");
+        clone.dataset.roomId = "0";
+        clone.dataset.roomNumber = "";
 
         var rowCount = roomsTableBody.querySelectorAll("tr:not(#newRowTemplate)").length;
         clone.innerHTML = clone.innerHTML.replace(/rooms\[\#\]/g, "rooms[" + rowCount + "]");
+
         if (position === "top") {
             roomsTableBody.insertBefore(clone, roomsTableBody.firstElementChild);
         } else {
             roomsTableBody.appendChild(clone);
         }
+
+        reindexRoomRows();
     }
 
     function sortRoomsTable(key, sortType, direction) {
@@ -279,6 +459,7 @@
         });
 
         rows.forEach(row => roomsTableBody.appendChild(row));
+        reindexRoomRows();
     }
 
     function getSortValue(row, key) {
@@ -321,9 +502,22 @@
 
     if (roomsTable) {
         roomsTable.addEventListener("click", function (e) {
-            if (e.target && e.target.classList.contains("btn-delete-row")) {
-                var row = e.target.closest("tr");
-                row.remove();
+            const target = e.target;
+            if (target && target.classList.contains("btn-delete-row")) {
+                const row = target.closest("tr");
+                handleDeleteRow(row);
+            }
+        });
+    }
+
+    if (roomsTableBody) {
+        roomsTableBody.addEventListener("input", function (event) {
+            const target = event.target;
+            if (target && target.name && target.name.endsWith(".RoomNumber")) {
+                const row = target.closest("tr");
+                if (row) {
+                    row.dataset.roomNumber = target.value || "";
+                }
             }
         });
     }
@@ -354,6 +548,8 @@
             window.location.href = this.value;
         });
     }
+
+    reindexRoomRows();
 </script>
 }
 

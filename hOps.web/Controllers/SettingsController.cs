@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Data.Sqlite;
 using Npgsql;
+using Microsoft.Extensions.Logging;
 
 namespace hOps.web.Controllers
 {
@@ -26,12 +27,17 @@ namespace hOps.web.Controllers
     {
         private readonly ApplicationDbContext _db;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly ILogger<SettingsController> _logger;
         private const string DefaultShiftColor = "#3b82f6";
 
-        public SettingsController(ApplicationDbContext db, UserManager<ApplicationUser> userManager)
+        public SettingsController(
+            ApplicationDbContext db,
+            UserManager<ApplicationUser> userManager,
+            ILogger<SettingsController> logger)
         {
             _db = db;
             _userManager = userManager;
+            _logger = logger;
         }
 
         private async Task<List<Property>> GetEditablePropertiesAsync()
@@ -1138,6 +1144,58 @@ namespace hOps.web.Controllers
 
             TempData["RoomsMessage"] = "Rooms updated successfully.";
             return RedirectToAction(nameof(Rooms), new { propertyId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteRoom([FromBody] DeleteRoomRequest? request)
+        {
+            if (request == null || request.RoomId <= 0 || request.PropertyId <= 0)
+            {
+                return BadRequest(new { error = "Invalid room delete request." });
+            }
+
+            var properties = await GetEditablePropertiesAsync();
+            if (!properties.Any(p => p.Id == request.PropertyId))
+            {
+                return Forbid();
+            }
+
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+
+            var room = await _db.Rooms
+                .Where(r => r.Id == request.RoomId && r.PropertyId == request.PropertyId)
+                .SingleOrDefaultAsync();
+
+            if (room == null)
+            {
+                return NotFound();
+            }
+
+            await _db.RoomLayouts
+                .Where(layout => layout.RoomId == room.Id)
+                .ExecuteDeleteAsync();
+
+            var affectedRooms = await _db.Rooms
+                .Where(r => r.Id == room.Id && r.PropertyId == room.PropertyId)
+                .ExecuteDeleteAsync();
+
+            if (affectedRooms == 0)
+            {
+                await transaction.RollbackAsync();
+                return NotFound();
+            }
+
+            if (affectedRooms > 1)
+            {
+                await transaction.RollbackAsync();
+                var message = $"DeleteRoom unexpectedly affected {affectedRooms} entries for roomId {request.RoomId}.";
+                _logger.LogCritical(message);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = message });
+            }
+
+            await transaction.CommitAsync();
+            return Ok(new { message = $"Room {room.RoomNumber} deleted." });
         }
 
         [HttpPost]
