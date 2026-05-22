@@ -8,6 +8,8 @@ namespace hOps.web.ViewModels.WorkOrders
         public int Id { get; set; }
         public string Status { get; set; } = string.Empty;
         public string StatusColor { get; set; } = "#6c757d";
+        public string StatusLabel { get; set; } = string.Empty;
+        public string TranslatedStatusLabel { get; set; } = string.Empty;
         public string Location { get; set; } = string.Empty;
         public string TranslatedLocation { get; set; } = string.Empty;
         public string? WorkOrderType { get; set; }
@@ -25,6 +27,7 @@ namespace hOps.web.ViewModels.WorkOrders
         public string? DepartmentColor { get; set; }
         public string? AssignedToName { get; set; }
         public string? AssignedToId { get; set; }
+        public string TranslatedAssignedTo { get; set; } = string.Empty;
         public string? Creator { get; set; }
         public string PriorityLabel { get; set; } = string.Empty;
         public string PriorityClass { get; set; } = "badge bg-light text-dark border";
@@ -35,6 +38,7 @@ namespace hOps.web.ViewModels.WorkOrders
         public string? CompletionNotes { get; set; }
         public string? TranslatedCompletionNotes { get; set; }
         public List<WorkOrderPropertyDisplayViewModel> Properties { get; set; } = new();
+        public List<string> TranslatedPropertyNames { get; set; } = new();
         public List<WorkOrderAttachmentViewModel> Attachments { get; set; } = new();
     }
 

@@ -1537,11 +1537,16 @@ namespace hOps.web.Controllers
                     ? string.Join(" ", new[] { wo.CreatedBy.FirstName, wo.CreatedBy.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)))
                     : null;
 
+                var statusLabel = WorkOrderStatusOptions.GetLabel(wo.Status ?? string.Empty);
+                var assignedDisplayName = BuildDisplayName(wo.AssignedTo);
+
                 var item = new WorkOrderListItemViewModel
                 {
                     Id = wo.Id,
                     Status = wo.Status,
                     StatusColor = WorkOrderStatusOptions.GetColor(wo.Status),
+                    StatusLabel = statusLabel,
+                    TranslatedStatusLabel = statusLabel,
                     Location = wo.Location ?? string.Empty,
                     TranslatedLocation = wo.Location ?? string.Empty,
                     WorkOrderType = wo.WorkOrderType?.Name,
@@ -1560,7 +1565,8 @@ namespace hOps.web.Controllers
                     DepartmentId = wo.DepartmentId,
                     DepartmentColor = wo.Department?.Color,
                     AssignedToId = wo.AssignedToUserId,
-                    AssignedToName = BuildDisplayName(wo.AssignedTo),
+                    AssignedToName = assignedDisplayName,
+                    TranslatedAssignedTo = string.IsNullOrWhiteSpace(assignedDisplayName) ? unassignedTranslated : assignedDisplayName,
                     Creator = creatorName,
                     PriorityLabel = sla.PriorityLabel,
                     PriorityClass = sla.PriorityClass,
@@ -1569,6 +1575,21 @@ namespace hOps.web.Controllers
                     SlaSummary = WorkOrderSlaHelper.BuildSummaryText(sla),
                     IsOverdue = sla.IsOverdue,
                     Properties = propertyDetails,
+                    TranslatedPropertyNames = propertyDetails
+                        .Select(p =>
+                        {
+                            var name = string.IsNullOrWhiteSpace(p.TranslatedName) ? p.Name : p.TranslatedName;
+                            if (string.IsNullOrWhiteSpace(name))
+                            {
+                                return null;
+                            }
+
+                            return string.IsNullOrWhiteSpace(p.Code)
+                                ? name
+                                : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", name, p.Code);
+                        })
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .ToList()!,
                     Attachments = wo.Attachments.Select(a => new WorkOrderAttachmentViewModel
                     {
                         FilePath = a.FilePath,
@@ -1676,6 +1697,66 @@ namespace hOps.web.Controllers
                                 activeLanguage,
                                 cancellationToken);
                         }
+
+                        item.TranslatedPropertyNames = item.Properties
+                            .Select(p =>
+                            {
+                                var translatedName = string.IsNullOrWhiteSpace(p.TranslatedName) ? p.Name : p.TranslatedName;
+                                if (string.IsNullOrWhiteSpace(translatedName))
+                                {
+                                    return null;
+                                }
+
+                                return string.IsNullOrWhiteSpace(p.Code)
+                                    ? translatedName
+                                    : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", translatedName, p.Code);
+                            })
+                            .Where(value => !string.IsNullOrWhiteSpace(value))
+                            .ToList()!;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(item.StatusLabel))
+                    {
+                        item.TranslatedStatusLabel = _translationService.Translate(item.StatusLabel, activeLanguage, item.StatusLabel);
+                    }
+
+                    item.TranslatedAssignedTo = string.IsNullOrWhiteSpace(item.AssignedToName)
+                        ? unassignedTranslated
+                        : item.AssignedToName;
+                }
+            }
+            else
+            {
+                foreach (var item in listItems)
+                {
+                    item.TranslatedPropertyNames = item.Properties
+                        .Select(p =>
+                        {
+                            var translatedName = string.IsNullOrWhiteSpace(p.TranslatedName) ? p.Name : p.TranslatedName;
+                            if (string.IsNullOrWhiteSpace(translatedName))
+                            {
+                                return null;
+                            }
+
+                            return string.IsNullOrWhiteSpace(p.Code)
+                                ? translatedName
+                                : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", translatedName, p.Code);
+                        })
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .ToList()!;
+
+                    if (string.IsNullOrWhiteSpace(item.TranslatedAssignedTo))
+                    {
+                        item.TranslatedAssignedTo = string.IsNullOrWhiteSpace(item.AssignedToName)
+                            ? unassignedTranslated
+                            : item.AssignedToName;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(item.TranslatedStatusLabel))
+                    {
+                        item.TranslatedStatusLabel = string.IsNullOrWhiteSpace(item.StatusLabel)
+                            ? item.Status
+                            : item.StatusLabel;
                     }
                 }
             }

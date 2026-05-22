@@ -7,6 +7,15 @@
     };
 
     const translateKey = ([key, fallback]) => t(key, fallback);
+    const getPreferredValue = (primary, fallback) => {
+        if (typeof primary === 'string' && primary.trim().length) {
+            return primary;
+        }
+        if (typeof fallback === 'string' && fallback.trim().length) {
+            return fallback;
+        }
+        return '';
+    };
     const KEYS = {
         modalTitle: ['WorkOrders.Modal.Title', 'Work Order'],
         modalNoIssue: ['WorkOrders.Modal.NoIssueProvided', 'No issue provided.'],
@@ -122,25 +131,35 @@
     }
 
     function populateModal(data) {
-        setText(fields.title, data.issue || translateKey(KEYS.modalTitle));
+        const issueText = getPreferredValue(data.translatedIssue, data.issue);
+        setText(fields.title, issueText || translateKey(KEYS.modalTitle));
 
         if (fields.issue) {
-            fields.issue.innerHTML = data.issueHtml || escapeHtml(data.issue || translateKey(KEYS.modalNoIssue));
+            const issueHtml = getPreferredValue(data.translatedIssueHtml, data.issueHtml);
+            if (issueHtml) {
+                fields.issue.innerHTML = issueHtml;
+            } else if (issueText) {
+                fields.issue.innerHTML = escapeHtml(issueText);
+            } else {
+                fields.issue.innerHTML = `<span class="text-muted">${translateKey(KEYS.modalNoIssue)}</span>`;
+            }
         }
 
         if (fields.details) {
-            if (data.detailsHtml) {
-                fields.details.innerHTML = data.detailsHtml;
-            } else if (data.details) {
-                fields.details.textContent = data.details;
+            const detailsHtml = getPreferredValue(data.translatedDetailsHtml, data.detailsHtml);
+            const detailsText = getPreferredValue(data.translatedDetails, data.details);
+            if (detailsHtml) {
+                fields.details.innerHTML = detailsHtml;
+            } else if (detailsText) {
+                fields.details.textContent = detailsText;
             } else {
                 fields.details.innerHTML = `<span class="text-muted">${translateKey(KEYS.modalNoDetails)}</span>`;
             }
         }
 
         if (fields.completionNotes && completionNotesSection) {
-            const notesHtml = data.completionNotesHtml || '';
-            const notesText = data.completionNotes || '';
+            const notesHtml = getPreferredValue(data.translatedCompletionNotesHtml, data.completionNotesHtml);
+            const notesText = getPreferredValue(data.translatedCompletionNotes, data.completionNotes);
             const hasNotes = Boolean((notesHtml && notesHtml.trim()) || (notesText && notesText.trim()));
             completionNotesSection.classList.toggle('d-none', !hasNotes);
             if (hasNotes) {
@@ -154,20 +173,30 @@
             }
         }
 
-        setText(fields.location, data.location);
+        const locationText = getPreferredValue(data.translatedLocation, data.location);
+        setText(fields.location, locationText);
         const unassignedText = translateKey(KEYS.unassigned);
-        setText(fields.department, data.department, unassignedText);
-        setText(fields.assignee, data.assignedTo, unassignedText);
+        const departmentText = getPreferredValue(data.translatedDepartment, data.department);
+        setText(fields.department, departmentText, unassignedText);
+        const assigneeText = getPreferredValue(data.translatedAssignedTo, data.assignedTo);
+        setText(fields.assignee, assigneeText, unassignedText);
         setText(fields.dueDate, data.dueDateText);
         setText(fields.created, data.createdAtText);
         setText(fields.creator, data.creator, translateKey(KEYS.unknown));
-        setBadge(fields.status, data.statusLabel || data.status, data.statusColor);
-        setBadge(fields.type, data.workOrderType, '', true);
+        const statusLabel = getPreferredValue(data.translatedStatusLabel, data.statusLabel || data.status);
+        setBadge(fields.status, statusLabel, data.statusColor);
+        const typeLabel = getPreferredValue(data.translatedWorkOrderType, data.workOrderType);
+        setBadge(fields.type, typeLabel, '', true);
 
         if (fields.properties) {
             const propertiesFallback = data.propertiesEmptyText || translateKey(KEYS.propertiesEmpty);
-            const props = Array.isArray(data.properties) && data.properties.length
-                ? data.properties.join(', ') : propertiesFallback;
+            const translatedProps = Array.isArray(data.translatedProperties) ? data.translatedProperties : null;
+            const rawProps = Array.isArray(data.rawProperties)
+                ? data.rawProperties
+                : (Array.isArray(data.properties) ? data.properties : null);
+            const props = translatedProps && translatedProps.length
+                ? translatedProps.join(', ')
+                : (rawProps && rawProps.length ? rawProps.join(', ') : propertiesFallback);
             fields.properties.textContent = props;
         }
 
@@ -274,7 +303,10 @@
 
         attachmentsModalBody.innerHTML = '';
         const attachmentFallback = data.attachmentFallbackLabel || translateKey(KEYS.attachmentLabel);
-        attachmentsModalTitle.textContent = data.issue || attachmentsModalDefaultTitle;
+        const attachmentModalTitle = getPreferredValue(data.translatedIssue, data.issue);
+        if (attachmentsModalTitle) {
+            attachmentsModalTitle.textContent = attachmentModalTitle || attachmentsModalDefaultTitle;
+        }
 
         attachments.forEach(att => {
             const col = document.createElement('div');
@@ -391,12 +423,17 @@
             return `<div class="text-muted small">${translateKey(KEYS.popoverNoDetails)}</div>`;
         }
 
-        const html = data.detailsHtml || (data.details ? escapeHtml(data.details) : '');
-        if (!html) {
+        const detailsHtml = getPreferredValue(data.translatedDetailsHtml, data.detailsHtml);
+        if (detailsHtml) {
+            return `<div class="workorder-details-popover-content">${detailsHtml}</div>`;
+        }
+
+        const detailsText = getPreferredValue(data.translatedDetails, data.details);
+        if (!detailsText) {
             return `<div class="text-muted small">${translateKey(KEYS.popoverNoDetails)}</div>`;
         }
 
-        return `<div class="workorder-details-popover-content">${html}</div>`;
+        return `<div class="workorder-details-popover-content">${escapeHtml(detailsText)}</div>`;
     }
 })();
 

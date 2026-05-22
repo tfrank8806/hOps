@@ -884,7 +884,12 @@
                                     var statusLabelRaw = !string.IsNullOrWhiteSpace(order.Status) && order.Status.Equals("New", StringComparison.OrdinalIgnoreCase)
                                         ? "Open"
                                         : order.Status ?? string.Empty;
-                                    var statusDisplay = Html.Localize(statusLabelRaw).ToString();
+                                    var rawStatusLabel = string.IsNullOrWhiteSpace(order.StatusLabel)
+                                        ? statusLabelRaw
+                                        : order.StatusLabel;
+                                    var statusDisplay = string.IsNullOrWhiteSpace(order.TranslatedStatusLabel)
+                                        ? Html.Localize(rawStatusLabel).ToString()
+                                        : order.TranslatedStatusLabel!;
                                     var nextStatusFriendlyNameRaw = nextStatusLabel.Equals("New", StringComparison.OrdinalIgnoreCase) ? "Open" : nextStatusLabel;
                                     var nextStatusFriendlyName = Html.Localize(nextStatusFriendlyNameRaw);
                                     var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
@@ -903,34 +908,59 @@
                                             isImage = IsImageAttachment(imageCandidate)
                                         };
                                     }).ToList();
+                                    var originalDepartmentName = order.Department ?? string.Empty;
                                     var departmentDisplayText = string.IsNullOrWhiteSpace(order.TranslatedDepartment)
                                         ? unassignedLabel.ToString()
                                         : order.TranslatedDepartment!;
-                                    var assignedToDisplay = string.IsNullOrWhiteSpace(order.AssignedToName)
-                                        ? unassignedLabel.ToString()
-                                        : order.AssignedToName;
+                                    var assignedToDisplay = string.IsNullOrWhiteSpace(order.TranslatedAssignedTo)
+                                        ? (string.IsNullOrWhiteSpace(order.AssignedToName) ? unassignedLabel.ToString() : order.AssignedToName!)
+                                        : order.TranslatedAssignedTo;
+                                    var originalAssignedTo = string.IsNullOrWhiteSpace(order.AssignedToName) ? string.Empty : order.AssignedToName!;
                                     var orderIdString = order.Id.ToString(CultureInfo.InvariantCulture);
-                                    var translatedIssue = order.TranslatedIssue ?? order.Issue ?? string.Empty;
-                                    var translatedIssueHtml = MentionMarkupFormatter.ToHtml(translatedIssue);
-                                    var translatedDetails = order.TranslatedDetails ?? order.Details ?? string.Empty;
+                                    var originalIssue = order.Issue ?? string.Empty;
+                                    var translatedIssue = string.IsNullOrWhiteSpace(order.TranslatedIssue) ? originalIssue : order.TranslatedIssue!;
+                                    var translatedIssueHtml = string.IsNullOrWhiteSpace(translatedIssue) ? string.Empty : MentionMarkupFormatter.ToHtml(translatedIssue);
+                                    var originalIssueHtml = string.IsNullOrWhiteSpace(originalIssue) ? string.Empty : MentionMarkupFormatter.ToHtml(originalIssue);
+                                    var originalDetails = order.Details ?? string.Empty;
+                                    var translatedDetails = string.IsNullOrWhiteSpace(order.TranslatedDetails) ? originalDetails : order.TranslatedDetails!;
                                     var translatedDetailsHtml = string.IsNullOrWhiteSpace(translatedDetails) ? string.Empty : MentionMarkupFormatter.ToHtml(translatedDetails);
-                                    var translatedCompletionNotes = order.TranslatedCompletionNotes ?? order.CompletionNotes ?? string.Empty;
+                                    var originalDetailsHtml = string.IsNullOrWhiteSpace(originalDetails) ? string.Empty : MentionMarkupFormatter.ToHtml(originalDetails);
+                                    var originalCompletionNotes = order.CompletionNotes ?? string.Empty;
+                                    var translatedCompletionNotes = string.IsNullOrWhiteSpace(order.TranslatedCompletionNotes) ? originalCompletionNotes : order.TranslatedCompletionNotes!;
                                     var translatedCompletionNotesHtml = string.IsNullOrWhiteSpace(translatedCompletionNotes) ? string.Empty : MentionMarkupFormatter.ToHtml(translatedCompletionNotes);
-                                    var translatedLocation = order.TranslatedLocation ?? order.Location ?? string.Empty;
-                                    var propertyDisplayNames = new List<string>();
+                                    var originalCompletionNotesHtml = string.IsNullOrWhiteSpace(originalCompletionNotes) ? string.Empty : MentionMarkupFormatter.ToHtml(originalCompletionNotes);
+                                    var originalLocation = order.Location ?? string.Empty;
+                                    var translatedLocation = string.IsNullOrWhiteSpace(order.TranslatedLocation) ? originalLocation : order.TranslatedLocation!;
+                                    var workOrderTypeRaw = order.WorkOrderType ?? unspecifiedTypeLabel;
+                                    var workOrderTypeTranslated = string.IsNullOrWhiteSpace(order.TranslatedWorkOrderType) ? workOrderTypeRaw : order.TranslatedWorkOrderType;
+                                    var propertyDisplayNames = order.TranslatedPropertyNames != null && order.TranslatedPropertyNames.Count > 0
+                                        ? new List<string>(order.TranslatedPropertyNames)
+                                        : new List<string>();
+                                    var rawPropertyDisplayNames = new List<string>();
                                     if (order.Properties != null)
                                     {
                                         foreach (var property in order.Properties)
                                         {
-                                            var displayName = string.IsNullOrWhiteSpace(property.TranslatedName)
-                                                ? property.Name
-                                                : property.TranslatedName;
-                                            var propertyEntryLabel = string.IsNullOrWhiteSpace(property.Code)
-                                                ? displayName
-                                                : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", displayName, property.Code);
-                                            if (!string.IsNullOrWhiteSpace(propertyEntryLabel))
+                                            string? BuildEntry(string? value) =>
+                                                string.IsNullOrWhiteSpace(value)
+                                                    ? null
+                                                    : (string.IsNullOrWhiteSpace(property.Code)
+                                                        ? value
+                                                        : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", value, property.Code));
+
+                                            var rawEntry = BuildEntry(property.Name);
+                                            if (!string.IsNullOrWhiteSpace(rawEntry))
                                             {
-                                                propertyDisplayNames.Add(propertyEntryLabel);
+                                                rawPropertyDisplayNames.Add(rawEntry);
+                                            }
+
+                                            if (propertyDisplayNames.Count == 0)
+                                            {
+                                                var translatedEntry = BuildEntry(property.TranslatedName);
+                                                if (!string.IsNullOrWhiteSpace(translatedEntry))
+                                                {
+                                                    propertyDisplayNames.Add(translatedEntry);
+                                                }
                                             }
                                         }
                                     }
@@ -939,27 +969,37 @@
                                     {
                                         id = order.Id,
                                         issue = translatedIssue,
+                                        rawIssue = originalIssue,
                                         issueHtml = translatedIssueHtml,
+                                        rawIssueHtml = originalIssueHtml,
                                         details = translatedDetails,
+                                        rawDetails = originalDetails,
                                         detailsHtml = translatedDetailsHtml,
+                                        rawDetailsHtml = originalDetailsHtml,
                                         completionNotes = translatedCompletionNotes,
+                                        rawCompletionNotes = originalCompletionNotes,
                                         completionNotesHtml = translatedCompletionNotesHtml,
+                                        rawCompletionNotesHtml = originalCompletionNotesHtml,
                                         location = translatedLocation,
+                                        rawLocation = originalLocation,
                                         status = order.Status,
                                         statusLabel = statusDisplay,
+                                        rawStatusLabel = rawStatusLabel,
                                         statusColor = order.StatusColor,
-                                        workOrderType = string.IsNullOrWhiteSpace(order.TranslatedWorkOrderType)
-                                            ? (order.WorkOrderType ?? unspecifiedTypeLabel)
-                                            : order.TranslatedWorkOrderType,
+                                        workOrderType = workOrderTypeTranslated,
+                                        workOrderTypeRaw = workOrderTypeRaw,
                                         department = departmentDisplayText,
+                                        rawDepartment = originalDepartmentName,
                                         departmentColor = order.DepartmentColor,
                                         assignedTo = assignedToDisplay,
+                                        rawAssignedTo = originalAssignedTo,
                                         assignedToId = order.AssignedToId,
                                         dueDateText = order.DueDate.ToString("d", CultureInfo.CurrentCulture),
                                         createdAtText = createdLocal.ToString("g", CultureInfo.CurrentCulture),
                                         creator = string.IsNullOrWhiteSpace(order.Creator) ? unknownUserLabel : order.Creator,
                                         createdByLabel = createdByPrefix,
                                         properties = propertyDisplayNames,
+                                        rawProperties = rawPropertyDisplayNames,
                                         propertiesEmptyText = notAssignedPropertyText,
                                         attachments = attachmentsPayload,
                                         attachmentFallbackLabel = attachmentFallbackLabel,
@@ -1024,19 +1064,19 @@
                     </td>
                     <td class="col-assigned">
                         <div class="fw-semibold text-uppercase small text-muted">@Html.Localize("Assigned To")</div>
-                        @if (!string.IsNullOrWhiteSpace(order.AssignedToName))
+                        @if (!string.IsNullOrWhiteSpace(originalAssignedTo))
                         {
-                            <div>@order.AssignedToName</div>
+                            <div>@assignedToDisplay</div>
                         }
                         else
                         {
-                            <span class="text-muted">@unassignedLabel</span>
+                            <span class="text-muted">@assignedToDisplay</span>
                         }
                     </td>
                     <td class="col-type">@(
-                        string.IsNullOrWhiteSpace(order.TranslatedWorkOrderType)
+                        string.IsNullOrWhiteSpace(workOrderTypeTranslated)
                             ? Html.Localize("Unspecified")
-                            : order.TranslatedWorkOrderType
+                            : workOrderTypeTranslated
                         )</td>
                     <td class="col-issue">
                         <div class="workorder-issue">@Html.Raw(translatedIssueHtml)</div>
