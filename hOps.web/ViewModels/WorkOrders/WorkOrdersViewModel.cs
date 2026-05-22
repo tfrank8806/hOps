@@ -28,6 +28,7 @@ namespace hOps.web.ViewModels.WorkOrders
     public class DepartmentWorkOrderSummaryViewModel
     {
         public string DepartmentName { get; set; } = string.Empty;
+        public string? TranslatedDepartmentName { get; set; }
         public string? DepartmentColor { get; set; }
         public int OpenCount { get; set; }
     }

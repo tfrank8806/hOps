@@ -6,18 +6,20 @@
         return key || fallback;
     };
 
-    const localizeSentinel = (value, sentinel) => {
-        if (!value) {
-            return value;
-        }
-
-        const normalizedValue = String(value).trim().toLowerCase();
-        const normalizedSentinel = String(sentinel).trim().toLowerCase();
-        if (normalizedValue === normalizedSentinel) {
-            return t(sentinel);
-        }
-
-        return value;
+    const translateKey = ([key, fallback]) => t(key, fallback);
+    const KEYS = {
+        modalTitle: ['WorkOrders.Modal.Title', 'Work Order'],
+        modalNoIssue: ['WorkOrders.Modal.NoIssueProvided', 'No issue provided.'],
+        modalNoDetails: ['WorkOrders.Modal.NoAdditionalDetails', 'No additional details provided.'],
+        unassigned: ['WorkOrders.Unassigned', 'Unassigned'],
+        unknown: ['Unknown', 'Unknown'],
+        propertiesEmpty: ['WorkOrders.Details.NotAssignedToProperty', 'Not assigned to a property yet.'],
+        createdBy: ['WorkOrders.Details.CreatedBy', 'Created by'],
+        popoverNoDetails: ['WorkOrders.Popover.NoDetails', 'No details available.'],
+        attachmentPreview: ['WorkOrders.Attachments.ImageAlt', 'Attachment preview'],
+        attachmentLabel: ['WorkOrders.Attachments.AttachmentLabel', 'Attachment'],
+        attachmentsOpenFile: ['WorkOrders.Attachments.OpenFile', 'Open File'],
+        attachmentsModalTitle: ['WorkOrders.Attachments.ModalTitle', 'Attachments']
     };
 
     const modalEl = document.getElementById('workOrderDetailsModal');
@@ -32,6 +34,7 @@
     const attachmentsModalBody = attachmentsModalEl?.querySelector('[data-attachments-modal-body]');
     const attachmentsModalEmpty = attachmentsModalEl?.querySelector('[data-attachments-modal-empty]');
     const attachmentsModalTitle = attachmentsModalEl?.querySelector('[data-attachments-modal-title]');
+    const attachmentsModalDefaultTitle = attachmentsModalTitle?.textContent?.trim() || translateKey(KEYS.attachmentsModalTitle);
         const fields = {
             title: modalEl.querySelector('[data-workorder-field="title"]'),
             meta: modalEl.querySelector('[data-workorder-field="meta"]'),
@@ -119,10 +122,10 @@
     }
 
     function populateModal(data) {
-        setText(fields.title, data.issue || t('Work Order'));
+        setText(fields.title, data.issue || translateKey(KEYS.modalTitle));
 
         if (fields.issue) {
-            fields.issue.innerHTML = data.issueHtml || escapeHtml(data.issue || t('No issue provided.'));
+            fields.issue.innerHTML = data.issueHtml || escapeHtml(data.issue || translateKey(KEYS.modalNoIssue));
         }
 
         if (fields.details) {
@@ -131,7 +134,7 @@
             } else if (data.details) {
                 fields.details.textContent = data.details;
             } else {
-                fields.details.innerHTML = `<span class="text-muted">${t('No additional details provided.')}</span>`;
+                fields.details.innerHTML = `<span class="text-muted">${translateKey(KEYS.modalNoDetails)}</span>`;
             }
         }
 
@@ -152,26 +155,26 @@
         }
 
         setText(fields.location, data.location);
-        const departmentText = localizeSentinel(data.department, 'Unassigned');
-        const assigneeText = localizeSentinel(data.assignedTo, 'Unassigned');
-        setText(fields.department, departmentText, t('Unassigned'));
-        setText(fields.assignee, assigneeText, t('Unassigned'));
+        const unassignedText = translateKey(KEYS.unassigned);
+        setText(fields.department, data.department, unassignedText);
+        setText(fields.assignee, data.assignedTo, unassignedText);
         setText(fields.dueDate, data.dueDateText);
         setText(fields.created, data.createdAtText);
-        setText(fields.creator, data.creator, t('Unknown'));
+        setText(fields.creator, data.creator, translateKey(KEYS.unknown));
         setBadge(fields.status, data.statusLabel || data.status, data.statusColor);
         setBadge(fields.type, data.workOrderType, '', true);
 
         if (fields.properties) {
+            const propertiesFallback = data.propertiesEmptyText || translateKey(KEYS.propertiesEmpty);
             const props = Array.isArray(data.properties) && data.properties.length
-                ? data.properties.join(', ') : t('Not assigned to a property yet.');
+                ? data.properties.join(', ') : propertiesFallback;
             fields.properties.textContent = props;
         }
 
         if (fields.meta) {
             const metaParts = [];
             if (data.creator) {
-                metaParts.push(`${t('Created by')} ${data.creator}`);
+                metaParts.push(`${data.createdByLabel || translateKey(KEYS.createdBy)} ${data.creator}`);
             }
             if (data.createdAtText) {
                 metaParts.push(data.createdAtText);
@@ -179,10 +182,10 @@
             fields.meta.textContent = metaParts.join(' \u2022 ');
         }
 
-        renderAttachments(Array.isArray(data.attachments) ? data.attachments : []);
+        renderAttachments(Array.isArray(data.attachments) ? data.attachments : [], data.attachmentFallbackLabel);
     }
 
-    function renderAttachments(attachments) {
+    function renderAttachments(attachments, attachmentFallback = translateKey(KEYS.attachmentLabel)) {
         if (!attachmentsContainer) {
             return;
         }
@@ -210,7 +213,7 @@
 
                 const img = document.createElement('img');
                 img.src = att.url;
-                img.alt = att.name || t('Attachment preview');
+                img.alt = att.name || translateKey(KEYS.attachmentPreview);
                 img.className = 'workorder-attachment-img';
                 img.loading = 'lazy';
 
@@ -227,7 +230,7 @@
 
                 const nameEl = document.createElement('div');
                 nameEl.className = 'fw-semibold';
-                nameEl.textContent = att.name || t('Attachment');
+                nameEl.textContent = att.name || attachmentFallback;
                 fileCard.appendChild(nameEl);
 
                 col.appendChild(fileCard);
@@ -242,7 +245,7 @@
                 openLink.target = '_blank';
                 openLink.rel = 'noopener';
                 openLink.className = 'btn btn-sm btn-outline-primary';
-                openLink.textContent = t('Open File');
+                openLink.textContent = translateKey(KEYS.attachmentsOpenFile);
 
                 actions.appendChild(openLink);
                 col.appendChild(actions);
@@ -270,7 +273,8 @@
         }
 
         attachmentsModalBody.innerHTML = '';
-        attachmentsModalTitle.textContent = data.issue || t('Work Order Attachments');
+        const attachmentFallback = data.attachmentFallbackLabel || translateKey(KEYS.attachmentLabel);
+        attachmentsModalTitle.textContent = data.issue || attachmentsModalDefaultTitle;
 
         attachments.forEach(att => {
             const col = document.createElement('div');
@@ -285,7 +289,7 @@
 
                 const img = document.createElement('img');
                 img.src = att.url;
-                img.alt = att.name || t('Attachment preview');
+                img.alt = att.name || translateKey(KEYS.attachmentPreview);
                 img.className = 'img-fluid rounded shadow-sm';
                 img.loading = 'lazy';
 
@@ -297,7 +301,7 @@
 
                 const title = document.createElement('div');
                 title.className = 'fw-semibold';
-                title.textContent = att.name || t('Attachment');
+                title.textContent = att.name || attachmentFallback;
                 card.appendChild(title);
 
                 const link = document.createElement('a');
@@ -305,7 +309,7 @@
                 link.target = '_blank';
                 link.rel = 'noopener';
                 link.className = 'btn btn-sm btn-outline-primary align-self-start';
-                link.textContent = t('Open File');
+                link.textContent = translateKey(KEYS.attachmentsOpenFile);
                 card.appendChild(link);
 
                 col.appendChild(card);
@@ -384,12 +388,12 @@
     function buildDetailsPopoverContent(row) {
         const data = getRowData(row);
         if (!data) {
-            return `<div class="text-muted small">${t('No details available.')}</div>`;
+            return `<div class="text-muted small">${translateKey(KEYS.popoverNoDetails)}</div>`;
         }
 
         const html = data.detailsHtml || (data.details ? escapeHtml(data.details) : '');
         if (!html) {
-            return `<div class="text-muted small">${t('No details available.')}</div>`;
+            return `<div class="text-muted small">${translateKey(KEYS.popoverNoDetails)}</div>`;
         }
 
         return `<div class="workorder-details-popover-content">${html}</div>`;

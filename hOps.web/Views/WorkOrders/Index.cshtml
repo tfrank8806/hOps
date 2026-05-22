@@ -10,7 +10,8 @@
 @model hOps.web.ViewModels.WorkOrders.WorkOrdersViewModel
 
 @{
-    ViewData["Title"] = "Work Orders";
+    var localizedWorkOrdersTitle = Html.Localize("WorkOrders.Title", "Work Orders").ToString();
+    ViewData["Title"] = localizedWorkOrdersTitle;
     ViewData["MainContainerClass"] = "main-inner--wide main-inner--wide-stretched";
     ViewData["ContentSurfaceClass"] = "content-surface--flush";
 
@@ -19,8 +20,12 @@
     var formRouteId = Model.IsEditing && Model.EditingWorkOrderId.HasValue
         ? Model.EditingWorkOrderId.Value.ToString()
         : null;
-    var formTitle = Model.IsEditing ? "Edit Work Order" : "Create Work Order";
-    var submitLabel = Model.IsEditing ? "Update Work Order" : "Submit Work Order";
+    var editWorkOrderText = Html.Localize("WorkOrders.Form.EditTitle", "Edit Work Order").ToString();
+    var createWorkOrderText = Html.Localize("WorkOrders.Form.CreateTitle", "Create Work Order").ToString();
+    var updateWorkOrderText = Html.Localize("WorkOrders.Form.UpdateButton", "Update Work Order").ToString();
+    var submitWorkOrderText = Html.Localize("WorkOrders.Form.SubmitButton", "Submit Work Order").ToString();
+    var formTitle = Model.IsEditing ? editWorkOrderText : createWorkOrderText;
+    var submitLabel = Model.IsEditing ? updateWorkOrderText : submitWorkOrderText;
     var canAddAdditionalLocations = !Model.IsEditing;
 
     var filterQuery = new QueryBuilder();
@@ -70,8 +75,94 @@
     var exportUrl = $"{Url.Action("Export")}{filterQueryString}";
     var indexUrlWithFilters = $"{Url.Action("Index")}{filterQueryString}";
     var hasAssigneeOptions = Model.AssigneeOptions != null && Model.AssigneeOptions.Count > 0;
-    var hideCompletedLabel = Html.Localize("Hide completed");
-    var unassignedLabel = Html.Localize("Unassigned");
+    var hasActiveFilters =
+        !string.Equals(Model.Filters.SortOrder, "newest", StringComparison.OrdinalIgnoreCase) ||
+        !string.IsNullOrWhiteSpace(Model.Filters.RoomNumber) ||
+        !string.IsNullOrWhiteSpace(Model.Filters.Search) ||
+        Model.Filters.DepartmentIds.Any() ||
+        Model.Filters.WorkOrderTypeIds.Any() ||
+        Model.Filters.Statuses.Any() ||
+        Model.Filters.CreatorIds.Any() ||
+        Model.Filters.PropertyIds.Any() ||
+        !Model.Filters.HideCompleted;
+
+    var hideCompletedLabel = Html.Localize("WorkOrders.HideCompleted", "Hide completed").ToString();
+    var unassignedLabel = Html.Localize("WorkOrders.Unassigned", "Unassigned").ToString();
+    var filtersHeading = Html.Localize("WorkOrders.Filters.Heading", "Filters").ToString();
+    var defaultSortLabel = Html.Localize("WorkOrders.Filters.DefaultSort", "Default Sort").ToString();
+    var newestFirstLabel = Html.Localize("WorkOrders.Filters.NewestFirst", "Newest First").ToString();
+    var oldestFirstLabel = Html.Localize("WorkOrders.Filters.OldestFirst", "Oldest First").ToString();
+    var roomLocationLabel = Html.Localize("WorkOrders.Filters.RoomOrLocation", "Room / Location").ToString();
+    var statusLabel = Html.Localize("WorkOrders.Filters.Status", "Status").ToString();
+    var departmentLabel = Html.Localize("WorkOrders.Filters.Department", "Department").ToString();
+    var workOrderTypeLabel = Html.Localize("WorkOrders.Filters.WorkOrderType", "Work Order Type").ToString();
+    var creatorLabel = Html.Localize("WorkOrders.Filters.Creator", "Creator").ToString();
+    var propertyLabel = Html.Localize("WorkOrders.Filters.Property", "Property").ToString();
+    var keywordSearchLabel = Html.Localize("WorkOrders.Filters.KeywordSearch", "Keyword Search").ToString();
+    var searchPlaceholderText = Html.Localize("WorkOrders.Filters.SearchPlaceholder", "Search issue, details, or location").ToString();
+    var allStatusesLabel = Html.Localize("WorkOrders.Filters.AllStatuses", "All statuses").ToString();
+    var allDepartmentsLabel = Html.Localize("WorkOrders.Filters.AllDepartments", "All departments").ToString();
+    var allTypesLabel = Html.Localize("WorkOrders.Filters.AllTypes", "All types").ToString();
+    var allCreatorsLabel = Html.Localize("WorkOrders.Filters.AllCreators", "All creators").ToString();
+    var allPropertiesLabel = Html.Localize("WorkOrders.Filters.AllProperties", "All properties").ToString();
+    var resetFiltersLabel = Html.Localize("WorkOrders.Filters.Reset", "Reset").ToString();
+    var applyFiltersLabel = Html.Localize("WorkOrders.Filters.Apply", "Apply Filters").ToString();
+    var hideFiltersText = Html.Localize("WorkOrders.Filters.Hide", "Hide Filters").ToString();
+    var showFiltersText = Html.Localize("WorkOrders.Filters.Show", "Show Filters").ToString();
+    var filterToggleText = hasActiveFilters ? hideFiltersText : showFiltersText;
+    var openByDepartmentHeading = Html.Localize("WorkOrders.Summary.OpenByDepartment", "Open work orders by department").ToString();
+    var statusExcludesHint = Html.Localize("WorkOrders.Summary.StatusExcludesCompleted", "Status excludes completed & cancelled").ToString();
+    var openWorkOrdersLabel = Html.Localize("WorkOrders.Summary.OpenCountLabel", "Open work orders").ToString();
+    var workOrdersHeading = Html.Localize("WorkOrders.List.Heading", "Work Orders").ToString();
+    var actionsHeaderLabel = Html.Localize("WorkOrders.Columns.Actions", "Actions").ToString();
+    var statusHeaderLabel = Html.Localize("WorkOrders.Columns.Status", "Status").ToString();
+    var locationHeaderLabel = Html.Localize("WorkOrders.Columns.Location", "Location").ToString();
+    var departmentHeaderLabel = Html.Localize("WorkOrders.Columns.Department", "Department").ToString();
+    var assignedHeaderLabel = Html.Localize("WorkOrders.Columns.Assigned", "Assigned").ToString();
+    var typeHeaderLabel = Html.Localize("WorkOrders.Columns.Type", "Type").ToString();
+    var issueHeaderLabel = Html.Localize("WorkOrders.Columns.Issue", "Issue").ToString();
+    var detailsHeaderLabel = Html.Localize("WorkOrders.Columns.Details", "Details").ToString();
+    var dueHeaderLabel = Html.Localize("WorkOrders.Columns.Due", "Due").ToString();
+    var createdHeaderLabel = Html.Localize("WorkOrders.Columns.Created", "Created").ToString();
+    var attachmentsHeaderLabel = Html.Localize("WorkOrders.Columns.Attachments", "Attachments").ToString();
+    var previewLabel = Html.Localize("WorkOrders.Actions.Preview", "Preview").ToString();
+    var editLabel = Html.Localize("WorkOrders.Actions.Edit", "Edit").ToString();
+    var updateStatusLabel = Html.Localize("WorkOrders.Actions.UpdateStatus", "Update Status").ToString();
+    var updateStatusTitle = Html.Localize("WorkOrders.Actions.UpdateStatusTitle", "Update status").ToString();
+    var emptyTableMessage = Html.Localize("WorkOrders.Table.Empty", "No work orders found. Adjust filters or create a new work order.").ToString();
+    var removeLocationLabel = Html.Localize("WorkOrders.Actions.RemoveLocation", "Remove location").ToString();
+    var noEligibleTeammatesText = Html.Localize("WorkOrders.Form.NoEligibleTeammates", "No eligible teammates found for the selected property.").ToString();
+    var startTypingHelpText = Html.Localize("WorkOrders.Form.StartTypingToFilter", "Start typing above to filter the list.").ToString();
+    var propertiesLegendLabel = Html.Localize("WorkOrders.Form.PropertiesLegend", "Properties").ToString();
+    var workOrderModalTitle = Html.Localize("WorkOrders.Details.ModalTitle", "Work Order").ToString();
+    var locationModalLabel = Html.Localize("WorkOrders.Details.Location", "Location").ToString();
+    var departmentModalLabel = Html.Localize("WorkOrders.Details.Department", "Department").ToString();
+    var assignedToModalLabel = Html.Localize("WorkOrders.Details.AssignedTo", "Assigned To").ToString();
+    var dueDateModalLabel = Html.Localize("WorkOrders.Details.DueDate", "Due Date").ToString();
+    var createdModalLabel = Html.Localize("WorkOrders.Details.Created", "Created").ToString();
+    var creatorModalLabel = Html.Localize("WorkOrders.Details.Creator", "Creator").ToString();
+    var propertiesModalLabel = Html.Localize("WorkOrders.Details.Properties", "Properties").ToString();
+    var issueModalLabel = Html.Localize("WorkOrders.Details.Issue", "Issue").ToString();
+    var detailsModalLabel = Html.Localize("WorkOrders.Details.Details", "Details").ToString();
+    var completionNotesModalLabel = Html.Localize("WorkOrders.Details.CompletionNotes", "Completion Notes").ToString();
+    var attachmentsModalLabel = Html.Localize("WorkOrders.Details.Attachments", "Attachments").ToString();
+    var attachmentsEmptyText = Html.Localize("WorkOrders.Details.AttachmentsEmpty", "No attachments were uploaded for this work order.").ToString();
+    var closeModalLabel = Html.Localize("WorkOrders.Details.Close", "Close").ToString();
+    var attachmentsModalTitle = Html.Localize("WorkOrders.Attachments.ModalTitle", "Attachments").ToString();
+    var attachmentsModalEmptyText = Html.Localize("WorkOrders.Attachments.Empty", "No attachments available for this work order.").ToString();
+    var completionNotesModalTitle = Html.Localize("WorkOrders.CompletionNotes.ModalTitle", "Add Completion Notes").ToString();
+    var completionNotesModalDescription = Html.Localize("WorkOrders.CompletionNotes.Description", "Share any closing details or follow-ups. This step is optional.").ToString();
+    var markCompleteLabel = Html.Localize("WorkOrders.CompletionNotes.Submit", "Mark Complete").ToString();
+    var attachmentFallbackLabel = Html.Localize("WorkOrders.Attachments.DefaultName", "Attachment").ToString();
+    var unspecifiedTypeLabel = Html.Localize("WorkOrders.Type.Unspecified", "Unspecified").ToString();
+    var notAssignedPropertyText = Html.Localize("WorkOrders.Details.NotAssignedToProperty", "Not assigned to a property yet.").ToString();
+    var createdByPrefix = Html.Localize("WorkOrders.Details.CreatedBy", "Created by").ToString();
+    var unknownUserLabel = Html.Localize("Unknown", "Unknown").ToString();
+    var deleteLabel = Html.Localize("Common.Delete", "Delete").ToString();
+    var searchTeammatesPlaceholder = Html.Localize("WorkOrders.Form.SearchTeammates", "Type to search teammates").ToString();
+    var notAssignedOptionLabel = Html.Localize("WorkOrders.Form.NotAssignedOption", "-- Not assigned --").ToString();
+    var uploadPhotosEditingText = Html.Localize("WorkOrders.Form.UploadPhotosEditing", "Upload photos to add new attachments (existing files remain available).").ToString();
+    var uploadPhotosCreatingText = Html.Localize("WorkOrders.Form.UploadPhotosCreating", "Upload supporting photos (optional).").ToString();
 }
 
 @functions {
@@ -519,7 +610,7 @@
     <div class="col-12 col-xl-8 col-xxl-9 order-2 order-xl-1">
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Filters</h5>
+                <h5 class="mb-0">@filtersHeading</h5>
                 <button type="button"
                         class="btn btn-sm btn-outline-secondary collapsed"
                         data-bs-toggle="collapse"
@@ -527,7 +618,7 @@
                         aria-expanded="false"
                         aria-controls="workOrdersFiltersCollapse"
                         id="toggleFiltersButton">
-                    Show Filters
+                    @filterToggleText
                 </button>
             </div>
             <div id="workOrdersFiltersCollapse" class="collapse">
@@ -535,69 +626,75 @@
                     <form method="get" class="row g-3">
                         <input type="hidden" name="HideCompleted" value="@(Model.Filters.HideCompleted ? "true" : "false")" />
                         <div class="col-md-4">
-                            <label for="SortOrder" class="form-label">Default Sort</label>
+                            <label for="SortOrder" class="form-label">@defaultSortLabel</label>
                             <select class="form-select" id="SortOrder" name="SortOrder">
-                                <option value="newest" selected="@(Model.Filters.SortOrder == "newest" ? "selected" : null)">Newest First</option>
-                                <option value="oldest" selected="@(Model.Filters.SortOrder == "oldest" ? "selected" : null)">Oldest First</option>
+                                <option value="newest" selected="@(Model.Filters.SortOrder == "newest" ? "selected" : null)">@newestFirstLabel</option>
+                                <option value="oldest" selected="@(Model.Filters.SortOrder == "oldest" ? "selected" : null)">@oldestFirstLabel</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label for="RoomNumber" class="form-label">Room / Location</label>
+                            <label for="RoomNumber" class="form-label">@roomLocationLabel</label>
                             <input type="text" class="form-control" id="RoomNumber" name="RoomNumber" value="@Model.Filters.RoomNumber" />
                         </div>
                         <div class="col-md-4">
-                            <label for="Statuses" class="form-label">Status</label>
+                            <label for="Statuses" class="form-label">@statusLabel</label>
                             <select class="form-select js-checkbox-multiselect"
                                     id="Statuses"
                                     name="Statuses"
                                     multiple
-                                    data-placeholder="All statuses"
-                                    data-all-label="All statuses">
+                                    data-placeholder="@allStatusesLabel"
+                                    data-all-label="@allStatusesLabel">
                                 @foreach (var status in Model.StatusOptions)
                                 {
                                     var isSelected = Model.Filters.Statuses.Any(s => string.Equals(s, status.Key, StringComparison.OrdinalIgnoreCase));
-                                    <option value="@status.Key" selected="@(isSelected ? "selected" : null)">@status.Label</option>
+                                    <option value="@status.Key" selected="@(isSelected ? "selected" : null)">@Html.Localize($"WorkOrders.Status.{status.Key}", status.Label)</option>
                                 }
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label for="DepartmentIds" class="form-label">Department</label>
+                            <label for="DepartmentIds" class="form-label">@departmentLabel</label>
                             <select class="form-select js-checkbox-multiselect"
                                     id="DepartmentIds"
                                     name="DepartmentIds"
                                     multiple
-                                    data-placeholder="All departments"
-                                    data-all-label="All departments">
+                                    data-placeholder="@allDepartmentsLabel"
+                                    data-all-label="@allDepartmentsLabel">
                                 @foreach (var dept in Model.Departments)
                                 {
                                     var isSelected = Model.Filters.DepartmentIds.Contains(dept.Id);
-                                    <option value="@dept.Id" selected="@(isSelected ? "selected" : null)">@dept.Name</option>
+                                    var deptIdString = dept.Id.ToString(CultureInfo.InvariantCulture);
+                                    var translatedDepartmentName = await Html.DisplayTranslatedTextAsync("Department", deptIdString, "Name", dept.Name ?? string.Empty);
+                                    var departmentOptionLabel = string.IsNullOrWhiteSpace(translatedDepartmentName) ? dept.Name : translatedDepartmentName;
+                                    <option value="@dept.Id" selected="@(isSelected ? "selected" : null)">@departmentOptionLabel</option>
                                 }
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label for="WorkOrderTypeIds" class="form-label">Work Order Type</label>
+                            <label for="WorkOrderTypeIds" class="form-label">@workOrderTypeLabel</label>
                             <select class="form-select js-checkbox-multiselect"
                                     id="WorkOrderTypeIds"
                                     name="WorkOrderTypeIds"
                                     multiple
-                                    data-placeholder="All types"
-                                    data-all-label="All types">
+                                    data-placeholder="@allTypesLabel"
+                                    data-all-label="@allTypesLabel">
                                 @foreach (var type in Model.WorkOrderTypes)
                                 {
                                     var isSelected = Model.Filters.WorkOrderTypeIds.Contains(type.Id);
-                                    <option value="@type.Id" selected="@(isSelected ? "selected" : null)">@type.Name</option>
+                                    var typeIdString = type.Id.ToString(CultureInfo.InvariantCulture);
+                                    var translatedTypeName = await Html.DisplayTranslatedTextAsync("WorkOrderType", typeIdString, "Name", type.Name ?? string.Empty);
+                                    var workOrderTypeOptionLabel = string.IsNullOrWhiteSpace(translatedTypeName) ? type.Name : translatedTypeName;
+                                    <option value="@type.Id" selected="@(isSelected ? "selected" : null)">@workOrderTypeOptionLabel</option>
                                 }
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label for="CreatorIds" class="form-label">Creator</label>
+                            <label for="CreatorIds" class="form-label">@creatorLabel</label>
                             <select class="form-select js-checkbox-multiselect"
                                     id="CreatorIds"
                                     name="CreatorIds"
                                     multiple
-                                    data-placeholder="All creators"
-                                    data-all-label="All creators">
+                                    data-placeholder="@allCreatorsLabel"
+                                    data-all-label="@allCreatorsLabel">
                                 @foreach (var creator in Model.CreatorOptions)
                                 {
                                     if (string.IsNullOrWhiteSpace(creator.Value))
@@ -612,31 +709,34 @@
                         @if (Model.PropertyFilterOptions.Count > 0)
                         {
                             <div class="col-md-4">
-                                <label for="PropertyIds" class="form-label">Property</label>
+                                <label for="PropertyIds" class="form-label">@propertyLabel</label>
                                 <select class="form-select js-checkbox-multiselect"
                                         id="PropertyIds"
                                         name="PropertyIds"
                                         multiple
-                                        data-placeholder="All properties"
-                                        data-all-label="All properties">
+                                        data-placeholder="@allPropertiesLabel"
+                                        data-all-label="@allPropertiesLabel">
                                     @foreach (var property in Model.PropertyFilterOptions)
                                     {
                                         var isSelected = property.IsFilterSelected;
-                                        var propertyLabel = string.IsNullOrWhiteSpace(property.Code)
-                                            ? property.Name
-                                            : $"{property.Name} ({property.Code})";
-                                        <option value="@property.Id" selected="@(isSelected ? "selected" : null)">@propertyLabel</option>
+                                        var propertyIdString = property.Id.ToString(CultureInfo.InvariantCulture);
+                                        var translatedPropertyName = await Html.DisplayTranslatedTextAsync("Property", propertyIdString, "Name", property.Name ?? string.Empty);
+                                        var propertyNameDisplay = string.IsNullOrWhiteSpace(translatedPropertyName) ? property.Name : translatedPropertyName;
+                                        var propertyOptionLabel = string.IsNullOrWhiteSpace(property.Code)
+                                            ? propertyNameDisplay
+                                            : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", propertyNameDisplay, property.Code);
+                                        <option value="@property.Id" selected="@(isSelected ? "selected" : null)">@propertyOptionLabel</option>
                                     }
                                 </select>
                             </div>
                         }
                         <div class="col-md-8">
-                            <label for="Search" class="form-label">Keyword Search</label>
-                            <input type="text" class="form-control" id="Search" name="Search" value="@Model.Filters.Search" placeholder="Search issue, details, or location" />
+                            <label for="Search" class="form-label">@keywordSearchLabel</label>
+                            <input type="text" class="form-control" id="Search" name="Search" value="@Model.Filters.Search" placeholder="@searchPlaceholderText" />
                         </div>
                         <div class="col-md-4 d-flex align-items-end justify-content-end gap-2">
-                            <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
-                            <button type="submit" class="btn btn-primary">Apply Filters</button>
+                            <a asp-action="Index" class="btn btn-outline-secondary">@resetFiltersLabel</a>
+                            <button type="submit" class="btn btn-primary">@applyFiltersLabel</button>
                         </div>
                     </form>
                 </div>
@@ -648,8 +748,8 @@
                 <div class="card shadow-sm mb-4">
                     <div class="card-body">
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                            <h5 class="mb-0">Open work orders by department</h5>
-                            <span class="text-muted small">Status excludes completed &amp; cancelled</span>
+                            <h5 class="mb-0">@openByDepartmentHeading</h5>
+                            <span class="text-muted small">@statusExcludesHint</span>
                         </div>
                         <div class="workorder-department-summary-grid">
                             @foreach (var summary in Model.DepartmentSummaries)
@@ -663,7 +763,7 @@
                                         <span class="workorder-department-summary__label">@summary.DepartmentName</span>
                                     </div>
                                     <div class="workorder-department-summary__count">@summary.OpenCount</div>
-                                    <div class="text-muted small">Open work orders</div>
+                            <div class="text-muted small">@openWorkOrdersLabel</div>
                                 </div>
                             }
                         </div>
@@ -673,7 +773,7 @@
             <div class="card shadow-sm">
                 <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-3">
-                        <h5 class="mb-0">Work Orders (@Model.WorkOrders.Count)</h5>
+                        <h5 class="mb-0">@workOrdersHeading (@Model.WorkOrders.Count)</h5>
                         <form method="get" class="d-flex align-items-center gap-2 hide-completed-form">
                             <input type="hidden" name="HideCompleted" value="false" data-hide-completed-hidden @(Model.Filters.HideCompleted ? "disabled" : null) />
                             <input type="hidden" name="SortOrder" value="@Model.Filters.SortOrder" />
@@ -742,17 +842,17 @@
                 </colgroup>
                 <thead class="table-light">
                             <tr>
-                                <th scope="col" class="text-center">Actions</th>
-                            <th scope="col">@SortableHeader("Status", "status")</th>
-                            <th scope="col">@SortableHeader("Location", "location")</th>
-                            <th scope="col">@SortableHeader("Department", "department")</th>
-                            <th scope="col">Assigned</th>
-                            <th scope="col">@SortableHeader("Type", "type")</th>
-                                <th scope="col">@SortableHeader("Issue", "issue")</th>
-                                <th scope="col">@SortableHeader("Details", "details")</th>
-                                <th scope="col">@SortableHeader("Due", "due")</th>
-                                <th scope="col">@SortableHeader("Created", "created")</th>
-                                <th scope="col" class="text-center" aria-label="Attachments">
+                                <th scope="col" class="text-center">@actionsHeaderLabel</th>
+                            <th scope="col">@SortableHeader(statusHeaderLabel, "status")</th>
+                            <th scope="col">@SortableHeader(locationHeaderLabel, "location")</th>
+                            <th scope="col">@SortableHeader(departmentHeaderLabel, "department")</th>
+                            <th scope="col">@assignedHeaderLabel</th>
+                            <th scope="col">@SortableHeader(typeHeaderLabel, "type")</th>
+                                <th scope="col">@SortableHeader(issueHeaderLabel, "issue")</th>
+                                <th scope="col">@SortableHeader(detailsHeaderLabel, "details")</th>
+                                <th scope="col">@SortableHeader(dueHeaderLabel, "due")</th>
+                                <th scope="col">@SortableHeader(createdHeaderLabel, "created")</th>
+                                <th scope="col" class="text-center" aria-label="@attachmentsHeaderLabel">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                                         <path fill="currentColor" d="M6.354 13.657a3.5 3.5 0 0 1-4.95-4.95l6.718-6.718a2.5 2.5 0 0 1 3.536 3.536L5.621 11.612a1.5 1.5 0 1 1-2.121-2.121l5.303-5.304a.5.5 0 1 1 .708.708L4.208 10.2a.5.5 0 0 0 .707.707l5.303-5.303a1.5 1.5 0 1 0-2.121-2.121L1.379 10.5a2.5 2.5 0 1 0 3.536 3.536l5.657-5.657a.5.5 0 0 1 .707.708l-5.657 5.657Z" />
                                     </svg>
@@ -763,7 +863,7 @@
                             @if (!Model.WorkOrders.Any())
                             {
                                 <tr>
-                                    <td colspan="10" class="text-center py-4">No work orders found. Adjust filters or create a new work order.</td>
+                                    <td colspan="10" class="text-center py-4">@emptyTableMessage</td>
                                 </tr>
                             }
                             else
@@ -781,8 +881,10 @@
                                         statusIndex = 0;
                                     }
                                     var nextStatusLabel = statusSequence[(statusIndex + 1) % statusSequence.Length];
-                                    var statusDisplayRaw = order.Status.Equals("New", StringComparison.OrdinalIgnoreCase) ? "Open" : order.Status;
-                                    var statusDisplay = Html.Localize(statusDisplayRaw);
+                                    var statusLabelRaw = !string.IsNullOrWhiteSpace(order.Status) && order.Status.Equals("New", StringComparison.OrdinalIgnoreCase)
+                                        ? "Open"
+                                        : order.Status ?? string.Empty;
+                                    var statusDisplay = Html.Localize(statusLabelRaw).ToString();
                                     var nextStatusFriendlyNameRaw = nextStatusLabel.Equals("New", StringComparison.OrdinalIgnoreCase) ? "Open" : nextStatusLabel;
                                     var nextStatusFriendlyName = Html.Localize(nextStatusFriendlyNameRaw);
                                     var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
@@ -796,22 +898,43 @@
                                         var imageCandidate = !string.IsNullOrWhiteSpace(att.FileName) ? att.FileName : rawPath;
                                         return new
                                         {
-                                            name = string.IsNullOrWhiteSpace(fileLabel) ? "Attachment" : fileLabel,
+                                            name = string.IsNullOrWhiteSpace(fileLabel) ? attachmentFallbackLabel : fileLabel,
                                             url = resolvedUrl,
                                             isImage = IsImageAttachment(imageCandidate)
                                         };
                                     }).ToList();
-                                    var departmentDisplayRaw = string.IsNullOrWhiteSpace(order.Department) ? "Unassigned" : order.Department;
-                                    var departmentDisplay = Html.Localize(departmentDisplayRaw);
-                                    var assignedToDisplay = string.IsNullOrWhiteSpace(order.AssignedToName) ? unassignedLabel : order.AssignedToName;
+                                    var departmentDisplayText = string.IsNullOrWhiteSpace(order.TranslatedDepartment)
+                                        ? unassignedLabel.ToString()
+                                        : order.TranslatedDepartment!;
+                                    var assignedToDisplay = string.IsNullOrWhiteSpace(order.AssignedToName)
+                                        ? unassignedLabel.ToString()
+                                        : order.AssignedToName;
                                     var orderIdString = order.Id.ToString(CultureInfo.InvariantCulture);
-                                    var translatedIssue = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Issue", order.Issue);
+                                    var translatedIssue = order.TranslatedIssue ?? order.Issue ?? string.Empty;
                                     var translatedIssueHtml = MentionMarkupFormatter.ToHtml(translatedIssue);
-                                    var translatedDetails = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Details", order.Details ?? string.Empty);
+                                    var translatedDetails = order.TranslatedDetails ?? order.Details ?? string.Empty;
                                     var translatedDetailsHtml = string.IsNullOrWhiteSpace(translatedDetails) ? string.Empty : MentionMarkupFormatter.ToHtml(translatedDetails);
-                                    var translatedCompletionNotes = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "CompletionNotes", order.CompletionNotes ?? string.Empty);
+                                    var translatedCompletionNotes = order.TranslatedCompletionNotes ?? order.CompletionNotes ?? string.Empty;
                                     var translatedCompletionNotesHtml = string.IsNullOrWhiteSpace(translatedCompletionNotes) ? string.Empty : MentionMarkupFormatter.ToHtml(translatedCompletionNotes);
-                                    var translatedLocation = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Location", order.Location ?? string.Empty);
+                                    var translatedLocation = order.TranslatedLocation ?? order.Location ?? string.Empty;
+                                    var propertyDisplayNames = new List<string>();
+                                    if (order.Properties != null)
+                                    {
+                                        foreach (var property in order.Properties)
+                                        {
+                                            var displayName = string.IsNullOrWhiteSpace(property.TranslatedName)
+                                                ? property.Name
+                                                : property.TranslatedName;
+                                            var propertyEntryLabel = string.IsNullOrWhiteSpace(property.Code)
+                                                ? displayName
+                                                : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", displayName, property.Code);
+                                            if (!string.IsNullOrWhiteSpace(propertyEntryLabel))
+                                            {
+                                                propertyDisplayNames.Add(propertyEntryLabel);
+                                            }
+                                        }
+                                    }
+                                    var propertiesDisplay = string.Join(", ", propertyDisplayNames);
                                     var workOrderPayload = new
                                     {
                                         id = order.Id,
@@ -825,16 +948,21 @@
                                         status = order.Status,
                                         statusLabel = statusDisplay,
                                         statusColor = order.StatusColor,
-                                        workOrderType = order.WorkOrderType ?? "Unspecified",
-                                        department = departmentDisplay,
+                                        workOrderType = string.IsNullOrWhiteSpace(order.TranslatedWorkOrderType)
+                                            ? (order.WorkOrderType ?? unspecifiedTypeLabel)
+                                            : order.TranslatedWorkOrderType,
+                                        department = departmentDisplayText,
                                         departmentColor = order.DepartmentColor,
                                         assignedTo = assignedToDisplay,
                                         assignedToId = order.AssignedToId,
-                                        dueDateText = order.DueDate.ToString("MM-dd-yy"),
-                                        createdAtText = createdLocal.ToString("MM-dd-yy h:mm tt"),
-                                        creator = string.IsNullOrWhiteSpace(order.Creator) ? Html.Localize("Unknown") : order.Creator,
-                                        properties = order.Properties,
+                                        dueDateText = order.DueDate.ToString("d", CultureInfo.CurrentCulture),
+                                        createdAtText = createdLocal.ToString("g", CultureInfo.CurrentCulture),
+                                        creator = string.IsNullOrWhiteSpace(order.Creator) ? unknownUserLabel : order.Creator,
+                                        createdByLabel = createdByPrefix,
+                                        properties = propertyDisplayNames,
+                                        propertiesEmptyText = notAssignedPropertyText,
                                         attachments = attachmentsPayload,
+                                        attachmentFallbackLabel = attachmentFallbackLabel,
                                         priority = order.PriorityLabel,
                                         priorityClass = order.PriorityClass,
                                         slaStatus = order.SlaStatus,
@@ -849,7 +977,7 @@
                         <div class="workorder-action-group">
                             <a class="btn btn-outline-primary btn-sm"
                                href="@($"{Url.Action("Edit", new { id = order.Id })}{filterQueryString}")">
-                                Edit
+                                @editLabel
                             </a>
                             @if (Model.CanUpdateWorkOrderStatus)
                             {
@@ -857,11 +985,11 @@
                                 <form method="post" action="@advanceUrl" class="workorder-progress-form">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="CompletionNotes" value="@order.CompletionNotes" data-completion-notes />
-                                    <label class="visually-hidden" for="workorder_status_@order.Id">Update Status</label>
+                                    <label class="visually-hidden" for="workorder_status_@order.Id">@updateStatusLabel</label>
                                     <select id="workorder_status_@order.Id"
                                             class="form-select form-select-sm workorder-status-select"
                                             name="Status"
-                                            title="Update status">
+                                            title="@updateStatusTitle">
                                         @foreach (var statusOption in Model.StatusOptions)
                                         {
                                             var isSelected = statusOption.Key.Equals(order.Status, StringComparison.OrdinalIgnoreCase) ||
@@ -885,9 +1013,9 @@
                         <div class="fw-semibold workorder-location">@translatedLocation</div>
                     </td>
                     <td class="col-department">
-                        @if (!string.IsNullOrWhiteSpace(order.Department))
+                        @if (!string.IsNullOrWhiteSpace(order.TranslatedDepartment))
                         {
-                            <span class="badge" style="background-color:@order.DepartmentColor;">@departmentDisplay</span>
+                            <span class="badge" style="background-color:@order.DepartmentColor;">@departmentDisplayText</span>
                         }
                         else
                         {
@@ -895,7 +1023,7 @@
                         }
                     </td>
                     <td class="col-assigned">
-                        <div class="fw-semibold text-uppercase small text-muted">Assigned To</div>
+                        <div class="fw-semibold text-uppercase small text-muted">@Html.Localize("Assigned To")</div>
                         @if (!string.IsNullOrWhiteSpace(order.AssignedToName))
                         {
                             <div>@order.AssignedToName</div>
@@ -905,7 +1033,11 @@
                             <span class="text-muted">@unassignedLabel</span>
                         }
                     </td>
-                    <td class="col-type">@order.WorkOrderType</td>
+                    <td class="col-type">@(
+                        string.IsNullOrWhiteSpace(order.TranslatedWorkOrderType)
+                            ? Html.Localize("Unspecified")
+                            : order.TranslatedWorkOrderType
+                        )</td>
                     <td class="col-issue">
                         <div class="workorder-issue">@Html.Raw(translatedIssueHtml)</div>
                     </td>
@@ -935,7 +1067,7 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                                     <path fill="currentColor" d="M12 7c4.418 0 8 3.239 8 5s-3.582 5-8 5-8-3.239-8-5 3.582-5 8-5Zm0-2C6.477 5 2 8.582 2 12s4.477 7 10 7 10-3.582 10-7-4.477-7-10-7Zm0 4a3 3 0 1 0 0 6a3 3 0 0 0 0-6Zm0 2a1 1 0 1 1 0 2a1 1 0 0 1 0-2Z" />
                                 </svg>
-                                <span>Preview</span>
+                                <span>@previewLabel</span>
                                 <span class="badge bg-light text-dark">@order.Attachments.Count</span>
                             </button>
                         }
@@ -962,14 +1094,14 @@
                     @if (Model.IsEditing)
                     {
                         <div class="d-flex align-items-center gap-2 flex-wrap">
-                            <a class="btn btn-sm btn-light" href="@indexUrlWithFilters">@Html.Localize("Cancel")</a>
+                            <a class="btn btn-sm btn-light" href="@indexUrlWithFilters">@Html.Localize("Cancel", "Cancel")</a>
                             @if (Model.CanManageWorkOrders && Model.Form != null && Model.Form.Id.HasValue)
                             {
                                 var deleteId = Model.Form!.Id!.Value;
                                 var deleteUrl = $"{Url.Action("Delete", new { id = deleteId })}{filterQueryString}";
                                 <form method="post" action="@deleteUrl" onsubmit="return confirm('Are you sure you want to delete this work order?');">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                    <button type="submit" class="btn btn-sm btn-danger">@deleteLabel</button>
                                 </form>
                             }
                         </div>
@@ -1019,9 +1151,9 @@
                                                 <button type="button"
                                                         class="btn btn-outline-secondary"
                                                         data-remove-additional-location
-                                                        title="Remove location">
+                                                        title="@removeLocationLabel">
                                                     <span aria-hidden="true">&times;</span>
-                                                    <span class="visually-hidden">Remove location</span>
+                                                    <span class="visually-hidden">@removeLocationLabel</span>
                                                 </button>
                                             </div>
                                         }
@@ -1041,9 +1173,9 @@
                                             <button type="button"
                                                     class="btn btn-outline-secondary"
                                                     data-remove-additional-location
-                                                    title="Remove location">
+                                                    title="@removeLocationLabel">
                                                 <span aria-hidden="true">&times;</span>
-                                                <span class="visually-hidden">Remove location</span>
+                                                <span class="visually-hidden">@removeLocationLabel</span>
                                             </button>
                                         </div>
                                     </template>
@@ -1098,13 +1230,13 @@
                             <label asp-for="Form.AssignedUserId" class="form-label"></label>
                             <input type="search"
                                    class="form-control form-control-sm mb-2"
-                                   placeholder="Type to search teammates"
+                                   placeholder="@searchTeammatesPlaceholder"
                                    data-searchable-select-input
                                    @(hasAssigneeOptions ? null : "disabled") />
                             <select asp-for="Form.AssignedUserId"
                                     class="form-select"
                                     data-searchable-select-target>
-                                <option value="">-- Not assigned --</option>
+                                <option value="">@notAssignedOptionLabel</option>
                                 @if (Model.AssigneeOptions != null)
                                 {
                                     foreach (var option in Model.AssigneeOptions)
@@ -1115,11 +1247,11 @@
                             </select>
                             @if (!hasAssigneeOptions)
                             {
-                                <span class="form-text">No eligible teammates found for the selected property.</span>
+                                <span class="form-text">@noEligibleTeammatesText</span>
                             }
                             else
                             {
-                                <span class="form-text">Start typing above to filter the list.</span>
+                                <span class="form-text">@startTypingHelpText</span>
                             }
                             <span asp-validation-for="Form.AssignedUserId" class="text-danger"></span>
                         </div>
@@ -1129,11 +1261,11 @@
                             <span class="form-text">
                                 @if (Model.IsEditing)
                                 {
-                                    @:Upload photos to add new attachments (existing files remain available).
+                                    @uploadPhotosEditingText
                                 }
                                 else
                                 {
-                                    @:Upload supporting photos (optional).
+                                    @uploadPhotosCreatingText
                                 }
                             </span>
                             <span asp-validation-for="Form.Photos" class="text-danger"></span>
@@ -1141,13 +1273,19 @@
                         @if (showPropertySelector)
                         {
                             <fieldset class="mb-3">
-                                <legend class="fs-6">Properties</legend>
+                                <legend class="fs-6">@propertiesLegendLabel</legend>
                                 <span asp-validation-for="Form.SelectedPropertyIds" class="text-danger"></span>
                                 @foreach (var property in Model.PropertyOptions)
                                 {
+                                    var propertyIdString = property.Id.ToString(CultureInfo.InvariantCulture);
+                                    var translatedPropertyName = await Html.DisplayTranslatedTextAsync("Property", propertyIdString, "Name", property.Name ?? string.Empty);
+                                    var propertyNameDisplay = string.IsNullOrWhiteSpace(translatedPropertyName) ? property.Name : translatedPropertyName;
+                                    var propertyOptionLabel = string.IsNullOrWhiteSpace(property.Code)
+                                        ? propertyNameDisplay
+                                        : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", propertyNameDisplay, property.Code);
                                     <div class="form-check d-flex align-items-center gap-2 mb-2">
                                         <input class="form-check-input" type="checkbox" value="@property.Id" name="Form.SelectedPropertyIds" id="property_@property.Id" @(property.IsSelected ? "checked" : string.Empty) />
-                                        <label class="form-check-label mb-0" for="property_@property.Id">@property.Name (@property.Code)</label>
+                                        <label class="form-check-label mb-0" for="property_@property.Id">@propertyOptionLabel</label>
                                     </div>
                                 }
                             </fieldset>
@@ -1173,7 +1311,7 @@
         <div class="modal-content">
             <div class="modal-header flex-wrap gap-2">
                 <div>
-                    <h5 class="modal-title mb-0" id="workOrderDetailsLabel" data-workorder-field="title">Work Order</h5>
+                    <h5 class="modal-title mb-0" id="workOrderDetailsLabel" data-workorder-field="title">@workOrderModalTitle</h5>
                     <div class="text-muted small" data-workorder-field="meta"></div>
                 </div>
                 <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
@@ -1184,54 +1322,54 @@
             <div class="modal-body">
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
-                        <div class="fw-semibold text-uppercase small text-muted">Location</div>
+                        <div class="fw-semibold text-uppercase small text-muted">@locationModalLabel</div>
                         <div data-workorder-field="location"></div>
                     </div>
                     <div class="col-md-6">
-                        <div class="fw-semibold text-uppercase small text-muted">Department</div>
+                        <div class="fw-semibold text-uppercase small text-muted">@departmentModalLabel</div>
                         <div data-workorder-field="department"></div>
                     </div>
                     <div class="col-md-6">
-                        <div class="fw-semibold text-uppercase small text-muted">Assigned To</div>
+                        <div class="fw-semibold text-uppercase small text-muted">@assignedToModalLabel</div>
                         <div data-workorder-field="assignee"></div>
                     </div>
                     <div class="col-md-6">
-                        <div class="fw-semibold text-uppercase small text-muted">Due Date</div>
+                        <div class="fw-semibold text-uppercase small text-muted">@dueDateModalLabel</div>
                         <div data-workorder-field="dueDate"></div>
                     </div>
                     <div class="col-md-6">
-                        <div class="fw-semibold text-uppercase small text-muted">Created</div>
+                        <div class="fw-semibold text-uppercase small text-muted">@createdModalLabel</div>
                         <div data-workorder-field="created"></div>
                     </div>
                     <div class="col-md-6">
-                        <div class="fw-semibold text-uppercase small text-muted">Creator</div>
+                        <div class="fw-semibold text-uppercase small text-muted">@creatorModalLabel</div>
                         <div data-workorder-field="creator" class="text-body"></div>
                     </div>
                     <div class="col-12">
-                        <div class="fw-semibold text-uppercase small text-muted">Properties</div>
+                        <div class="fw-semibold text-uppercase small text-muted">@propertiesModalLabel</div>
                         <div data-workorder-field="properties"></div>
                     </div>
                 </div>
                 <div class="mb-3">
-                    <div class="fw-semibold text-uppercase small text-muted">Issue</div>
+                    <div class="fw-semibold text-uppercase small text-muted">@issueModalLabel</div>
                     <div data-workorder-field="issue"></div>
                 </div>
                 <div class="mb-3">
-                    <div class="fw-semibold text-uppercase small text-muted">Details</div>
+                    <div class="fw-semibold text-uppercase small text-muted">@detailsModalLabel</div>
                     <div data-workorder-field="details" class="text-body"></div>
                 </div>
                 <div class="mb-3 d-none" data-completion-notes-container>
-                    <div class="fw-semibold text-uppercase small text-muted">Completion Notes</div>
+                    <div class="fw-semibold text-uppercase small text-muted">@completionNotesModalLabel</div>
                     <div data-workorder-field="completionNotes" class="text-body"></div>
                 </div>
                 <div class="mb-2" data-workorder-attachments-section>
-                    <div class="fw-semibold text-uppercase small text-muted">Attachments</div>
+                    <div class="fw-semibold text-uppercase small text-muted">@attachmentsModalLabel</div>
                     <div class="row g-3 workorder-modal-attachments" data-workorder-attachments></div>
-                    <p class="text-muted small mb-0" data-workorder-attachments-empty>No attachments were uploaded for this work order.</p>
+                    <p class="text-muted small mb-0" data-workorder-attachments-empty>@attachmentsEmptyText</p>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@closeModalLabel</button>
             </div>
         </div>
     </div>
@@ -1241,12 +1379,12 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="workOrderAttachmentsLabel" data-attachments-modal-title>Attachments</h5>
+                <h5 class="modal-title" id="workOrderAttachmentsLabel" data-attachments-modal-title>@attachmentsModalTitle</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="row g-3" data-attachments-modal-body></div>
-                <p class="text-muted mb-0 d-none" data-attachments-modal-empty>No attachments available for this work order.</p>
+                <p class="text-muted mb-0 d-none" data-attachments-modal-empty>@attachmentsModalEmptyText</p>
             </div>
         </div>
     </div>
@@ -1256,16 +1394,16 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="completeWorkOrderModalLabel">Add Completion Notes</h5>
+                <h5 class="modal-title" id="completeWorkOrderModalLabel">@completionNotesModalTitle</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted small mb-2">Share any closing details or follow-ups. This step is optional.</p>
+                <p class="text-muted small mb-2">@completionNotesModalDescription</p>
                 <textarea class="form-control" rows="4" data-complete-notes-input placeholder="Enter completion notes (optional)"></textarea>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Html.Localize("Cancel")</button>
-                <button type="button" class="btn btn-primary" data-complete-submit>Mark Complete</button>
+                <button type="button" class="btn btn-primary" data-complete-submit>@markCompleteLabel</button>
             </div>
         </div>
     </div>

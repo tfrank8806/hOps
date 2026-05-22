@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -9,6 +10,7 @@ using System.Threading.Tasks;
 using hOps.web.Data;
 using hOps.web.Models;
 using hOps.web.Services;
+using hOps.web.Services.Localization;
 using hOps.web.Utilities;
 using hOps.web.ViewModels;
 using hOps.web.ViewModels.Home;
@@ -30,6 +32,7 @@ namespace hOps.web.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<HomeController> _logger;
         private readonly IConfiguration _configuration;
+        private readonly ITranslationService _translationService;
 
         private const string PersonaSessionKey = "HomeLayoutPersona";
         private const int DefaultWidgetHeight = 300;
@@ -98,13 +101,15 @@ namespace hOps.web.Controllers
             MentionService mentionService,
             IWebHostEnvironment environment,
             IConfiguration configuration,
-            ILogger<HomeController> logger)
+            ILogger<HomeController> logger,
+            ITranslationService translationService)
             : base(context, userManager)
         {
             _mentionService = mentionService;
             _environment = environment;
             _logger = logger;
             _configuration = configuration;
+            _translationService = translationService;
         }
 
         public async Task<IActionResult> Index()
@@ -1051,6 +1056,7 @@ namespace hOps.web.Controllers
                 .Select(wo => new
                 {
                     WorkOrder = wo,
+                    DepartmentId = wo.DepartmentId,
                     DepartmentName = wo.Department != null ? wo.Department.Name : null,
                     DepartmentColor = wo.Department != null && !string.IsNullOrWhiteSpace(wo.Department.Color)
                         ? wo.Department.Color
@@ -1068,8 +1074,12 @@ namespace hOps.web.Controllers
                     Id = entry.WorkOrder.Id,
                     Status = entry.WorkOrder.Status,
                     Issue = entry.WorkOrder.Issue,
+                    TranslatedIssue = entry.WorkOrder.Issue ?? string.Empty,
                     Location = entry.WorkOrder.Location,
+                    TranslatedLocation = entry.WorkOrder.Location,
                     DepartmentName = entry.DepartmentName,
+                    DepartmentId = entry.DepartmentId,
+                    TranslatedDepartmentName = entry.DepartmentName,
                     DepartmentColor = entry.DepartmentColor,
                     CreatedAt = entry.WorkOrder.CreatedAt,
                     DueDate = entry.WorkOrder.DueDate,
@@ -1083,21 +1093,90 @@ namespace hOps.web.Controllers
                 };
             }).ToList();
 
+            var activeLanguage = HttpContext.Items["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+            var isDefaultLanguage = string.Equals(activeLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+            var cancellationToken = HttpContext.RequestAborted;
+
+            if (!isDefaultLanguage)
+            {
+                foreach (var workOrder in viewModel.WorkOrders)
+                {
+                    var entityId = workOrder.Id.ToString(CultureInfo.InvariantCulture);
+
+                    if (!string.IsNullOrWhiteSpace(workOrder.Issue))
+                    {
+                        workOrder.TranslatedIssue = await _translationService.TranslateDynamicAsync(
+                            "WorkOrder",
+                            entityId,
+                            "Issue",
+                            workOrder.Issue!,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(workOrder.Location))
+                    {
+                        workOrder.TranslatedLocation = await _translationService.TranslateDynamicAsync(
+                            "WorkOrder",
+                            entityId,
+                            "Location",
+                            workOrder.Location!,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(workOrder.DepartmentName) && workOrder.DepartmentId.HasValue)
+                    {
+                        workOrder.TranslatedDepartmentName = await _translationService.TranslateDynamicAsync(
+                            "Department",
+                            workOrder.DepartmentId.Value.ToString(CultureInfo.InvariantCulture),
+                            "Name",
+                            workOrder.DepartmentName,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+                }
+            }
+
             viewModel.WorkOrderDepartmentSummaries = viewModel.WorkOrders
                 .GroupBy(wo => new
                 {
+                    Id = wo.DepartmentId,
                     Name = string.IsNullOrWhiteSpace(wo.DepartmentName) ? "Unassigned" : wo.DepartmentName,
                     Color = string.IsNullOrWhiteSpace(wo.DepartmentColor) ? null : wo.DepartmentColor
                 })
                 .Select(group => new WorkOrderDepartmentSummaryViewModel
                 {
+                    DepartmentId = group.Key.Id,
                     DepartmentName = group.Key.Name ?? "Unassigned",
+                    TranslatedDepartmentName = group.Key.Name ?? "Unassigned",
                     DepartmentColor = group.Key.Color,
                     OpenCount = group.Count()
                 })
                 .OrderByDescending(summary => summary.OpenCount)
                 .ThenBy(summary => summary.DepartmentName)
                 .ToList();
+
+            if (!isDefaultLanguage)
+            {
+                foreach (var summary in viewModel.WorkOrderDepartmentSummaries)
+                {
+                    if (summary.DepartmentId.HasValue && !string.IsNullOrWhiteSpace(summary.DepartmentName))
+                    {
+                        summary.TranslatedDepartmentName = await _translationService.TranslateDynamicAsync(
+                            "Department",
+                            summary.DepartmentId.Value.ToString(CultureInfo.InvariantCulture),
+                            "Name",
+                            summary.DepartmentName,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+                }
+            }
         }
 
         private async Task PopulateLostFoundAsync(HomeIndexViewModel viewModel, int propertyId)

@@ -1,7 +1,9 @@
 @using System.Globalization
+@using System.Text.Json
 @model hOps.web.ViewModels.PassOnLogIndexViewModel
-@{ 
-    ViewData["Title"] = Html.Localize("Pass On Logs");
+@{
+    var localizedTitle = Html.Localize("PassOnLogs.Title", "Pass On Logs").ToString();
+    ViewData["Title"] = localizedTitle;
     ViewData["MainContainerClass"] = "main-inner--wide";
     var hasActiveFilters =
         Model.Filters.StartDate.HasValue ||
@@ -12,21 +14,28 @@
         !string.Equals(Model.Filters.SortOrder, "newest", StringComparison.OrdinalIgnoreCase) ||
         Model.Filters.ShowUnreadOnly;
     var filterCollapseClass = hasActiveFilters ? "collapse show" : "collapse";
-    var hideFiltersText = Html.Localize("Hide Filters");
-    var showFiltersText = Html.Localize("Show Filters");
+    var hideFiltersText = Html.Localize("PassOnLogs.Filters.Hide", "Hide Filters").ToString();
+    var showFiltersText = Html.Localize("PassOnLogs.Filters.Show", "Show Filters").ToString();
     var filterToggleText = hasActiveFilters ? hideFiltersText : showFiltersText;
-    var sortLabel = Html.Localize("Sort");
-    var fromLabel = Html.Localize("From");
-    var toLabel = Html.Localize("To");
-    var creatorLabel = Html.Localize("Creator");
-    var propertyLabel = Html.Localize("Property");
-    var keywordLabel = Html.Localize("Keyword");
-    var allCreatorsLabel = Html.Localize("All creators");
-    var allPropertiesLabel = Html.Localize("All properties");
-    var searchPlaceholder = Html.Localize("Search title or body");
-    var unreadOnlyLabel = Html.Localize("Unread only");
-    var resetLabel = Html.Localize("Reset");
-    var applyLabel = Html.Localize("Apply");
+    var sortLabel = Html.Localize("PassOnLogs.Filters.Sort", "Sort").ToString();
+    var fromLabel = Html.Localize("PassOnLogs.Filters.From", "From").ToString();
+    var toLabel = Html.Localize("PassOnLogs.Filters.To", "To").ToString();
+    var creatorLabel = Html.Localize("PassOnLogs.Filters.Creator", "Creator").ToString();
+    var propertyLabel = Html.Localize("PassOnLogs.Filters.Property", "Property").ToString();
+    var keywordLabel = Html.Localize("PassOnLogs.Filters.Keyword", "Keyword").ToString();
+    var allCreatorsLabel = Html.Localize("PassOnLogs.Filters.AllCreators", "All creators").ToString();
+    var allPropertiesLabel = Html.Localize("PassOnLogs.Filters.AllProperties", "All properties").ToString();
+    var searchPlaceholder = Html.Localize("PassOnLogs.Filters.SearchPlaceholder", "Search title or body").ToString();
+    var unreadOnlyLabel = Html.Localize("PassOnLogs.Filters.UnreadOnly", "Unread only").ToString();
+    var resetLabel = Html.Localize("Common.Reset", "Reset").ToString();
+    var applyLabel = Html.Localize("Common.Apply", "Apply").ToString();
+    var newLogLabel = Html.Localize("PassOnLogs.Actions.NewLog", "New Log").ToString();
+    var noLogsMessage = Html.Localize("PassOnLogs.Empty", "No logs matched the selected filters.").ToString();
+    var byLabel = Html.Localize("PassOnLogs.ByLabel", "By").ToString();
+    var propertiesLabel = Html.Localize("PassOnLogs.PropertiesLabel", "Properties:").ToString();
+    var unreadLabel = Html.Localize("PassOnLogs.Unread", "Unread").ToString();
+    var commentSingularLabel = Html.Localize("PassOnLogs.CommentSingular", "comment").ToString();
+    var commentPluralLabel = Html.Localize("PassOnLogs.CommentPlural", "comments").ToString();
 }
 
 @section Scripts {
@@ -38,8 +47,8 @@
                 return;
             }
 
-            const hideLabel = toggleButton.getAttribute('data-hide-label') || 'Hide Filters';
-            const showLabel = toggleButton.getAttribute('data-show-label') || 'Show Filters';
+            const hideLabel = toggleButton.getAttribute('data-hide-label') || @JsonSerializer.Serialize(hideFiltersText);
+            const showLabel = toggleButton.getAttribute('data-show-label') || @JsonSerializer.Serialize(showFiltersText);
 
             const updateLabel = () => {
                 const isShown = collapseElement.classList.contains('show');
@@ -55,7 +64,7 @@
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <h2 class="mb-0">@Html.Localize("Pass On Logs")</h2>
+    <h2 class="mb-0">@localizedTitle</h2>
     <div class="d-flex align-items-center gap-2">
         <button class="btn btn-outline-secondary"
                 type="button"
@@ -70,7 +79,7 @@
         </button>
         @if (Model.CanCreateLog)
         {
-            <a asp-action="Create" class="btn btn-primary">@Html.Localize("New Log")</a>
+            <a asp-action="Create" class="btn btn-primary">@newLogLabel</a>
         }
     </div>
 </div>
@@ -88,7 +97,7 @@
                 <select class="form-select" id="SortOrder" name="SortOrder">
                     @foreach (var option in Model.Filters.SortOptions)
                     {
-                        <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@Html.Localize(option.Text)</option>
+                        <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@Html.Localize($"PassOnLogs.Filters.SortOptions.{option.Value}", option.Text)</option>
                     }
                 </select>
             </div>
@@ -128,9 +137,12 @@
                         data-all-label="@allPropertiesLabel">
                     @foreach (var property in Model.Filters.PropertyOptions)
                     {
+                        var propertyIdString = property.Id.ToString(CultureInfo.InvariantCulture);
+                        var translatedPropertyName = await Html.DisplayTranslatedTextAsync("Property", propertyIdString, "Name", property.Name);
+                        var propertyNameDisplay = string.IsNullOrWhiteSpace(translatedPropertyName) ? property.Name : translatedPropertyName;
                         var label = string.IsNullOrWhiteSpace(property.Code)
-                            ? property.Name
-                            : $"{property.Name} ({property.Code})";
+                            ? propertyNameDisplay
+                            : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", propertyNameDisplay, property.Code);
                         <option value="@property.Id" selected="@(property.IsSelected ? "selected" : null)">@label</option>
                     }
                 </select>
@@ -161,7 +173,7 @@
 
 @if (!Model.Logs.Any())
 {
-    <div class="alert alert-info">@Html.Localize("No logs matched the selected filters.")</div>
+    <div class="alert alert-info">@noLogsMessage</div>
 }
 else
 {
@@ -171,10 +183,7 @@ else
             var logId = log.Id.ToString(CultureInfo.InvariantCulture);
             var displayTitle = await Html.DisplayTranslatedTextAsync("PassOnLog", logId, "Title", log.Title);
             var displayPreview = await Html.DisplayTranslatedTextAsync("PassOnLog", logId, "Preview", log.Preview);
-            var byLabel = Html.Localize("By");
-            var unreadLabel = Html.Localize("Unread");
-            var propertiesLabel = Html.Localize("Properties:");
-            var commentLabel = log.CommentCount == 1 ? Html.Localize("comment") : Html.Localize("comments");
+            var commentLabel = log.CommentCount == 1 ? commentSingularLabel : commentPluralLabel;
             var createdLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
             var propertyDisplayNames = new List<string>();
             if (log.Properties != null)

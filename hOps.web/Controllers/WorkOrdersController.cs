@@ -352,30 +352,127 @@ namespace hOps.web.Controllers
                     wo.Issue,
                     wo.Location,
                     wo.CreatedAt,
+                    DepartmentId = wo.DepartmentId,
                     DepartmentName = wo.Department != null ? wo.Department.Name : null,
                     DepartmentColor = wo.Department != null ? wo.Department.Color : null
                 })
                 .AsNoTracking()
                 .ToListAsync();
 
+            var activeLanguage = HttpContext.Items["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+            var isDefaultLanguage = string.Equals(activeLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+            var cancellationToken = HttpContext.RequestAborted;
+            var unassignedLabel = "Unassigned";
+
             var matchingOrders = openOrders
                 .Where(wo => MatchesRoom(trimmedRoom, wo.Location))
-                .Select(wo => new
+                .Select(wo =>
                 {
-                    wo.Id,
-                    wo.Status,
-                    wo.Issue,
-                    DepartmentName = wo.DepartmentName,
-                    DepartmentColor = string.IsNullOrWhiteSpace(wo.DepartmentColor) ? "#dc3545" : wo.DepartmentColor,
-                    CreatedAt = _timeZoneService.ConvertToUserTime(wo.CreatedAt)
-                        .ToString("MMM d, yyyy h:mm tt", CultureInfo.CurrentCulture),
-                    DetailUrl = Url.Action(nameof(Edit), new { id = wo.Id }) ?? Url.Action(nameof(Index))
+                    var departmentColor = string.IsNullOrWhiteSpace(wo.DepartmentColor) ? "#dc3545" : wo.DepartmentColor!;
+                    var detailUrl = Url.Action(nameof(Edit), new { id = wo.Id }) ?? Url.Action(nameof(Index)) ?? "#";
+                    var createdDisplay = _timeZoneService.ConvertToUserTime(wo.CreatedAt)
+                        .ToString("MMM d, yyyy h:mm tt", CultureInfo.CurrentCulture);
+                    var statusLabel = WorkOrderStatusOptions.GetLabel(wo.Status ?? string.Empty);
+
+                    return new RoomWorkOrderSummary
+                    {
+                        Id = wo.Id,
+                        Status = wo.Status ?? string.Empty,
+                        StatusLabel = statusLabel,
+                        Issue = wo.Issue ?? string.Empty,
+                        Location = wo.Location ?? string.Empty,
+                        DepartmentId = wo.DepartmentId,
+                        DepartmentName = string.IsNullOrWhiteSpace(wo.DepartmentName) ? unassignedLabel : wo.DepartmentName!,
+                        DepartmentColor = departmentColor,
+                        CreatedAtDisplay = createdDisplay,
+                        DetailUrl = detailUrl
+                    };
                 })
                 .ToList();
 
+            if (!isDefaultLanguage && matchingOrders.Count > 0)
+            {
+                foreach (var order in matchingOrders)
+                {
+                    var entityId = order.Id.ToString(CultureInfo.InvariantCulture);
+
+                    if (!string.IsNullOrWhiteSpace(order.Issue))
+                    {
+                        var translatedIssue = await _translationService.TranslateDynamicAsync(
+                            "WorkOrder",
+                            entityId,
+                            "Issue",
+                            order.Issue,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        order.Issue = string.IsNullOrWhiteSpace(translatedIssue) ? order.Issue : translatedIssue;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(order.Location))
+                    {
+                        var translatedLocation = await _translationService.TranslateDynamicAsync(
+                            "WorkOrder",
+                            entityId,
+                            "Location",
+                            order.Location,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        order.Location = string.IsNullOrWhiteSpace(translatedLocation) ? order.Location : translatedLocation;
+                    }
+
+                    if (order.DepartmentId.HasValue && !string.IsNullOrWhiteSpace(order.DepartmentName) && !string.Equals(order.DepartmentName, unassignedLabel, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var translatedDepartment = await _translationService.TranslateDynamicAsync(
+                            "Department",
+                            order.DepartmentId.Value.ToString(CultureInfo.InvariantCulture),
+                            "Name",
+                            order.DepartmentName,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedDepartment))
+                        {
+                            order.DepartmentName = translatedDepartment;
+                        }
+                    }
+                    else
+                    {
+                        order.DepartmentName = _translationService.Translate("WorkOrders.Unassigned", activeLanguage, order.DepartmentName);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(order.StatusLabel))
+                    {
+                        order.StatusLabel = _translationService.Translate(order.StatusLabel, activeLanguage, order.StatusLabel);
+                    }
+                }
+            }
+            else if (matchingOrders.Count > 0)
+            {
+                foreach (var order in matchingOrders)
+                {
+                    if (!order.DepartmentId.HasValue || string.IsNullOrWhiteSpace(order.DepartmentName) || string.Equals(order.DepartmentName, unassignedLabel, StringComparison.OrdinalIgnoreCase))
+                    {
+                        order.DepartmentName = unassignedLabel;
+                    }
+                }
+            }
+
             return Json(new
             {
-                workOrders = matchingOrders
+                workOrders = matchingOrders.Select(order => new
+                {
+                    id = order.Id,
+                    status = order.Status,
+                    statusLabel = order.StatusLabel,
+                    issue = order.Issue,
+                    location = order.Location,
+                    departmentName = order.DepartmentName,
+                    departmentColor = order.DepartmentColor,
+                    createdAt = order.CreatedAtDisplay,
+                    detailUrl = order.DetailUrl
+                })
             });
         }
 
@@ -1414,42 +1511,175 @@ namespace hOps.web.Controllers
             var workOrders = await query.ToListAsync();
             var now = DateTime.UtcNow;
 
-            var listItems = workOrders.Select(wo =>
+            var activeLanguage = HttpContext.Items["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+            var isDefaultLanguage = string.Equals(activeLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+            var cancellationToken = HttpContext.RequestAborted;
+            var unassignedTranslated = isDefaultLanguage
+                ? "Unassigned"
+                : _translationService.Translate("Unassigned", activeLanguage, "Unassigned");
+
+            var listItems = new List<WorkOrderListItemViewModel>();
+            foreach (var wo in workOrders)
             {
                 var sla = WorkOrderSlaHelper.Calculate(wo.DueDate, now);
-                return new WorkOrderListItemViewModel
+                var propertyDetails = wo.Properties?
+                    .Select(p => new WorkOrderPropertyDisplayViewModel
+                    {
+                        Id = p.PropertyId,
+                        Name = p.Property?.Name ?? string.Empty,
+                        TranslatedName = p.Property?.Name ?? string.Empty,
+                        Code = p.Property?.Code ?? string.Empty
+                    })
+                    .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList() ?? new List<WorkOrderPropertyDisplayViewModel>();
+
+                var creatorName = wo.CreatedBy != null
+                    ? string.Join(" ", new[] { wo.CreatedBy.FirstName, wo.CreatedBy.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)))
+                    : null;
+
+                var item = new WorkOrderListItemViewModel
                 {
                     Id = wo.Id,
                     Status = wo.Status,
                     StatusColor = WorkOrderStatusOptions.GetColor(wo.Status),
-                    Location = wo.Location,
+                    Location = wo.Location ?? string.Empty,
+                    TranslatedLocation = wo.Location ?? string.Empty,
                     WorkOrderType = wo.WorkOrderType?.Name,
-                    Issue = wo.Issue,
+                    TranslatedWorkOrderType = wo.WorkOrderType?.Name,
+                    WorkOrderTypeId = wo.WorkOrderTypeId,
+                    Issue = wo.Issue ?? string.Empty,
+                    TranslatedIssue = wo.Issue ?? string.Empty,
                     Details = wo.Details,
+                    TranslatedDetails = wo.Details,
                     CompletionNotes = wo.CompletionNotes,
+                    TranslatedCompletionNotes = wo.CompletionNotes,
                     DueDate = wo.DueDate,
                     CreatedAt = wo.CreatedAt,
                     Department = wo.Department?.Name,
+                    TranslatedDepartment = wo.Department?.Name ?? unassignedTranslated,
+                    DepartmentId = wo.DepartmentId,
                     DepartmentColor = wo.Department?.Color,
                     AssignedToId = wo.AssignedToUserId,
                     AssignedToName = BuildDisplayName(wo.AssignedTo),
-                    Creator = wo.CreatedBy != null
-                        ? string.Join(" ", new[] { wo.CreatedBy.FirstName, wo.CreatedBy.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)))
-                        : null,
+                    Creator = creatorName,
                     PriorityLabel = sla.PriorityLabel,
                     PriorityClass = sla.PriorityClass,
                     SlaStatus = sla.SlaStatus,
                     SlaStatusClass = sla.SlaStatusClass,
                     SlaSummary = WorkOrderSlaHelper.BuildSummaryText(sla),
                     IsOverdue = sla.IsOverdue,
-                    Properties = wo.Properties.Select(p => $"{p.Property.Name} ({p.Property.Code})").ToList(),
+                    Properties = propertyDetails,
                     Attachments = wo.Attachments.Select(a => new WorkOrderAttachmentViewModel
                     {
                         FilePath = a.FilePath,
                         FileName = string.IsNullOrWhiteSpace(a.OriginalFileName) ? Path.GetFileName(a.FilePath) : a.OriginalFileName
                     }).ToList()
                 };
-            }).ToList();
+
+                listItems.Add(item);
+            }
+
+            if (!isDefaultLanguage)
+            {
+                foreach (var item in listItems)
+                {
+                    var entityId = item.Id.ToString(CultureInfo.InvariantCulture);
+
+                    if (!string.IsNullOrWhiteSpace(item.Location))
+                    {
+                        item.TranslatedLocation = await _translationService.TranslateDynamicAsync(
+                            "WorkOrder",
+                            entityId,
+                            "Location",
+                            item.Location,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(item.Issue))
+                    {
+                        item.TranslatedIssue = await _translationService.TranslateDynamicAsync(
+                            "WorkOrder",
+                            entityId,
+                            "Issue",
+                            item.Issue,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(item.Details))
+                    {
+                        item.TranslatedDetails = await _translationService.TranslateDynamicAsync(
+                            "WorkOrder",
+                            entityId,
+                            "Details",
+                            item.Details,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(item.CompletionNotes))
+                    {
+                        item.TranslatedCompletionNotes = await _translationService.TranslateDynamicAsync(
+                            "WorkOrder",
+                            entityId,
+                            "CompletionNotes",
+                            item.CompletionNotes,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(item.WorkOrderType) && item.WorkOrderTypeId.HasValue)
+                    {
+                        item.TranslatedWorkOrderType = await _translationService.TranslateDynamicAsync(
+                            "WorkOrderType",
+                            item.WorkOrderTypeId.Value.ToString(CultureInfo.InvariantCulture),
+                            "Name",
+                            item.WorkOrderType,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(item.Department) && item.DepartmentId.HasValue)
+                    {
+                        item.TranslatedDepartment = await _translationService.TranslateDynamicAsync(
+                            "Department",
+                            item.DepartmentId.Value.ToString(CultureInfo.InvariantCulture),
+                            "Name",
+                            item.Department,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+
+                    if (item.Properties is { Count: > 0 })
+                    {
+                        foreach (var property in item.Properties)
+                        {
+                            if (string.IsNullOrWhiteSpace(property.Name))
+                            {
+                                property.TranslatedName = property.Name;
+                                continue;
+                            }
+
+                            property.TranslatedName = await _translationService.TranslateDynamicAsync(
+                                "Property",
+                                property.Id.ToString(CultureInfo.InvariantCulture),
+                                "Name",
+                                property.Name,
+                                _translationService.DefaultLanguage,
+                                activeLanguage,
+                                cancellationToken);
+                        }
+                    }
+                }
+            }
+
 
             var departmentSummaries = listItems
                 .Where(wo =>
@@ -1459,11 +1689,13 @@ namespace hOps.web.Controllers
                 .GroupBy(wo => new
                 {
                     Name = string.IsNullOrWhiteSpace(wo.Department) ? "Unassigned" : wo.Department,
+                    Translated = string.IsNullOrWhiteSpace(wo.TranslatedDepartment) ? unassignedTranslated : wo.TranslatedDepartment,
                     Color = string.IsNullOrWhiteSpace(wo.DepartmentColor) ? null : wo.DepartmentColor
                 })
                 .Select(group => new DepartmentWorkOrderSummaryViewModel
                 {
                     DepartmentName = group.Key.Name ?? "Unassigned",
+                    TranslatedDepartmentName = group.Key.Translated ?? group.Key.Name ?? "Unassigned",
                     DepartmentColor = group.Key.Color,
                     OpenCount = group.Count()
                 })
@@ -1772,6 +2004,20 @@ namespace hOps.web.Controllers
             }
 
             return string.IsNullOrWhiteSpace(user.Email) ? user.UserName ?? "Teammate" : user.Email!;
+        }
+
+        private sealed class RoomWorkOrderSummary
+        {
+            public int Id { get; set; }
+            public string Status { get; set; } = string.Empty;
+            public string StatusLabel { get; set; } = string.Empty;
+            public string Issue { get; set; } = string.Empty;
+            public string Location { get; set; } = string.Empty;
+            public int? DepartmentId { get; set; }
+            public string DepartmentName { get; set; } = string.Empty;
+            public string DepartmentColor { get; set; } = "#dc3545";
+            public string CreatedAtDisplay { get; set; } = string.Empty;
+            public string DetailUrl { get; set; } = "#";
         }
 
         private sealed class AssignableUserOption

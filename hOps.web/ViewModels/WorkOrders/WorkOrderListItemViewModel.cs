@@ -9,12 +9,19 @@ namespace hOps.web.ViewModels.WorkOrders
         public string Status { get; set; } = string.Empty;
         public string StatusColor { get; set; } = "#6c757d";
         public string Location { get; set; } = string.Empty;
+        public string TranslatedLocation { get; set; } = string.Empty;
         public string? WorkOrderType { get; set; }
+        public string? TranslatedWorkOrderType { get; set; }
+        public int? WorkOrderTypeId { get; set; }
         public string Issue { get; set; } = string.Empty;
+        public string TranslatedIssue { get; set; } = string.Empty;
         public string? Details { get; set; }
+        public string? TranslatedDetails { get; set; }
         public DateTime DueDate { get; set; }
         public DateTime CreatedAt { get; set; }
         public string? Department { get; set; }
+        public string? TranslatedDepartment { get; set; }
+        public int? DepartmentId { get; set; }
         public string? DepartmentColor { get; set; }
         public string? AssignedToName { get; set; }
         public string? AssignedToId { get; set; }
@@ -26,7 +33,16 @@ namespace hOps.web.ViewModels.WorkOrders
         public string SlaSummary { get; set; } = string.Empty;
         public bool IsOverdue { get; set; }
         public string? CompletionNotes { get; set; }
-        public List<string> Properties { get; set; } = new();
+        public string? TranslatedCompletionNotes { get; set; }
+        public List<WorkOrderPropertyDisplayViewModel> Properties { get; set; } = new();
         public List<WorkOrderAttachmentViewModel> Attachments { get; set; } = new();
+    }
+
+    public class WorkOrderPropertyDisplayViewModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string TranslatedName { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
     }
 }

@@ -103,8 +103,12 @@ namespace hOps.web.ViewModels.Home
         public int Id { get; set; }
         public string Status { get; set; } = string.Empty;
         public string Issue { get; set; } = string.Empty;
+        public string TranslatedIssue { get; set; } = string.Empty;
         public string? Location { get; set; }
+        public string? TranslatedLocation { get; set; }
         public string? DepartmentName { get; set; }
+        public int? DepartmentId { get; set; }
+        public string? TranslatedDepartmentName { get; set; }
         public string? DepartmentColor { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime DueDate { get; set; }
@@ -119,7 +123,9 @@ namespace hOps.web.ViewModels.Home
 
     public class WorkOrderDepartmentSummaryViewModel
     {
+        public int? DepartmentId { get; set; }
         public string DepartmentName { get; set; } = string.Empty;
+        public string? TranslatedDepartmentName { get; set; }
         public string? DepartmentColor { get; set; }
         public int OpenCount { get; set; }
     }

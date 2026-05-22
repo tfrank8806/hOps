@@ -4,6 +4,13 @@
 @{
     var workOrders = Model.WorkOrders ?? new List<hOps.web.ViewModels.Home.WorkOrderSummaryViewModel>();
     var departmentSummaries = Model.WorkOrderDepartmentSummaries ?? new List<hOps.web.ViewModels.Home.WorkOrderDepartmentSummaryViewModel>();
+    var widgetTitle = Html.Localize("Home.WorkOrdersWidget.Title", "Work Orders").ToString();
+    var newWorkOrderLabel = Html.Localize("Home.WorkOrdersWidget.NewWorkOrder", "New Work Order").ToString();
+    var viewAllLabel = Html.Localize("Home.WorkOrdersWidget.ViewAll", "View All").ToString();
+    var emptyStateText = Html.Localize("Home.WorkOrdersWidget.Empty", "No work orders are currently assigned to this property.").ToString();
+    var openByDepartmentLabel = Html.Localize("Home.WorkOrdersWidget.OpenByDepartment", "Open work orders by department").ToString();
+    var includesStatusesText = Html.Localize("Home.WorkOrdersWidget.IncludesStatuses", "Includes New, In Progress, and Escalated").ToString();
+    var openedTemplate = Html.Localize("Home.WorkOrdersWidget.OpenedTemplate", "Opened {0}").ToString();
 
     string GetDateColor(DateTime dateTime)
     {
@@ -26,21 +33,21 @@
 
 <div class="card shadow-sm h-100 home-widget-card home-widget-card--fill">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2 home-widget-card__header">
-        <h2 class="h6 mb-0">@Html.Localize("Work Orders")</h2>
+        <h2 class="h6 mb-0">@widgetTitle</h2>
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <a class="btn btn-sm btn-primary"
                asp-controller="WorkOrders"
                asp-action="Index"
                asp-fragment="workOrdersForm">
-                + New Work Order
+                <span class="pe-1">+</span>@newWorkOrderLabel
             </a>
-            <a class="btn btn-sm btn-outline-primary" asp-controller="WorkOrders" asp-action="Index">@Html.Localize("View All")</a>
+            <a class="btn btn-sm btn-outline-primary" asp-controller="WorkOrders" asp-action="Index">@viewAllLabel</a>
         </div>
     </div>
     <div class="card-body home-widget-card__body">
         @if (!workOrders.Any())
         {
-            <p class="text-muted mb-0">@Html.Localize("No work orders are currently assigned to this property.")</p>
+            <p class="text-muted mb-0">@emptyStateText</p>
         }
         else
         {
@@ -92,8 +99,8 @@
             {
                 <div class="mb-3">
                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-                        <span class="fw-semibold">@Html.Localize("Open work orders by department")</span>
-                        <span class="text-muted small">@Html.Localize("Includes New, In Progress, and Escalated")</span>
+                        <span class="fw-semibold">@openByDepartmentLabel</span>
+                        <span class="text-muted small">@includesStatusesText</span>
                     </div>
                     <div class="home-workorder-summary-grid">
                         @foreach (var summary in departmentSummaries)
@@ -101,10 +108,13 @@
                             var deptColor = string.IsNullOrWhiteSpace(summary.DepartmentColor)
                                 ? "#0d6efd"
                                 : summary.DepartmentColor!;
+                            var summaryDisplayName = string.IsNullOrWhiteSpace(summary.TranslatedDepartmentName)
+                                ? summary.DepartmentName
+                                : summary.TranslatedDepartmentName;
                             <div class="home-workorder-summary-item" style="--dept-color:@deptColor">
                                 <div class="department-info">
                                     <span class="department-dot" aria-hidden="true"></span>
-                                    <span>@Html.Localize(summary.DepartmentName ?? string.Empty)</span>
+                                    <span>@summaryDisplayName</span>
                                 </div>
                                 <div class="department-count">@summary.OpenCount</div>
                             </div>
@@ -122,7 +132,7 @@
                     var locationDisplay = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Location", order.Location ?? string.Empty);
                     var departmentDisplay = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "DepartmentName", order.DepartmentName ?? string.Empty);
                     var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
-                    var openedLabel = string.Format(CultureInfo.CurrentCulture, Html.Localize("Opened {0}"), createdLocal.ToString("g", CultureInfo.CurrentCulture));
+                    var openedLabel = string.Format(CultureInfo.CurrentCulture, openedTemplate, createdLocal.ToString("g", CultureInfo.CurrentCulture));
                     <li class="widget-item">
                         <div class="d-flex justify-content-between align-items-start gap-3">
                             <div class="flex-grow-1">
