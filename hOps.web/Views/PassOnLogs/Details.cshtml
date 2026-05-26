@@ -4,14 +4,20 @@
 @model hOps.web.ViewModels.PassOnLogDetailsViewModel
 @{
     var entityId = Model.Id.ToString(CultureInfo.InvariantCulture);
-    var displayTitle = await Html.DisplayTranslatedTextAsync("PassOnLog", entityId, "Title", Model.Title);
-    var displayBody = await Html.DisplayTranslatedTextAsync("PassOnLog", entityId, "Body", Model.Body);
+    var displayTitle = string.IsNullOrWhiteSpace(Model.TranslatedTitle)
+        ? await Html.DisplayTranslatedTextAsync("PassOnLog", entityId, "Title", Model.Title)
+        : Model.TranslatedTitle;
+    var displayBody = string.IsNullOrWhiteSpace(Model.TranslatedBody)
+        ? await Html.DisplayTranslatedTextAsync("PassOnLog", entityId, "Body", Model.Body)
+        : Model.TranslatedBody;
     ViewData["Title"] = displayTitle;
 
     var createdLocal = TimeZoneService.ConvertToUserTime(Model.CreatedAt);
     var updatedLocal = Model.UpdatedAt.HasValue ? TimeZoneService.ConvertToUserTime(Model.UpdatedAt.Value) : (DateTime?)null;
-    var propertyDisplayNames = new List<string>();
-    if (Model.Properties != null)
+    var propertyDisplayNames = Model.TranslatedPropertyNames != null && Model.TranslatedPropertyNames.Count > 0
+        ? new List<string>(Model.TranslatedPropertyNames)
+        : new List<string>();
+    if (propertyDisplayNames.Count == 0 && Model.Properties != null)
     {
         foreach (var property in Model.Properties)
         {
@@ -21,10 +27,10 @@
         var propertyEntry = string.IsNullOrWhiteSpace(property.Code)
             ? propertyNameDisplay
             : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", propertyNameDisplay, property.Code);
-        if (!string.IsNullOrWhiteSpace(propertyEntry))
-        {
-            propertyDisplayNames.Add(propertyEntry);
-        }
+            if (!string.IsNullOrWhiteSpace(propertyEntry))
+            {
+                propertyDisplayNames.Add(propertyEntry);
+            }
         }
     }
     var propertiesDisplay = string.Join(", ", propertyDisplayNames);
@@ -129,11 +135,13 @@
                                     <div class="flex-grow-1">
                                         @{
                                             var commentLocal = TimeZoneService.ConvertToUserTime(comment.CreatedAt);
-                                            var commentBody = await Html.DisplayTranslatedTextAsync(
-                                                "PassOnLogComment",
-                                                comment.Id.ToString(CultureInfo.InvariantCulture),
-                                                "Body",
-                                                comment.Body);
+                                            var commentBody = string.IsNullOrWhiteSpace(comment.TranslatedBody)
+                                                ? await Html.DisplayTranslatedTextAsync(
+                                                    "PassOnLogComment",
+                                                    comment.Id.ToString(CultureInfo.InvariantCulture),
+                                                   "Body",
+                                                    comment.Body)
+                                                : comment.TranslatedBody;
                                         }
                                         <div class="passon-comment__header">
                                             <div class="fw-semibold mb-0">@comment.CreatorName</div>
@@ -148,7 +156,7 @@
                 }
                 else
                 {
-                    <p class="text-muted">No comments yet.</p>
+                    <p class="text-muted">@Html.Localize("PassOnLogs.Comments.Empty", "No comments yet.")</p>
                 }
 
                 <form asp-action="AddComment" method="post" class="card" enctype="multipart/form-data">
@@ -159,15 +167,15 @@
                             <textarea asp-for="NewComment.Body"
                                       class="form-control"
                                       rows="3"
-                                      placeholder="Share an update or clarification..."
+                                      placeholder="@Html.Localize("PassOnLogs.Comment.Placeholder", "Share an update or clarification...")"
                                       data-enable-mentions="true"
                                       data-rich-text="true"
                                       data-clipboard-upload-target="#passOnLogCommentFiles"></textarea>
-                            <div class="form-text">Basic formatting works here too for quick emphasis. Paste images and they'll be attached below.</div>
+                            <div class="form-text">@Html.Localize("PassOnLogs.Comment.FormattingHelp", "Basic formatting works here too for quick emphasis. Paste images and they'll be attached below.")</div>
                             <span asp-validation-for="NewComment.Body" class="text-danger"></span>
                         </div>
                         <div class="mb-3">
-                            <label for="passOnLogCommentFiles" class="form-label">Add images</label>
+                            <label for="passOnLogCommentFiles" class="form-label">@Html.Localize("PassOnLogs.Comment.AddImagesLabel", "Add images")</label>
                             <input asp-for="NewComment.Files"
                                    type="file"
                                    id="passOnLogCommentFiles"

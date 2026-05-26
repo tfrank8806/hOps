@@ -14,6 +14,7 @@ using hOps.web.Services.Localization;
 using hOps.web.Utilities;
 using hOps.web.ViewModels;
 using hOps.web.ViewModels.Home;
+using hOps.web.ViewModels.WorkOrders;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -1069,10 +1070,13 @@ namespace hOps.web.Controllers
             viewModel.WorkOrders = recentWorkOrders.Select(entry =>
             {
                 var sla = WorkOrderSlaHelper.Calculate(entry.WorkOrder.DueDate, now);
+                var statusLabel = WorkOrderStatusOptions.GetLabel(entry.WorkOrder.Status);
                 return new WorkOrderSummaryViewModel
                 {
                     Id = entry.WorkOrder.Id,
                     Status = entry.WorkOrder.Status,
+                    StatusLabel = statusLabel ?? entry.WorkOrder.Status ?? string.Empty,
+                    TranslatedStatusLabel = statusLabel ?? entry.WorkOrder.Status ?? string.Empty,
                     Issue = entry.WorkOrder.Issue,
                     TranslatedIssue = entry.WorkOrder.Issue ?? string.Empty,
                     Location = entry.WorkOrder.Location,
@@ -1138,6 +1142,24 @@ namespace hOps.web.Controllers
                             activeLanguage,
                             cancellationToken);
                     }
+
+                    if (!string.IsNullOrWhiteSpace(workOrder.StatusLabel))
+                    {
+                        workOrder.TranslatedStatusLabel = _translationService.Translate(workOrder.StatusLabel, activeLanguage, workOrder.StatusLabel);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(workOrder.Status))
+                    {
+                        workOrder.TranslatedStatusLabel = _translationService.Translate(workOrder.Status, activeLanguage, workOrder.Status);
+                    }
+                }
+            }
+            else
+            {
+                foreach (var workOrder in viewModel.WorkOrders)
+                {
+                    workOrder.TranslatedStatusLabel = string.IsNullOrWhiteSpace(workOrder.StatusLabel)
+                        ? workOrder.Status
+                        : workOrder.StatusLabel;
                 }
             }
 
@@ -1224,7 +1246,9 @@ namespace hOps.web.Controllers
                 {
                     Id = log.Id,
                     Title = log.Title,
+                    TranslatedTitle = log.Title,
                     Preview = preview,
+                    TranslatedPreview = preview,
                     CreatorName = creatorName,
                     CreatorAvatar = UserAvatarHelper.BuildFromUser(log.CreatedBy, creatorName, "sm"),
                     CreatedAt = log.CreatedAt,
@@ -1232,6 +1256,58 @@ namespace hOps.web.Controllers
                     IsRead = log.CreatedById == currentUserId || log.Views.Any(v => v.ViewerId == currentUserId)
                 };
             }).ToList();
+
+            var activeLanguage = HttpContext.Items["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+            var isDefaultLanguage = string.Equals(activeLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+            var cancellationToken = HttpContext.RequestAborted;
+
+            if (!isDefaultLanguage)
+            {
+                foreach (var summary in viewModel.PassOnLogs)
+                {
+                    var entityId = summary.Id.ToString(CultureInfo.InvariantCulture);
+
+                    if (!string.IsNullOrWhiteSpace(summary.Title))
+                    {
+                        var translatedTitle = await _translationService.TranslateDynamicAsync(
+                            "PassOnLog",
+                            entityId,
+                            "Title",
+                            summary.Title,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedTitle))
+                        {
+                            summary.TranslatedTitle = translatedTitle;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(summary.Preview))
+                    {
+                        var translatedPreview = await _translationService.TranslateDynamicAsync(
+                            "PassOnLog",
+                            entityId,
+                            "Preview",
+                            summary.Preview,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedPreview))
+                        {
+                            summary.TranslatedPreview = translatedPreview;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                foreach (var summary in viewModel.PassOnLogs)
+                {
+                    summary.TranslatedTitle = summary.Title;
+                    summary.TranslatedPreview = summary.Preview;
+                }
+            }
         }
 
         private async Task PopulateActivityFeedAsync(HomeIndexViewModel viewModel, int propertyId, string currentUserId)
@@ -1249,11 +1325,14 @@ namespace hOps.web.Controllers
             foreach (var post in bulletinPosts)
             {
                 var author = post.CreatedBy != null ? BuildDisplayName(post.CreatedBy) : "Team Member";
+                var bulletinPreview = TruncatePreview(RichTextRenderer.ToPlainText(post.Content));
                 feedItems.Add(new ActivityFeedItemViewModel
                 {
                     ItemType = "bulletin",
                     Title = "Bulletin Update",
-                    Preview = TruncatePreview(RichTextRenderer.ToPlainText(post.Content)),
+                    TranslatedTitle = "Bulletin Update",
+                    Preview = bulletinPreview,
+                    TranslatedPreview = bulletinPreview,
                     CreatorName = author,
                     BadgeText = "Bulletin",
                     BadgeClass = "badge bg-primary",
@@ -1269,7 +1348,9 @@ namespace hOps.web.Controllers
                 {
                     ItemType = "passon",
                     Title = log.Title,
+                    TranslatedTitle = log.TranslatedTitle,
                     Preview = log.Preview,
+                    TranslatedPreview = log.TranslatedPreview,
                     CreatorName = log.CreatorName,
                     BadgeText = "Pass On",
                     BadgeClass = "badge bg-success text-white",
@@ -1317,19 +1398,25 @@ namespace hOps.web.Controllers
                     : null;
 
                 var creatorName = BuildDisplayName(creator);
+                var issueText = order.Issue ?? string.Empty;
+                var locationText = order.Location ?? string.Empty;
 
                 feedItems.Add(new ActivityFeedItemViewModel
                 {
                     ItemType = "workorder",
                     Title = $"Work Order #{order.Id}",
-                    Preview = order.Issue,
+                    TranslatedTitle = $"Work Order #{order.Id}",
+                    Preview = issueText,
+                    TranslatedPreview = issueText,
                     CreatorName = creatorName,
-                    Meta = order.Location,
+                    Meta = locationText,
+                    TranslatedMeta = locationText,
                     BadgeText = order.Status,
                     BadgeClass = "badge bg-secondary",
                     OccurredAt = order.CreatedAt,
                     LinkUrl = Url.Action("Edit", "WorkOrders", new { id = order.Id }),
-                    Avatar = UserAvatarHelper.BuildFromUser(creator, creatorName, "sm")
+                    Avatar = UserAvatarHelper.BuildFromUser(creator, creatorName, "sm"),
+                    WorkOrderId = order.Id
                 });
             }
 
@@ -1346,13 +1433,110 @@ namespace hOps.web.Controllers
                 {
                     ItemType = "mention",
                     Title = alert.Title,
+                    TranslatedTitle = alert.Title,
                     Preview = alert.Content ?? string.Empty,
+                    TranslatedPreview = alert.Content ?? string.Empty,
                     Meta = "Mention",
+                    TranslatedMeta = "Mention",
                     BadgeText = "Mention",
                     BadgeClass = "badge bg-info text-dark",
                     OccurredAt = alert.CreatedAt,
                     LinkUrl = alert.LinkUrl
                 });
+            }
+
+            var activeLanguage = HttpContext.Items["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+            var isDefaultLanguage = string.Equals(activeLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+
+            foreach (var item in feedItems)
+            {
+                item.TranslatedTitle = string.IsNullOrWhiteSpace(item.TranslatedTitle) ? item.Title ?? string.Empty : item.TranslatedTitle;
+                item.TranslatedPreview = string.IsNullOrWhiteSpace(item.TranslatedPreview) ? item.Preview ?? string.Empty : item.TranslatedPreview;
+                item.TranslatedMeta = string.IsNullOrWhiteSpace(item.TranslatedMeta) ? item.Meta ?? string.Empty : item.TranslatedMeta;
+            }
+
+            if (!isDefaultLanguage)
+            {
+                var cancellationToken = HttpContext.RequestAborted;
+                foreach (var item in feedItems)
+                {
+                    switch (item.ItemType)
+                    {
+                        case "workorder":
+                            if (item.WorkOrderId.HasValue)
+                            {
+                                var entityId = item.WorkOrderId.Value.ToString(CultureInfo.InvariantCulture);
+
+                                if (!string.IsNullOrWhiteSpace(item.Preview))
+                                {
+                                    var translatedIssue = await _translationService.TranslateDynamicAsync(
+                                        "WorkOrder",
+                                        entityId,
+                                        "Issue",
+                                        item.Preview,
+                                        _translationService.DefaultLanguage,
+                                        activeLanguage,
+                                        cancellationToken);
+                                    if (!string.IsNullOrWhiteSpace(translatedIssue))
+                                    {
+                                        item.TranslatedPreview = translatedIssue;
+                                    }
+                                }
+
+                                if (!string.IsNullOrWhiteSpace(item.Meta))
+                                {
+                                    var translatedLocation = await _translationService.TranslateDynamicAsync(
+                                        "WorkOrder",
+                                        entityId,
+                                        "Location",
+                                        item.Meta,
+                                        _translationService.DefaultLanguage,
+                                        activeLanguage,
+                                        cancellationToken);
+                                    if (!string.IsNullOrWhiteSpace(translatedLocation))
+                                    {
+                                        item.TranslatedMeta = translatedLocation;
+                                    }
+                                }
+
+                                var translatedPrefix = _translationService.Translate("Work Order", activeLanguage, "Work Order");
+                                item.TranslatedTitle = string.Format(CultureInfo.CurrentCulture, "{0} #{1}", translatedPrefix, item.WorkOrderId.Value);
+
+                                if (!string.IsNullOrWhiteSpace(item.BadgeText))
+                                {
+                                    item.BadgeText = _translationService.Translate(item.BadgeText, activeLanguage, item.BadgeText);
+                                }
+                            }
+                            break;
+                        case "passon":
+                            if (!string.IsNullOrWhiteSpace(item.BadgeText))
+                            {
+                                item.BadgeText = _translationService.Translate(item.BadgeText, activeLanguage, item.BadgeText);
+                            }
+                            break;
+                        case "bulletin":
+                            item.TranslatedTitle = _translationService.Translate(item.Title ?? string.Empty, activeLanguage, item.Title ?? string.Empty);
+                            if (!string.IsNullOrWhiteSpace(item.BadgeText))
+                            {
+                                item.BadgeText = _translationService.Translate(item.BadgeText, activeLanguage, item.BadgeText);
+                            }
+                            break;
+                        case "mention":
+                            item.TranslatedMeta = _translationService.Translate(item.Meta ?? string.Empty, activeLanguage, item.Meta ?? string.Empty);
+                            item.TranslatedTitle = _translationService.Translate(item.Title ?? string.Empty, activeLanguage, item.Title ?? string.Empty);
+                            if (!string.IsNullOrWhiteSpace(item.BadgeText))
+                            {
+                                item.BadgeText = _translationService.Translate(item.BadgeText, activeLanguage, item.BadgeText);
+                            }
+                            break;
+                        default:
+                            if (!string.IsNullOrWhiteSpace(item.BadgeText))
+                            {
+                                item.BadgeText = _translationService.Translate(item.BadgeText, activeLanguage, item.BadgeText);
+                            }
+                            break;
+                    }
+                }
             }
 
             viewModel.ActivityFeed = feedItems

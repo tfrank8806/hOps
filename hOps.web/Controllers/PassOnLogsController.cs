@@ -3,6 +3,7 @@ using hOps.web.Models;
 using hOps.web.Services;
 using hOps.web.Utilities;
 using hOps.web.ViewModels;
+using hOps.web.Services.Localization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -29,6 +30,7 @@ namespace hOps.web.Controllers
         private readonly IPassOnLogNotificationService _notificationService;
         private readonly ILogger<PassOnLogsController> _logger;
         private readonly IWebHostEnvironment _environment;
+        private readonly ITranslationService _translationService;
 
         public PassOnLogsController(
             ApplicationDbContext context,
@@ -36,13 +38,15 @@ namespace hOps.web.Controllers
             MentionService mentionService,
             IPassOnLogNotificationService notificationService,
             ILogger<PassOnLogsController> logger,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            ITranslationService translationService)
             : base(context, userManager)
         {
             _mentionService = mentionService;
             _notificationService = notificationService;
             _logger = logger;
             _environment = environment;
+            _translationService = translationService;
         }
 
         public async Task<IActionResult> Index([FromQuery] PassOnLogFiltersViewModel? filters)
@@ -124,6 +128,7 @@ namespace hOps.web.Controllers
                 {
                     Id = p.Id,
                     Name = p.Name,
+                    TranslatedName = p.Name,
                     Code = p.Code,
                     IsSelected = filters.PropertyIds.Contains(p.Id)
                 })
@@ -179,6 +184,7 @@ namespace hOps.web.Controllers
                         {
                             Id = group.Key,
                             Name = property?.Name ?? string.Empty,
+                            TranslatedName = property?.Name ?? string.Empty,
                             Code = property?.Code ?? string.Empty
                         };
                     })
@@ -189,16 +195,173 @@ namespace hOps.web.Controllers
                 {
                     Id = log.Id,
                     Title = log.Title,
+                    TranslatedTitle = log.Title,
                     CreatorName = creatorName,
                     CreatorAvatar = UserAvatarHelper.BuildFromUser(log.CreatedBy, creatorName, "lg"),
                     CreatedAt = log.CreatedAt,
                     IsUnread = IsLogUnread(log, currentUser.Id),
                     PropertyNames = properties.Select(p => p.Name).Where(name => !string.IsNullOrWhiteSpace(name)).Distinct().OrderBy(name => name).ToList(),
+                    TranslatedPropertyNames = properties
+                        .Select(p =>
+                        {
+                            var name = string.IsNullOrWhiteSpace(p.TranslatedName) ? p.Name : p.TranslatedName;
+                            if (string.IsNullOrWhiteSpace(name))
+                            {
+                                return null;
+                            }
+
+                            return string.IsNullOrWhiteSpace(p.Code)
+                                ? name
+                                : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", name, p.Code);
+                        })
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .ToList()!,
                     Properties = properties,
                     CommentCount = log.Comments.Count,
-                    Preview = BuildPreview(log.Body)
+                    Preview = BuildPreview(log.Body),
+                    TranslatedPreview = BuildPreview(log.Body)
                 };
             }).ToList();
+
+            var activeLanguage = HttpContext.Items["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+            var isDefaultLanguage = string.Equals(activeLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+            var cancellationToken = HttpContext.RequestAborted;
+
+            string? BuildPropertyDisplayName(PassOnLogPropertyDisplayViewModel property)
+            {
+                var displayName = string.IsNullOrWhiteSpace(property.TranslatedName) ? property.Name : property.TranslatedName;
+                if (string.IsNullOrWhiteSpace(displayName))
+                {
+                    return null;
+                }
+
+                return string.IsNullOrWhiteSpace(property.Code)
+                    ? displayName
+                    : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", displayName, property.Code);
+            }
+
+            if (!isDefaultLanguage)
+            {
+                foreach (var item in logItems)
+                {
+                    var entityId = item.Id.ToString(CultureInfo.InvariantCulture);
+
+                    if (!string.IsNullOrWhiteSpace(item.Title))
+                    {
+                        var translatedTitle = await _translationService.TranslateDynamicAsync(
+                            "PassOnLog",
+                            entityId,
+                            "Title",
+                            item.Title,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedTitle))
+                        {
+                            item.TranslatedTitle = translatedTitle;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(item.Preview))
+                    {
+                        var translatedPreview = await _translationService.TranslateDynamicAsync(
+                            "PassOnLog",
+                            entityId,
+                            "Preview",
+                            item.Preview,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedPreview))
+                        {
+                            item.TranslatedPreview = translatedPreview;
+                        }
+                    }
+
+                    if (item.Properties is { Count: > 0 })
+                    {
+                        foreach (var property in item.Properties)
+                        {
+                            if (string.IsNullOrWhiteSpace(property.Name))
+                            {
+                                property.TranslatedName = property.Name;
+                                continue;
+                            }
+
+                            var translatedPropertyName = await _translationService.TranslateDynamicAsync(
+                                "Property",
+                                property.Id.ToString(CultureInfo.InvariantCulture),
+                                "Name",
+                                property.Name,
+                                _translationService.DefaultLanguage,
+                                activeLanguage,
+                                cancellationToken);
+
+                            property.TranslatedName = string.IsNullOrWhiteSpace(translatedPropertyName)
+                                ? property.Name
+                                : translatedPropertyName;
+                        }
+
+                        item.TranslatedPropertyNames = item.Properties
+                            .Select(BuildPropertyDisplayName)
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .ToList()!;
+                    }
+                }
+
+                if (filters.PropertyOptions != null && filters.PropertyOptions.Count > 0)
+                {
+                    foreach (var option in filters.PropertyOptions)
+                    {
+                        if (string.IsNullOrWhiteSpace(option.Name))
+                        {
+                            option.TranslatedName = option.Name;
+                            continue;
+                        }
+
+                        var translatedName = await _translationService.TranslateDynamicAsync(
+                            "Property",
+                            option.Id.ToString(CultureInfo.InvariantCulture),
+                            "Name",
+                            option.Name,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+
+                        option.TranslatedName = string.IsNullOrWhiteSpace(translatedName)
+                            ? option.Name
+                            : translatedName;
+                    }
+                }
+            }
+            else
+            {
+                foreach (var item in logItems)
+                {
+                    item.TranslatedTitle = item.Title;
+                    item.TranslatedPreview = item.Preview;
+                    if (item.Properties is { Count: > 0 })
+                    {
+                        foreach (var property in item.Properties)
+                        {
+                            property.TranslatedName = property.Name;
+                        }
+
+                        item.TranslatedPropertyNames = item.Properties
+                            .Select(BuildPropertyDisplayName)
+                            .Where(value => !string.IsNullOrWhiteSpace(value))
+                            .ToList()!;
+                    }
+                }
+
+                if (filters.PropertyOptions != null && filters.PropertyOptions.Count > 0)
+                {
+                    foreach (var option in filters.PropertyOptions)
+                    {
+                        option.TranslatedName = option.Name;
+                    }
+                }
+            }
 
             if (filters.ShowUnreadOnly)
             {
@@ -231,7 +394,7 @@ namespace hOps.web.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            var model = BuildFormViewModel(new PassOnLogFormViewModel(), accessibleProperties);
+            var model = await BuildFormViewModelAsync(new PassOnLogFormViewModel(), accessibleProperties);
             if (accessibleProperties.Count == 1)
             {
                 model.SelectedPropertyIds = new List<int> { accessibleProperties.First().Id };
@@ -257,7 +420,7 @@ namespace hOps.web.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            model = BuildFormViewModel(model, accessibleProperties);
+            model = await BuildFormViewModelAsync(model, accessibleProperties);
 
             EnsurePropertySelection(model, accessibleProperties.Select(p => p.Id).ToList());
 
@@ -370,7 +533,7 @@ namespace hOps.web.Controllers
                     .ToList()
             };
 
-            model = BuildFormViewModel(model, accessibleProperties);
+            model = await BuildFormViewModelAsync(model, accessibleProperties);
 
             return View(model);
         }
@@ -423,7 +586,7 @@ namespace hOps.web.Controllers
 
             model.ExistingAttachments = existingAttachments;
 
-            model = BuildFormViewModel(model, accessibleProperties);
+            model = await BuildFormViewModelAsync(model, accessibleProperties);
 
             EnsurePropertySelection(model, accessibleProperties.Select(p => p.Id).ToList());
 
@@ -567,7 +730,7 @@ namespace hOps.web.Controllers
             }
 
             var canDelete = User.IsInRole("Admin") || User.IsInRole("Manager");
-            var model = BuildDetailsViewModel(log, currentUser.Id, nextLogId, previousLogId, canDelete);
+            var model = await BuildDetailsViewModelAsync(log, currentUser.Id, nextLogId, previousLogId, canDelete);
             return View(model);
         }
 
@@ -614,7 +777,7 @@ namespace hOps.web.Controllers
             {
                 var (nextLogId, previousLogId) = await GetNeighborLogIdsAsync(log, accessiblePropertyIds);
                 var canDelete = User.IsInRole("Admin") || User.IsInRole("Manager");
-                var modelWithErrors = BuildDetailsViewModel(log, currentUser.Id, nextLogId, previousLogId, canDelete);
+                var modelWithErrors = await BuildDetailsViewModelAsync(log, currentUser.Id, nextLogId, previousLogId, canDelete);
                 modelWithErrors.NewComment = input;
                 modelWithErrors.NewComment.ReturnUrl = input.ReturnUrl;
                 return View("Details", modelWithErrors);
@@ -785,7 +948,7 @@ namespace hOps.web.Controllers
             return properties;
         }
 
-        private PassOnLogFormViewModel BuildFormViewModel(PassOnLogFormViewModel model, List<Property> accessibleProperties)
+        private async Task<PassOnLogFormViewModel> BuildFormViewModelAsync(PassOnLogFormViewModel model, List<Property> accessibleProperties)
         {
             model.SelectedPropertyIds ??= new List<int>();
             var selectedSet = new HashSet<int>(model.SelectedPropertyIds);
@@ -795,10 +958,47 @@ namespace hOps.web.Controllers
                 {
                     Id = p.Id,
                     Name = p.Name,
+                    TranslatedName = p.Name,
                     Code = p.Code,
                     IsSelected = selectedSet.Contains(p.Id)
                 })
                 .ToList();
+
+            var activeLanguage = HttpContext.Items["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+            var isDefaultLanguage = string.Equals(activeLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+            var cancellationToken = HttpContext.RequestAborted;
+
+            if (!isDefaultLanguage && model.PropertyOptions.Count > 0)
+            {
+                foreach (var option in model.PropertyOptions)
+                {
+                    if (string.IsNullOrWhiteSpace(option.Name))
+                    {
+                        option.TranslatedName = option.Name;
+                        continue;
+                    }
+
+                    var translatedName = await _translationService.TranslateDynamicAsync(
+                        "Property",
+                        option.Id.ToString(CultureInfo.InvariantCulture),
+                        "Name",
+                        option.Name,
+                        _translationService.DefaultLanguage,
+                        activeLanguage,
+                        cancellationToken);
+
+                    option.TranslatedName = string.IsNullOrWhiteSpace(translatedName)
+                        ? option.Name
+                        : translatedName;
+                }
+            }
+            else
+            {
+                foreach (var option in model.PropertyOptions)
+                {
+                    option.TranslatedName = option.Name;
+                }
+            }
 
             return model;
         }
@@ -974,7 +1174,7 @@ namespace hOps.web.Controllers
             return int.TryParse(match.Groups["id"].Value, out logId);
         }
 
-        private PassOnLogDetailsViewModel BuildDetailsViewModel(PassOnLog log, string currentUserId, int? nextLogId, int? previousLogId, bool canDelete)
+        private async Task<PassOnLogDetailsViewModel> BuildDetailsViewModelAsync(PassOnLog log, string currentUserId, int? nextLogId, int? previousLogId, bool canDelete)
         {
             var creatorName = PassOnLogEmailHelper.FormatUserName(log.CreatedBy?.FirstName, log.CreatedBy?.LastName, log.CreatedBy?.Email ?? string.Empty);
 
@@ -998,6 +1198,7 @@ namespace hOps.web.Controllers
                         {
                             Id = group.Key,
                             Name = property?.Name ?? string.Empty,
+                            TranslatedName = property?.Name ?? string.Empty,
                             Code = property?.Code ?? string.Empty
                         };
                     })
@@ -1013,6 +1214,7 @@ namespace hOps.web.Controllers
                         {
                             Id = c.Id,
                             Body = c.Body,
+                            TranslatedBody = c.Body,
                             CreatedAt = c.CreatedAt,
                             CreatorName = commentCreatorName,
                             CreatorAvatar = UserAvatarHelper.BuildFromUser(c.CreatedBy, commentCreatorName, "sm")
@@ -1045,6 +1247,139 @@ namespace hOps.web.Controllers
             };
 
             vm.CanDelete = canDelete;
+            vm.TranslatedTitle = vm.Title;
+            vm.TranslatedBody = vm.Body;
+            vm.TranslatedPropertyNames = vm.Properties
+                .Select(property =>
+                {
+                    var displayName = string.IsNullOrWhiteSpace(property.TranslatedName) ? property.Name : property.TranslatedName;
+                    if (string.IsNullOrWhiteSpace(displayName))
+                    {
+                        return null;
+                    }
+
+                    return string.IsNullOrWhiteSpace(property.Code)
+                        ? displayName
+                        : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", displayName, property.Code);
+                })
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToList()!;
+
+            var activeLanguage = HttpContext.Items["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+            var isDefaultLanguage = string.Equals(activeLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+            var cancellationToken = HttpContext.RequestAborted;
+
+            if (!isDefaultLanguage)
+            {
+                var entityId = vm.Id.ToString(CultureInfo.InvariantCulture);
+
+                if (!string.IsNullOrWhiteSpace(vm.Title))
+                {
+                    var translatedTitle = await _translationService.TranslateDynamicAsync(
+                        "PassOnLog",
+                        entityId,
+                        "Title",
+                        vm.Title,
+                        _translationService.DefaultLanguage,
+                        activeLanguage,
+                        cancellationToken);
+                    if (!string.IsNullOrWhiteSpace(translatedTitle))
+                    {
+                        vm.TranslatedTitle = translatedTitle;
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(vm.Body))
+                {
+                    var translatedBody = await _translationService.TranslateDynamicAsync(
+                        "PassOnLog",
+                        entityId,
+                        "Body",
+                        vm.Body,
+                        _translationService.DefaultLanguage,
+                        activeLanguage,
+                        cancellationToken);
+                    if (!string.IsNullOrWhiteSpace(translatedBody))
+                    {
+                        vm.TranslatedBody = translatedBody;
+                    }
+                }
+
+                if (vm.Properties is { Count: > 0 })
+                {
+                    foreach (var property in vm.Properties)
+                    {
+                        if (string.IsNullOrWhiteSpace(property.Name))
+                        {
+                            property.TranslatedName = property.Name;
+                            continue;
+                        }
+
+                        var translatedPropertyName = await _translationService.TranslateDynamicAsync(
+                            "Property",
+                            property.Id.ToString(CultureInfo.InvariantCulture),
+                            "Name",
+                            property.Name,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+
+                        property.TranslatedName = string.IsNullOrWhiteSpace(translatedPropertyName)
+                            ? property.Name
+                            : translatedPropertyName;
+                    }
+
+                    vm.TranslatedPropertyNames = vm.Properties
+                        .Select(property =>
+                        {
+                            var displayName = string.IsNullOrWhiteSpace(property.TranslatedName) ? property.Name : property.TranslatedName;
+                            if (string.IsNullOrWhiteSpace(displayName))
+                            {
+                                return null;
+                            }
+
+                            return string.IsNullOrWhiteSpace(property.Code)
+                                ? displayName
+                                : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", displayName, property.Code);
+                        })
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .ToList()!;
+                }
+
+                foreach (var comment in vm.Comments)
+                {
+                    if (string.IsNullOrWhiteSpace(comment.Body))
+                    {
+                        comment.TranslatedBody = comment.Body;
+                        continue;
+                    }
+
+                    var translatedComment = await _translationService.TranslateDynamicAsync(
+                        "PassOnLogComment",
+                        comment.Id.ToString(CultureInfo.InvariantCulture),
+                        "Body",
+                        comment.Body,
+                        _translationService.DefaultLanguage,
+                        activeLanguage,
+                        cancellationToken);
+
+                    comment.TranslatedBody = string.IsNullOrWhiteSpace(translatedComment)
+                        ? comment.Body
+                        : translatedComment;
+                }
+            }
+            else
+            {
+                foreach (var property in vm.Properties)
+                {
+                    property.TranslatedName = property.Name;
+                }
+
+                foreach (var comment in vm.Comments)
+                {
+                    comment.TranslatedBody = comment.Body;
+                }
+            }
 
             return vm;
         }

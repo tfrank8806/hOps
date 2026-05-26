@@ -128,9 +128,15 @@
                 {
                     var hasLink = !string.IsNullOrWhiteSpace(order.DetailUrl);
                     var orderIdString = order.Id.ToString(CultureInfo.InvariantCulture);
-                    var issueDisplay = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Issue", order.Issue);
-                    var locationDisplay = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Location", order.Location ?? string.Empty);
-                    var departmentDisplay = await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "DepartmentName", order.DepartmentName ?? string.Empty);
+                    var issueDisplay = string.IsNullOrWhiteSpace(order.TranslatedIssue)
+                        ? await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Issue", order.Issue)
+                        : order.TranslatedIssue;
+                    var locationDisplay = string.IsNullOrWhiteSpace(order.TranslatedLocation)
+                        ? await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "Location", order.Location ?? string.Empty)
+                        : order.TranslatedLocation;
+                    var departmentDisplay = string.IsNullOrWhiteSpace(order.TranslatedDepartmentName)
+                        ? await Html.DisplayTranslatedTextAsync("WorkOrder", orderIdString, "DepartmentName", order.DepartmentName ?? string.Empty)
+                        : order.TranslatedDepartmentName;
                     var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
                     var openedLabel = string.Format(CultureInfo.CurrentCulture, openedTemplate, createdLocal.ToString("g", CultureInfo.CurrentCulture));
                     <li class="widget-item">
@@ -168,12 +174,16 @@
                             </div>
                             @{
                                 var statusColor = hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetColor(order.Status);
-                                var statusLabel = hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetLabel(order.Status);
-                                var localizedStatusLabel = Html.Localize(statusLabel ?? string.Empty);
+                                var statusLabel = !string.IsNullOrWhiteSpace(order.StatusLabel)
+                                    ? order.StatusLabel
+                                    : hOps.web.ViewModels.WorkOrders.WorkOrderStatusOptions.GetLabel(order.Status);
+                                var statusDisplayText = string.IsNullOrWhiteSpace(order.TranslatedStatusLabel)
+                                    ? Html.Localize(statusLabel ?? string.Empty).ToString()
+                                    : order.TranslatedStatusLabel;
                                 var localizedPriorityLabel = Html.Localize(order.PriorityLabel ?? string.Empty);
                             }
                             <div class="d-flex flex-column align-items-end gap-1 text-end flex-shrink-0">
-                                <span class="badge" style="background-color:@statusColor">@localizedStatusLabel</span>
+                                <span class="badge" style="background-color:@statusColor">@statusDisplayText</span>
                                 <span class="@order.PriorityClass">@localizedPriorityLabel</span>
                                 <small class="text-muted">@order.DueDate.ToString("d", CultureInfo.CurrentCulture)</small>
                             </div>

@@ -1590,6 +1590,21 @@ namespace hOps.web.Controllers
                         })
                         .Where(value => !string.IsNullOrWhiteSpace(value))
                         .ToList()!,
+                    TranslatedProperties = propertyDetails
+                        .Select(p =>
+                        {
+                            var name = string.IsNullOrWhiteSpace(p.TranslatedName) ? p.Name : p.TranslatedName;
+                            if (string.IsNullOrWhiteSpace(name))
+                            {
+                                return null;
+                            }
+
+                            return string.IsNullOrWhiteSpace(p.Code)
+                                ? name
+                                : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", name, p.Code);
+                        })
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .ToList()!,
                     Attachments = wo.Attachments.Select(a => new WorkOrderAttachmentViewModel
                     {
                         FilePath = a.FilePath,
@@ -1713,6 +1728,7 @@ namespace hOps.web.Controllers
                             })
                             .Where(value => !string.IsNullOrWhiteSpace(value))
                             .ToList()!;
+                        item.TranslatedProperties = new List<string>(item.TranslatedPropertyNames);
                     }
 
                     if (!string.IsNullOrWhiteSpace(item.StatusLabel))
@@ -1744,6 +1760,7 @@ namespace hOps.web.Controllers
                         })
                         .Where(value => !string.IsNullOrWhiteSpace(value))
                         .ToList()!;
+                    item.TranslatedProperties = new List<string>(item.TranslatedPropertyNames);
 
                     if (string.IsNullOrWhiteSpace(item.TranslatedAssignedTo))
                     {

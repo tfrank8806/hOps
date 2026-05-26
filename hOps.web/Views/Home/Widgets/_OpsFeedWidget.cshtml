@@ -19,9 +19,15 @@
                     var entityIdSeed = !string.IsNullOrWhiteSpace(item.LinkUrl)
                         ? item.LinkUrl
                         : $"{item.ItemType}_{item.PassOnLogId?.ToString(CultureInfo.InvariantCulture) ?? "0"}";
-                    var titleDisplay = await Html.DisplayTranslatedTextAsync("ActivityFeed", entityIdSeed, "Title", item.Title ?? string.Empty);
-                    var previewDisplay = await Html.DisplayTranslatedTextAsync("ActivityFeed", entityIdSeed, "Preview", item.Preview ?? string.Empty);
-                    var metaDisplay = await Html.DisplayTranslatedTextAsync("ActivityFeed", entityIdSeed, "Meta", item.Meta ?? string.Empty);
+                    var titleDisplay = string.IsNullOrWhiteSpace(item.TranslatedTitle)
+                        ? await Html.DisplayTranslatedTextAsync("ActivityFeed", entityIdSeed, "Title", item.Title ?? string.Empty)
+                        : item.TranslatedTitle;
+                    var previewDisplay = string.IsNullOrWhiteSpace(item.TranslatedPreview)
+                        ? await Html.DisplayTranslatedTextAsync("ActivityFeed", entityIdSeed, "Preview", item.Preview ?? string.Empty)
+                        : item.TranslatedPreview;
+                    var metaDisplay = string.IsNullOrWhiteSpace(item.TranslatedMeta)
+                        ? await Html.DisplayTranslatedTextAsync("ActivityFeed", entityIdSeed, "Meta", item.Meta ?? string.Empty)
+                        : item.TranslatedMeta;
                     var creatorDisplay = string.IsNullOrWhiteSpace(item.CreatorName) ? Html.Localize("Unknown") : item.CreatorName;
                     <article class="ops-feed__item">
                         <div class="ops-feed__avatar">

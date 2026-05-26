@@ -1,3 +1,4 @@
+@using System.Globalization
 @model hOps.web.ViewModels.PassOnLogFormViewModel
 @{
     string EscapeTextareaValue(string? value) => string.IsNullOrEmpty(value)
@@ -22,22 +23,26 @@
               data-enable-mentions="true"
               data-rich-text="true"
               data-clipboard-upload-target="#passOnLogFiles">@Html.Raw(EscapeTextareaValue(Model.Body))</textarea>
-    <div class="form-text">Add emphasis, lists, and quotes with the toolbar to make your update easier to scan.</div>
+    <div class="form-text">@Html.Localize("PassOnLogs.Form.BodyHelp", "Add emphasis, lists, and quotes with the toolbar to make your update easier to scan.")</div>
     <span asp-validation-for="Body" class="text-danger"></span>
 </div>
 
 @if (Model.PropertyOptions.Count > 1)
 {
     <div class="mb-3">
-        <label class="form-label">Select Properties</label>
-        <div class="form-text">Choose the properties that should receive this log.</div>
+        <label class="form-label">@Html.Localize("PassOnLogs.Form.SelectProperties", "Select Properties")</label>
+        <div class="form-text">@Html.Localize("PassOnLogs.Form.SelectPropertiesHelp", "Choose the properties that should receive this log.")</div>
         @foreach (var property in Model.PropertyOptions)
         {
             var inputId = $"property_{property.Id}";
+            var propertyNameDisplay = string.IsNullOrWhiteSpace(property.TranslatedName) ? property.Name : property.TranslatedName;
+            var displayLabel = string.IsNullOrWhiteSpace(property.Code)
+                ? propertyNameDisplay
+                : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", propertyNameDisplay, property.Code);
             <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="SelectedPropertyIds" value="@property.Id" id="@inputId" @(Model.SelectedPropertyIds.Contains(property.Id) ? "checked" : string.Empty) />
                 <label class="form-check-label" for="@inputId">
-                    @property.Name (@property.Code)
+                    @displayLabel
                 </label>
             </div>
         }
@@ -48,15 +53,22 @@ else if (Model.PropertyOptions.Count == 1)
 {
     <input type="hidden" name="SelectedPropertyIds" value="@Model.PropertyOptions[0].Id" />
     <div class="mb-3">
-        <label class="form-label">Property</label>
-        <div class="form-control-plaintext">@Model.PropertyOptions[0].Name (@Model.PropertyOptions[0].Code)</div>
+        <label class="form-label">@Html.Localize("PassOnLogs.Form.Property", "Property")</label>
+        @{
+            var property = Model.PropertyOptions[0];
+            var propertyNameDisplay = string.IsNullOrWhiteSpace(property.TranslatedName) ? property.Name : property.TranslatedName;
+            var displayLabel = string.IsNullOrWhiteSpace(property.Code)
+                ? propertyNameDisplay
+                : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", propertyNameDisplay, property.Code);
+        }
+        <div class="form-control-plaintext">@displayLabel</div>
     </div>
 }
 
 @if (Model.ExistingAttachments.Any())
 {
     <div class="mb-3">
-        <label class="form-label">Current Attachments</label>
+        <label class="form-label">@Html.Localize("PassOnLogs.Form.CurrentAttachments", "Current Attachments")</label>
         <ul class="list-unstyled mb-2">
             @foreach (var attachment in Model.ExistingAttachments)
             {
@@ -66,18 +78,18 @@ else if (Model.PropertyOptions.Count == 1)
                     <a href="@attachment.DownloadUrl" target="_blank" rel="noopener">@attachment.FileName</a>
                     <div class="form-check mb-0">
                         <input class="form-check-input" type="checkbox" name="AttachmentsToDelete" value="@attachment.Id" id="@checkboxId" @(isMarked ? "checked" : string.Empty) />
-                        <label class="form-check-label" for="@checkboxId">Remove</label>
+                        <label class="form-check-label" for="@checkboxId">@Html.Localize("PassOnLogs.Form.RemoveAttachment", "Remove")</label>
                     </div>
                 </li>
             }
         </ul>
-        <div class="form-text">Select remove to delete an existing attachment when you save.</div>
+        <div class="form-text">@Html.Localize("PassOnLogs.Form.RemoveAttachmentHelp", "Select remove to delete an existing attachment when you save.")</div>
     </div>
 }
 
 <div class="mb-3">
     <label asp-for="Files" class="form-label"></label>
     <input asp-for="Files" class="form-control" type="file" multiple id="passOnLogFiles" />
-    <div class="form-text">Attach supporting files like photos or documents. You can select multiple files at once.</div>
+    <div class="form-text">@Html.Localize("PassOnLogs.Form.AttachmentsHelp", "Attach supporting files like photos or documents. You can select multiple files at once.")</div>
     <span asp-validation-for="Files" class="text-danger"></span>
 </div>

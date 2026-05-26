@@ -1,9 +1,13 @@
+@using System.Text.Json
 @model hOps.web.ViewModels.PassOnLogFormViewModel
 @{
-    ViewData["Title"] = "Edit Pass On Log";
+    var pageTitle = Html.Localize("PassOnLogs.Edit.Title", "Edit Pass On Log").ToString();
+    var saveLabel = Html.Localize("PassOnLogs.Edit.SaveButton", "Save Changes").ToString();
+    var savingLabel = Html.Localize("PassOnLogs.Edit.SavingLabel", "Saving...").ToString();
+    ViewData["Title"] = pageTitle;
 }
 
-<h2 class="mb-4">Edit Pass On Log</h2>
+<h2 class="mb-4">@pageTitle</h2>
 
 <form asp-action="Edit" method="post" enctype="multipart/form-data" class="card" id="passOnLogForm">
     <div class="card-body">
@@ -12,7 +16,7 @@
     </div>
     <div class="card-footer d-flex justify-content-end gap-2">
         <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">@Html.Localize("Cancel")</a>
-        <button type="submit" class="btn btn-primary" data-submit-btn="true" data-loading-text="Saving...">Save Changes</button>
+        <button type="submit" class="btn btn-primary" data-submit-btn="true" data-loading-text="@savingLabel">@saveLabel</button>
     </div>
 </form>
 
@@ -33,7 +37,7 @@
                 }
 
                 submitBtn.disabled = true;
-                const loadingText = submitBtn.dataset.loadingText || 'Saving...';
+                const loadingText = submitBtn.dataset.loadingText || @JsonSerializer.Serialize(savingLabel);
                 submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${loadingText}`;
             });
         })();

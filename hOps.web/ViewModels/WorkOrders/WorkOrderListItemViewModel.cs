@@ -39,6 +39,7 @@ namespace hOps.web.ViewModels.WorkOrders
         public string? TranslatedCompletionNotes { get; set; }
         public List<WorkOrderPropertyDisplayViewModel> Properties { get; set; } = new();
         public List<string> TranslatedPropertyNames { get; set; } = new();
+        public List<string> TranslatedProperties { get; set; } = new();
         public List<WorkOrderAttachmentViewModel> Attachments { get; set; } = new();
     }
 

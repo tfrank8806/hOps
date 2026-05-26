@@ -123,7 +123,7 @@
                         {
                             continue;
                         }
-                        <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
+                        <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@Html.Localize(option.Text, option.Text)</option>
                     }
                 </select>
             </div>
@@ -138,8 +138,13 @@
                     @foreach (var property in Model.Filters.PropertyOptions)
                     {
                         var propertyIdString = property.Id.ToString(CultureInfo.InvariantCulture);
-                        var translatedPropertyName = await Html.DisplayTranslatedTextAsync("Property", propertyIdString, "Name", property.Name);
-                        var propertyNameDisplay = string.IsNullOrWhiteSpace(translatedPropertyName) ? property.Name : translatedPropertyName;
+                        var propertyNameDisplay = string.IsNullOrWhiteSpace(property.TranslatedName)
+                            ? await Html.DisplayTranslatedTextAsync("Property", propertyIdString, "Name", property.Name)
+                            : property.TranslatedName;
+                        if (string.IsNullOrWhiteSpace(propertyNameDisplay))
+                        {
+                            propertyNameDisplay = property.Name;
+                        }
                         var label = string.IsNullOrWhiteSpace(property.Code)
                             ? propertyNameDisplay
                             : string.Format(CultureInfo.CurrentCulture, "{0} ({1})", propertyNameDisplay, property.Code);
@@ -181,12 +186,18 @@ else
         @foreach (var log in Model.Logs)
         {
             var logId = log.Id.ToString(CultureInfo.InvariantCulture);
-            var displayTitle = await Html.DisplayTranslatedTextAsync("PassOnLog", logId, "Title", log.Title);
-            var displayPreview = await Html.DisplayTranslatedTextAsync("PassOnLog", logId, "Preview", log.Preview);
+            var displayTitle = string.IsNullOrWhiteSpace(log.TranslatedTitle)
+                ? await Html.DisplayTranslatedTextAsync("PassOnLog", logId, "Title", log.Title)
+                : log.TranslatedTitle;
+            var displayPreview = string.IsNullOrWhiteSpace(log.TranslatedPreview)
+                ? await Html.DisplayTranslatedTextAsync("PassOnLog", logId, "Preview", log.Preview)
+                : log.TranslatedPreview;
             var commentLabel = log.CommentCount == 1 ? commentSingularLabel : commentPluralLabel;
             var createdLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
-            var propertyDisplayNames = new List<string>();
-            if (log.Properties != null)
+            var propertyDisplayNames = log.TranslatedPropertyNames != null && log.TranslatedPropertyNames.Count > 0
+                ? new List<string>(log.TranslatedPropertyNames)
+                : new List<string>();
+            if (propertyDisplayNames.Count == 0 && log.Properties != null)
             {
                 foreach (var property in log.Properties)
                 {
@@ -202,7 +213,9 @@ else
                     }
                 }
             }
-            var propertiesDisplay = string.Join(", ", propertyDisplayNames);
+            var propertiesDisplay = propertyDisplayNames.Count > 0
+                ? string.Join(", ", propertyDisplayNames)
+                : string.Empty;
             <a asp-action="Details" asp-route-id="@log.Id" class="list-group-item list-group-item-action log-list-item @(log.IsUnread ? "log-unread" : string.Empty)">
                 <div class="d-flex gap-3 align-items-start">
                     <div class="flex-shrink-0">

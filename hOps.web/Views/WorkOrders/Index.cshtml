@@ -933,9 +933,11 @@
                                     var translatedLocation = string.IsNullOrWhiteSpace(order.TranslatedLocation) ? originalLocation : order.TranslatedLocation!;
                                     var workOrderTypeRaw = order.WorkOrderType ?? unspecifiedTypeLabel;
                                     var workOrderTypeTranslated = string.IsNullOrWhiteSpace(order.TranslatedWorkOrderType) ? workOrderTypeRaw : order.TranslatedWorkOrderType;
-                                    var propertyDisplayNames = order.TranslatedPropertyNames != null && order.TranslatedPropertyNames.Count > 0
-                                        ? new List<string>(order.TranslatedPropertyNames)
-                                        : new List<string>();
+                                    var propertyDisplayNames = order.TranslatedProperties != null && order.TranslatedProperties.Count > 0
+                                        ? new List<string>(order.TranslatedProperties)
+                                        : (order.TranslatedPropertyNames != null && order.TranslatedPropertyNames.Count > 0
+                                            ? new List<string>(order.TranslatedPropertyNames)
+                                            : new List<string>());
                                     var rawPropertyDisplayNames = new List<string>();
                                     if (order.Properties != null)
                                     {
@@ -969,29 +971,40 @@
                                     {
                                         id = order.Id,
                                         issue = translatedIssue,
+                                        translatedIssue = translatedIssue,
                                         rawIssue = originalIssue,
                                         issueHtml = translatedIssueHtml,
+                                        translatedIssueHtml = translatedIssueHtml,
                                         rawIssueHtml = originalIssueHtml,
                                         details = translatedDetails,
+                                        translatedDetails = translatedDetails,
                                         rawDetails = originalDetails,
                                         detailsHtml = translatedDetailsHtml,
+                                        translatedDetailsHtml = translatedDetailsHtml,
                                         rawDetailsHtml = originalDetailsHtml,
                                         completionNotes = translatedCompletionNotes,
+                                        translatedCompletionNotes = translatedCompletionNotes,
                                         rawCompletionNotes = originalCompletionNotes,
                                         completionNotesHtml = translatedCompletionNotesHtml,
+                                        translatedCompletionNotesHtml = translatedCompletionNotesHtml,
                                         rawCompletionNotesHtml = originalCompletionNotesHtml,
                                         location = translatedLocation,
+                                        translatedLocation = translatedLocation,
                                         rawLocation = originalLocation,
                                         status = order.Status,
                                         statusLabel = statusDisplay,
+                                        translatedStatusLabel = statusDisplay,
                                         rawStatusLabel = rawStatusLabel,
                                         statusColor = order.StatusColor,
                                         workOrderType = workOrderTypeTranslated,
+                                        translatedWorkOrderType = workOrderTypeTranslated,
                                         workOrderTypeRaw = workOrderTypeRaw,
                                         department = departmentDisplayText,
+                                        translatedDepartment = departmentDisplayText,
                                         rawDepartment = originalDepartmentName,
                                         departmentColor = order.DepartmentColor,
                                         assignedTo = assignedToDisplay,
+                                        translatedAssignedTo = assignedToDisplay,
                                         rawAssignedTo = originalAssignedTo,
                                         assignedToId = order.AssignedToId,
                                         dueDateText = order.DueDate.ToString("d", CultureInfo.CurrentCulture),
@@ -999,6 +1012,7 @@
                                         creator = string.IsNullOrWhiteSpace(order.Creator) ? unknownUserLabel : order.Creator,
                                         createdByLabel = createdByPrefix,
                                         properties = propertyDisplayNames,
+                                        translatedProperties = propertyDisplayNames,
                                         rawProperties = rawPropertyDisplayNames,
                                         propertiesEmptyText = notAssignedPropertyText,
                                         attachments = attachmentsPayload,
@@ -1464,9 +1478,11 @@
             const filtersCollapse = document.getElementById('workOrdersFiltersCollapse');
             const filtersToggleButton = document.getElementById('toggleFiltersButton');
             if (filtersCollapse && filtersToggleButton) {
+                const hideText = @JsonSerializer.Serialize(hideFiltersText);
+                const showText = @JsonSerializer.Serialize(showFiltersText);
                 const updateToggleText = () => {
                     const isExpanded = filtersCollapse.classList.contains('show');
-                    filtersToggleButton.textContent = isExpanded ? 'Hide Filters' : 'Show Filters';
+                    filtersToggleButton.textContent = isExpanded ? hideText : showText;
                 };
                 filtersCollapse.addEventListener('shown.bs.collapse', updateToggleText);
                 filtersCollapse.addEventListener('hidden.bs.collapse', updateToggleText);

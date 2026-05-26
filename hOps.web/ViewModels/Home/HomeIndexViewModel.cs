@@ -102,6 +102,8 @@ namespace hOps.web.ViewModels.Home
     {
         public int Id { get; set; }
         public string Status { get; set; } = string.Empty;
+        public string StatusLabel { get; set; } = string.Empty;
+        public string TranslatedStatusLabel { get; set; } = string.Empty;
         public string Issue { get; set; } = string.Empty;
         public string TranslatedIssue { get; set; } = string.Empty;
         public string? Location { get; set; }
@@ -175,7 +177,9 @@ namespace hOps.web.ViewModels.Home
     {
         public int Id { get; set; }
         public string Title { get; set; } = string.Empty;
+        public string TranslatedTitle { get; set; } = string.Empty;
         public string Preview { get; set; } = string.Empty;
+        public string TranslatedPreview { get; set; } = string.Empty;
         public string CreatorName { get; set; } = string.Empty;
         public UserAvatarViewModel CreatorAvatar { get; set; } = new();
         public DateTime CreatedAt { get; set; }
@@ -243,9 +247,12 @@ namespace hOps.web.ViewModels.Home
     {
         public string ItemType { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
+        public string TranslatedTitle { get; set; } = string.Empty;
         public string Preview { get; set; } = string.Empty;
+        public string TranslatedPreview { get; set; } = string.Empty;
         public string? CreatorName { get; set; }
         public string? Meta { get; set; }
+        public string TranslatedMeta { get; set; } = string.Empty;
         public string? LinkUrl { get; set; }
         public string? BadgeText { get; set; }
         public string? BadgeClass { get; set; }
@@ -253,7 +260,8 @@ namespace hOps.web.ViewModels.Home
         public UserAvatarViewModel? Avatar { get; set; }
         public bool CanReply { get; set; }
         public int? PassOnLogId { get; set; }
-        public string ReplyPlaceholder { get; set; } = "Add a quick reply…";
+        public int? WorkOrderId { get; set; }
+        public string ReplyPlaceholder { get; set; } = "Add a quick reply...";
         public string? ReplyReturnUrl { get; set; }
     }
 

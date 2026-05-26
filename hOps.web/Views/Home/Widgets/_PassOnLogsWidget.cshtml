@@ -33,8 +33,12 @@
                 @foreach (var log in Model.PassOnLogs)
                 {
                     var logIdString = log.Id.ToString(CultureInfo.InvariantCulture);
-                    var titleDisplay = await Html.DisplayTranslatedTextAsync("PassOnLog", logIdString, "Title", log.Title);
-                    var previewDisplay = await Html.DisplayTranslatedTextAsync("PassOnLog", logIdString, "Preview", log.Preview);
+                    var titleDisplay = string.IsNullOrWhiteSpace(log.TranslatedTitle)
+                        ? await Html.DisplayTranslatedTextAsync("PassOnLog", logIdString, "Title", log.Title)
+                        : log.TranslatedTitle;
+                    var previewDisplay = string.IsNullOrWhiteSpace(log.TranslatedPreview)
+                        ? await Html.DisplayTranslatedTextAsync("PassOnLog", logIdString, "Preview", log.Preview)
+                        : log.TranslatedPreview;
                     var createdLocal = TimeZoneService.ConvertToUserTime(log.CreatedAt);
                     var createdDisplay = createdLocal.ToString("g", CultureInfo.CurrentCulture);
                     <li class="mb-3 pb-3 border-bottom">
