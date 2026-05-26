@@ -309,13 +309,19 @@ builder.Services.AddRazorPages();
 builder.Services.AddLocalization();
 var supportedCultureInfos = LanguageConstants.SupportedLanguages
     .Select(language => new CultureInfo(language.Code))
-    .ToList();
+    .ToArray();
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
     options.DefaultRequestCulture = new RequestCulture(LanguageConstants.English);
     options.SupportedCultures = supportedCultureInfos;
     options.SupportedUICultures = supportedCultureInfos;
     options.ApplyCurrentCultureToResponseHeaders = true;
+    options.RequestCultureProviders = new IRequestCultureProvider[]
+    {
+        new CookieRequestCultureProvider(),
+        new QueryStringRequestCultureProvider(),
+        new AcceptLanguageHeaderRequestCultureProvider()
+    };
 });
 builder.Services.Configure<MvcOptions>(options =>
 {

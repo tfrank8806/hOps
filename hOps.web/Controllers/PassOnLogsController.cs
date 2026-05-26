@@ -51,6 +51,14 @@ namespace hOps.web.Controllers
 
         public async Task<IActionResult> Index([FromQuery] PassOnLogFiltersViewModel? filters)
         {
+            var logActiveLanguage = HttpContext.Items["ActiveLanguage"] as string ?? "(null)";
+            _logger.LogInformation(
+                "LANGDEBUG PassOnLogs/Index culture={Culture} uiCulture={UICulture} active={ActiveLanguage} defaultLang={DefaultLanguage}",
+                CultureInfo.CurrentCulture.Name,
+                CultureInfo.CurrentUICulture.Name,
+                logActiveLanguage,
+                _translationService.DefaultLanguage);
+
             var currentUser = await _userManager.GetUserAsync(User);
             if (currentUser == null)
             {

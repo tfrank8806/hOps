@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using hOps.web.Data;
@@ -8,6 +9,7 @@ using hOps.web.Utilities;
 using hOps.web.ViewModels.WorkOrders;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
@@ -37,18 +39,35 @@ public class BaseController : Controller
             var languagePreferenceService = httpContext.RequestServices.GetRequiredService<hOps.web.Services.Localization.ILanguagePreferenceService>();
             var translationService = httpContext.RequestServices.GetRequiredService<hOps.web.Services.Localization.ITranslationService>();
             var cancellationToken = httpContext.RequestAborted;
-            var preferredLanguage = await languagePreferenceService.GetPreferredLanguageAsync(User, cancellationToken);
-            httpContext.Items["ActiveLanguage"] = preferredLanguage;
 
-            if (string.IsNullOrWhiteSpace(languagePreferenceService.GetPreferredLanguageFromCookie()))
+            var requestCultureFeature = httpContext.Features.Get<IRequestCultureFeature>();
+            var requestCulture = requestCultureFeature?.RequestCulture
+                ?? new RequestCulture(CultureInfo.CurrentCulture, CultureInfo.CurrentUICulture);
+            var activeLanguage = requestCulture.UICulture.TwoLetterISOLanguageName;
+
+            var preferredLanguage = await languagePreferenceService.GetPreferredLanguageAsync(User, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(preferredLanguage) &&
+                !string.Equals(preferredLanguage, activeLanguage, StringComparison.OrdinalIgnoreCase))
             {
-                languagePreferenceService.SetPreferredLanguageCookie(preferredLanguage);
+                activeLanguage = preferredLanguage;
+                var cultureInfo = new CultureInfo(activeLanguage);
+                CultureInfo.CurrentCulture = cultureInfo;
+                CultureInfo.CurrentUICulture = cultureInfo;
             }
-            ViewBag.ActiveLanguage = preferredLanguage;
+
+            var cookieLanguage = languagePreferenceService.GetPreferredLanguageFromCookie();
+            if (string.IsNullOrWhiteSpace(cookieLanguage) ||
+                !string.Equals(cookieLanguage, activeLanguage, StringComparison.OrdinalIgnoreCase))
+            {
+                languagePreferenceService.SetPreferredLanguageCookie(activeLanguage);
+            }
+
+            httpContext.Items["ActiveLanguage"] = activeLanguage;
+            ViewBag.ActiveLanguage = activeLanguage;
             ViewBag.DefaultLanguage = translationService.DefaultLanguage;
             ViewBag.SupportedLanguages = translationService.SupportedLanguages;
             ViewBag.ActiveLanguageDisplayName = translationService.SupportedLanguages
-                .FirstOrDefault(l => string.Equals(l.Code, preferredLanguage, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? "English";
+                .FirstOrDefault(l => string.Equals(l.Code, activeLanguage, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? "English";
         }
         catch (Exception ex)
         {

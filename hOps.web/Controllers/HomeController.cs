@@ -115,6 +115,16 @@ namespace hOps.web.Controllers
 
         public async Task<IActionResult> Index()
         {
+            var activeLanguage = HttpContext.Items["ActiveLanguage"] as string ?? "(null)";
+            var layoutLanguage = ViewBag?.ActiveLanguage as string ?? "(null)";
+            _logger.LogInformation(
+                "LANGDEBUG Home/Index culture={Culture} uiCulture={UICulture} active={ActiveLanguage} defaultLang={DefaultLanguage} staticLang={StaticLanguage}",
+                CultureInfo.CurrentCulture.Name,
+                CultureInfo.CurrentUICulture.Name,
+                activeLanguage,
+                _translationService.DefaultLanguage,
+                layoutLanguage);
+
             ViewData["Title"] = "Home";
 
             var viewModel = new HomeIndexViewModel();

@@ -70,6 +70,22 @@ namespace hOps.web.Controllers
         [HttpGet]
         public async Task<IActionResult> Index([FromQuery] WorkOrderFilterInput filters)
         {
+            var activeLanguage = HttpContext.Items["ActiveLanguage"] as string ?? "(null)";
+            _logger.LogWarning(
+                "LANGDEBUG WorkOrders/Index culture={Culture} uiCulture={UICulture} active={ActiveLanguage} defaultLang={DefaultLanguage}",
+                CultureInfo.CurrentCulture.Name,
+                CultureInfo.CurrentUICulture.Name,
+                activeLanguage,
+                _translationService.DefaultLanguage);
+
+            var logActiveLanguage = HttpContext.Items["ActiveLanguage"] as string ?? "(null)";
+            _logger.LogInformation(
+                "LANGDEBUG WorkOrders/Index culture={Culture} uiCulture={UICulture} active={ActiveLanguage} defaultLang={DefaultLanguage}",
+                CultureInfo.CurrentCulture.Name,
+                CultureInfo.CurrentUICulture.Name,
+                logActiveLanguage,
+                _translationService.DefaultLanguage);
+
             var viewModel = await BuildViewModelAsync(filters, null);
             return View(viewModel);
         }

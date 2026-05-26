@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -35,6 +36,7 @@ namespace hOps.web.Services.Localization
         public async Task<string> GetPreferredLanguageAsync(ClaimsPrincipal user, CancellationToken cancellationToken = default)
         {
             var cookieLanguage = GetPreferredLanguageFromCookie();
+            _logger.LogDebug("LANGDEBUG LanguagePreferenceService.GetPreferredLanguageAsync cookie={Cookie} currentCulture={Culture} uiCulture={UICulture}", cookieLanguage ?? "(null)", CultureInfo.CurrentCulture.Name, CultureInfo.CurrentUICulture.Name);
 
             if (user?.Identity?.IsAuthenticated == true)
             {
@@ -48,6 +50,7 @@ namespace hOps.web.Services.Localization
                         {
                             await PersistUserLanguageAsync(appUser, normalized, cancellationToken);
                         }
+                        _logger.LogDebug("LANGDEBUG LanguagePreferenceService returning userPref={Language}", normalized);
                         return normalized;
                     }
 
@@ -55,6 +58,7 @@ namespace hOps.web.Services.Localization
                     {
                         var normalized = NormalizeLanguage(cookieLanguage);
                         await PersistUserLanguageAsync(appUser, normalized, cancellationToken);
+                        _logger.LogDebug("LANGDEBUG LanguagePreferenceService using cookie for user={Language}", normalized);
                         return normalized;
                     }
                 }
@@ -62,16 +66,24 @@ namespace hOps.web.Services.Localization
 
             if (!string.IsNullOrWhiteSpace(cookieLanguage))
             {
-                return NormalizeLanguage(cookieLanguage);
+                var normalized = NormalizeLanguage(cookieLanguage);
+                _logger.LogDebug("LANGDEBUG LanguagePreferenceService returning cookie language={Language}", normalized);
+                return normalized;
             }
 
+            _logger.LogDebug("LANGDEBUG LanguagePreferenceService falling back to default={Default}", GetDefaultLanguage());
             return GetDefaultLanguage();
         }
 
         public async Task SetPreferredLanguageAsync(ClaimsPrincipal user, string languageCode, CancellationToken cancellationToken = default)
         {
             var normalizedLanguage = NormalizeLanguage(languageCode);
+            _logger.LogDebug("LANGDEBUG LanguagePreferenceService.SetPreferredLanguageAsync requested={Requested} normalized={Normalized}", languageCode, normalizedLanguage);
             SetPreferredLanguageCookie(normalizedLanguage);
+
+            var cultureInfo = new CultureInfo(normalizedLanguage);
+            CultureInfo.CurrentCulture = cultureInfo;
+            CultureInfo.CurrentUICulture = cultureInfo;
 
             if (user?.Identity?.IsAuthenticated == true)
             {
@@ -107,6 +119,7 @@ namespace hOps.web.Services.Localization
                 CookieRequestCultureProvider.DefaultCookieName,
                 CookieRequestCultureProvider.MakeCookieValue(requestCulture),
                 cookieOptions);
+            _logger.LogDebug("LANGDEBUG LanguagePreferenceService.SetPreferredLanguageCookie cookie={Cookie} cultureCookie={CultureCookie}", normalized, CookieRequestCultureProvider.MakeCookieValue(requestCulture));
         }
 
         public string? GetPreferredLanguageFromCookie()

@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.DependencyInjection;
 using hOps.web.Services.Localization;
@@ -19,11 +20,11 @@ namespace hOps.web.Localization
                 return language;
             }
 
-            return LanguageConstants.English;
+            return CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
         }
 
         public static string GetActiveLanguage(this IHtmlHelper htmlHelper)
-            => htmlHelper?.ViewContext?.GetActiveLanguage() ?? LanguageConstants.English;
+            => htmlHelper?.ViewContext?.GetActiveLanguage() ?? CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
 
         public static string Localize(this IHtmlHelper htmlHelper, string key, string? fallback = null)
         {
