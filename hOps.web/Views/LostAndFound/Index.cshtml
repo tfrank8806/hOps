@@ -587,7 +587,7 @@
                             }
                             <dd class="col-sm-8">@createdLocal.ToString("f")</dd>
 
-                            <dt class="col-sm-4">@Html.Localize("Logged By")</dt>
+                            <dt class="col-sm-4">@Html.Localize("Logged by")</dt>
                             <dd class="col-sm-8">@(!string.IsNullOrWhiteSpace(entry.CreatedByDisplayName) ? entry.CreatedByDisplayName : entry.CreatedByUser?.Email)</dd>
 
                             @if (!string.IsNullOrWhiteSpace(locationDisplay))
@@ -874,7 +874,7 @@
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="submit" class="btn btn-primary">@Html.Localize("Save Changes")</button>
+                            <button type="submit" class="btn btn-primary">@Html.Localize("Save changes")</button>
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Html.Localize("Cancel")</button>
                         </div>
                     </form>

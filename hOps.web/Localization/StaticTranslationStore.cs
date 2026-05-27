@@ -49,9 +49,21 @@ namespace hOps.web.Localization
 
                 var json = File.ReadAllText(path);
                 var dictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(json, SerializerOptions);
-                return dictionary != null
-                    ? new Dictionary<string, string>(dictionary, StringComparer.OrdinalIgnoreCase)
-                    : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (dictionary == null)
+                {
+                    return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                }
+
+                var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var kvp in dictionary)
+                {
+                    if (!result.ContainsKey(kvp.Key))
+                    {
+                        result[kvp.Key] = kvp.Value;
+                    }
+                }
+
+                return result;
             }
             catch (Exception ex)
             {

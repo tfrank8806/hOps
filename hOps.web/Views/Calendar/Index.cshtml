@@ -575,7 +575,7 @@ else if (ViewBag.WarningMessage is string warningMessage)
                     <dt class="col-sm-4">@Html.Localize("Attachments")</dt>
                     <dd class="col-sm-8" data-details="attachments"></dd>
 
-                    <dt class="col-sm-4">@Html.Localize("Created By")</dt>
+                    <dt class="col-sm-4">@Html.Localize("Created by")</dt>
                     <dd class="col-sm-8" data-details="created-by"></dd>
 
                     <dt class="col-sm-4">@Html.Localize("Created On")</dt>
@@ -1210,7 +1210,7 @@ else if (ViewBag.WarningMessage is string warningMessage)
             const deleteSingleConfirmTemplate = @Html.Raw(JsonSerializer.Serialize(Html.Localize("Delete \"{0}\"? This action cannot be undone.")));
             const deleteSeriesConfirmText = @Html.Raw(JsonSerializer.Serialize(Html.Localize("Delete the entire series? Click OK for series or Cancel to delete only this occurrence.")));
             const defaultEventTitle = @Html.Raw(JsonSerializer.Serialize(Html.Localize("this event")));
-            const defaultModalTitle = @Html.Raw(JsonSerializer.Serialize(Html.Localize("This event")));
+            const defaultModalTitle = @Html.Raw(JsonSerializer.Serialize(Html.Localize("this event")));
 
             const handleDeleteAction = () => {
                 if (!activeEventDataset) {

@@ -57,7 +57,7 @@
                                 @if (!string.IsNullOrWhiteSpace(Model.ChecklistFilePath))
                                 {
                                     <a href="@Model.ChecklistFilePath" target="_blank" rel="noopener">
-                                        @(string.IsNullOrWhiteSpace(Model.ChecklistFileName) ? Html.Localize("Download checklist") : Model.ChecklistFileName)
+                        @(string.IsNullOrWhiteSpace(Model.ChecklistFileName) ? Html.Localize("Download Checklist") : Model.ChecklistFileName)
                                     </a>
                                 }
                                 else
@@ -255,7 +255,7 @@
                             class="btn btn-primary"
                             data-submit-btn="true"
                             data-loading-text="@(Model.IsEditMode ? Html.Localize("Saving...") : Html.Localize("Creating..."))">
-                        @(Model.IsEditMode ? Html.Localize("Save Changes") : Html.Localize("Save Maintenance Log"))
+                        @(Model.IsEditMode ? Html.Localize("Save changes") : Html.Localize("Save Maintenance Log"))
                     </button>
                 </div>
             </form>

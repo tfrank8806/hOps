@@ -454,7 +454,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                     <input class="form-check-input" type="checkbox" id="folderSettingsApply" name="FolderSettingsForm.ApplyToDocuments" value="true" @(Model.FolderSettingsForm.ApplyToDocuments ? "checked" : string.Empty) />
                                     <label class="form-check-label" for="folderSettingsApply">@Html.Localize("Update all documents in this folder to use this visibility")</label>
                                 </div>
-                                <button type="submit" class="btn btn-primary w-100">@Html.Localize("Save Changes")</button>
+                                <button type="submit" class="btn btn-primary w-100">@Html.Localize("Save changes")</button>
                             </form>
                         </div>
                     </div>
@@ -715,7 +715,7 @@ string GetSortIndicator(string field) => string.Equals(Model.SortField, field, S
                                                         <div class="mb-2 doc-visibility-single">
                                                             <label class="form-label" for="docVisibilityPropertySelect-@doc.Id">@Html.Localize("Property")</label>
                                                             <select class="form-select form-select-sm" id="docVisibilityPropertySelect-@doc.Id" name="PropertyId">
-                                                                <option value="">@Html.Localize("Select property")</option>
+                                                                <option value="">@Html.Localize("Select Property")</option>
                                                                 @foreach (var option in Model.PropertyOptions)
                                                                 {
                                                                     <option value="@option.Id" selected="@(doc.AccessPropertyId == option.Id ? "selected" : null)">@FormatPropertyLabel(option)</option>

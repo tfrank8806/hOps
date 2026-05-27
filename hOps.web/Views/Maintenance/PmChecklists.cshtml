@@ -7,7 +7,7 @@
     ViewData["Title"] = Html.Localize("PM Checklists");
     var editor = Model.ChecklistEditor ?? new MaintenancePmChecklistEditorViewModel();
     var frequencyPerYear = Model.FrequencyPerYear;
-    var checklistCountLabel = Html.Localize(Model.Checklists.Count == 1 ? "checklist" : "checklists");
+    var checklistCountLabel = Html.Localize(Model.Checklists.Count == 1 ? "Checklist" : "Checklists");
 }
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
@@ -89,7 +89,7 @@
                 <h5 class="mb-0">@Html.Localize("Import checklist from CSV")</h5>
                 <div class="text-muted small">@Html.Localize("Upload tasks in bulk or start with the blank template.")</div>
             </div>
-            <a asp-action="DownloadChecklistTemplateCsv" class="btn btn-outline-secondary btn-sm">@Html.Localize("Download blank CSV")</a>
+            <a asp-action="DownloadChecklistTemplateCsv" class="btn btn-outline-secondary btn-sm">@Html.Localize("Download Blank CSV")</a>
         </div>
         <form asp-action="UploadChecklistTemplate" method="post" enctype="multipart/form-data" class="row g-3">
             @Html.AntiForgeryToken()
@@ -164,7 +164,7 @@
                         <label class="form-check-label" for="checklistActive">@Html.Localize("Checklist is active")</label>
                     </div>
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">@Html.Localize(editor.Id.HasValue ? "Save Changes" : "Create Checklist")</button>
+                        <button type="submit" class="btn btn-primary">@Html.Localize(editor.Id.HasValue ? "Save changes" : "Create Checklist")</button>
                         @if (editor.Id.HasValue)
                         {
                             <a asp-action="PmChecklists" asp-route-propertyId="@Model.PropertyId" class="btn btn-outline-secondary">@Html.Localize("Start New")</a>
