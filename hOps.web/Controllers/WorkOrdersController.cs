@@ -1413,6 +1413,7 @@ namespace hOps.web.Controllers
                 : new List<string>();
             var canManage = HasManagementPrivileges(userRoles);
             var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+            var accessiblePropertySet = new HashSet<int>(accessiblePropertyIds);
             var canUpdateStatus = accessiblePropertyIds.Any();
             var statuses = WorkOrderStatusOptions.All;
             var statusColorMap = statuses.ToDictionary(s => s.Key, s => s.ColorHex, StringComparer.OrdinalIgnoreCase);
@@ -1857,10 +1858,10 @@ namespace hOps.web.Controllers
             var departmentQuery = _context.Departments.AsQueryable();
             var workOrderTypeQuery = _context.WorkOrderTypes.AsQueryable();
 
-            if (targetPropertySet.Any())
+            if (accessiblePropertySet.Any())
             {
-                departmentQuery = departmentQuery.Where(d => !d.PropertyId.HasValue || targetPropertySet.Contains(d.PropertyId.Value));
-                workOrderTypeQuery = workOrderTypeQuery.Where(t => !t.PropertyId.HasValue || targetPropertySet.Contains(t.PropertyId.Value));
+                departmentQuery = departmentQuery.Where(d => !d.PropertyId.HasValue || accessiblePropertySet.Contains(d.PropertyId.Value));
+                workOrderTypeQuery = workOrderTypeQuery.Where(t => !t.PropertyId.HasValue || accessiblePropertySet.Contains(t.PropertyId.Value));
             }
             else
             {
@@ -1868,8 +1869,14 @@ namespace hOps.web.Controllers
                 workOrderTypeQuery = workOrderTypeQuery.Where(_ => false);
             }
 
-            var departments = await departmentQuery.OrderBy(d => d.Name).ToListAsync();
-            var workOrderTypes = await workOrderTypeQuery.OrderBy(t => t.Name).ToListAsync();
+            var departments = await departmentQuery
+                .OrderBy(d => d.Name)
+                .AsNoTracking()
+                .ToListAsync();
+            var workOrderTypes = await workOrderTypeQuery
+                .OrderBy(t => t.Name)
+                .AsNoTracking()
+                .ToListAsync();
 
             var creatorFilters = new HashSet<string>(filters.CreatorIds, StringComparer.OrdinalIgnoreCase);
 
@@ -2003,6 +2010,14 @@ namespace hOps.web.Controllers
                     effectiveForm.AssignedUserId = null;
                 }
             }
+
+            _logger.LogInformation(
+                "LANGDEBUG WorkOrders/FormData user={UserId} accessible={Accessible} target={Target} deptCount={DeptCount} typeCount={TypeCount}",
+                user?.Id ?? "(anon)",
+                string.Join(",", accessiblePropertySet.Select(id => id.ToString(CultureInfo.InvariantCulture))),
+                string.Join(",", targetPropertySet.Select(id => id.ToString(CultureInfo.InvariantCulture))),
+                departments.Count,
+                workOrderTypes.Count);
 
             var viewModel = new WorkOrdersViewModel
             {
