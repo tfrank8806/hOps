@@ -1564,16 +1564,16 @@ namespace hOps.web.Controllers
                     StatusLabel = statusLabel,
                     TranslatedStatusLabel = statusLabel,
                     Location = wo.Location ?? string.Empty,
-                    TranslatedLocation = wo.Location ?? string.Empty,
+                    TranslatedLocation = null,
                     WorkOrderType = wo.WorkOrderType?.Name,
                     TranslatedWorkOrderType = wo.WorkOrderType?.Name,
                     WorkOrderTypeId = wo.WorkOrderTypeId,
                     Issue = wo.Issue ?? string.Empty,
-                    TranslatedIssue = wo.Issue ?? string.Empty,
+                    TranslatedIssue = null,
                     Details = wo.Details,
-                    TranslatedDetails = wo.Details,
+                    TranslatedDetails = null,
                     CompletionNotes = wo.CompletionNotes,
-                    TranslatedCompletionNotes = wo.CompletionNotes,
+                    TranslatedCompletionNotes = null,
                     DueDate = wo.DueDate,
                     CreatedAt = wo.CreatedAt,
                     Department = wo.Department?.Name,
@@ -1639,7 +1639,7 @@ namespace hOps.web.Controllers
 
                     if (!string.IsNullOrWhiteSpace(item.Location))
                     {
-                        item.TranslatedLocation = await _translationService.TranslateDynamicAsync(
+                        var translatedLocation = await _translationService.TranslateDynamicAsync(
                             "WorkOrder",
                             entityId,
                             "Location",
@@ -1647,11 +1647,15 @@ namespace hOps.web.Controllers
                             _translationService.DefaultLanguage,
                             activeLanguage,
                             cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedLocation))
+                        {
+                            item.TranslatedLocation = translatedLocation;
+                        }
                     }
 
                     if (!string.IsNullOrWhiteSpace(item.Issue))
                     {
-                        item.TranslatedIssue = await _translationService.TranslateDynamicAsync(
+                        var translatedIssue = await _translationService.TranslateDynamicAsync(
                             "WorkOrder",
                             entityId,
                             "Issue",
@@ -1659,11 +1663,15 @@ namespace hOps.web.Controllers
                             _translationService.DefaultLanguage,
                             activeLanguage,
                             cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedIssue))
+                        {
+                            item.TranslatedIssue = translatedIssue;
+                        }
                     }
 
                     if (!string.IsNullOrWhiteSpace(item.Details))
                     {
-                        item.TranslatedDetails = await _translationService.TranslateDynamicAsync(
+                        var translatedDetails = await _translationService.TranslateDynamicAsync(
                             "WorkOrder",
                             entityId,
                             "Details",
@@ -1671,11 +1679,15 @@ namespace hOps.web.Controllers
                             _translationService.DefaultLanguage,
                             activeLanguage,
                             cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedDetails))
+                        {
+                            item.TranslatedDetails = translatedDetails;
+                        }
                     }
 
                     if (!string.IsNullOrWhiteSpace(item.CompletionNotes))
                     {
-                        item.TranslatedCompletionNotes = await _translationService.TranslateDynamicAsync(
+                        var translatedCompletionNotes = await _translationService.TranslateDynamicAsync(
                             "WorkOrder",
                             entityId,
                             "CompletionNotes",
@@ -1683,11 +1695,15 @@ namespace hOps.web.Controllers
                             _translationService.DefaultLanguage,
                             activeLanguage,
                             cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedCompletionNotes))
+                        {
+                            item.TranslatedCompletionNotes = translatedCompletionNotes;
+                        }
                     }
 
                     if (!string.IsNullOrWhiteSpace(item.WorkOrderType) && item.WorkOrderTypeId.HasValue)
                     {
-                        item.TranslatedWorkOrderType = await _translationService.TranslateDynamicAsync(
+                        var translatedWorkOrderType = await _translationService.TranslateDynamicAsync(
                             "WorkOrderType",
                             item.WorkOrderTypeId.Value.ToString(CultureInfo.InvariantCulture),
                             "Name",
@@ -1695,11 +1711,15 @@ namespace hOps.web.Controllers
                             _translationService.DefaultLanguage,
                             activeLanguage,
                             cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedWorkOrderType))
+                        {
+                            item.TranslatedWorkOrderType = translatedWorkOrderType;
+                        }
                     }
 
                     if (!string.IsNullOrWhiteSpace(item.Department) && item.DepartmentId.HasValue)
                     {
-                        item.TranslatedDepartment = await _translationService.TranslateDynamicAsync(
+                        var translatedDepartment = await _translationService.TranslateDynamicAsync(
                             "Department",
                             item.DepartmentId.Value.ToString(CultureInfo.InvariantCulture),
                             "Name",
@@ -1707,6 +1727,10 @@ namespace hOps.web.Controllers
                             _translationService.DefaultLanguage,
                             activeLanguage,
                             cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedDepartment))
+                        {
+                            item.TranslatedDepartment = translatedDepartment;
+                        }
                     }
 
                     if (item.Properties is { Count: > 0 })
@@ -1755,6 +1779,19 @@ namespace hOps.web.Controllers
                     item.TranslatedAssignedTo = string.IsNullOrWhiteSpace(item.AssignedToName)
                         ? unassignedTranslated
                         : item.AssignedToName;
+                }
+
+                var debugItem = listItems.FirstOrDefault(i => !string.IsNullOrWhiteSpace(i.Issue) || !string.IsNullOrWhiteSpace(i.Details));
+                if (debugItem != null)
+                {
+                    _logger.LogInformation(
+                        "LANGDEBUG WorkOrders/ListRow id={WorkOrderId} lang={Language} issue='{OriginalIssue}' -> '{TranslatedIssue}' details='{OriginalDetails}' -> '{TranslatedDetails}'",
+                        debugItem.Id,
+                        activeLanguage,
+                        debugItem.Issue,
+                        string.IsNullOrWhiteSpace(debugItem.TranslatedIssue) ? "(null)" : debugItem.TranslatedIssue,
+                        debugItem.Details ?? string.Empty,
+                        string.IsNullOrWhiteSpace(debugItem.TranslatedDetails) ? "(null)" : debugItem.TranslatedDetails);
                 }
             }
             else

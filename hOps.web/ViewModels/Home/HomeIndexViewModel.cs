@@ -105,7 +105,7 @@ namespace hOps.web.ViewModels.Home
         public string StatusLabel { get; set; } = string.Empty;
         public string TranslatedStatusLabel { get; set; } = string.Empty;
         public string Issue { get; set; } = string.Empty;
-        public string TranslatedIssue { get; set; } = string.Empty;
+        public string? TranslatedIssue { get; set; }
         public string? Location { get; set; }
         public string? TranslatedLocation { get; set; }
         public string? DepartmentName { get; set; }

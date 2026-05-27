@@ -1088,9 +1088,9 @@ namespace hOps.web.Controllers
                     StatusLabel = statusLabel ?? entry.WorkOrder.Status ?? string.Empty,
                     TranslatedStatusLabel = statusLabel ?? entry.WorkOrder.Status ?? string.Empty,
                     Issue = entry.WorkOrder.Issue,
-                    TranslatedIssue = entry.WorkOrder.Issue ?? string.Empty,
+                    TranslatedIssue = null,
                     Location = entry.WorkOrder.Location,
-                    TranslatedLocation = entry.WorkOrder.Location,
+                    TranslatedLocation = null,
                     DepartmentName = entry.DepartmentName,
                     DepartmentId = entry.DepartmentId,
                     TranslatedDepartmentName = entry.DepartmentName,
@@ -1119,7 +1119,7 @@ namespace hOps.web.Controllers
 
                     if (!string.IsNullOrWhiteSpace(workOrder.Issue))
                     {
-                        workOrder.TranslatedIssue = await _translationService.TranslateDynamicAsync(
+                        var translatedIssue = await _translationService.TranslateDynamicAsync(
                             "WorkOrder",
                             entityId,
                             "Issue",
@@ -1127,11 +1127,15 @@ namespace hOps.web.Controllers
                             _translationService.DefaultLanguage,
                             activeLanguage,
                             cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedIssue))
+                        {
+                            workOrder.TranslatedIssue = translatedIssue;
+                        }
                     }
 
                     if (!string.IsNullOrWhiteSpace(workOrder.Location))
                     {
-                        workOrder.TranslatedLocation = await _translationService.TranslateDynamicAsync(
+                        var translatedLocation = await _translationService.TranslateDynamicAsync(
                             "WorkOrder",
                             entityId,
                             "Location",
@@ -1139,11 +1143,15 @@ namespace hOps.web.Controllers
                             _translationService.DefaultLanguage,
                             activeLanguage,
                             cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedLocation))
+                        {
+                            workOrder.TranslatedLocation = translatedLocation;
+                        }
                     }
 
                     if (!string.IsNullOrWhiteSpace(workOrder.DepartmentName) && workOrder.DepartmentId.HasValue)
                     {
-                        workOrder.TranslatedDepartmentName = await _translationService.TranslateDynamicAsync(
+                        var translatedDepartment = await _translationService.TranslateDynamicAsync(
                             "Department",
                             workOrder.DepartmentId.Value.ToString(CultureInfo.InvariantCulture),
                             "Name",
@@ -1151,6 +1159,10 @@ namespace hOps.web.Controllers
                             _translationService.DefaultLanguage,
                             activeLanguage,
                             cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedDepartment))
+                        {
+                            workOrder.TranslatedDepartmentName = translatedDepartment;
+                        }
                     }
 
                     if (!string.IsNullOrWhiteSpace(workOrder.StatusLabel))
@@ -1198,7 +1210,7 @@ namespace hOps.web.Controllers
                 {
                     if (summary.DepartmentId.HasValue && !string.IsNullOrWhiteSpace(summary.DepartmentName))
                     {
-                        summary.TranslatedDepartmentName = await _translationService.TranslateDynamicAsync(
+                        var translatedDepartmentName = await _translationService.TranslateDynamicAsync(
                             "Department",
                             summary.DepartmentId.Value.ToString(CultureInfo.InvariantCulture),
                             "Name",
@@ -1206,6 +1218,10 @@ namespace hOps.web.Controllers
                             _translationService.DefaultLanguage,
                             activeLanguage,
                             cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(translatedDepartmentName))
+                        {
+                            summary.TranslatedDepartmentName = translatedDepartmentName;
+                        }
                     }
                 }
             }

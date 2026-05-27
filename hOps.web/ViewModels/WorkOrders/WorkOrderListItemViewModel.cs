@@ -11,12 +11,12 @@ namespace hOps.web.ViewModels.WorkOrders
         public string StatusLabel { get; set; } = string.Empty;
         public string TranslatedStatusLabel { get; set; } = string.Empty;
         public string Location { get; set; } = string.Empty;
-        public string TranslatedLocation { get; set; } = string.Empty;
+        public string? TranslatedLocation { get; set; }
         public string? WorkOrderType { get; set; }
         public string? TranslatedWorkOrderType { get; set; }
         public int? WorkOrderTypeId { get; set; }
         public string Issue { get; set; } = string.Empty;
-        public string TranslatedIssue { get; set; } = string.Empty;
+        public string? TranslatedIssue { get; set; }
         public string? Details { get; set; }
         public string? TranslatedDetails { get; set; }
         public DateTime DueDate { get; set; }
