@@ -335,7 +335,7 @@ builder.Services.AddHttpClient<ICaptchaValidator, GoogleRecaptchaValidator>();
 builder.Services.AddSingleton(supabaseStorageOptions);
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<StaticTranslationStore>();
-builder.Services.AddSingleton<IExternalTranslationProvider, NoOpTranslationProvider>();
+builder.Services.AddHttpClient<IExternalTranslationProvider, GoogleTranslateProvider>();
 builder.Services.AddScoped<ITranslationService, TranslationService>();
 builder.Services.AddScoped<ILanguagePreferenceService, LanguagePreferenceService>();
 

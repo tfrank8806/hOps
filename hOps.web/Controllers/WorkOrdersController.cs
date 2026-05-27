@@ -2042,6 +2042,132 @@ namespace hOps.web.Controllers
             return viewModel;
         }
 
+        [HttpGet]
+        public async Task<IActionResult> CreateFormOptions([FromQuery] int[] propertyIds)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Challenge();
+            }
+
+            var accessiblePropertyIds = await GetAccessiblePropertyIdsAsync(user);
+            if (!accessiblePropertyIds.Any())
+            {
+                return Json(new { departments = Array.Empty<object>(), workOrderTypes = Array.Empty<object>() });
+            }
+
+            var normalizedPropertyIds = propertyIds?
+                .Where(id => accessiblePropertyIds.Contains(id))
+                .Distinct()
+                .ToList() ?? new List<int>();
+
+            if (!normalizedPropertyIds.Any())
+            {
+                normalizedPropertyIds = accessiblePropertyIds;
+            }
+
+            var propertySet = new HashSet<int>(normalizedPropertyIds);
+            var activeLanguage = HttpContext.Items["ActiveLanguage"] as string ?? _translationService.DefaultLanguage;
+            var isDefaultLanguage = string.Equals(activeLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
+            var cancellationToken = HttpContext.RequestAborted;
+
+            var departments = await _context.Departments
+                .AsNoTracking()
+                .Where(d => !d.PropertyId.HasValue || propertySet.Contains(d.PropertyId.Value))
+                .OrderBy(d => d.Name)
+                .Select(d => new { d.Id, d.Name })
+                .ToListAsync(cancellationToken);
+
+            var workOrderTypes = await _context.WorkOrderTypes
+                .AsNoTracking()
+                .Where(t => !t.PropertyId.HasValue || propertySet.Contains(t.PropertyId.Value))
+                .OrderBy(t => t.Name)
+                .Select(t => new { t.Id, t.Name })
+                .ToListAsync(cancellationToken);
+
+            var departmentResults = new List<object>(departments.Count);
+            var typeResults = new List<object>(workOrderTypes.Count);
+
+            if (!isDefaultLanguage)
+            {
+                foreach (var dept in departments)
+                {
+                    string? translatedName = null;
+                    if (!string.IsNullOrWhiteSpace(dept.Name))
+                    {
+                        translatedName = await _translationService.TranslateDynamicAsync(
+                            "Department",
+                            dept.Id.ToString(CultureInfo.InvariantCulture),
+                            "Name",
+                            dept.Name,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+
+                    departmentResults.Add(new
+                    {
+                        id = dept.Id,
+                        name = dept.Name,
+                        translatedName = string.IsNullOrWhiteSpace(translatedName) ? dept.Name : translatedName
+                    });
+                }
+
+                foreach (var type in workOrderTypes)
+                {
+                    string? translatedName = null;
+                    if (!string.IsNullOrWhiteSpace(type.Name))
+                    {
+                        translatedName = await _translationService.TranslateDynamicAsync(
+                            "WorkOrderType",
+                            type.Id.ToString(CultureInfo.InvariantCulture),
+                            "Name",
+                            type.Name,
+                            _translationService.DefaultLanguage,
+                            activeLanguage,
+                            cancellationToken);
+                    }
+
+                    typeResults.Add(new
+                    {
+                        id = type.Id,
+                        name = type.Name,
+                        translatedName = string.IsNullOrWhiteSpace(translatedName) ? type.Name : translatedName
+                    });
+                }
+            }
+            else
+            {
+                departmentResults.AddRange(departments.Select(dept => new
+                {
+                    id = dept.Id,
+                    name = dept.Name,
+                    translatedName = dept.Name
+                }));
+
+                typeResults.AddRange(workOrderTypes.Select(type => new
+                {
+                    id = type.Id,
+                    name = type.Name,
+                    translatedName = type.Name
+                }));
+            }
+
+            _logger.LogInformation(
+                "LANGDEBUG WorkOrders/FormOptions user={UserId} properties={Properties} deptCount={DeptCount} typeCount={TypeCount}",
+                user.Id,
+                string.Join(",", propertySet.Select(id => id.ToString(CultureInfo.InvariantCulture))),
+                departmentResults.Count,
+                typeResults.Count);
+
+            return Json(new
+            {
+                departments = departmentResults,
+                workOrderTypes = typeResults
+            });
+        }
+
         private IActionResult RedirectBack(string? returnUrl, object? fallbackRouteValues = null)
         {
             if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))

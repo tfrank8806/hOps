@@ -660,6 +660,105 @@
     });
 })();
 
+(() => {
+    const formCard = document.getElementById('workOrdersForm');
+    if (!formCard) {
+        return;
+    }
+
+    const departmentSelect = formCard.querySelector('[data-workorders-department-select]');
+    const workOrderTypeSelect = formCard.querySelector('[data-workorders-type-select]');
+    const propertyInputs = () => Array.from(formCard.querySelectorAll('[data-workorders-property]'));
+    const endpoint = formCard.dataset.formOptionsUrl || '';
+    const propertyDefaults = (formCard.dataset.propertyDefaults || '')
+        .split(',')
+        .map(id => id.trim())
+        .filter(Boolean);
+
+    if (!endpoint || (!departmentSelect && !workOrderTypeSelect)) {
+        return;
+    }
+
+    const buildParams = () => {
+        const params = new URLSearchParams();
+        const activePropertyInputs = propertyInputs();
+        const selectedProperties = activePropertyInputs
+            .filter(input => !input.disabled && input.checked)
+            .map(input => input.value)
+            .filter(Boolean);
+
+        const propertiesToSend = selectedProperties.length > 0
+            ? selectedProperties
+            : (activePropertyInputs.length > 0
+                ? activePropertyInputs.map(input => input.value).filter(Boolean)
+                : propertyDefaults);
+
+        propertiesToSend.forEach(id => params.append('propertyIds', id));
+        return params.toString();
+    };
+
+    const updateSelect = (select, items, placeholderText) => {
+        if (!select) {
+            return;
+        }
+
+        const effectivePlaceholder = placeholderText || select.dataset.placeholder || '';
+        const currentValue = select.value;
+        const preserved = Array.from(select.options).filter(option => option.dataset.keep === 'true' || option.value === '');
+        select.replaceChildren();
+
+        if (preserved.length === 0 && effectivePlaceholder) {
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.dataset.keep = 'true';
+            placeholder.textContent = effectivePlaceholder;
+            select.appendChild(placeholder);
+        } else {
+            preserved.forEach(option => select.appendChild(option));
+        }
+
+        if (Array.isArray(items)) {
+            items.forEach(item => {
+                const option = document.createElement('option');
+                option.value = String(item.id);
+                option.textContent = (item.translatedName || item.name || '').trim();
+                option.dataset.rawName = item.name || '';
+                select.appendChild(option);
+            });
+        }
+
+        const hasCurrent = Array.from(select.options).some(option => option.value === currentValue);
+        select.value = hasCurrent ? currentValue : '';
+    };
+
+    const refreshFormOptions = () => {
+        const query = buildParams();
+        const url = query ? `${endpoint}?${query}` : endpoint;
+
+        fetch(url, { headers: { 'Accept': 'application/json' } })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load form options (${response.status})`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Work order form data', data);
+                const unassignedLabel = departmentSelect?.dataset.placeholder || '';
+                updateSelect(workOrderTypeSelect, data?.workOrderTypes || [], workOrderTypeSelect?.dataset.placeholder || '');
+                updateSelect(departmentSelect, data?.departments || [], unassignedLabel);
+            })
+            .catch(error => {
+                console.error('Unable to refresh work order form options', error);
+            });
+    };
+
+    propertyInputs().forEach(input => {
+        input.addEventListener('change', refreshFormOptions);
+    });
+
+    refreshFormOptions();
+})();
 
 
 
