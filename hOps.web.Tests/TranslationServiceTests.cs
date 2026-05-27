@@ -104,6 +104,52 @@ namespace hOps.web.Tests
             Assert.Equal("Hola mundo", second);
         }
 
+        [Fact]
+        public async Task TranslateDynamicAsync_PreservesCurlyColorTokens()
+        {
+            const string entityType = "Announcement";
+            const string entityId = "5";
+            const string field = "Content";
+            const string sourceText = "{{color:blue}}GSS:{{/color}} Testing the translation now.";
+
+            _provider.Translator = text => text
+                .Replace("Testing", "Probando")
+                .Replace("the translation now", "la traducción ahora");
+
+            var translated = await _translationService.TranslateDynamicAsync(
+                entityType,
+                entityId,
+                field,
+                sourceText,
+                LanguageConstants.English,
+                LanguageConstants.Spanish);
+
+            Assert.Equal("{{color:blue}}GSS:{{/color}} Probando la traducción ahora.", translated);
+        }
+
+        [Fact]
+        public async Task TranslateDynamicAsync_PreservesUrls()
+        {
+            const string entityType = "Announcement";
+            const string entityId = "6";
+            const string field = "Content";
+            const string sourceText = "Visit https://example.com for details.";
+
+            _provider.Translator = text => text
+                .Replace("Visit", "Visita")
+                .Replace("for details", "para más detalles");
+
+            var translated = await _translationService.TranslateDynamicAsync(
+                entityType,
+                entityId,
+                field,
+                sourceText,
+                LanguageConstants.English,
+                LanguageConstants.Spanish);
+
+            Assert.Equal("Visita https://example.com para más detalles.", translated);
+        }
+
         public void Dispose()
         {
             _context.Dispose();
@@ -118,10 +164,11 @@ namespace hOps.web.Tests
         private sealed class StubTranslationProvider : IExternalTranslationProvider
         {
             public Queue<string?> Results { get; } = new();
+            public Func<string, string> Translator { get; set; } = text => text;
 
             public Task<string?> TranslateAsync(string text, string sourceLanguage, string targetLanguage, System.Threading.CancellationToken cancellationToken = default)
             {
-                var result = Results.Count > 0 ? Results.Dequeue() : null;
+                var result = Results.Count > 0 ? Results.Dequeue() : Translator(text);
                 return Task.FromResult(result);
             }
         }

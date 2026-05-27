@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using hOps.web.Data;
@@ -21,6 +23,11 @@ namespace hOps.web.Services.Localization
         private readonly IExternalTranslationProvider _translationProvider;
         private readonly IMemoryCache _memoryCache;
         private readonly ILogger<TranslationService> _logger;
+
+        private const string PlaceholderFormat = "__HOPS_TOKEN_{0}__";
+        private static readonly Regex CurlyTokenRegex = new(@"\{\{.*?\}\}", RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.CultureInvariant);
+        private static readonly Regex HtmlTagRegex = new(@"<[^>]+>", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex UrlRegex = new(@"https?://[^\s]+", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
         public TranslationService(
             ApplicationDbContext context,
@@ -112,6 +119,7 @@ namespace hOps.web.Services.Localization
             var normalizedField = string.IsNullOrWhiteSpace(field) ? "General" : field.Trim();
             var hash = ComputeHash(sourceText);
             var cacheKey = BuildCacheKey(normalizedEntityType, normalizedEntityId, normalizedField, normalizedSource, normalizedTarget, hash);
+            var sanitizedSource = ProtectTranslationTokens(sourceText, out var placeholderMap);
 
             if (_memoryCache.TryGetValue(cacheKey, out string? cachedValue))
             {
@@ -134,12 +142,10 @@ namespace hOps.web.Services.Localization
                     return existing.TranslatedTextValue;
                 }
 
-                var translated = await _translationProvider.TranslateAsync(sourceText, normalizedSource, normalizedTarget, cancellationToken);
-                if (string.IsNullOrWhiteSpace(translated))
-                {
-                    CacheTranslation(cacheKey, sourceText);
-                    return sourceText;
-                }
+                var translated = await _translationProvider.TranslateAsync(sanitizedSource, normalizedSource, normalizedTarget, cancellationToken);
+                var restoredTranslation = RestoreTranslationTokens(
+                    string.IsNullOrWhiteSpace(translated) ? sourceText : translated!,
+                    placeholderMap);
 
                 if (existing == null)
                 {
@@ -152,7 +158,7 @@ namespace hOps.web.Services.Localization
                         TargetLanguage = normalizedTarget,
                         SourceText = sourceText,
                         SourceTextHash = hash,
-                        TranslatedTextValue = translated,
+                        TranslatedTextValue = restoredTranslation,
                         LastUpdatedUtc = DateTime.UtcNow
                     };
                     _context.TranslatedTexts.Add(existing);
@@ -162,14 +168,14 @@ namespace hOps.web.Services.Localization
                     existing.SourceText = sourceText;
                     existing.SourceTextHash = hash;
                     existing.SourceLanguage = normalizedSource;
-                    existing.TranslatedTextValue = translated;
+                    existing.TranslatedTextValue = restoredTranslation;
                     existing.LastUpdatedUtc = DateTime.UtcNow;
                     _context.TranslatedTexts.Update(existing);
                 }
 
                 await _context.SaveChangesAsync(cancellationToken);
-                CacheTranslation(cacheKey, translated);
-                return translated;
+                CacheTranslation(cacheKey, restoredTranslation);
+                return restoredTranslation;
             }
             catch (Exception ex)
             {
@@ -229,6 +235,56 @@ namespace hOps.web.Services.Localization
             };
 
             _memoryCache.Set(cacheKey, value, options);
+        }
+
+        private static string ProtectTranslationTokens(string input, out Dictionary<string, string> placeholderMap)
+        {
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            placeholderMap = map;
+            if (string.IsNullOrEmpty(input))
+            {
+                return input;
+            }
+
+            var tokenToPlaceholder = new Dictionary<string, string>(StringComparer.Ordinal);
+            var counter = 0;
+
+            string ReplaceTokens(string text, Regex regex)
+            {
+                return regex.Replace(text, match =>
+                {
+                    var token = match.Value;
+                    if (!tokenToPlaceholder.TryGetValue(token, out var placeholder))
+                    {
+                        placeholder = string.Format(CultureInfo.InvariantCulture, PlaceholderFormat, counter++);
+                        tokenToPlaceholder[token] = placeholder;
+                        map[placeholder] = token;
+                    }
+                    return placeholder;
+                });
+            }
+
+            var result = input;
+            result = ReplaceTokens(result, CurlyTokenRegex);
+            result = ReplaceTokens(result, HtmlTagRegex);
+            result = ReplaceTokens(result, UrlRegex);
+            return result;
+        }
+
+        private static string RestoreTranslationTokens(string translated, Dictionary<string, string> placeholderMap)
+        {
+            if (string.IsNullOrEmpty(translated) || placeholderMap.Count == 0)
+            {
+                return translated;
+            }
+
+            var builder = new StringBuilder(translated);
+            foreach (var kvp in placeholderMap)
+            {
+                builder.Replace(kvp.Key, kvp.Value);
+            }
+
+            return builder.ToString();
         }
     }
 }
