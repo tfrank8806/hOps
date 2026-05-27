@@ -1576,7 +1576,7 @@ namespace hOps.web.Controllers
             var startDate = DateTime.UtcNow.Date;
             var endDate = startDate.AddDays(14);
 
-            var assignments = await _context.ScheduleAssignments
+            var assignmentData = await _context.ScheduleAssignments
                 .AsNoTracking()
                 .Where(a =>
                     a.Schedule.PropertyId == propertyId &&
@@ -1586,6 +1586,23 @@ namespace hOps.web.Controllers
                     a.Employee.ApplicationUserId == currentUserId &&
                     a.ShiftDate >= startDate &&
                     a.ShiftDate <= endDate)
+                .OrderBy(a => a.ShiftDate)
+                .Select(a => new
+                {
+                    a.Id,
+                    a.ScheduleId,
+                    a.ScheduleEmployeeId,
+                    a.ShiftDate,
+                    a.ShiftName,
+                    a.ShiftStartTime,
+                    a.ShiftEndTime,
+                    a.Notes,
+                    ScheduleTitle = string.IsNullOrWhiteSpace(a.Schedule.Title) ? "Weekly Schedule" : a.Schedule.Title,
+                    a.Schedule.WeekStartDate
+                })
+                .ToListAsync();
+
+            var orderedAssignments = assignmentData
                 .OrderBy(a => a.ShiftDate)
                 .ThenBy(a => a.ShiftStartTime ?? TimeSpan.Zero)
                 .Take(10)
@@ -1599,12 +1616,12 @@ namespace hOps.web.Controllers
                     ShiftStartTime = a.ShiftStartTime,
                     ShiftEndTime = a.ShiftEndTime,
                     Notes = a.Notes,
-                    ScheduleTitle = string.IsNullOrWhiteSpace(a.Schedule.Title) ? "Weekly Schedule" : a.Schedule.Title,
-                    WeekStartDate = a.Schedule.WeekStartDate
+                    ScheduleTitle = a.ScheduleTitle,
+                    WeekStartDate = a.WeekStartDate
                 })
-                .ToListAsync();
+                .ToList();
 
-            viewModel.MyScheduleShifts = assignments;
+            viewModel.MyScheduleShifts = orderedAssignments;
         }
 
         private async Task PopulatePackageLogAsync(HomeIndexViewModel viewModel, int propertyId)
