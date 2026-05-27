@@ -55,12 +55,6 @@
             : string.Format(CultureInfo.CurrentCulture, Html.Localize("Height: Default ({0}px)"), defaultHeight);
 }
 
-<div class="alert alert-info mb-3">
-    <strong>Culture Debug:</strong>
-    <span>UI=@CultureInfo.CurrentUICulture.Name</span>
-    <span class="ms-2">Localized Sample=@Html.Localize("Work Orders", "Work Orders")</span>
-</div>
-
 <form id="homeLayoutAntiforgery" method="post" class="d-none">
     @Html.AntiForgeryToken()
 </form>

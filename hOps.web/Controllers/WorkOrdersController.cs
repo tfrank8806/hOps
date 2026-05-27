@@ -2011,14 +2011,6 @@ namespace hOps.web.Controllers
                 }
             }
 
-            _logger.LogInformation(
-                "LANGDEBUG WorkOrders/FormData user={UserId} accessible={Accessible} target={Target} deptCount={DeptCount} typeCount={TypeCount}",
-                user?.Id ?? "(anon)",
-                string.Join(",", accessiblePropertySet.Select(id => id.ToString(CultureInfo.InvariantCulture))),
-                string.Join(",", targetPropertySet.Select(id => id.ToString(CultureInfo.InvariantCulture))),
-                departments.Count,
-                workOrderTypes.Count);
-
             var viewModel = new WorkOrdersViewModel
             {
                 WorkOrders = listItems,
@@ -2153,13 +2145,6 @@ namespace hOps.web.Controllers
                     translatedName = type.Name
                 }));
             }
-
-            _logger.LogInformation(
-                "LANGDEBUG WorkOrders/FormOptions user={UserId} properties={Properties} deptCount={DeptCount} typeCount={TypeCount}",
-                user.Id,
-                string.Join(",", propertySet.Select(id => id.ToString(CultureInfo.InvariantCulture))),
-                departmentResults.Count,
-                typeResults.Count);
 
             return Json(new
             {

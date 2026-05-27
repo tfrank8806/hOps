@@ -743,7 +743,6 @@
                 return response.json();
             })
             .then(data => {
-                console.log('Work order form data', data);
                 const unassignedLabel = departmentSelect?.dataset.placeholder || '';
                 updateSelect(workOrderTypeSelect, data?.workOrderTypes || [], workOrderTypeSelect?.dataset.placeholder || '');
                 updateSelect(departmentSelect, data?.departments || [], unassignedLabel);
