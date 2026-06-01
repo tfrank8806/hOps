@@ -1858,10 +1858,12 @@ namespace hOps.web.Controllers
             var departmentQuery = _context.Departments.AsQueryable();
             var workOrderTypeQuery = _context.WorkOrderTypes.AsQueryable();
 
-            if (accessiblePropertySet.Any())
+            var filterPropertySet = targetPropertySet.Any() ? targetPropertySet : accessiblePropertySet;
+
+            if (filterPropertySet.Any())
             {
-                departmentQuery = departmentQuery.Where(d => !d.PropertyId.HasValue || accessiblePropertySet.Contains(d.PropertyId.Value));
-                workOrderTypeQuery = workOrderTypeQuery.Where(t => !t.PropertyId.HasValue || accessiblePropertySet.Contains(t.PropertyId.Value));
+                departmentQuery = departmentQuery.Where(d => !d.PropertyId.HasValue || filterPropertySet.Contains(d.PropertyId.Value));
+                workOrderTypeQuery = workOrderTypeQuery.Where(t => !t.PropertyId.HasValue || filterPropertySet.Contains(t.PropertyId.Value));
             }
             else
             {
@@ -1869,14 +1871,23 @@ namespace hOps.web.Controllers
                 workOrderTypeQuery = workOrderTypeQuery.Where(_ => false);
             }
 
-            var departments = await departmentQuery
-                .OrderBy(d => d.Name)
-                .AsNoTracking()
-                .ToListAsync();
-            var workOrderTypes = await workOrderTypeQuery
-                .OrderBy(t => t.Name)
-                .AsNoTracking()
-                .ToListAsync();
+            var departments = (await departmentQuery
+                    .OrderBy(d => d.Name)
+                    .ThenByDescending(d => d.PropertyId.HasValue)
+                    .ThenBy(d => d.PropertyId)
+                    .AsNoTracking()
+                    .ToListAsync())
+                .DistinctBy(d => NormalizeFilterName(d.Name), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var workOrderTypes = (await workOrderTypeQuery
+                    .OrderBy(t => t.Name)
+                    .ThenByDescending(t => t.PropertyId.HasValue)
+                    .ThenBy(t => t.PropertyId)
+                    .AsNoTracking()
+                    .ToListAsync())
+                .DistinctBy(t => NormalizeFilterName(t.Name), StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
             var creatorFilters = new HashSet<string>(filters.CreatorIds, StringComparer.OrdinalIgnoreCase);
 
@@ -2064,19 +2075,33 @@ namespace hOps.web.Controllers
             var isDefaultLanguage = string.Equals(activeLanguage, _translationService.DefaultLanguage, StringComparison.OrdinalIgnoreCase);
             var cancellationToken = HttpContext.RequestAborted;
 
-            var departments = await _context.Departments
+            var departmentCandidates = await _context.Departments
                 .AsNoTracking()
                 .Where(d => !d.PropertyId.HasValue || propertySet.Contains(d.PropertyId.Value))
                 .OrderBy(d => d.Name)
-                .Select(d => new { d.Id, d.Name })
+                .ThenByDescending(d => d.PropertyId.HasValue)
+                .ThenBy(d => d.PropertyId)
+                .Select(d => new { d.Id, d.Name, d.PropertyId })
                 .ToListAsync(cancellationToken);
 
-            var workOrderTypes = await _context.WorkOrderTypes
+            var workOrderTypeCandidates = await _context.WorkOrderTypes
                 .AsNoTracking()
                 .Where(t => !t.PropertyId.HasValue || propertySet.Contains(t.PropertyId.Value))
                 .OrderBy(t => t.Name)
-                .Select(t => new { t.Id, t.Name })
+                .ThenByDescending(t => t.PropertyId.HasValue)
+                .ThenBy(t => t.PropertyId)
+                .Select(t => new { t.Id, t.Name, t.PropertyId })
                 .ToListAsync(cancellationToken);
+
+            var departments = departmentCandidates
+                .DistinctBy(d => NormalizeFilterName(d.Name), StringComparer.OrdinalIgnoreCase)
+                .Select(d => new { d.Id, d.Name })
+                .ToList();
+
+            var workOrderTypes = workOrderTypeCandidates
+                .DistinctBy(t => NormalizeFilterName(t.Name), StringComparer.OrdinalIgnoreCase)
+                .Select(t => new { t.Id, t.Name })
+                .ToList();
 
             var departmentResults = new List<object>(departments.Count);
             var typeResults = new List<object>(workOrderTypes.Count);
@@ -2163,6 +2188,13 @@ namespace hOps.web.Controllers
             return fallbackRouteValues == null
                 ? RedirectToAction(nameof(Index))
                 : RedirectToAction(nameof(Index), fallbackRouteValues);
+        }
+
+        private static string NormalizeFilterName(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? string.Empty
+                : value.Trim();
         }
 
         private int? GetCurrentPropertyId()
