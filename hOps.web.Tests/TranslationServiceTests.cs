@@ -36,7 +36,9 @@ namespace hOps.web.Tests
                 Path.Combine(_contentRoot, "Localization", "static.es.json"),
                 """
                 {
-                  "Hello": "Hola"
+                  "Hello": "Hola",
+                  "Lost & Found": "Objetos perdidos",
+                  "Package & Mail Log": "Registro de paquetes y correo"
                 }
                 """);
 
@@ -67,6 +69,19 @@ namespace hOps.web.Tests
         {
             var result = _translationService.Translate("Hello", LanguageConstants.Spanish, "Hello");
             Assert.Equal("Hola", result);
+        }
+
+        [Fact]
+        public void Translate_HandlesAmpersandsInKeysAndFallbacks()
+        {
+            var spanishLostFound = _translationService.Translate("Lost & Found", LanguageConstants.Spanish, "Lost & Found");
+            Assert.Equal("Objetos perdidos", spanishLostFound);
+
+            var englishPackageMail = _translationService.Translate("Package & Mail Log", LanguageConstants.English, "Package & Mail Log");
+            Assert.Equal("Package & Mail Log", englishPackageMail);
+
+            var encoded = System.Text.Encodings.Web.HtmlEncoder.Default.Encode(englishPackageMail);
+            Assert.Equal("Package &amp; Mail Log", encoded);
         }
 
         [Fact]

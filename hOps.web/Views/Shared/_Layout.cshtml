@@ -423,12 +423,12 @@
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link @(currentController == "LostAndFound" ? "active" : string.Empty)" asp-controller="LostAndFound" asp-action="Index">
-                                    <span class="sidebar-text">@Html.Localize("Lost &amp; Found")</span>
+                                    <span class="sidebar-text">@Html.Localize("Lost & Found")</span>
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link @(currentController == "MailLog" ? "active" : string.Empty)" asp-controller="MailLog" asp-action="Index">
-                                    <span class="sidebar-text">@Html.Localize("Package &amp; Mail Log")</span>
+                                    <span class="sidebar-text">@Html.Localize("Package & Mail Log")</span>
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -625,7 +625,7 @@
                 <div class="todo-sidebar-inner">
                     <div class="todo-sidebar-header">
                         <h6 class="mb-0">@Html.Localize("To-Do")</h6>
-                        <small class="text-muted">@Html.Localize("Your assignments &amp; reminders")</small>
+                        <small class="text-muted">@Html.Localize("Your assignments & reminders")</small>
                     </div>
                     <div class="todo-sidebar-body">
                         @if (!string.IsNullOrWhiteSpace(toDoMessage))
