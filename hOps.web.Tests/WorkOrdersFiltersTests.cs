@@ -124,6 +124,26 @@ public sealed class WorkOrdersFiltersTests
             typeNames.Count);
     }
 
+    [Fact]
+    public async Task Print_ReturnsFilteredWorkOrdersView()
+    {
+        await using var scope = await WorkOrdersFiltersTestScope.CreateAsync();
+        await scope.AddWorkOrderAsync(scope.Property1, "101", "Fix sink", "New");
+        await scope.AddWorkOrderAsync(scope.Property2, "202", "Fix lock", "New");
+
+        var result = await scope.Controller.Print(new WorkOrderFilterInput
+        {
+            PropertyIds = new List<int> { scope.Property1.Id }
+        });
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<WorkOrdersViewModel>(view.Model);
+        var order = Assert.Single(model.WorkOrders);
+        Assert.Equal("101", order.Location);
+        Assert.Equal("Fix sink", order.Issue);
+        Assert.Contains(scope.Property1.Id, model.Filters.PropertyIds);
+    }
+
     private static IEnumerable<object> ExtractAnonymousList(object source, string propertyName)
     {
         var property = source.GetType().GetProperty(propertyName);
@@ -307,6 +327,26 @@ public sealed class WorkOrdersFiltersTests
 
             var task = (Task<WorkOrdersViewModel>)_buildViewModelMethod.Invoke(Controller, new object?[] { filters, null })!;
             return await task.ConfigureAwait(false);
+        }
+
+        public async Task AddWorkOrderAsync(Property property, string location, string issue, string status)
+        {
+            DbContext.WorkOrders.Add(new WorkOrder
+            {
+                Location = location,
+                Issue = issue,
+                Status = status,
+                DueDate = DateTime.UtcNow.Date,
+                CreatedAt = DateTime.UtcNow,
+                CreatedById = User.Id,
+                CreatedBy = User,
+                Properties = new List<WorkOrderProperty>
+                {
+                    new() { PropertyId = property.Id, Property = property }
+                }
+            });
+
+            await DbContext.SaveChangesAsync();
         }
 
         public async ValueTask DisposeAsync()

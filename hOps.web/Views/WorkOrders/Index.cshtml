@@ -73,6 +73,7 @@
 
     var filterQueryString = filterQuery.ToQueryString().ToString();
     var exportUrl = $"{Url.Action("Export")}{filterQueryString}";
+    var printUrl = $"{Url.Action("Print")}{filterQueryString}";
     var indexUrlWithFilters = $"{Url.Action("Index")}{filterQueryString}";
     var hasAssigneeOptions = Model.AssigneeOptions != null && Model.AssigneeOptions.Count > 0;
     var hasActiveFilters =
@@ -823,9 +824,9 @@
                         </form>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" id="printWorkOrdersButton">
+                        <a href="@printUrl" class="btn btn-outline-secondary btn-sm" id="printWorkOrdersButton" target="_blank" rel="noopener">
                             Print Current List
-                        </button>
+                        </a>
                         <a href="@exportUrl" class="btn btn-outline-success btn-sm">
                             Export to Excel
                         </a>
@@ -1473,13 +1474,6 @@
     <script src="~/js/workorders.js" asp-append-version="true"></script>
     <script>
         (function () {
-            const printButton = document.getElementById('printWorkOrdersButton');
-            if (printButton) {
-                printButton.addEventListener('click', function () {
-                    window.print();
-                });
-            }
-
             const filtersCollapse = document.getElementById('workOrdersFiltersCollapse');
             const filtersToggleButton = document.getElementById('toggleFiltersButton');
             if (filtersCollapse && filtersToggleButton) {

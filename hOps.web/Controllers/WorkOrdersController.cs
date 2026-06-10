@@ -267,6 +267,13 @@ namespace hOps.web.Controllers
             return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> Print([FromQuery] WorkOrderFilterInput filters)
+        {
+            var viewModel = await BuildViewModelAsync(filters, null);
+            return View(viewModel);
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind(Prefix = "Form")] WorkOrderFormViewModel form)

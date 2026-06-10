@@ -1,0 +1,320 @@
+@using System
+@using System.Globalization
+@using hOps.web.Utilities
+@model hOps.web.ViewModels.WorkOrders.WorkOrdersViewModel
+
+@{
+    Layout = null;
+    var title = Html.Localize("WorkOrders.Print.Title", "Work Orders - Print").ToString();
+    var generatedLabel = Html.Localize("WorkOrders.Print.Generated", "Generated").ToString();
+    var countLabel = Html.Localize("WorkOrders.Print.Count", "Work orders").ToString();
+    var printLabel = Html.Localize("WorkOrders.Print.Button", "Print").ToString();
+    var closeLabel = Html.Localize("Close", "Close").ToString();
+    var printUnavailableText = Html.Localize("WorkOrders.Print.Unavailable", "Printing is not available in this browser. Use the browser menu or Ctrl+P to print this page.").ToString();
+    var noRowsText = Html.Localize("WorkOrders.Table.Empty", "No work orders found. Adjust filters or create a new work order.").ToString();
+    var statusHeaderLabel = Html.Localize("WorkOrders.Columns.Status", "Status").ToString();
+    var locationHeaderLabel = Html.Localize("WorkOrders.Columns.Location", "Location").ToString();
+    var departmentHeaderLabel = Html.Localize("WorkOrders.Columns.Department", "Department").ToString();
+    var assignedHeaderLabel = Html.Localize("WorkOrders.Columns.Assigned", "Assigned").ToString();
+    var typeHeaderLabel = Html.Localize("WorkOrders.Columns.Type", "Type").ToString();
+    var issueHeaderLabel = Html.Localize("WorkOrders.Columns.Issue", "Issue").ToString();
+    var detailsHeaderLabel = Html.Localize("WorkOrders.Columns.Details", "Details").ToString();
+    var dueHeaderLabel = Html.Localize("WorkOrders.Columns.Due", "Due").ToString();
+    var createdHeaderLabel = Html.Localize("WorkOrders.Columns.Created", "Created").ToString();
+    var attachmentsHeaderLabel = Html.Localize("WorkOrders.Columns.Attachments", "Attachments").ToString();
+    var unassignedLabel = Html.Localize("WorkOrders.Unassigned", "Unassigned").ToString();
+    var unspecifiedTypeLabel = Html.Localize("WorkOrders.Type.Unspecified", "Unspecified").ToString();
+    var noDetailsLabel = Html.Localize("No details", "No details").ToString();
+    var generatedAt = TimeZoneService.ConvertToUserTime(DateTime.UtcNow);
+}
+
+<!doctype html>
+<html lang="@CultureInfo.CurrentUICulture.Name">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@title</title>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 13px;
+            color: #111827;
+        }
+
+        body {
+            margin: 0;
+            background: #f8fafc;
+        }
+
+        .page {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        h1 {
+            margin: 0 0 4px;
+            font-size: 24px;
+        }
+
+        .meta {
+            color: #4b5563;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            appearance: none;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: #fff;
+            color: #111827;
+            cursor: pointer;
+            padding: 8px 12px;
+            text-decoration: none;
+            font: inherit;
+        }
+
+        .btn-primary {
+            border-color: #0d6efd;
+            background: #0d6efd;
+            color: #fff;
+        }
+
+        .alert {
+            margin-bottom: 16px;
+            padding: 10px 12px;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            background: #fffbeb;
+            color: #92400e;
+        }
+
+        .d-none {
+            display: none;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            table-layout: fixed;
+        }
+
+        th,
+        td {
+            border: 1px solid #d1d5db;
+            padding: 6px 8px;
+            text-align: left;
+            vertical-align: top;
+            word-break: break-word;
+        }
+
+        th {
+            background: #f3f4f6;
+            font-weight: 700;
+        }
+
+        .badge {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 2px 7px;
+            background: #e5e7eb;
+            color: #111827;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .status-badge {
+            color: #fff;
+        }
+
+        .muted {
+            color: #6b7280;
+        }
+
+        .nowrap {
+            white-space: nowrap;
+        }
+
+        @@page {
+            size: landscape;
+            margin: 0.45in;
+        }
+
+        @@media print {
+            body {
+                background: #fff;
+            }
+
+            .page {
+                max-width: none;
+                padding: 0;
+            }
+
+            .actions,
+            .alert {
+                display: none !important;
+            }
+
+            table {
+                font-size: 10px;
+            }
+
+            th,
+            td {
+                padding: 4px 5px;
+            }
+
+            a {
+                color: inherit;
+                text-decoration: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <div class="toolbar">
+            <div>
+                <h1>@Html.Localize("WorkOrders.Title", "Work Orders")</h1>
+                <div class="meta">
+                    @generatedLabel @generatedAt.ToString("g", CultureInfo.CurrentCulture)
+                    <span aria-hidden="true"> &bull; </span>
+                    @Model.WorkOrders.Count @countLabel
+                </div>
+            </div>
+            <div class="actions">
+                <button type="button" class="btn btn-primary" data-print-now>@printLabel</button>
+                <button type="button" class="btn" data-close-print>@closeLabel</button>
+            </div>
+        </div>
+
+        <div class="alert d-none" role="alert" data-print-error>
+            @printUnavailableText
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 8%;">@statusHeaderLabel</th>
+                    <th style="width: 9%;">@locationHeaderLabel</th>
+                    <th style="width: 10%;">@departmentHeaderLabel</th>
+                    <th style="width: 10%;">@assignedHeaderLabel</th>
+                    <th style="width: 9%;">@typeHeaderLabel</th>
+                    <th style="width: 17%;">@issueHeaderLabel</th>
+                    <th style="width: 19%;">@detailsHeaderLabel</th>
+                    <th style="width: 7%;">@dueHeaderLabel</th>
+                    <th style="width: 7%;">@createdHeaderLabel</th>
+                    <th style="width: 4%;">@attachmentsHeaderLabel</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.WorkOrders.Any())
+                {
+                    <tr>
+                        <td colspan="10" class="muted">@noRowsText</td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var order in Model.WorkOrders)
+                    {
+                        var statusDisplay = string.IsNullOrWhiteSpace(order.TranslatedStatusLabel)
+                            ? (string.IsNullOrWhiteSpace(order.StatusLabel) ? order.Status : order.StatusLabel)
+                            : order.TranslatedStatusLabel;
+                        var locationDisplay = string.IsNullOrWhiteSpace(order.TranslatedLocation) ? order.Location : order.TranslatedLocation;
+                        var departmentDisplay = string.IsNullOrWhiteSpace(order.TranslatedDepartment) ? unassignedLabel : order.TranslatedDepartment;
+                        var assignedDisplay = string.IsNullOrWhiteSpace(order.TranslatedAssignedTo)
+                            ? (string.IsNullOrWhiteSpace(order.AssignedToName) ? unassignedLabel : order.AssignedToName)
+                            : order.TranslatedAssignedTo;
+                        var typeDisplay = string.IsNullOrWhiteSpace(order.TranslatedWorkOrderType)
+                            ? (string.IsNullOrWhiteSpace(order.WorkOrderType) ? unspecifiedTypeLabel : order.WorkOrderType)
+                            : order.TranslatedWorkOrderType;
+                        var issueDisplay = string.IsNullOrWhiteSpace(order.TranslatedIssue) ? order.Issue : order.TranslatedIssue;
+                        var detailsDisplay = string.IsNullOrWhiteSpace(order.TranslatedDetails) ? order.Details : order.TranslatedDetails;
+                        var createdLocal = TimeZoneService.ConvertToUserTime(order.CreatedAt);
+                        <tr>
+                            <td>
+                                <span class="badge status-badge" style="background-color:@order.StatusColor">@statusDisplay</span>
+                                @if (!string.IsNullOrWhiteSpace(order.PriorityLabel))
+                                {
+                                    <div class="muted">@order.PriorityLabel</div>
+                                }
+                            </td>
+                            <td>@locationDisplay</td>
+                            <td>@departmentDisplay</td>
+                            <td>@assignedDisplay</td>
+                            <td>@typeDisplay</td>
+                            <td>@Html.Raw(MentionMarkupFormatter.ToHtml(issueDisplay ?? string.Empty))</td>
+                            <td>
+                                @if (string.IsNullOrWhiteSpace(detailsDisplay))
+                                {
+                                    <span class="muted">@noDetailsLabel</span>
+                                }
+                                else
+                                {
+                                    @Html.Raw(MentionMarkupFormatter.ToHtml(detailsDisplay))
+                                }
+                            </td>
+                            <td class="nowrap">
+                                @order.DueDate.ToString("MM-dd-yy", CultureInfo.CurrentCulture)
+                                @if (!string.IsNullOrWhiteSpace(order.SlaSummary))
+                                {
+                                    <div class="muted">@order.SlaSummary</div>
+                                }
+                            </td>
+                            <td class="nowrap">@createdLocal.ToString("MM-dd-yy", CultureInfo.CurrentCulture)</td>
+                            <td class="nowrap">@order.Attachments.Count</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </main>
+
+    <script>
+        (function () {
+            const error = document.querySelector('[data-print-error]');
+            const showPrintError = function () {
+                if (error) {
+                    error.classList.remove('d-none');
+                }
+            };
+            const printPage = function () {
+                if (typeof window.print !== 'function') {
+                    showPrintError();
+                    return;
+                }
+
+                try {
+                    window.print();
+                } catch (err) {
+                    showPrintError();
+                }
+            };
+
+            document.querySelector('[data-print-now]')?.addEventListener('click', printPage);
+            document.querySelector('[data-close-print]')?.addEventListener('click', function () {
+                window.close();
+            });
+
+            window.addEventListener('load', function () {
+                window.setTimeout(printPage, 150);
+            });
+        })();
+    </script>
+</body>
+</html>
